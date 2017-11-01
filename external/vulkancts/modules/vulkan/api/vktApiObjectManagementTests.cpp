@@ -302,6 +302,11 @@ T alignToPowerOfTwo (T value, T align)
 	return (value + align - T(1)) & ~(align - T(1));
 }
 
+inline bool hasDeviceExtension (Context& context, const string& name)
+{
+	return de::contains(context.getDeviceExtensions().begin(), context.getDeviceExtensions().end(), name);
+}
+
 VkDeviceSize getPageTableSize (const PlatformMemoryLimits& limits, VkDeviceSize allocationSize)
 {
 	VkDeviceSize	totalSize	= 0;
@@ -316,8 +321,6 @@ VkDeviceSize getPageTableSize (const PlatformMemoryLimits& limits, VkDeviceSize 
 
 	return totalSize;
 }
-
-
 
 size_t getCurrentSystemMemoryUsage (const AllocationCallbackRecorder& allocRecoder)
 {
@@ -416,6 +419,7 @@ enum
 	MAX_CONCURRENT_INSTANCES		= 32,
 	MAX_CONCURRENT_DEVICES			= 32,
 	MAX_CONCURRENT_SYNC_PRIMITIVES	= 100,
+	MAX_CONCURRENT_PIPELINE_CACHES	= 128,
 	DEFAULT_MAX_CONCURRENT_OBJECTS	= 16*1024,
 };
 
@@ -1128,7 +1132,7 @@ struct PipelineCache
 
 	static deUint32 getMaxConcurrent (Context& context, const Parameters& params)
 	{
-		return getSafeObjectCount<PipelineCache>(context, params, DEFAULT_MAX_CONCURRENT_OBJECTS);
+		return getSafeObjectCount<PipelineCache>(context, params, MAX_CONCURRENT_PIPELINE_CACHES);
 	}
 
 	static Move<VkPipelineCache> create (const Environment& env, const Resources&, const Parameters&)
@@ -2258,6 +2262,7 @@ tcu::TestStatus createMaxConcurrentTest (Context& context, typename Object::Para
 			context.getTestContext().touchWatchdog();
 	}
 
+	context.getTestContext().touchWatchdog();
 	objects.clear();
 
 	return tcu::TestStatus::pass("Ok");
@@ -2513,18 +2518,25 @@ tcu::TestStatus allocCallbackFailTest (Context& context, typename Object::Parame
 	if (numPassingAllocs == 0)
 		return tcu::TestStatus(QP_TEST_RESULT_QUALITY_WARNING, "Allocation callbacks not called");
 	else if (numPassingAllocs == maxTries)
-		return tcu::TestStatus(QP_TEST_RESULT_COMPATIBILITY_WARNING, "Max iter count reached; OOM testing incomplete");
+	{
+		context.getTestContext().getLog()
+			<< TestLog::Message << "WARNING: Maximum iteration count (" << maxTries << ") reached without object construction passing. "
+								<< "OOM testing incomplete, use --deqp-test-iteration-count= to test with higher limit." << TestLog::EndMessage;
+		return tcu::TestStatus(QP_TEST_RESULT_PASS, "Max iter count reached");
+	}
 	else
 		return tcu::TestStatus::pass("Ok");
 }
 
 // Determine whether an API call sets the invalid handles to NULL (true) or leaves them undefined or not modified (false)
-template<typename T> inline bool isNullHandleOnAllocationFailure			 (void) { return false; }
-template<>			 inline bool isNullHandleOnAllocationFailure<VkPipeline> (void) { return true;  }
+template<typename T> inline bool isNullHandleOnAllocationFailure				  (Context&)		 { return false; }
+template<>			 inline bool isNullHandleOnAllocationFailure<VkCommandBuffer> (Context& context) { return hasDeviceExtension(context, "VK_KHR_maintenance1"); }
+template<>			 inline bool isNullHandleOnAllocationFailure<VkDescriptorSet> (Context& context) { return hasDeviceExtension(context, "VK_KHR_maintenance1"); }
+template<>			 inline bool isNullHandleOnAllocationFailure<VkPipeline>	  (Context&)		 { return true;  }
 
-template<typename T> inline bool isPooledObject								 (void) { return false; };
-template<>			 inline bool isPooledObject<VkCommandBuffer>			 (void) { return true;  };
-template<>			 inline bool isPooledObject<VkDescriptorSet>			 (void) { return true;  };
+template<typename T> inline bool isPooledObject					 (void) { return false; };
+template<>			 inline bool isPooledObject<VkCommandBuffer> (void) { return true;  };
+template<>			 inline bool isPooledObject<VkDescriptorSet> (void) { return true;  };
 
 template<typename Object>
 tcu::TestStatus allocCallbackFailMultipleObjectsTest (Context& context, typename Object::Parameters params)
@@ -2532,7 +2544,7 @@ tcu::TestStatus allocCallbackFailMultipleObjectsTest (Context& context, typename
 	typedef SharedPtr<Move<typename Object::Type> >	ObjectTypeSp;
 
 	static const deUint32	numObjects			= 4;
-	const bool				expectNullHandles	= isNullHandleOnAllocationFailure<typename Object::Type>();
+	const bool				expectNullHandles	= isNullHandleOnAllocationFailure<typename Object::Type>(context);
 	deUint32				numPassingAllocs	= 0;
 
 	{

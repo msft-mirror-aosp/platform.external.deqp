@@ -105,7 +105,7 @@ class SourcePackage (Source):
 		dstPath		= os.path.join(EXTERNAL_DIR, self.baseDir, self.archiveDir, self.filename)
 
 		if checksum != self.checksum:
-			raise Exception("Checksum mismatch for %s, exepected %s, got %s" % (self.filename, self.checksum, checksum))
+			raise Exception("Checksum mismatch for %s, expected %s, got %s" % (self.filename, self.checksum, checksum))
 
 		if not os.path.exists(os.path.dirname(dstPath)):
 			os.mkdir(os.path.dirname(dstPath))
@@ -173,9 +173,9 @@ def postExtractLibpng (path):
 
 PACKAGES = [
 	SourcePackage(
-		"http://zlib.net/zlib-1.2.10.tar.gz",
-		"zlib-1.2.10.tar.gz",
-		"8d7e9f698ce48787b6e1c67e6bff79e487303e66077e25cb9784ac8835978017",
+		"http://zlib.net/zlib-1.2.11.tar.gz",
+		"zlib-1.2.11.tar.gz",
+		"c3e5e9fdd5004dcb542feda5ee4f0ff0744628baf8ed2dd5d66f8ca1197cb1a1",
 		"zlib"),
 	SourcePackage(
 		"http://prdownloads.sourceforge.net/libpng/libpng-1.6.27.tar.gz",
@@ -185,15 +185,15 @@ PACKAGES = [
 		postExtract = postExtractLibpng),
 	GitRepo(
 		"https://github.com/KhronosGroup/SPIRV-Tools.git",
-		"5c19de25107d496a15c7869b3e1dab0a0f85913d",
+		"0b0454c42c6b6f6746434bd5c78c5c70f65d9c51",
 		"spirv-tools"),
 	GitRepo(
 		"https://github.com/KhronosGroup/glslang.git",
-		"e3aa654c4b0c761b28d7864192ca8ceea6faf70a",
+		"a5c5fb61180e8703ca85f36d618f98e16dc317e2",
 		"glslang"),
 	GitRepo(
 		"https://github.com/KhronosGroup/SPIRV-Headers.git",
-		"bd47a9abaefac00be692eae677daed1b977e625c",
+		"2bf02308656f97898c5f7e433712f21737c61e4e",
 		"spirv-headers"),
 ]
 

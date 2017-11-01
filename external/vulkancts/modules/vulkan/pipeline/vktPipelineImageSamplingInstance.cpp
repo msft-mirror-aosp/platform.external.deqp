@@ -32,6 +32,7 @@
 #include "vkRefUtil.hpp"
 #include "tcuTexLookupVerifier.hpp"
 #include "tcuTextureUtil.hpp"
+#include "tcuTestLog.hpp"
 #include "deSTLUtil.hpp"
 
 namespace vkt
@@ -45,6 +46,65 @@ using de::UniquePtr;
 
 namespace
 {
+de::MovePtr<Allocation> allocateBuffer (const InstanceInterface&	vki,
+										const DeviceInterface&		vkd,
+										const VkPhysicalDevice&		physDevice,
+										const VkDevice				device,
+										const VkBuffer&				buffer,
+										const MemoryRequirement		requirement,
+										Allocator&					allocator,
+										AllocationKind				allocationKind)
+{
+	switch (allocationKind)
+	{
+		case ALLOCATION_KIND_SUBALLOCATED:
+		{
+			const VkMemoryRequirements	memoryRequirements	= getBufferMemoryRequirements(vkd, device, buffer);
+
+			return allocator.allocate(memoryRequirements, requirement);
+		}
+
+		case ALLOCATION_KIND_DEDICATED:
+		{
+			return allocateDedicated(vki, vkd, physDevice, device, buffer, requirement);
+		}
+
+		default:
+		{
+			TCU_THROW(InternalError, "Invalid allocation kind");
+		}
+	}
+}
+
+de::MovePtr<Allocation> allocateImage (const InstanceInterface&		vki,
+									   const DeviceInterface&		vkd,
+									   const VkPhysicalDevice&		physDevice,
+									   const VkDevice				device,
+									   const VkImage&				image,
+									   const MemoryRequirement		requirement,
+									   Allocator&					allocator,
+									   AllocationKind				allocationKind)
+{
+	switch (allocationKind)
+	{
+		case ALLOCATION_KIND_SUBALLOCATED:
+		{
+			const VkMemoryRequirements	memoryRequirements	= getImageMemoryRequirements(vkd, device, image);
+
+			return allocator.allocate(memoryRequirements, requirement);
+		}
+
+		case ALLOCATION_KIND_DEDICATED:
+		{
+			return allocateDedicated(vki, vkd, physDevice, device, image, requirement);
+		}
+
+		default:
+		{
+			TCU_THROW(InternalError, "Invalid allocation kind");
+		}
+	}
+}
 
 static VkImageType getCompatibleImageType (VkImageViewType viewType)
 {
@@ -134,8 +194,10 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 											  float								samplerLod,
 											  const std::vector<Vertex4Tex4>&	vertices,
 											  VkDescriptorType					samplingType,
-											  int								imageCount)
+											  int								imageCount,
+											  AllocationKind					allocationKind)
 	: vkt::TestInstance		(context)
+	, m_allocationKind		(allocationKind)
 	, m_samplingType		(samplingType)
 	, m_imageViewType		(imageViewType)
 	, m_imageFormat			(imageFormat)
@@ -150,7 +212,9 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 	, m_colorFormat			(VK_FORMAT_R8G8B8A8_UNORM)
 	, m_vertices			(vertices)
 {
+	const InstanceInterface&	vki						= context.getInstanceInterface();
 	const DeviceInterface&		vk						= context.getDeviceInterface();
+	const VkPhysicalDevice		physDevice				= context.getPhysicalDevice();
 	const VkDevice				vkDevice				= context.getDevice();
 	const VkQueue				queue					= context.getUniversalQueue();
 	const deUint32				queueFamilyIndex		= context.getUniversalQueueFamilyIndex();
@@ -159,6 +223,9 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 
 	if (!isSupportedSamplableFormat(context.getInstanceInterface(), context.getPhysicalDevice(), imageFormat))
 		throw tcu::NotSupportedError(std::string("Unsupported format for sampling: ") + getFormatName(imageFormat));
+
+	if ((deUint32)imageCount > context.getDeviceProperties().limits.maxColorAttachments)
+		throw tcu::NotSupportedError(std::string("Unsupported render target count: ") + de::toString(imageCount));
 
 	if ((samplerParams.minFilter == VK_FILTER_LINEAR ||
 		 samplerParams.magFilter == VK_FILTER_LINEAR ||
@@ -198,6 +265,14 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 
 	if (imageViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY && !context.getDeviceFeatures().imageCubeArray)
 		TCU_THROW(NotSupportedError, "imageCubeArray feature is not supported");
+
+	if (m_allocationKind == ALLOCATION_KIND_DEDICATED)
+	{
+		const std::string extensionName("VK_KHR_dedicated_allocation");
+
+		if (!de::contains(context.getDeviceExtensions().begin(), context.getDeviceExtensions().end(), extensionName))
+			TCU_THROW(NotSupportedError, std::string(extensionName + " is not supported").c_str());
+	}
 
 	// Create texture images, views and samplers
 	{
@@ -242,7 +317,7 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 		for (int imgNdx = 0; imgNdx < m_imageCount; ++imgNdx)
 		{
 			m_images[imgNdx] = SharedImagePtr(new UniqueImage(createImage(vk, vkDevice, &imageParams)));
-			m_imageAllocs[imgNdx] = SharedAllocPtr(new UniqueAlloc(memAlloc.allocate(getImageMemoryRequirements(vk, vkDevice, **m_images[imgNdx]), MemoryRequirement::Any)));
+			m_imageAllocs[imgNdx] = SharedAllocPtr(new UniqueAlloc(allocateImage(vki, vk, physDevice, vkDevice, **m_images[imgNdx], MemoryRequirement::Any, memAlloc, m_allocationKind)));
 			VK_CHECK(vk.bindImageMemory(vkDevice, **m_images[imgNdx], (*m_imageAllocs[imgNdx])->getMemory(), (*m_imageAllocs[imgNdx])->getOffset()));
 
 			// Upload texture data
@@ -347,7 +422,7 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 		for (int imgNdx = 0; imgNdx < m_imageCount; ++imgNdx)
 		{
 			m_colorImages[imgNdx] = SharedImagePtr(new UniqueImage(createImage(vk, vkDevice, &colorImageParams)));
-			m_colorImageAllocs[imgNdx] = SharedAllocPtr(new UniqueAlloc(memAlloc.allocate(getImageMemoryRequirements(vk, vkDevice, **m_colorImages[imgNdx]), MemoryRequirement::Any)));
+			m_colorImageAllocs[imgNdx] = SharedAllocPtr(new UniqueAlloc(allocateImage(vki, vk, physDevice, vkDevice, **m_colorImages[imgNdx], MemoryRequirement::Any, memAlloc, m_allocationKind)));
 			VK_CHECK(vk.bindImageMemory(vkDevice, **m_colorImages[imgNdx], (*m_colorImageAllocs[imgNdx])->getMemory(), (*m_colorImageAllocs[imgNdx])->getOffset()));
 
 			const VkImageViewCreateInfo colorAttachmentViewParams =
@@ -681,8 +756,7 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 		DE_ASSERT(vertexBufferSize > 0);
 
 		m_vertexBuffer		= createBuffer(vk, vkDevice, &vertexBufferParams);
-		m_vertexBufferAlloc	= memAlloc.allocate(getBufferMemoryRequirements(vk, vkDevice, *m_vertexBuffer), MemoryRequirement::HostVisible);
-
+		m_vertexBufferAlloc = allocateBuffer(vki, vk, physDevice, vkDevice, *m_vertexBuffer, MemoryRequirement::HostVisible, memAlloc, m_allocationKind);
 		VK_CHECK(vk.bindBufferMemory(vkDevice, *m_vertexBuffer, m_vertexBufferAlloc->getMemory(), m_vertexBufferAlloc->getOffset()));
 
 		// Load vertices into vertex buffer
@@ -691,29 +765,10 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 	}
 
 	// Create command pool
-	{
-		const VkCommandPoolCreateInfo cmdPoolParams =
-		{
-			VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,		// VkStructureType				sType;
-			DE_NULL,										// const void*					pNext;
-			VK_COMMAND_POOL_CREATE_TRANSIENT_BIT,			// VkCommandPoolCreateFlags	flags;
-			queueFamilyIndex								// deUint32					queueFamilyIndex;
-		};
-
-		m_cmdPool = createCommandPool(vk, vkDevice, &cmdPoolParams);
-	}
+	m_cmdPool = createCommandPool(vk, vkDevice, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, queueFamilyIndex);
 
 	// Create command buffer
 	{
-		const VkCommandBufferAllocateInfo cmdBufferAllocateInfo =
-		{
-			VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,	// VkStructureType			sType;
-			DE_NULL,										// const void*				pNext;
-			*m_cmdPool,										// VkCommandPool			commandPool;
-			VK_COMMAND_BUFFER_LEVEL_PRIMARY,				// VkCommandBufferLevel		level;
-			1u,												// deUint32					bufferCount;
-		};
-
 		const VkCommandBufferBeginInfo cmdBufferBeginInfo =
 		{
 			VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,	// VkStructureType					sType;
@@ -722,7 +777,7 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 			(const VkCommandBufferInheritanceInfo*)DE_NULL,
 		};
 
-		const VkClearValue attachmentClearValue = defaultClearValue(m_colorFormat);
+		const std::vector<VkClearValue> attachmentClearValues (m_imageCount, defaultClearValue(m_colorFormat));
 
 		const VkRenderPassBeginInfo renderPassBeginInfo =
 		{
@@ -734,8 +789,8 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 				{ 0, 0 },
 				{ (deUint32)m_renderSize.x(), (deUint32)m_renderSize.y() }
 			},														// VkRect2D				renderArea;
-			1,														// deUint32				clearValueCount;
-			&attachmentClearValue									// const VkClearValue*	pClearValues;
+			static_cast<deUint32>(attachmentClearValues.size()),	// deUint32				clearValueCount;
+			&attachmentClearValues[0]								// const VkClearValue*	pClearValues;
 		};
 
 		std::vector<VkImageMemoryBarrier> preAttachmentBarriers(m_imageCount);
@@ -758,7 +813,7 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 			preAttachmentBarriers[imgNdx].subresourceRange.layerCount		= 1u;
 		}
 
-		m_cmdBuffer = allocateCommandBuffer(vk, vkDevice, &cmdBufferAllocateInfo);
+		m_cmdBuffer = allocateCommandBuffer(vk, vkDevice, *m_cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
 		VK_CHECK(vk.beginCommandBuffer(*m_cmdBuffer, &cmdBufferBeginInfo));
 
@@ -780,16 +835,7 @@ ImageSamplingInstance::ImageSamplingInstance (Context&							context,
 	}
 
 	// Create fence
-	{
-		const VkFenceCreateInfo fenceParams =
-		{
-			VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,	// VkStructureType		sType;
-			DE_NULL,								// const void*			pNext;
-			0u										// VkFenceCreateFlags	flags;
-		};
-
-		m_fence = createFence(vk, vkDevice, &fenceParams);
-	}
+	m_fence = createFence(vk, vkDevice);
 }
 
 ImageSamplingInstance::~ImageSamplingInstance (void)
@@ -1295,6 +1341,79 @@ MovePtr<tcu::Texture3DView> getTexture3DView (const TestTexture& testTexture, co
 	return MovePtr<tcu::Texture3DView>(new tcu::Texture3DView((int)levels.size(), &levels[0]));
 }
 
+bool validateResultImage (const TestTexture&					texture,
+						  const VkImageViewType					imageViewType,
+						  const VkImageSubresourceRange&		subresource,
+						  const tcu::Sampler&					sampler,
+						  const vk::VkComponentMapping&			componentMapping,
+						  const tcu::ConstPixelBufferAccess&	coordAccess,
+						  const tcu::Vec2&						lodBounds,
+						  const tcu::LookupPrecision&			lookupPrecision,
+						  const tcu::Vec4&						lookupScale,
+						  const tcu::Vec4&						lookupBias,
+						  const tcu::ConstPixelBufferAccess&	resultAccess,
+						  const tcu::PixelBufferAccess&			errorAccess)
+{
+	std::vector<tcu::ConstPixelBufferAccess>	levels;
+
+	switch (imageViewType)
+	{
+		case VK_IMAGE_VIEW_TYPE_1D:
+		{
+			UniquePtr<tcu::Texture1DView>			texView(getTexture1DView(texture, subresource, levels));
+
+			return validateResultImage(*texView, sampler, componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
+		}
+
+		case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
+		{
+			UniquePtr<tcu::Texture1DArrayView>		texView(getTexture1DArrayView(texture, subresource, levels));
+
+			return validateResultImage(*texView, sampler, componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
+		}
+
+		case VK_IMAGE_VIEW_TYPE_2D:
+		{
+			UniquePtr<tcu::Texture2DView>			texView(getTexture2DView(texture, subresource, levels));
+
+			return validateResultImage(*texView, sampler, componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
+		}
+
+		case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
+		{
+			UniquePtr<tcu::Texture2DArrayView>		texView(getTexture2DArrayView(texture, subresource, levels));
+
+			return validateResultImage(*texView, sampler, componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
+		}
+
+		case VK_IMAGE_VIEW_TYPE_CUBE:
+		{
+			UniquePtr<tcu::TextureCubeView>			texView(getTextureCubeView(texture, subresource, levels));
+
+			return validateResultImage(*texView, sampler, componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
+		}
+
+		case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
+		{
+			UniquePtr<tcu::TextureCubeArrayView>	texView(getTextureCubeArrayView(texture, subresource, levels));
+
+			return validateResultImage(*texView, sampler, componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
+			break;
+		}
+
+		case VK_IMAGE_VIEW_TYPE_3D:
+		{
+			UniquePtr<tcu::Texture3DView>			texView(getTexture3DView(texture, subresource, levels));
+
+			return validateResultImage(*texView, sampler, componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
+		}
+
+		default:
+			DE_ASSERT(false);
+			return false;
+	}
+}
+
 } // anonymous
 
 tcu::TestStatus ImageSamplingInstance::verifyImage (void)
@@ -1308,6 +1427,7 @@ tcu::TestStatus ImageSamplingInstance::verifyImage (void)
 	ReferenceRenderer					refRenderer				(m_renderSize.x(), m_renderSize.y(), 1, colorFormat, depthStencilFormat, &rrProgram);
 
 	bool								compareOkAll			= true;
+	bool								anyWarnings				= false;
 
 	tcu::Vec4							lookupScale				(1.0f);
 	tcu::Vec4							lookupBias				(0.0f);
@@ -1332,6 +1452,10 @@ tcu::TestStatus ImageSamplingInstance::verifyImage (void)
 		tcu::TextureLevel					errorMask		(tcu::TextureFormat(tcu::TextureFormat::RGBA, tcu::TextureFormat::UNORM_INT8), (int)m_renderSize.x(), (int)m_renderSize.y());
 		const tcu::PixelBufferAccess		errorAccess		= errorMask.getAccess();
 
+		const bool							allowSnorm8Bug	= m_texture->getTextureFormat().type == tcu::TextureFormat::SNORM_INT8 &&
+															  (m_samplerParams.minFilter == VK_FILTER_LINEAR || m_samplerParams.magFilter == VK_FILTER_LINEAR);
+		const bool							isNearestOnly	= (m_samplerParams.minFilter == VK_FILTER_NEAREST && m_samplerParams.magFilter == VK_FILTER_NEAREST);
+
 		tcu::LookupPrecision				lookupPrecision;
 
 		// Set precision requirements - very low for these tests as
@@ -1339,7 +1463,7 @@ tcu::TestStatus ImageSamplingInstance::verifyImage (void)
 		lookupPrecision.coordBits		= tcu::IVec3(17, 17, 17);
 		lookupPrecision.uvwBits			= tcu::IVec3(5, 5, 5);
 		lookupPrecision.colorMask		= tcu::BVec4(true);
-		lookupPrecision.colorThreshold	= tcu::computeFixedPointThreshold(tcu::IVec4(8, 8, 8, 8)) / swizzleScaleBias(lookupScale, m_componentMapping);
+		lookupPrecision.colorThreshold	= tcu::computeFixedPointThreshold(max((tcu::IVec4(8, 8, 8, 8) - (isNearestOnly ? 1 : 2)), tcu::IVec4(0))) / swizzleScaleBias(lookupScale, m_componentMapping);
 
 		if (tcu::isSRGB(m_texture->getTextureFormat()))
 			lookupPrecision.colorThreshold += tcu::Vec4(4.f / 255.f);
@@ -1347,85 +1471,59 @@ tcu::TestStatus ImageSamplingInstance::verifyImage (void)
 		for (int imgNdx = 0; imgNdx < m_imageCount; ++imgNdx)
 		{
 			// Read back result image
-			UniquePtr<tcu::TextureLevel>		result(readColorAttachment(m_context.getDeviceInterface(),
-				m_context.getDevice(),
-				m_context.getUniversalQueue(),
-				m_context.getUniversalQueueFamilyIndex(),
-				m_context.getDefaultAllocator(),
-				**m_colorImages[imgNdx],
-				m_colorFormat,
-				m_renderSize));
-			const tcu::ConstPixelBufferAccess	resultAccess = result->getAccess();
+			UniquePtr<tcu::TextureLevel>		result			(readColorAttachment(m_context.getDeviceInterface(),
+																					 m_context.getDevice(),
+																					 m_context.getUniversalQueue(),
+																					 m_context.getUniversalQueueFamilyIndex(),
+																					 m_context.getDefaultAllocator(),
+																					 **m_colorImages[imgNdx],
+																					 m_colorFormat,
+																					 m_renderSize));
+			const tcu::ConstPixelBufferAccess	resultAccess	= result->getAccess();
+			bool								compareOk		= validateResultImage(*m_texture,
+																					  m_imageViewType,
+																					  subresource,
+																					  sampler,
+																					  m_componentMapping,
+																					  coordAccess,
+																					  lodBounds,
+																					  lookupPrecision,
+																					  lookupScale,
+																					  lookupBias,
+																					  resultAccess,
+																					  errorAccess);
 
-			bool								compareOk	 = true;
-
-			switch (m_imageViewType)
+			if (!compareOk && allowSnorm8Bug)
 			{
-				case VK_IMAGE_VIEW_TYPE_1D:
-				{
-					std::vector<tcu::ConstPixelBufferAccess>	levels;
-					UniquePtr<tcu::Texture1DView>				texView(getTexture1DView(*m_texture, subresource, levels));
+				// HW waiver (VK-GL-CTS issue: 229)
+				//
+				// Due to an error in bit replication of the fixed point SNORM values, linear filtered
+				// negative SNORM values will differ slightly from ideal precision in the last bit, moving
+				// the values towards 0.
+				//
+				// This occurs on all members of the PowerVR Rogue family of GPUs
+				tcu::LookupPrecision	relaxedPrecision;
 
-					compareOk = validateResultImage(*texView, sampler, m_componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
-					break;
-				}
+				relaxedPrecision.colorThreshold += tcu::Vec4(4.f / 255.f);
 
-				case VK_IMAGE_VIEW_TYPE_1D_ARRAY:
-				{
-					std::vector<tcu::ConstPixelBufferAccess>	levels;
-					UniquePtr<tcu::Texture1DArrayView>			texView(getTexture1DArrayView(*m_texture, subresource, levels));
+				m_context.getTestContext().getLog()
+					<< tcu::TestLog::Message
+					<< "Warning: Strict validation failed, re-trying with lower precision for SNORM8 format"
+					<< tcu::TestLog::EndMessage;
+				anyWarnings = true;
 
-					compareOk = validateResultImage(*texView, sampler, m_componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
-					break;
-				}
-
-				case VK_IMAGE_VIEW_TYPE_2D:
-				{
-					std::vector<tcu::ConstPixelBufferAccess>	levels;
-					UniquePtr<tcu::Texture2DView>				texView(getTexture2DView(*m_texture, subresource, levels));
-
-					compareOk = validateResultImage(*texView, sampler, m_componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
-					break;
-				}
-
-				case VK_IMAGE_VIEW_TYPE_2D_ARRAY:
-				{
-					std::vector<tcu::ConstPixelBufferAccess>	levels;
-					UniquePtr<tcu::Texture2DArrayView>			texView(getTexture2DArrayView(*m_texture, subresource, levels));
-
-					compareOk = validateResultImage(*texView, sampler, m_componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
-					break;
-				}
-
-				case VK_IMAGE_VIEW_TYPE_CUBE:
-				{
-					std::vector<tcu::ConstPixelBufferAccess>	levels;
-					UniquePtr<tcu::TextureCubeView>				texView(getTextureCubeView(*m_texture, subresource, levels));
-
-					compareOk = validateResultImage(*texView, sampler, m_componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
-					break;
-				}
-
-				case VK_IMAGE_VIEW_TYPE_CUBE_ARRAY:
-				{
-					std::vector<tcu::ConstPixelBufferAccess>	levels;
-					UniquePtr<tcu::TextureCubeArrayView>		texView(getTextureCubeArrayView(*m_texture, subresource, levels));
-
-					compareOk = validateResultImage(*texView, sampler, m_componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
-					break;
-				}
-
-				case VK_IMAGE_VIEW_TYPE_3D:
-				{
-					std::vector<tcu::ConstPixelBufferAccess>	levels;
-					UniquePtr<tcu::Texture3DView>				texView(getTexture3DView(*m_texture, subresource, levels));
-
-					compareOk = validateResultImage(*texView, sampler, m_componentMapping, coordAccess, lodBounds, lookupPrecision, lookupScale, lookupBias, resultAccess, errorAccess);
-					break;
-				}
-
-				default:
-					DE_ASSERT(false);
+				compareOk = validateResultImage(*m_texture,
+												m_imageViewType,
+												subresource,
+												sampler,
+												m_componentMapping,
+												coordAccess,
+												lodBounds,
+												relaxedPrecision,
+												lookupScale,
+												lookupBias,
+												resultAccess,
+												errorAccess);
 			}
 
 			if (!compareOk)
@@ -1438,7 +1536,12 @@ tcu::TestStatus ImageSamplingInstance::verifyImage (void)
 	}
 
 	if (compareOkAll)
-		return tcu::TestStatus::pass("Result image matches reference");
+	{
+		if (anyWarnings)
+			return tcu::TestStatus(QP_TEST_RESULT_QUALITY_WARNING, "Inaccurate filtering results");
+		else
+			return tcu::TestStatus::pass("Result image matches reference");
+	}
 	else
 		return tcu::TestStatus::fail("Image mismatch");
 }

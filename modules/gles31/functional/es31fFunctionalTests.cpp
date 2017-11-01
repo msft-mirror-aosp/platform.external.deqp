@@ -76,6 +76,7 @@
 #include "es31fDebugTests.hpp"
 #include "es31fFboColorbufferTests.hpp"
 #include "es31fFboNoAttachmentTests.hpp"
+#include "es31fFboSRGBWriteControlTests.hpp"
 #include "es31fProgramInterfaceQueryTests.hpp"
 #include "es31fTextureGatherTests.hpp"
 #include "es31fTextureFormatTests.hpp"
@@ -88,6 +89,9 @@
 #include "es31fCopyImageTests.hpp"
 #include "es31fDrawBuffersIndexedTests.hpp"
 #include "es31fDefaultVertexArrayObjectTests.hpp"
+#include "es31fSRGBDecodeTests.hpp"
+#include "es31fDrawElementsBaseVertexTests.hpp"
+#include "es31fShaderFramebufferFetchTests.hpp"
 
 namespace deqp
 {
@@ -199,6 +203,7 @@ public:
 		addChild(new ShaderHelperInvocationTests		(m_context));
 		addChild(new ShaderLibraryTest					(m_context, "implicit_conversions", "GL_EXT_shader_implicit_conversions Tests"));
 		addChild(new ShaderLibraryTest					(m_context, "uniform_block", "Uniform block tests"));
+		addChild(new ShaderFramebufferFetchTests		(m_context));
 	}
 };
 
@@ -293,6 +298,21 @@ public:
 		addChild(new FboColorTests						(m_context));
 		addChild(createFboNoAttachmentTests				(m_context));
 		addChild(createFboNoAttachmentCompletenessTests	(m_context));
+		addChild(new FboSRGBWriteControlTests			(m_context));
+	}
+};
+
+class SRGBTextureDecodeTests : public TestCaseGroup
+{
+public:
+	SRGBTextureDecodeTests (Context& context)
+		: TestCaseGroup (context, "srgb_texture_decode", "GL_EXT_texture_sRGB_decode tests")
+	{
+	}
+
+	void init (void)
+	{
+		addChild(new SRGBDecodeTests	(m_context));
 	}
 };
 
@@ -337,6 +357,8 @@ void FunctionalTests::init (void)
 	addChild(createCopyImageTests						(m_context));
 	addChild(createDrawBuffersIndexedTests				(m_context));
 	addChild(new DefaultVertexArrayObjectTests			(m_context));
+	addChild(new SRGBTextureDecodeTests					(m_context));
+	addChild(new DrawElementsBaseVertexTests			(m_context));
 }
 
 } // Functional

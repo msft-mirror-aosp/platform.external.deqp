@@ -4,7 +4,7 @@
 # drawElements Quality Program utilities
 # --------------------------------------
 #
-# Copyright 2015 The Android Open Source Project
+# Copyright 2015-2017 The Android Open Source Project
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -36,9 +36,10 @@ EGL_DIR				= os.path.normpath(os.path.join(SCRIPTS_DIR, "..", "..", "framework",
 OPENGL_INC_DIR		= os.path.join(OPENGL_DIR, "wrapper")
 
 GL_SOURCE			= khr_util.registry_cache.RegistrySource(
-						"gl.xml",
-						32093,
-						"3292120320cacbc27009e7507656d7be17bb25f06876814c67eeffa369281eed")
+						"https://raw.githubusercontent.com/KhronosGroup/OpenGL-Registry",
+						"xml/gl.xml",
+						"7ac9c857db1e3a6065485e4e2144151f48a4f1c4",
+						"2475e1ff6d69048e67a49188d8be09195b261ed96b2b4108a0f7d7a459834674")
 
 EXTENSIONS			= [
 	'GL_KHR_texture_compression_astc_ldr',
@@ -48,11 +49,13 @@ EXTENSIONS			= [
 	'GL_EXT_geometry_point_size',
 	'GL_EXT_tessellation_shader',
 	'GL_EXT_geometry_shader',
+	'GL_EXT_robustness',
 	'GL_EXT_texture_buffer',
 	'GL_EXT_texture_snorm',
 	'GL_EXT_primitive_bounding_box',
 	'GL_OES_EGL_image',
 	'GL_OES_compressed_ETC1_RGB8_texture',
+	'GL_OES_compressed_paletted_texture',
 	'GL_OES_texture_half_float',
 	'GL_OES_texture_storage_multisample_2d_array',
 	'GL_OES_sample_shading',
@@ -67,6 +70,8 @@ EXTENSIONS			= [
 	'GL_EXT_debug_marker',
 	'GL_EXT_robustness',
 	'GL_KHR_robustness',
+	'GL_EXT_draw_elements_base_vertex',
+	'GL_OES_draw_elements_base_vertex',
 ]
 
 def getGLRegistry ():

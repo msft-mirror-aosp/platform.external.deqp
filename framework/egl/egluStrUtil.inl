@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos EGL API description (egl.xml) revision 33315.
+ * Generated from Khronos EGL API description (egl.xml) revision 13a26984991216cbf9a44fbf390f95dc05b5493a.
  */
 
 const char* getBooleanName (int value)
@@ -104,6 +104,7 @@ const char* getConfigAttribName (int value)
 		case EGL_TRANSPARENT_RED_VALUE:		return "EGL_TRANSPARENT_RED_VALUE";
 		case EGL_TRANSPARENT_GREEN_VALUE:	return "EGL_TRANSPARENT_GREEN_VALUE";
 		case EGL_TRANSPARENT_BLUE_VALUE:	return "EGL_TRANSPARENT_BLUE_VALUE";
+		case EGL_COLOR_COMPONENT_TYPE_EXT:	return "EGL_COLOR_COMPONENT_TYPE_EXT";
 		default:							return DE_NULL;
 	}
 }

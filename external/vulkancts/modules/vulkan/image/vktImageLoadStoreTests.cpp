@@ -445,8 +445,8 @@ tcu::TestStatus BaseTestInstance::iterate (void)
 	const Unique<VkPipelineLayout> pipelineLayout(makePipelineLayout(vk, device, descriptorSetLayout));
 	const Unique<VkPipeline> pipeline(makeComputePipeline(vk, device, *pipelineLayout, *shaderModule));
 
-	const Unique<VkCommandPool> cmdPool(makeCommandPool(vk, device, queueFamilyIndex));
-	const Unique<VkCommandBuffer> cmdBuffer(makeCommandBuffer(vk, device, *cmdPool));
+	const Unique<VkCommandPool> cmdPool(createCommandPool(vk, device, VK_COMMAND_POOL_RESET_RELEASE_RESOURCES_BIT, queueFamilyIndex));
+	const Unique<VkCommandBuffer> cmdBuffer(allocateCommandBuffer(vk, device, *cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY));
 
 	beginCommandBuffer(vk, *cmdBuffer);
 
@@ -1014,7 +1014,7 @@ void ImageLoadStoreTestInstance::commandBindDescriptorsForLayer (const VkCommand
 	const VkImageView	  srcImageView	= **m_allSrcImageViews[layerNdx];
 	const VkImageView	  dstImageView	= **m_allDstImageViews[layerNdx];
 
-	const VkDescriptorImageInfo descriptorSrcImageInfo = makeDescriptorImageInfo(DE_NULL, srcImageView, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	const VkDescriptorImageInfo descriptorSrcImageInfo = makeDescriptorImageInfo(DE_NULL, srcImageView, VK_IMAGE_LAYOUT_GENERAL);
 	const VkDescriptorImageInfo descriptorDstImageInfo = makeDescriptorImageInfo(DE_NULL, dstImageView, VK_IMAGE_LAYOUT_GENERAL);
 
 	DescriptorSetUpdateBuilder()
@@ -1052,7 +1052,7 @@ void ImageLoadStoreTestInstance::commandBeforeCompute (const VkCommandBuffer cmd
 	{
 		const VkImageMemoryBarrier barrierAfterCopy = makeImageMemoryBarrier(
 			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL,
 			m_imageSrc->get(), fullImageSubresourceRange);
 
 		const VkBufferImageCopy copyRegion = makeBufferImageCopy(m_texture);

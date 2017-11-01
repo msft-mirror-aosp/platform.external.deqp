@@ -36,6 +36,7 @@
 #include "vktSynchronizationUtil.hpp"
 #include "vktSynchronizationOperation.hpp"
 #include "vktSynchronizationOperationTestData.hpp"
+#include "vktSynchronizationOperationResources.hpp"
 #include "vktTestGroupUtil.hpp"
 
 namespace vkt
@@ -120,21 +121,21 @@ public:
 			const std::vector<std::string>&	deviceExtensions	= context.getDeviceExtensions();
 			std::vector<const char*>		charDevExtensions;
 
-			for (std::size_t ndx = 0; ndx < deviceExtensions.size(); ++ndx)
+			for (size_t ndx = 0; ndx < deviceExtensions.size(); ++ndx)
 				charDevExtensions.push_back(deviceExtensions[ndx].c_str());
 
 			const VkDeviceCreateInfo		deviceInfo		=
 			{
-				VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,							//VkStructureType					sType;
-				DE_NULL,														//const void*						pNext;
-				0u,																//VkDeviceCreateFlags				flags;
-				static_cast<deUint32>(queueInfos.size()),						//deUint32							queueCreateInfoCount;
-				&queueInfos[0],													//const VkDeviceQueueCreateInfo*	pQueueCreateInfos;
-				0u,																//deUint32							enabledLayerCount;
-				DE_NULL,														//const char* const*				ppEnabledLayerNames;
-				static_cast<deUint32>(deviceExtensions.size()),					//deUint32							enabledExtensionCount;
-				charDevExtensions.empty() ? DE_NULL : &charDevExtensions[0],	//const char* const*				ppEnabledExtensionNames;
-				&context.getDeviceFeatures()									//const VkPhysicalDeviceFeatures*	pEnabledFeatures;
+				VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,			//VkStructureType					sType;
+				DE_NULL,										//const void*						pNext;
+				0u,												//VkDeviceCreateFlags				flags;
+				static_cast<deUint32>(queueInfos.size()),		//deUint32							queueCreateInfoCount;
+				&queueInfos[0],									//const VkDeviceQueueCreateInfo*	pQueueCreateInfos;
+				0u,												//deUint32							enabledLayerCount;
+				DE_NULL,										//const char* const*				ppEnabledLayerNames;
+				static_cast<deUint32>(deviceExtensions.size()),	//deUint32							enabledExtensionCount;
+				&charDevExtensions[0],							//const char* const*				ppEnabledExtensionNames;
+				&context.getDeviceFeatures()					//const VkPhysicalDeviceFeatures*	pEnabledFeatures;
 			};
 
 			m_logicalDevice	= createDevice(instance, physicalDevice, &deviceInfo);
@@ -319,8 +320,8 @@ public:
 
 			const Move<VkCommandPool>		cmdPool[]		=
 			{
-				makeCommandPool(vk, device, queuePairs[pairNdx].familyIndexWrite),
-				makeCommandPool(vk, device, queuePairs[pairNdx].familyIndexRead)
+				createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queuePairs[pairNdx].familyIndexWrite),
+				createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queuePairs[pairNdx].familyIndexRead)
 			};
 			const Move<VkCommandBuffer>		ptrCmdBuffer[]	=
 			{
@@ -332,13 +333,7 @@ public:
 				*ptrCmdBuffer[QUEUETYPE_WRITE],
 				*ptrCmdBuffer[QUEUETYPE_READ]
 			};
-			const VkSemaphoreCreateInfo		semaphoreInfo	=
-			{
-				VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,	//VkStructureType			sType;
-				DE_NULL,									//const void*				pNext;
-				0u											//VkSemaphoreCreateFlags	flags;
-			};
-			const Unique<VkSemaphore>		semaphore		(createSemaphore(vk, device, &semaphoreInfo, DE_NULL));
+			const Unique<VkSemaphore>		semaphore		(createSemaphore(vk, device));
 			const VkPipelineStageFlags		stageBits[]		= { VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT };
 			const VkSubmitInfo				submitInfo[]	=
 			{
@@ -420,8 +415,8 @@ public:
 			const UniquePtr<Operation>		readOp			(m_readOp.build(*m_opContext, *resource));
 			const Move<VkCommandPool>		cmdPool[]		=
 			{
-				makeCommandPool(vk, device, queuePairs[pairNdx].familyIndexWrite),
-				makeCommandPool(vk, device, queuePairs[pairNdx].familyIndexRead)
+				createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queuePairs[pairNdx].familyIndexWrite),
+				createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queuePairs[pairNdx].familyIndexRead)
 			};
 			const Move<VkCommandBuffer>		ptrCmdBuffer[]	=
 			{

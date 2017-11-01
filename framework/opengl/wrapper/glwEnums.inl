@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision 32093.
+ * Generated from Khronos GL API description (gl.xml) revision 7ac9c857db1e3a6065485e4e2144151f48a4f1c4.
  */
 #define GL_DEPTH_BUFFER_BIT												0x00000100
 #define GL_STENCIL_BUFFER_BIT											0x00000400
@@ -875,6 +875,16 @@
 #define GL_FRAGMENT_SHADER_DERIVATIVE_HINT								0x8B8B
 #define GL_SHADING_LANGUAGE_VERSION										0x8B8C
 #define GL_CURRENT_PROGRAM												0x8B8D
+#define GL_PALETTE4_RGB8_OES											0x8B90
+#define GL_PALETTE4_RGBA8_OES											0x8B91
+#define GL_PALETTE4_R5_G6_B5_OES										0x8B92
+#define GL_PALETTE4_RGBA4_OES											0x8B93
+#define GL_PALETTE4_RGB5_A1_OES											0x8B94
+#define GL_PALETTE8_RGB8_OES											0x8B95
+#define GL_PALETTE8_RGBA8_OES											0x8B96
+#define GL_PALETTE8_R5_G6_B5_OES										0x8B97
+#define GL_PALETTE8_RGBA4_OES											0x8B98
+#define GL_PALETTE8_RGB5_A1_OES											0x8B99
 #define GL_IMPLEMENTATION_COLOR_READ_TYPE								0x8B9A
 #define GL_IMPLEMENTATION_COLOR_READ_FORMAT								0x8B9B
 #define GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG								0x8C00

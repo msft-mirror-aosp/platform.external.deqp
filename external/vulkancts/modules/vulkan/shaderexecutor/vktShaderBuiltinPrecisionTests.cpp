@@ -1064,10 +1064,10 @@ const ExprP<Void>& voidP (void)
 template <typename T0 = Void, typename T1 = Void, typename T2 = Void, typename T3 = Void>
 struct Tuple4
 {
-	explicit Tuple4 (const T0& e0 = T0(),
-					 const T1& e1 = T1(),
-					 const T2& e2 = T2(),
-					 const T3& e3 = T3())
+	explicit Tuple4 (const T0 e0 = T0(),
+					 const T1 e1 = T1(),
+					 const T2 e2 = T2(),
+					 const T3 e3 = T3())
 		: a	(e0)
 		, b	(e1)
 		, c	(e2)
@@ -2903,12 +2903,32 @@ public:
 protected:
 	ExprP<float>	doExpand	(ExpandContext&, const ArgExprs& args) const
 	{
-		ExprP<float> val = args.a[0] * args.b[0];
+		ExprP<float> op[Size];
+		// Precompute all products.
+		for (int ndx = 0; ndx < Size; ++ndx)
+			op[ndx] = args.a[ndx] * args.b[ndx];
 
+		int idx[Size];
+		//Prepare an array of indices.
+		for (int ndx = 0; ndx < Size; ++ndx)
+			idx[ndx] = ndx;
+
+		ExprP<float> res = op[0];
+		// Compute the first dot alternative: SUM(a[i]*b[i]), i = 0 .. Size-1
 		for (int ndx = 1; ndx < Size; ++ndx)
-			val = val + args.a[ndx] * args.b[ndx];
+			res = res + op[ndx];
 
-		return val;
+		// Generate all permutations of indices and
+		// using a permutation compute a dot alternative.
+		// Generates all possible variants fo summation of products in the dot product expansion expression.
+		do {
+			ExprP<float> alt = constant(0.0f);
+			for (int ndx = 0; ndx < Size; ++ndx)
+				alt = alt + op[idx[ndx]];
+			res = alternatives(res, alt);
+		} while (std::next_permutation(idx, idx + Size));
+
+		return res;
 	}
 };
 
@@ -3077,7 +3097,9 @@ protected:
 		const ExprP<float>	dotNI	= bindExpression("dotNI", ctx, dot(n, i));
 
 		return i - alternatives((n * dotNI) * constant(2.0f),
-								n * (dotNI * constant(2.0f)));
+								alternatives(n * (dotNI * constant(2.0f)),
+											 alternatives(n * dot(i * constant(2.0f), n),
+														  n * dot(i, n * constant(2.0f)))));
 	}
 };
 
@@ -4360,27 +4382,27 @@ class BuiltinPrecisionCaseTestInstance : public TestInstance
 {
 public:
 									BuiltinPrecisionCaseTestInstance	(Context&						context,
-																		 const  CaseContext				caseCtx,
-																		 ShaderExecutor&				executor,
-																		 const  Variables<In, Out>		variables,
-																		 const  Samplings<In>&			samplings,
-																		 const  StatementP				stmt)
+																		 const CaseContext				caseCtx,
+																		 const ShaderSpec&				shaderSpec,
+																		 const Variables<In, Out>		variables,
+																		 const Samplings<In>&			samplings,
+																		 const StatementP				stmt)
 										: TestInstance	(context)
 										, m_caseCtx		(caseCtx)
-										, m_executor	(executor)
 										, m_variables	(variables)
 										, m_samplings	(samplings)
 										, m_stmt		(stmt)
+										, m_executor	(createExecutor(context, caseCtx.shaderType, shaderSpec))
 									{
 									}
 	virtual tcu::TestStatus			iterate								(void);
 
 protected:
 	CaseContext						m_caseCtx;
-	ShaderExecutor&					m_executor;
 	Variables<In, Out>				m_variables;
 	const Samplings<In>&			m_samplings;
 	StatementP						m_stmt;
+	de::UniquePtr<ShaderExecutor>	m_executor;
 };
 
 template<class In, class Out>
@@ -4440,7 +4462,7 @@ tcu::TestStatus BuiltinPrecisionCaseTestInstance<In, Out>::iterate (void)
 		default: break;
 	}
 
-	m_executor.execute(m_context, int(numValues), inputArr, outputArr);
+	m_executor->execute(int(numValues), inputArr, outputArr);
 
 	// Initialize environment with dummy values so we don't need to bind in inner loop.
 	{
@@ -4576,13 +4598,12 @@ protected:
 							: TestCase		(context.testContext, name.c_str(), name.c_str())
 							, m_ctx			(context)
 							, m_extension	(extension)
-							, m_executor	(DE_NULL)
 							{
 							}
 
 	virtual void		initPrograms	(vk::SourceCollections& programCollection) const
 	{
-		m_executor->setShaderSources(programCollection);
+		generateSources(m_ctx.shaderType, m_spec, programCollection);
 	}
 
 	const FloatFormat&	getFormat		(void) const			{ return m_ctx.floatFormat; }
@@ -4596,10 +4617,9 @@ protected:
 		return Symbol(variable.getName(), getVarTypeOf<T>(m_ctx.precision));
 	}
 
-	CaseContext							m_ctx;
-	const string						m_extension;
-	ShaderSpec							m_spec;
-	de::MovePtr<ShaderExecutor>			m_executor;
+	CaseContext			m_ctx;
+	const string		m_extension;
+	ShaderSpec			m_spec;
 };
 
 template <typename In, typename Out>
@@ -4640,8 +4660,6 @@ void PrecisionCase::testStatement (const Variables<In, Out>& variables, const St
 	}
 
 	m_spec.source = de::toString(stmt);
-
-	m_executor = de::MovePtr<ShaderExecutor>(createExecutor(m_ctx.shaderType, m_spec));
 }
 
 template <typename T>
@@ -4836,7 +4854,7 @@ public:
 
 	virtual	TestInstance*					createInstance	(Context& context) const
 	{
-		return new BuiltinPrecisionCaseTestInstance<In, Out>(context, m_ctx, *m_executor, m_variables, getSamplings(), m_stmt);
+		return new BuiltinPrecisionCaseTestInstance<In, Out>(context, m_ctx, m_spec, m_variables, getSamplings(), m_stmt);
 	}
 
 protected:
@@ -4890,7 +4908,7 @@ public:
 											}
 	virtual TestInstance*				createInstance	(Context& context) const
 	{
-		return new BuiltinPrecisionCaseTestInstance<In, Out>(context, m_ctx, *m_executor, m_variables, getSamplings(), m_stmt);
+		return new BuiltinPrecisionCaseTestInstance<In, Out>(context, m_ctx, m_spec, m_variables, getSamplings(), m_stmt);
 	}
 
 protected:
