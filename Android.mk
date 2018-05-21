@@ -712,6 +712,7 @@ LOCAL_SRC_FILES := \
 	modules/gles3/functional/es3fInternalFormatQueryTests.cpp \
 	modules/gles3/functional/es3fLifetimeTests.cpp \
 	modules/gles3/functional/es3fMultisampleTests.cpp \
+	modules/gles3/functional/es3fMultiviewTests.cpp \
 	modules/gles3/functional/es3fNegativeBufferApiTests.cpp \
 	modules/gles3/functional/es3fNegativeFragmentApiTests.cpp \
 	modules/gles3/functional/es3fNegativeShaderApiTests.cpp \
@@ -879,6 +880,7 @@ LOCAL_SRC_FILES := \
 	modules/gles31/functional/es31fShaderSharedVarTests.cpp \
 	modules/gles31/functional/es31fShaderStateQueryTests.cpp \
 	modules/gles31/functional/es31fShaderTextureSizeTests.cpp \
+	modules/gles31/functional/es31fShaderUniformIntegerFunctionTests.cpp \
 	modules/gles31/functional/es31fStencilTexturingTests.cpp \
 	modules/gles31/functional/es31fSynchronizationTests.cpp \
 	modules/gles31/functional/es31fTessellationGeometryInteractionTests.cpp \
@@ -1051,7 +1053,7 @@ LOCAL_CFLAGS += \
 
 LOCAL_SDK_VERSION := 22
 LOCAL_CPPFLAGS += -Wno-non-virtual-dtor -Wno-delete-non-virtual-dtor
-LOCAL_NDK_STL_VARIANT := gnustl_static
+LOCAL_NDK_STL_VARIANT := c++_static
 LOCAL_RTTI_FLAG := -frtti -fexceptions
 LOCAL_MULTILIB := both
 LOCAL_TIDY_CHECKS := \
