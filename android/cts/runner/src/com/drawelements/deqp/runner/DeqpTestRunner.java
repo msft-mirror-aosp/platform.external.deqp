@@ -27,6 +27,7 @@ import com.android.tradefed.config.OptionClass;
 import com.android.tradefed.device.DeviceNotAvailableException;
 import com.android.tradefed.device.ITestDevice;
 import com.android.tradefed.log.LogUtil.CLog;
+import com.android.tradefed.metrics.proto.MetricMeasurement.Metric;
 import com.android.tradefed.result.ByteArrayInputStreamSource;
 import com.android.tradefed.result.ITestInvocationListener;
 import com.android.tradefed.result.LogDataType;
@@ -38,7 +39,6 @@ import com.android.tradefed.testtype.IDeviceTest;
 import com.android.tradefed.testtype.IRemoteTest;
 import com.android.tradefed.testtype.IRuntimeHintProvider;
 import com.android.tradefed.testtype.IShardableTest;
-import com.android.tradefed.testtype.IStrictShardableTest;
 import com.android.tradefed.testtype.ITestCollector;
 import com.android.tradefed.testtype.ITestFilterReceiver;
 import com.android.tradefed.util.AbiUtils;
@@ -77,7 +77,7 @@ import java.util.regex.Pattern;
 @OptionClass(alias="deqp-test-runner")
 public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         ITestFilterReceiver, IAbiReceiver, IShardableTest, ITestCollector,
-        IRuntimeHintProvider, IStrictShardableTest {
+        IRuntimeHintProvider {
     private static final String DEQP_ONDEVICE_APK = "com.drawelements.deqp.apk";
     private static final String DEQP_ONDEVICE_PKG = "com.drawelements.deqp";
     private static final String INCOMPLETE_LOG_MESSAGE = "Crash: Incomplete test log";
@@ -313,7 +313,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                         mSink.testLog(testId.getClassName() + "." + testId.getTestName() + "@"
                                 + entry.getKey().getId(), LogDataType.XML, source);
 
-                        source.cancel();
+                        source.close();
                     }
                 }
 
@@ -334,7 +334,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     mSink.testFailed(testId, errorLog.toString());
                 }
 
-                final Map<String, String> emptyMap = Collections.emptyMap();
+                final HashMap<String, Metric> emptyMap = new HashMap<>();
                 mSink.testEnded(testId, emptyMap);
             }
         }
@@ -1616,12 +1616,13 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      * Pass all remaining tests without running them
      */
     private void fakePassTests(ITestInvocationListener listener) {
-        Map <String, String> emptyMap = Collections.emptyMap();
+        HashMap<String, Metric> emptyMap = new HashMap<>();
         for (TestDescription test : mRemainingTests) {
-            CLog.d("Skipping test '%s', Opengl ES version not supported", test.toString());
             listener.testStarted(test);
             listener.testEnded(test, emptyMap);
         }
+        // Log only once all the skipped tests
+        CLog.d("Opengl ES version not supported. Skipping tests '%s'", mRemainingTests);
         mRemainingTests.clear();
     }
 
@@ -1764,29 +1765,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private boolean isLandscapeClassRotation(String rotation) {
         return BatchRunConfiguration.ROTATION_LANDSCAPE.equals(rotation) ||
                 BatchRunConfiguration.ROTATION_REVERSE_LANDSCAPE.equals(rotation);
-    }
-
-    /**
-     * Install dEQP OnDevice Package
-     */
-    private void installTestApk() throws DeviceNotAvailableException {
-        try {
-            File apkFile = new File(mBuildHelper.getTestsDir(), DEQP_ONDEVICE_APK);
-            String[] options = {AbiUtils.createAbiFlag(mAbi.getName())};
-            String errorCode = getDevice().installPackage(apkFile, true, options);
-            if (errorCode != null) {
-                CLog.e("Failed to install %s. Reason: %s", DEQP_ONDEVICE_APK, errorCode);
-            }
-        } catch (FileNotFoundException e) {
-            CLog.e("Could not find test apk %s", DEQP_ONDEVICE_APK);
-        }
-    }
-
-    /**
-     * Uninstall dEQP OnDevice Package
-     */
-    private void uninstallTestApk() throws DeviceNotAvailableException {
-        getDevice().uninstallPackage(DEQP_ONDEVICE_PKG);
     }
 
     /**
@@ -2060,22 +2038,15 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                 // the names of the tests only
                 fakePassTests(listener);
             } else if (!mRemainingTests.isEmpty()) {
-                // Make sure there is no pre-existing package form earlier interrupted test run.
-                uninstallTestApk();
-                installTestApk();
-
                 mInstanceListerner.setSink(listener);
                 mDeviceRecovery.setDevice(mDevice);
                 runTests();
-
-                uninstallTestApk();
             }
         } catch (CapabilityQueryFailureException ex) {
             // Platform is not behaving correctly, for example crashing when trying to create
             // a window. Instead of silenty failing, signal failure by leaving the rest of the
             // test cases in "NotExecuted" state
             CLog.e("Capability query failed - leaving tests unexecuted.");
-            uninstallTestApk();
         } finally {
             listener.testRunEnded(System.currentTimeMillis() - startTime, emptyMap);
         }
@@ -2222,51 +2193,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         updateRuntimeHint(iterationSet.size(), runners);
         CLog.i("Split deqp tests into %d shards", runners.size());
         return runners;
-    }
-
-    /**
-     * This sharding should be deterministic for the same input and independent.
-     * Through this API, each shard could be executed on different machine.
-     */
-    @Override
-    public IRemoteTest getTestShard(int shardCount, int shardIndex) {
-        // TODO: refactor getTestshard and split to share some logic.
-        if (mTestInstances == null) {
-            loadTests();
-        }
-
-        List<IRemoteTest> runners = new ArrayList<>();
-        // NOTE: Use linked hash map to keep the insertion order in iteration
-        Map<TestDescription, Set<BatchRunConfiguration>> currentSet = new LinkedHashMap<>();
-        Map<TestDescription, Set<BatchRunConfiguration>> iterationSet = this.mTestInstances;
-
-        int batchLimit = iterationSet.keySet().size() / shardCount;
-        int i = 1;
-        // Go through tests, split
-        for (TestDescription test: iterationSet.keySet()) {
-            currentSet.put(test, iterationSet.get(test));
-            if (currentSet.size() >= batchLimit && i < shardCount) {
-                runners.add(new DeqpTestRunner(this, currentSet));
-                i++;
-                // NOTE: Use linked hash map to keep the insertion order in iteration
-                currentSet = new LinkedHashMap<>();
-            }
-        }
-        runners.add(new DeqpTestRunner(this, currentSet));
-
-        // Compute new runtime hints
-        updateRuntimeHint(iterationSet.size(), runners);
-
-        // If too many shards were requested, we complete with placeholder.
-        if (runners.size() < shardCount) {
-            for (int j = runners.size(); j < shardCount; j++) {
-                runners.add(new DeqpTestRunner(this,
-                        new LinkedHashMap<TestDescription, Set<BatchRunConfiguration>>()));
-            }
-        }
-
-        CLog.i("Split deqp tests into %d shards, return shard: %s", runners.size(), shardIndex);
-        return runners.get(shardIndex);
     }
 
     /**
