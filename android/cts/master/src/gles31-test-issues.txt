@@ -49,3 +49,6 @@ dEQP-GLES31.functional.shaders.builtin_functions.precision.reflect.lowp_compute.
 dEQP-GLES31.functional.shaders.builtin_functions.precision.reflect.mediump_compute.vec3
 dEQP-GLES31.functional.shaders.builtin_functions.precision.reflect.mediump_compute.vec4
 dEQP-GLES31.functional.shaders.builtin_functions.precision.reflect.highp_compute.vec3
+
+# Bug 122608943 shader generated is ridiculously large; exclude for P only.
+dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.48

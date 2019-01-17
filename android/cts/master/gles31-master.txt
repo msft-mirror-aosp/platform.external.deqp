@@ -10249,7 +10249,6 @@ dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.44
 dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.45
 dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.46
 dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.47
-dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.48
 dEQP-GLES31.functional.ssbo.layout.random.all_shared_buffer.49
 dEQP-GLES31.functional.ssbo.atomic.add.lowp_uint
 dEQP-GLES31.functional.ssbo.atomic.add.lowp_int
