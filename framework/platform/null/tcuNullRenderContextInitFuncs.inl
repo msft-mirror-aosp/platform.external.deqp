@@ -220,6 +220,7 @@ gl->framebufferRenderbuffer							= glFramebufferRenderbuffer;
 gl->framebufferTexture								= glFramebufferTexture;
 gl->framebufferTexture1D							= glFramebufferTexture1D;
 gl->framebufferTexture2D							= glFramebufferTexture2D;
+gl->framebufferTexture2DMultisampleEXT				= glFramebufferTexture2DMultisampleEXT;
 gl->framebufferTexture3D							= glFramebufferTexture3D;
 gl->framebufferTexture3DOES							= glFramebufferTexture3DOES;
 gl->framebufferTextureLayer							= glFramebufferTextureLayer;

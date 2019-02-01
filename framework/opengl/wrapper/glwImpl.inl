@@ -1740,6 +1740,14 @@ void glwFramebufferTexture2D (GLenum target, GLenum attachment, GLenum textarget
 	gl->framebufferTexture2D(target, attachment, textarget, texture, level);
 }
 
+void glwFramebufferTexture2DMultisampleEXT (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLsizei samples)
+{
+	const glw::Functions* gl = glw::getCurrentThreadFunctions();
+	if (!gl)
+		return;
+	gl->framebufferTexture2DMultisampleEXT(target, attachment, textarget, texture, level, samples);
+}
+
 void glwFramebufferTexture3D (GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset)
 {
 	const glw::Functions* gl = glw::getCurrentThreadFunctions();

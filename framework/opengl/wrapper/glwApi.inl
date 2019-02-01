@@ -220,6 +220,7 @@
 #define			glFramebufferTexture								glwFramebufferTexture
 #define			glFramebufferTexture1D								glwFramebufferTexture1D
 #define			glFramebufferTexture2D								glwFramebufferTexture2D
+#define			glFramebufferTexture2DMultisampleEXT				glwFramebufferTexture2DMultisampleEXT
 #define			glFramebufferTexture3D								glwFramebufferTexture3D
 #define			glFramebufferTexture3DOES							glwFramebufferTexture3DOES
 #define			glFramebufferTextureLayer							glwFramebufferTextureLayer
@@ -1112,6 +1113,7 @@ void			glwFramebufferRenderbuffer							(GLenum target, GLenum attachment, GLenu
 void			glwFramebufferTexture								(GLenum target, GLenum attachment, GLuint texture, GLint level);
 void			glwFramebufferTexture1D								(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
 void			glwFramebufferTexture2D								(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+void			glwFramebufferTexture2DMultisampleEXT				(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLsizei samples);
 void			glwFramebufferTexture3D								(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset);
 void			glwFramebufferTexture3DOES							(GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level, GLint zoffset);
 void			glwFramebufferTextureLayer							(GLenum target, GLenum attachment, GLuint texture, GLint level, GLint layer);

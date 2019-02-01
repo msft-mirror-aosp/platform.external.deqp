@@ -220,6 +220,7 @@ glFramebufferRenderbufferFunc							framebufferRenderbuffer;
 glFramebufferTextureFunc								framebufferTexture;
 glFramebufferTexture1DFunc								framebufferTexture1D;
 glFramebufferTexture2DFunc								framebufferTexture2D;
+glFramebufferTexture2DMultisampleEXTFunc				framebufferTexture2DMultisampleEXT;
 glFramebufferTexture3DFunc								framebufferTexture3D;
 glFramebufferTexture3DOESFunc							framebufferTexture3DOES;
 glFramebufferTextureLayerFunc							framebufferTextureLayer;
