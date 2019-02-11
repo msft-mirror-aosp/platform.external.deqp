@@ -290,7 +290,7 @@ protected:
 	void								uploadBuffer						(tcu::ConstPixelBufferAccess bufferAccess, const Allocation& bufferAlloc);
 	void								uploadImage							(const tcu::ConstPixelBufferAccess& src, VkImage dst, const ImageParms& parms, const deUint32 mipLevels = 1u);
 	virtual tcu::TestStatus				checkTestResult						(tcu::ConstPixelBufferAccess result);
-	virtual void						copyRegionToTextureLevel			(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region) = 0;
+	virtual void						copyRegionToTextureLevel			(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel = 0u) = 0;
 	deUint32							calculateSize						(tcu::ConstPixelBufferAccess src) const
 										{
 											return src.getWidth() * src.getHeight() * src.getDepth() * tcu::getPixelSize(src.getFormat());
@@ -845,7 +845,7 @@ private:
 	Move<VkImage>						m_destination;
 	de::MovePtr<Allocation>				m_destinationImageAlloc;
 
-	virtual void						copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region);
+	virtual void						copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel = 0u);
 };
 
 CopyImageToImage::CopyImageToImage (Context& context, TestParams params)
@@ -1117,8 +1117,10 @@ tcu::TestStatus CopyImageToImage::checkTestResult (tcu::ConstPixelBufferAccess r
 	return tcu::TestStatus::pass("CopiesAndBlitting test");
 }
 
-void CopyImageToImage::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region)
+void CopyImageToImage::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel)
 {
+	DE_UNREF(mipLevel);
+
 	VkOffset3D	srcOffset	= region.imageCopy.srcOffset;
 	VkOffset3D	dstOffset	= region.imageCopy.dstOffset;
 	VkExtent3D	extent		= region.imageCopy.extent;
@@ -1175,12 +1177,48 @@ public:
 														 const TestParams				params)
 								: vkt::TestCase	(testCtx, name, description)
 								, m_params		(params)
-							{}
+	{}
 
 	virtual TestInstance*	createInstance				(Context&						context) const
-							{
-								return new CopyImageToImage(context, m_params);
-							}
+	{
+		return new CopyImageToImage(context, m_params);
+	}
+
+	virtual void			checkSupport				(Context&						context) const
+	{
+		if (m_params.allocationKind == ALLOCATION_KIND_DEDICATED)
+		{
+			if (!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_dedicated_allocation"))
+				TCU_THROW(NotSupportedError, "VK_KHR_dedicated_allocation is not supported");
+		}
+
+		if ((m_params.dst.image.imageType == VK_IMAGE_TYPE_3D && m_params.src.image.imageType == VK_IMAGE_TYPE_2D) ||
+			(m_params.dst.image.imageType == VK_IMAGE_TYPE_2D && m_params.src.image.imageType == VK_IMAGE_TYPE_3D))
+		{
+			if (!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance1"))
+				TCU_THROW(NotSupportedError, "Extension VK_KHR_maintenance1 not supported");
+		}
+
+		VkImageFormatProperties properties;
+		if ((context.getInstanceInterface().getPhysicalDeviceImageFormatProperties (context.getPhysicalDevice(),
+																					m_params.src.image.format,
+																					m_params.src.image.imageType,
+																					VK_IMAGE_TILING_OPTIMAL,
+																					VK_IMAGE_USAGE_TRANSFER_SRC_BIT,
+																					0,
+																					&properties) == VK_ERROR_FORMAT_NOT_SUPPORTED) ||
+			(context.getInstanceInterface().getPhysicalDeviceImageFormatProperties (context.getPhysicalDevice(),
+																					m_params.dst.image.format,
+																					m_params.dst.image.imageType,
+																					VK_IMAGE_TILING_OPTIMAL,
+																					VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+																					0,
+																					&properties) == VK_ERROR_FORMAT_NOT_SUPPORTED))
+		{
+			TCU_THROW(NotSupportedError, "Format not supported");
+		}
+	}
+
 private:
 	TestParams				m_params;
 };
@@ -1193,7 +1231,7 @@ public:
 								CopyBufferToBuffer			(Context& context, TestParams params);
 	virtual tcu::TestStatus		iterate						(void);
 private:
-	virtual void				copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess, tcu::PixelBufferAccess, CopyRegion);
+	virtual void				copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess, tcu::PixelBufferAccess, CopyRegion, deUint32 mipLevel = 0u);
 	Move<VkBuffer>				m_source;
 	de::MovePtr<Allocation>		m_sourceBufferAlloc;
 	Move<VkBuffer>				m_destination;
@@ -1323,8 +1361,10 @@ tcu::TestStatus CopyBufferToBuffer::iterate (void)
 	return checkTestResult(resultLevel->getAccess());
 }
 
-void CopyBufferToBuffer::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region)
+void CopyBufferToBuffer::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel)
 {
+	DE_UNREF(mipLevel);
+
 	deMemcpy((deUint8*) dst.getDataPtr() + region.bufferCopy.dstOffset,
 			 (deUint8*) src.getDataPtr() + region.bufferCopy.srcOffset,
 			 (size_t)region.bufferCopy.size);
@@ -1358,7 +1398,7 @@ public:
 															 TestParams	testParams);
 	virtual tcu::TestStatus		iterate						(void);
 private:
-	virtual void				copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region);
+	virtual void				copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel = 0u);
 
 	tcu::TextureFormat			m_textureFormat;
 	VkDeviceSize				m_bufferSize;
@@ -1529,8 +1569,10 @@ private:
 	TestParams				m_params;
 };
 
-void CopyImageToBuffer::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region)
+void CopyImageToBuffer::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel)
 {
+	DE_UNREF(mipLevel);
+
 	deUint32			rowLength	= region.bufferImageCopy.bufferRowLength;
 	if (!rowLength)
 		rowLength = region.bufferImageCopy.imageExtent.width;
@@ -1566,7 +1608,7 @@ public:
 															 TestParams	testParams);
 	virtual tcu::TestStatus		iterate						(void);
 private:
-	virtual void				copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region);
+	virtual void				copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel = 0u);
 
 	tcu::TextureFormat			m_textureFormat;
 	VkDeviceSize				m_bufferSize;
@@ -1722,8 +1764,10 @@ private:
 	TestParams				m_params;
 };
 
-void CopyBufferToImage::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region)
+void CopyBufferToImage::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel)
 {
+	DE_UNREF(mipLevel);
+
 	deUint32			rowLength	= region.bufferImageCopy.bufferRowLength;
 	if (!rowLength)
 		rowLength = region.bufferImageCopy.imageExtent.width;
@@ -1760,7 +1804,7 @@ public:
 	virtual tcu::TestStatus				iterate							(void);
 protected:
 	virtual tcu::TestStatus				checkTestResult					(tcu::ConstPixelBufferAccess result);
-	virtual void						copyRegionToTextureLevel		(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region);
+	virtual void						copyRegionToTextureLevel		(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel = 0u);
 	virtual void						generateExpectedResult			(void);
 private:
 	bool								checkLinearFilteredResult		(const tcu::ConstPixelBufferAccess&	result,
@@ -2029,11 +2073,25 @@ bool BlittingImages::checkLinearFilteredResult (const tcu::ConstPixelBufferAcces
 												const tcu::ConstPixelBufferAccess&	unclampedExpected,
 												const tcu::TextureFormat&			srcFormat)
 {
-	tcu::TestLog&				log			(m_context.getTestContext().getLog());
-	const tcu::TextureFormat	dstFormat	= result.getFormat();
-	bool						isOk		= false;
+	tcu::TestLog&					log				(m_context.getTestContext().getLog());
+	const tcu::TextureFormat		dstFormat		= result.getFormat();
+	const tcu::TextureChannelClass	dstChannelClass = tcu::getTextureChannelClass(dstFormat.type);
+	const tcu::TextureChannelClass	srcChannelClass = tcu::getTextureChannelClass(srcFormat.type);
+	bool							isOk			= false;
 
 	log << tcu::TestLog::Section("ClampedSourceImage", "Region with clamped edges on source image.");
+
+	// if either of srcImage or dstImage was created with a signed/unsigned integer VkFormat,
+	// the other must also have been created with a signed/unsigned integer VkFormat
+	bool dstImageIsIntClass = dstChannelClass == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER ||
+							  dstChannelClass == tcu::TEXTURECHANNELCLASS_UNSIGNED_INTEGER;
+	bool srcImageIsIntClass = srcChannelClass == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER ||
+							  srcChannelClass == tcu::TEXTURECHANNELCLASS_UNSIGNED_INTEGER;
+	if (dstImageIsIntClass != srcImageIsIntClass)
+	{
+		log << tcu::TestLog::EndSection;
+		return false;
+	}
 
 	if (isFloatFormat(dstFormat))
 	{
@@ -2262,7 +2320,9 @@ bool BlittingImages::checkNearestFilteredResult (const tcu::ConstPixelBufferAcce
 {
 	tcu::TestLog&					log				(m_context.getTestContext().getLog());
 	const tcu::TextureFormat		dstFormat		= result.getFormat();
+	const tcu::TextureFormat		srcFormat		= source.getFormat();
 	const tcu::TextureChannelClass	dstChannelClass = tcu::getTextureChannelClass(dstFormat.type);
+	const tcu::TextureChannelClass	srcChannelClass = tcu::getTextureChannelClass(srcFormat.type);
 
 	tcu::TextureLevel		errorMaskStorage	(tcu::TextureFormat(tcu::TextureFormat::RGB, tcu::TextureFormat::UNORM_INT8), result.getWidth(), result.getHeight());
 	tcu::PixelBufferAccess	errorMask			= errorMaskStorage.getAccess();
@@ -2272,8 +2332,16 @@ bool BlittingImages::checkNearestFilteredResult (const tcu::ConstPixelBufferAcce
 
 	tcu::clear(errorMask, tcu::Vec4(0.0f, 1.0f, 0.0f, 1.0));
 
-	if (dstChannelClass == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER ||
-		dstChannelClass == tcu::TEXTURECHANNELCLASS_UNSIGNED_INTEGER)
+	// if either of srcImage or dstImage was created with a signed/unsigned integer VkFormat,
+	// the other must also have been created with a signed/unsigned integer VkFormat
+	bool dstImageIsIntClass = dstChannelClass == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER ||
+							  dstChannelClass == tcu::TEXTURECHANNELCLASS_UNSIGNED_INTEGER;
+	bool srcImageIsIntClass = srcChannelClass == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER ||
+							  srcChannelClass == tcu::TEXTURECHANNELCLASS_UNSIGNED_INTEGER;
+	if (dstImageIsIntClass != srcImageIsIntClass)
+		return false;
+
+	if (dstImageIsIntClass)
 	{
 		ok = intNearestBlitCompare(source, result, errorMask, m_params.regions);
 	}
@@ -2509,8 +2577,10 @@ MirrorMode getMirrorMode(const VkOffset3D s1, const VkOffset3D s2, const VkOffse
 	return MIRROR_MODE_LAST;
 }
 
-void BlittingImages::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region)
+void BlittingImages::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel)
 {
+	DE_UNREF(mipLevel);
+
 	const MirrorMode mirrorMode = getMirrorMode(region.imageBlit.srcOffsets[0],
 												region.imageBlit.srcOffsets[1],
 												region.imageBlit.dstOffsets[0],
@@ -2629,7 +2699,7 @@ public:
 	virtual tcu::TestStatus				iterate							(void);
 protected:
 	virtual tcu::TestStatus				checkTestResult					(tcu::ConstPixelBufferAccess result = tcu::ConstPixelBufferAccess());
-	virtual void						copyRegionToTextureLevel		(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region);
+	virtual void						copyRegionToTextureLevel		(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel = 0u);
 	virtual void						generateExpectedResult			(void);
 private:
 	bool								checkLinearFilteredResult		(void);
@@ -2983,6 +3053,29 @@ bool BlittingMipmaps::checkLinearFilteredResult (void)
 
 	for (deUint32 mipLevelNdx = 0u; mipLevelNdx < m_params.mipLevels; mipLevelNdx++)
 	{
+		// Update reference results with previous results that have been verified.
+		// This needs to be done such that accumulated errors don't exceed the fixed threshold.
+		for (deUint32 i = 0; i < m_params.regions.size(); i++)
+		{
+			const CopyRegion region = m_params.regions[i];
+			const deUint32 srcMipLevel = m_params.regions[i].imageBlit.srcSubresource.mipLevel;
+			const deUint32 dstMipLevel = m_params.regions[i].imageBlit.dstSubresource.mipLevel;
+			de::MovePtr<tcu::TextureLevel>	prevResultLevel;
+			tcu::ConstPixelBufferAccess src;
+			if (srcMipLevel < mipLevelNdx)
+			{
+				// Generate expected result from rendered result that was previously verified
+				prevResultLevel	= readImage(*m_destination, m_params.dst.image, srcMipLevel);
+				src = prevResultLevel->getAccess();
+			}
+			else
+			{
+				// Previous reference mipmaps might have changed, so recompute expected result
+				src = m_expectedTextureLevel[srcMipLevel]->getAccess();
+			}
+			copyRegionToTextureLevel(src, m_expectedTextureLevel[dstMipLevel]->getAccess(), region, dstMipLevel);
+		}
+
 		de::MovePtr<tcu::TextureLevel>			resultLevel			= readImage(*m_destination, m_params.dst.image, mipLevelNdx);
 		const tcu::ConstPixelBufferAccess&		resultAccess		= resultLevel->getAccess();
 
@@ -3145,8 +3238,10 @@ tcu::TestStatus BlittingMipmaps::checkTestResult (tcu::ConstPixelBufferAccess re
 	return tcu::TestStatus::pass("Pass");
 }
 
-void BlittingMipmaps::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region)
+void BlittingMipmaps::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel)
 {
+	DE_ASSERT(src.getDepth() == dst.getDepth());
+
 	const MirrorMode mirrorMode = getMirrorMode(region.imageBlit.srcOffsets[0],
 												region.imageBlit.srcOffsets[1],
 												region.imageBlit.dstOffsets[0],
@@ -3205,14 +3300,17 @@ void BlittingMipmaps::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src,
 	}
 	else
 	{
-		const tcu::ConstPixelBufferAccess	srcSubRegion	= tcu::getSubregion(src, srcOffset.x, srcOffset.y, srcExtent.x, srcExtent.y);
-		const tcu::PixelBufferAccess		dstSubRegion	= tcu::getSubregion(dst, dstOffset.x, dstOffset.y, dstExtent.x, dstExtent.y);
-		blit(dstSubRegion, srcSubRegion, filter, mirrorMode);
-
-		if (filter == tcu::Sampler::LINEAR)
+		for (int layerNdx = 0u; layerNdx < src.getDepth(); layerNdx++)
 		{
-			const tcu::PixelBufferAccess	unclampedSubRegion	= tcu::getSubregion(m_unclampedExpectedTextureLevel[0]->getAccess(), dstOffset.x, dstOffset.y, dstExtent.x, dstExtent.y);
-			scaleFromWholeSrcBuffer(unclampedSubRegion, src, srcOffset, srcExtent, filter);
+			const tcu::ConstPixelBufferAccess	srcSubRegion	= tcu::getSubregion(src, srcOffset.x, srcOffset.y, layerNdx, srcExtent.x, srcExtent.y, 1);
+			const tcu::PixelBufferAccess		dstSubRegion	= tcu::getSubregion(dst, dstOffset.x, dstOffset.y, layerNdx, dstExtent.x, dstExtent.y, 1);
+			blit(dstSubRegion, srcSubRegion, filter, mirrorMode);
+
+			if (filter == tcu::Sampler::LINEAR)
+			{
+				const tcu::PixelBufferAccess	unclampedSubRegion	= tcu::getSubregion(m_unclampedExpectedTextureLevel[mipLevel]->getAccess(), dstOffset.x, dstOffset.y, layerNdx, dstExtent.x, dstExtent.y, 1);
+				scaleFromWholeSrcBuffer(unclampedSubRegion, srcSubRegion, srcOffset, srcExtent, filter);
+			}
 		}
 	}
 }
@@ -3273,7 +3371,7 @@ public:
 	virtual tcu::TestStatus						iterate						(void);
 protected:
 	virtual tcu::TestStatus						checkTestResult				(tcu::ConstPixelBufferAccess result = tcu::ConstPixelBufferAccess());
-	void										copyMSImageToMSImage		(void);
+	void										copyMSImageToMSImage		(deUint32 copyArraySize);
 private:
 	Move<VkImage>								m_multisampledImage;
 	de::MovePtr<Allocation>						m_multisampledImageAlloc;
@@ -3288,7 +3386,8 @@ private:
 
 	virtual void								copyRegionToTextureLevel	(tcu::ConstPixelBufferAccess	src,
 																			 tcu::PixelBufferAccess			dst,
-																			 CopyRegion						region);
+																			 CopyRegion						region,
+																			 deUint32						dstMipLevel);
 };
 
 ResolveImageToImage::ResolveImageToImage (Context& context, TestParams params, const ResolveImageToImageOptions options)
@@ -3830,11 +3929,17 @@ tcu::TestStatus ResolveImageToImage::iterate (void)
 	generateBuffer(m_sourceTextureLevel->getAccess(), m_params.src.image.extent.width, m_params.src.image.extent.height, m_params.dst.image.extent.depth, FILL_MODE_MULTISAMPLE);
 	generateExpectedResult();
 
+	VkImage		sourceImage		= m_multisampledImage.get();
+	deUint32	sourceArraySize	= getArraySize(m_params.src.image);
+
 	switch (m_options)
 	{
-		case COPY_MS_IMAGE_TO_MS_IMAGE:
 		case COPY_MS_IMAGE_TO_ARRAY_MS_IMAGE:
-			copyMSImageToMSImage();
+			// Duplicate the multisampled image to a multisampled image array
+			sourceArraySize	= getArraySize(m_params.dst.image);
+		case COPY_MS_IMAGE_TO_MS_IMAGE:
+			copyMSImageToMSImage(sourceArraySize);
+			sourceImage	= m_multisampledCopyImage.get();
 			break;
 		default:
 			break;
@@ -3860,13 +3965,13 @@ tcu::TestStatus ResolveImageToImage::iterate (void)
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,		// VkImageLayout			newLayout;
 			VK_QUEUE_FAMILY_IGNORED,					// deUint32					srcQueueFamilyIndex;
 			VK_QUEUE_FAMILY_IGNORED,					// deUint32					dstQueueFamilyIndex;
-			m_multisampledImage.get(),					// VkImage					image;
+			sourceImage,								// VkImage					image;
 			{											// VkImageSubresourceRange	subresourceRange;
 				getAspectFlags(srcTcuFormat),		// VkImageAspectFlags	aspectMask;
 				0u,									// deUint32				baseMipLevel;
 				1u,									// deUint32				mipLevels;
 				0u,									// deUint32				baseArraySlice;
-				getArraySize(m_params.src.image)	// deUint32				arraySize;
+				sourceArraySize						// deUint32				arraySize;
 			}
 		},
 		// destination image
@@ -3920,7 +4025,7 @@ tcu::TestStatus ResolveImageToImage::iterate (void)
 
 	VK_CHECK(vk.beginCommandBuffer(*m_cmdBuffer, &cmdBufferBeginInfo));
 	vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)DE_NULL, 0, (const VkBufferMemoryBarrier*)DE_NULL, DE_LENGTH_OF_ARRAY(imageBarriers), imageBarriers);
-	vk.cmdResolveImage(*m_cmdBuffer, m_multisampledImage.get(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_destination.get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (deUint32)m_params.regions.size(), imageResolves.data());
+	vk.cmdResolveImage(*m_cmdBuffer, sourceImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_destination.get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, (deUint32)m_params.regions.size(), imageResolves.data());
 	vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)DE_NULL, 0, (const VkBufferMemoryBarrier*)DE_NULL, 1, &postImageBarrier);
 	VK_CHECK(vk.endCommandBuffer(*m_cmdBuffer));
 	submitCommandsAndWait(vk, vkDevice, queue, *m_cmdBuffer);
@@ -3946,8 +4051,10 @@ tcu::TestStatus ResolveImageToImage::checkTestResult (tcu::ConstPixelBufferAcces
 	return tcu::TestStatus::pass("CopiesAndBlitting test");
 }
 
-void ResolveImageToImage::copyRegionToTextureLevel(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region)
+void ResolveImageToImage::copyRegionToTextureLevel(tcu::ConstPixelBufferAccess src, tcu::PixelBufferAccess dst, CopyRegion region, deUint32 mipLevel)
 {
+	DE_UNREF(mipLevel);
+
 	VkOffset3D srcOffset	= region.imageResolve.srcOffset;
 			srcOffset.z		= region.imageResolve.srcSubresource.baseArrayLayer;
 	VkOffset3D dstOffset	= region.imageResolve.dstOffset;
@@ -3962,7 +4069,7 @@ void ResolveImageToImage::copyRegionToTextureLevel(tcu::ConstPixelBufferAccess s
 	tcu::copy(dstSubRegion, srcSubRegion);
 }
 
-void ResolveImageToImage::copyMSImageToMSImage (void)
+void ResolveImageToImage::copyMSImageToMSImage (deUint32 copyArraySize)
 {
 	const DeviceInterface&			vk					= m_context.getDeviceInterface();
 	const VkDevice					vkDevice			= m_context.getDevice();
@@ -3970,7 +4077,7 @@ void ResolveImageToImage::copyMSImageToMSImage (void)
 	const tcu::TextureFormat		srcTcuFormat		= mapVkFormat(m_params.src.image.format);
 	std::vector<VkImageCopy>		imageCopies;
 
-	for (deUint32 layerNdx = 0; layerNdx < getArraySize(m_params.dst.image); ++layerNdx)
+	for (deUint32 layerNdx = 0; layerNdx < copyArraySize; ++layerNdx)
 	{
 		const VkImageSubresourceLayers	sourceSubresourceLayers	=
 		{
@@ -4036,13 +4143,13 @@ void ResolveImageToImage::copyMSImageToMSImage (void)
 				0u,									// deUint32				baseMipLevel;
 				1u,									// deUint32				mipLevels;
 				0u,									// deUint32				baseArraySlice;
-				getArraySize(m_params.dst.image)	// deUint32				arraySize;
+				copyArraySize						// deUint32				arraySize;
 			}
 		},
 	};
 
 	const VkImageMemoryBarrier	postImageBarriers		=
-	// source image
+	// destination image
 	{
 		VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,		// VkStructureType			sType;
 		DE_NULL,									// const void*				pNext;
@@ -4058,7 +4165,7 @@ void ResolveImageToImage::copyMSImageToMSImage (void)
 			0u,									// deUint32				baseMipLevel;
 			1u,									// deUint32				mipLevels;
 			0u,									// deUint32				baseArraySlice;
-			getArraySize(m_params.dst.image)	// deUint32				arraySize;
+			copyArraySize						// deUint32				arraySize;
 		}
 	};
 
@@ -4077,8 +4184,6 @@ void ResolveImageToImage::copyMSImageToMSImage (void)
 	VK_CHECK(vk.endCommandBuffer(*m_cmdBuffer));
 
 	submitCommandsAndWait (vk, vkDevice, queue, *m_cmdBuffer);
-
-	m_multisampledImage = m_multisampledCopyImage;
 }
 
 class ResolveImageToImageTestCase : public vkt::TestCase
