@@ -9709,7 +9709,7 @@ bool SubImageErrorsTest::Test1D()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.textureSubImage1D(m_to_1D, 0, 0, s_reference_width, s_reference_format, s_reference_type,
-							 (glw::GLubyte*)NULL + s_reference_size * 2);
+							 glu::BufferOffsetAsPointer(s_reference_size * 2));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glTextureSubImage1D",
 								  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and the "
 								  "data would be unpacked from the buffer object such that the memory reads required "
@@ -9728,7 +9728,7 @@ bool SubImageErrorsTest::Test1D()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.textureSubImage1D(m_to_1D, 0, 0, s_reference_width, s_reference_format, s_reference_type,
-							 (glw::GLubyte*)NULL + 1);
+							 glu::BufferOffsetAsPointer(1));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glTextureSubImage1D",
 								  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and pixels "
 								  "is not evenly divisible into the number of bytes needed to store in memory a datum "
@@ -9950,7 +9950,7 @@ bool SubImageErrorsTest::Test2D()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.textureSubImage2D(m_to_2D, 0, 0, 0, s_reference_width, s_reference_height, s_reference_format,
-							 s_reference_type, (glw::GLubyte*)NULL + s_reference_size * 2);
+							 s_reference_type, glu::BufferOffsetAsPointer(s_reference_size * 2));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glTextureSubImage2D",
 								  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and the "
 								  "data would be unpacked from the buffer object such that the memory reads required "
@@ -9969,7 +9969,7 @@ bool SubImageErrorsTest::Test2D()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.textureSubImage2D(m_to_2D, 0, 0, 0, s_reference_width, s_reference_height, s_reference_format,
-							 s_reference_type, (glw::GLubyte*)NULL + 1);
+							 s_reference_type, glu::BufferOffsetAsPointer(1));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glTextureSubImage2D",
 								  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and pixels "
 								  "is not evenly divisible into the number of bytes needed to store in memory a datum "
@@ -10204,7 +10204,7 @@ bool SubImageErrorsTest::Test3D()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.textureSubImage3D(m_to_3D, 0, 0, 0, 0, s_reference_width, s_reference_height, s_reference_depth,
-							 s_reference_format, s_reference_type, (glw::GLubyte*)NULL + s_reference_size * 2);
+							 s_reference_format, s_reference_type, glu::BufferOffsetAsPointer(s_reference_size * 2));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glTextureSubImage3D",
 								  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and the "
 								  "data would be unpacked from the buffer object such that the memory reads required "
@@ -10223,7 +10223,7 @@ bool SubImageErrorsTest::Test3D()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.textureSubImage3D(m_to_3D, 0, 0, 0, 0, s_reference_width, s_reference_height, s_reference_depth,
-							 s_reference_format, s_reference_type, (glw::GLubyte*)NULL + 1);
+							 s_reference_format, s_reference_type, glu::BufferOffsetAsPointer(1));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glTextureSubImage3D",
 								  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and pixels "
 								  "is not evenly divisible into the number of bytes needed to store in memory a datum "
@@ -10333,7 +10333,7 @@ bool SubImageErrorsTest::Test1DCompressed()
 
 			gl.compressedTextureSubImage1D(m_to_1D_compressed, 0, 0, s_reference_width,
 										   m_reference_compressed_1D_format, m_reference_compressed_1D_size,
-										   (glw::GLubyte*)NULL + s_reference_size * 2);
+										   glu::BufferOffsetAsPointer(s_reference_size * 2));
 			is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glCompressedTextureSubImage1D",
 									  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and "
 									  "the buffer object's data store is currently mapped.");
@@ -10443,7 +10443,7 @@ bool SubImageErrorsTest::Test2DCompressed()
 
 			gl.compressedTextureSubImage2D(m_to_2D_compressed, 0, 0, 0, s_reference_width, s_reference_height,
 										   m_reference_compressed_2D_format, m_reference_compressed_2D_size,
-										   (glw::GLubyte*)NULL + s_reference_size * 2);
+										   glu::BufferOffsetAsPointer(s_reference_size * 2));
 			is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glCompressedTextureSubImage2D",
 									  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and "
 									  "the buffer object's data store is currently mapped.");
@@ -10576,7 +10576,7 @@ bool SubImageErrorsTest::Test3DCompressed()
 
 			gl.compressedTextureSubImage3D(m_to_3D_compressed, 0, 0, 0, 0, s_reference_width, s_reference_height,
 										   s_reference_depth, m_reference_compressed_3D_format,
-										   m_reference_compressed_3D_size, (glw::GLubyte*)NULL + s_reference_size * 2);
+										   m_reference_compressed_3D_size, glu::BufferOffsetAsPointer(s_reference_size * 2));
 			is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glCompressedTextureSubImage3D",
 									  "a non-zero buffer object name is bound to the PIXEL_UNPACK_BUFFER target and "
 									  "the buffer object's data store is currently mapped.");
@@ -12712,7 +12712,7 @@ tcu::TestNode::IterateResult ImageQueryErrorsTest::iterate()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.getTextureImage(texture_2D, 0, s_reference_format, s_reference_type, s_reference_size,
-						   (glw::GLuint*)NULL + 1);
+						   glu::BufferOffsetAsPointer(1 * sizeof(GLuint)));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glGetTextureImage",
 								  "a pixel pack buffer object is bound and packing the texture image into the buffer’s "
 								  "memory would exceed the size of the buffer.");
@@ -12728,7 +12728,7 @@ tcu::TestNode::IterateResult ImageQueryErrorsTest::iterate()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
 		gl.getTextureImage(texture_2D, 0, s_reference_format, s_reference_type, s_reference_size,
-						   (glw::GLubyte*)NULL + 1);
+						   glu::BufferOffsetAsPointer(1));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glGetTextureImage",
 								  "a pixel pack buffer object is bound and pixels is not evenly divisible by the "
 								  "number of basic machine units needed to store in memory the GL data type "
@@ -12806,7 +12806,7 @@ tcu::TestNode::IterateResult ImageQueryErrorsTest::iterate()
 		gl.bindBuffer(GL_PIXEL_PACK_BUFFER, buffer);
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glBindBuffer has failed");
 
-		gl.getCompressedTextureImage(texture_2D_compressed, 0, s_reference_size, (char*)NULL + s_reference_size - 1);
+		gl.getCompressedTextureImage(texture_2D_compressed, 0, s_reference_size, glu::BufferOffsetAsPointer(s_reference_size - 1));
 		is_ok &= CheckErrorAndLog(m_context, GL_INVALID_OPERATION, "glGetCompressedTextureImage",
 								  "a non-zero buffer object name is bound to the PIXEL_PACK_BUFFER target and the data "
 								  "would be packed to the buffer object such that the memory writes required would "
