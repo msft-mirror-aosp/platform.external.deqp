@@ -22,6 +22,7 @@ import com.android.tradefed.build.IFolderBuildInfo;
 import com.android.tradefed.config.ConfigurationException;
 import com.android.tradefed.config.OptionSetter;
 import com.android.tradefed.device.DeviceNotAvailableException;
+import com.android.tradefed.device.IManagedTestDevice;
 import com.android.tradefed.device.ITestDevice;
 import com.android.tradefed.metrics.proto.MetricMeasurement.Metric;
 import com.android.tradefed.result.ITestInvocationListener;
@@ -1343,8 +1344,10 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.verify(mockDevice);
     }
 
-    public static interface RecoverableTestDevice extends ITestDevice {
-        public void recoverDevice() throws DeviceNotAvailableException;
+    /**
+     * Test interface to mock Tradefed device types.
+     */
+    public static interface RecoverableTestDevice extends ITestDevice, IManagedTestDevice {
     }
 
     private static enum RecoveryEvent {

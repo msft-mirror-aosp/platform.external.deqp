@@ -1,16 +1,5 @@
 # EGL Tests to exclude when Testing ANGLE.
 
-# anglebug.com/3172
-dEQP-EGL.functional.choose_config.random.color_sizes
-dEQP-EGL.functional.choose_config.random.color_depth_stencil_sizes
-dEQP-EGL.functional.choose_config.random.buffer_sizes
-dEQP-EGL.functional.choose_config.random.surface_type
-dEQP-EGL.functional.choose_config.random.sample_buffers
-
-# anglebug.com/2329
-dEQP-EGL.functional.choose_config.simple.selection_only*
-dEQP-EGL.functional.choose_config.simple.selection_and_sort*
-
 # b/124910588
 dEQP-EGL.functional.hdr_metadata.smpte2086
 dEQP-EGL.functional.hdr_metadata.cta861_3

@@ -25,6 +25,7 @@ import com.android.tradefed.build.IBuildInfo;
 import com.android.tradefed.config.Option;
 import com.android.tradefed.config.OptionClass;
 import com.android.tradefed.device.DeviceNotAvailableException;
+import com.android.tradefed.device.IManagedTestDevice;
 import com.android.tradefed.device.ITestDevice;
 import com.android.tradefed.log.LogUtil.CLog;
 import com.android.tradefed.metrics.proto.MetricMeasurement.Metric;
@@ -52,8 +53,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -998,31 +997,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         }
 
         public void recoverDevice() throws DeviceNotAvailableException {
-            // Work around the API. We need to call recoverDevice() on the test device and
-            // we know that mDevice is a TestDevice. However even though the recoverDevice()
-            // method is public suggesting it should be publicly accessible, the class itself
-            // and its super-interface (IManagedTestDevice) are package-private.
-            final Method recoverDeviceMethod;
-            try {
-                recoverDeviceMethod = mDevice.getClass().getMethod("recoverDevice");
-                recoverDeviceMethod.setAccessible(true);
-            } catch (NoSuchMethodException ex) {
-                throw new AssertionError("Test device must have recoverDevice()");
-            }
-
-            try {
-                recoverDeviceMethod.invoke(mDevice);
-            } catch (InvocationTargetException ex) {
-                if (ex.getCause() instanceof DeviceNotAvailableException) {
-                    throw (DeviceNotAvailableException)ex.getCause();
-                } else if (ex.getCause() instanceof RuntimeException) {
-                    throw (RuntimeException)ex.getCause();
-                } else {
-                    throw new AssertionError("unexpected throw", ex);
-                }
-            } catch (IllegalAccessException ex) {
-                throw new AssertionError("unexpected throw", ex);
-            }
+            ((IManagedTestDevice) mDevice).recoverDevice();
         }
 
         private void rebootDevice() throws DeviceNotAvailableException {
@@ -2060,7 +2035,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         } catch (DeviceNotAvailableException ex) {
             // chain forward
             CLog.e("Failed to set up ANGLE correctly.");
-            throw new DeviceNotAvailableException("Device not available",
+            throw new DeviceNotAvailableException("Device not available", ex,
                 mDevice.getSerialNumber());
         }
     }
@@ -2084,7 +2059,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         } catch (DeviceNotAvailableException ex) {
             // chain forward
             CLog.e("Failed to clean up ANGLE correctly.");
-            throw new DeviceNotAvailableException("Device not available",
+            throw new DeviceNotAvailableException("Device not available", ex,
                 mDevice.getSerialNumber());
         }
     }
@@ -2126,7 +2101,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             }
         } catch (CapabilityQueryFailureException ex) {
             // Platform is not behaving correctly, for example crashing when trying to create
-            // a window. Instead of silenty failing, signal failure by leaving the rest of the
+            // a window. Instead of silently failing, signal failure by leaving the rest of the
             // test cases in "NotExecuted" state
             CLog.e("Capability query failed - leaving tests unexecuted.");
         } finally {

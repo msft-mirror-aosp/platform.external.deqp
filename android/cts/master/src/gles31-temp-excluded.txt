@@ -1,5 +1,2 @@
 # Tests to be temporarily skipped for Android CI, but still enforced in CTS.
 
-# b/120910671
-dEQP-GLES31.functional.separate_shader.random.67
-

@@ -12,6 +12,3 @@ dEQP-GLES2.functional.rasterization.primitives.lines
 
 # anglebug.com/2808 -- b/118636566
 dEQP-GLES2.functional.shaders.builtin_variable.fragcoord_w
-
-# b/122740575
-dEQP-GLES2.functional.texture.specification.random_teximage2d.2d_4
