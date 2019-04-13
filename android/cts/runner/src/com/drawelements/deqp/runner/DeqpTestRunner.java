@@ -1831,10 +1831,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private static Set<String> getNonPatternFilters(List<String> filters) {
         Set<String> nonPatternFilters = new HashSet<String>();
         for (String filter : filters) {
-        	if (filter.startsWith("#") || filter.isEmpty()) {
-        		// Skip comments and empty lines
-        		continue;
-			}
+            if (filter.startsWith("#") || filter.isEmpty()) {
+                // Skip comments and empty lines
+                continue;
+            }
             if (!filter.contains("*")) {
                 // Deqp usesly only dots for separating between parts of the names
                 // Convert last dot to hash if needed.
