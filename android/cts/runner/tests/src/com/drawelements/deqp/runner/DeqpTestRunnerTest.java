@@ -22,6 +22,7 @@ import com.android.tradefed.build.IFolderBuildInfo;
 import com.android.tradefed.config.ConfigurationException;
 import com.android.tradefed.config.OptionSetter;
 import com.android.tradefed.device.DeviceNotAvailableException;
+import com.android.tradefed.device.IManagedTestDevice;
 import com.android.tradefed.device.ITestDevice;
 import com.android.tradefed.metrics.proto.MetricMeasurement.Metric;
 import com.android.tradefed.result.ITestInvocationListener;
@@ -121,7 +122,7 @@ public class DeqpTestRunnerTest extends TestCase {
     private static DeqpTestRunner buildGlesTestRunner(int majorVersion,
                                                       int minorVersion,
                                                       Collection<TestDescription> tests,
-                                                      File testsDir) throws ConfigurationException, FileNotFoundException {
+                                                      File testsDir) throws ConfigurationException {
         StringWriter testlist = new StringWriter();
         for (TestDescription test : tests) {
             testlist.write(test.getClassName() + "." + test.getTestName() + "\n");
@@ -255,7 +256,7 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
@@ -396,7 +397,7 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
@@ -556,7 +557,7 @@ public class DeqpTestRunnerTest extends TestCase {
             EasyMock.expectLastCall().once();
         }
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
@@ -652,7 +653,7 @@ public class DeqpTestRunnerTest extends TestCase {
             }
         }
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
@@ -795,8 +796,7 @@ public class DeqpTestRunnerTest extends TestCase {
                 = EasyMock.createStrictMock(ITestInvocationListener.class);
         mockListener.testRunStarted(getTestId(deqpTest), 0);
         EasyMock.expectLastCall().once();
-
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockListener);
@@ -904,7 +904,7 @@ public class DeqpTestRunnerTest extends TestCase {
             EasyMock.expectLastCall().once();
         }
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
@@ -946,7 +946,6 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
-
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
@@ -954,7 +953,7 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
             andReturn("").once();
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice);
@@ -1002,8 +1001,7 @@ public class DeqpTestRunnerTest extends TestCase {
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
             andReturn("").once();
-
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice);
@@ -1118,7 +1116,7 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
@@ -1334,7 +1332,7 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice);
@@ -1344,8 +1342,10 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.verify(mockDevice);
     }
 
-    public static interface RecoverableTestDevice extends ITestDevice {
-        public void recoverDevice() throws DeviceNotAvailableException;
+    /**
+     * Test interface to mock Tradefed device types.
+     */
+    public static interface RecoverableTestDevice extends ITestDevice, IManagedTestDevice {
     }
 
     private static enum RecoveryEvent {
@@ -1685,15 +1685,13 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
-
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
             andReturn("").once();
-
-        mockListener.testRunEnded(EasyMock.anyLong(), (Map<String, String>) EasyMock.anyObject());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>anyObject());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
@@ -1758,7 +1756,7 @@ public class DeqpTestRunnerTest extends TestCase {
                 EasyMock.expectLastCall().once();
             }
 
-            mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+            mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
             EasyMock.expectLastCall().once();
 
             EasyMock.replay(mockDevice, mockIDevice);
@@ -1906,7 +1904,7 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testFailed(EasyMock.eq(testId), EasyMock.<String>notNull());
         EasyMock.expectLastCall().andThrow(new RunInterruptedException());
 
-        mockListener.testRunEnded(EasyMock.anyLong(), (Map<String, String>) EasyMock.anyObject());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>anyObject());
         EasyMock.expectLastCall().once();
         EasyMock.replay(mockDevice, mockIDevice);
         EasyMock.replay(mockListener);
@@ -2073,7 +2071,7 @@ public class DeqpTestRunnerTest extends TestCase {
             EasyMock.expectLastCall().once();
         }
 
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<Map<String, String>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
         EasyMock.replay(mockDevice, mockIDevice);
