@@ -4,7 +4,8 @@
 		  android:versionCode="1"
 		  android:versionName="1.0">
 	<application android:label="dEQP Tests"
-				 android:icon="@drawable/deqp_app">
+				 android:icon="@drawable/deqp_app"
+				 android:requestLegacyExternalStorage="true">
 		<activity android:name="com.drawelements.deqp.execserver.ExecServerActivity"
 				  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
 				  android:label="dEQP ExecServer"

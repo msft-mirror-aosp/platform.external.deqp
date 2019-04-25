@@ -64,7 +64,6 @@ import java.util.concurrent.TimeUnit;
 public class DeqpTestRunnerTest extends TestCase {
     private static final String NAME = "dEQP-GLES3";
     private static final IAbi ABI = new Abi("armeabi-v7a", "32");
-    private static final String SHELL_DIR = "/sdcard/Android/sandbox/com.drawelements.deqp/";
     private static final String APP_DIR = "/sdcard/";
     private static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
     private static final String LOG_FILE_NAME = "TestLog.qpa";
@@ -2146,17 +2145,17 @@ public class DeqpTestRunnerTest extends TestCase {
 
     private void runInstrumentationLineAndAnswer(ITestDevice mockDevice, IDevice mockIDevice,
             final String testTrie, final String cmd, final String output) throws Exception {
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + SHELL_DIR + CASE_LIST_FILE_NAME)))
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + APP_DIR + CASE_LIST_FILE_NAME)))
                 .andReturn("").once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + SHELL_DIR + LOG_FILE_NAME)))
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + APP_DIR + LOG_FILE_NAME)))
                 .andReturn("").once();
 
         if (testTrie == null) {
-            mockDevice.pushString((String)EasyMock.anyObject(), EasyMock.eq(SHELL_DIR + CASE_LIST_FILE_NAME));
+            mockDevice.pushString((String)EasyMock.anyObject(), EasyMock.eq(APP_DIR + CASE_LIST_FILE_NAME));
         }
         else {
-            mockDevice.pushString(testTrie + "\n", SHELL_DIR + CASE_LIST_FILE_NAME);
+            mockDevice.pushString(testTrie + "\n", APP_DIR + CASE_LIST_FILE_NAME);
         }
         EasyMock.expectLastCall().andReturn(true).once();
 

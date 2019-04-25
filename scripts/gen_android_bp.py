@@ -56,12 +56,17 @@ EXCLUDE_PATTERNS = [
 ]
 
 TEMPLATE = """
-# WARNING: This is auto-generated file. Do not modify, since changes will
-# be lost! Modify scripts/gen_android_mk.py instead.
+// WARNING: This is auto-generated file. Do not modify, since changes will
+// be lost! Modify scripts/gen_android_bp.py instead.
 
-LOCAL_SRC_FILES :={SRC_FILES}
+cc_defaults {
+    name: "libdeqp_gen",
 
-LOCAL_C_INCLUDES :={INCLUDES}
+    srcs: [
+{SRC_FILES}    ],
+    local_include_dirs: [
+{INCLUDES}    ],
+}
 
 """[1:-1]
 
@@ -122,24 +127,24 @@ def getSourceDirs (sourceFiles):
 
 	return sourceDirs
 
-def genMkStringList (items):
+def genBpStringList (items):
 	src = ""
 
 	for item in items:
-		src += " \\\n\t%s" % item
+		src += "       \"%s\",\n" % item
 
 	return src
 
-def genAndroidMk (sourceDirs, sourceFiles):
+def genAndroidBp (sourceDirs, sourceFiles):
 	src = TEMPLATE
-	src = src.replace("{INCLUDES}", genMkStringList(["$(deqp_dir)/%s" % s for s in sourceDirs]))
-	src = src.replace("{SRC_FILES}", genMkStringList(sourceFiles))
+	src = src.replace("{INCLUDES}", genBpStringList(sourceDirs))
+	src = src.replace("{SRC_FILES}", genBpStringList(sourceFiles))
 
 	return src
 
 if __name__ == "__main__":
 	sourceFiles		= getSourceFiles()
 	sourceDirs		= getSourceDirs(sourceFiles)
-	androidMkText	= genAndroidMk(sourceDirs, sourceFiles)
+	androidBpText	= genAndroidBp(sourceDirs, sourceFiles)
 
-	writeFile(os.path.join(DEQP_DIR, "AndroidGen.mk"), androidMkText)
+	writeFile(os.path.join(DEQP_DIR, "AndroidGen.bp"), androidBpText)
