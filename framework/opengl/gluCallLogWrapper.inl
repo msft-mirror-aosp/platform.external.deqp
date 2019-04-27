@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision b7aee529f02340247e45621e9dbd054817d39c71.
+ * Generated from Khronos GL API description (gl.xml) revision acc85f4b76949b015c0354bd8c20a1076a49b1cf.
  */
 
 void CallLogWrapper::glActiveShaderProgram (glw::GLuint pipeline, glw::GLuint program)
@@ -4745,6 +4745,13 @@ void CallLogWrapper::glRenderbufferStorageMultisample (glw::GLenum target, glw::
 	if (m_enableLog)
 		m_log << TestLog::Message << "glRenderbufferStorageMultisample(" << getFramebufferTargetStr(target) << ", " << samples << ", " << getUncompressedTextureFormatStr(internalformat) << ", " << width << ", " << height << ");" << TestLog::EndMessage;
 	m_gl.renderbufferStorageMultisample(target, samples, internalformat, width, height);
+}
+
+void CallLogWrapper::glRenderbufferStorageMultisampleEXT (glw::GLenum target, glw::GLsizei samples, glw::GLenum internalformat, glw::GLsizei width, glw::GLsizei height)
+{
+	if (m_enableLog)
+		m_log << TestLog::Message << "glRenderbufferStorageMultisampleEXT(" << toHex(target) << ", " << samples << ", " << toHex(internalformat) << ", " << width << ", " << height << ");" << TestLog::EndMessage;
+	m_gl.renderbufferStorageMultisampleEXT(target, samples, internalformat, width, height);
 }
 
 void CallLogWrapper::glResumeTransformFeedback (void)

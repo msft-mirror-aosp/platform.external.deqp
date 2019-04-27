@@ -4,22 +4,6 @@
 dEQP-EGL.functional.hdr_metadata.smpte2086
 dEQP-EGL.functional.hdr_metadata.cta861_3
 
-# anglebug.com/3081 -- b/124128521
-dEQP-EGL.functional.image.create.gles2_renderbuffer_depth16_depth_buffer
-dEQP-EGL.functional.image.create.gles2_renderbuffer_stencil_stencil_buffer
-
-# anglebug.com/3170
-dEQP-EGL.functional.image.modify.renderbuffer_depth16_renderbuffer_clear_depth
-dEQP-EGL.functional.image.modify.renderbuffer_stencil_renderbuffer_clear_stencil
-dEQP-EGL.functional.image.modify.renderbuffer_rgb565_tex_subimage_rgb8
-dEQP-EGL.functional.image.modify.renderbuffer_rgba4_tex_subimage_rgba8
-dEQP-EGL.functional.image.modify.tex_rgb565_tex_subimage_rgb8
-dEQP-EGL.functional.image.modify.tex_rgba4_tex_subimage_rgba8
-
-# anglebug.com/3081 -- b/124128521
-dEQP-EGL.functional.image.render_multiple_contexts.gles2_renderbuffer_depth16_depth_buffer
-dEQP-EGL.functional.image.render_multiple_contexts.gles2_renderbuffer_stencil_stencil_buffer
-
 # anglebug.com/3059
 dEQP-EGL.functional.sharing.gles2.multithread.*
 

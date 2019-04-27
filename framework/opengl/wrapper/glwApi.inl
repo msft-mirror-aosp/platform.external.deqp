@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision b7aee529f02340247e45621e9dbd054817d39c71.
+ * Generated from Khronos GL API description (gl.xml) revision acc85f4b76949b015c0354bd8c20a1076a49b1cf.
  */
 #define			glActiveShaderProgram								glwActiveShaderProgram
 #define			glActiveTexture										glwActiveTexture
@@ -647,6 +647,7 @@
 #define			glRenderGpuMaskNV									glwRenderGpuMaskNV
 #define			glRenderbufferStorage								glwRenderbufferStorage
 #define			glRenderbufferStorageMultisample					glwRenderbufferStorageMultisample
+#define			glRenderbufferStorageMultisampleEXT					glwRenderbufferStorageMultisampleEXT
 #define			glResumeTransformFeedback							glwResumeTransformFeedback
 #define			glSampleCoverage									glwSampleCoverage
 #define			glSampleMaski										glwSampleMaski
@@ -1552,6 +1553,7 @@ void			glwReleaseShaderCompiler							();
 void			glwRenderGpuMaskNV									(GLbitfield mask);
 void			glwRenderbufferStorage								(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
 void			glwRenderbufferStorageMultisample					(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+void			glwRenderbufferStorageMultisampleEXT				(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 void			glwResumeTransformFeedback							();
 void			glwSampleCoverage									(GLfloat value, GLboolean invert);
 void			glwSampleMaski										(GLuint maskNumber, GLbitfield mask);

@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision b7aee529f02340247e45621e9dbd054817d39c71.
+ * Generated from Khronos GL API description (gl.xml) revision acc85f4b76949b015c0354bd8c20a1076a49b1cf.
  */
 
 void glwActiveShaderProgram (GLuint pipeline, GLuint program)
@@ -5154,6 +5154,14 @@ void glwRenderbufferStorageMultisample (GLenum target, GLsizei samples, GLenum i
 	if (!gl)
 		return;
 	gl->renderbufferStorageMultisample(target, samples, internalformat, width, height);
+}
+
+void glwRenderbufferStorageMultisampleEXT (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height)
+{
+	const glw::Functions* gl = glw::getCurrentThreadFunctions();
+	if (!gl)
+		return;
+	gl->renderbufferStorageMultisampleEXT(target, samples, internalformat, width, height);
 }
 
 void glwResumeTransformFeedback (void)

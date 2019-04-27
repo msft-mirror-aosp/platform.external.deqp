@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision b7aee529f02340247e45621e9dbd054817d39c71.
+ * Generated from Khronos GL API description (gl.xml) revision acc85f4b76949b015c0354bd8c20a1076a49b1cf.
  */
 typedef GLW_APICALL void			(GLW_APIENTRY* glActiveShaderProgramFunc)								(GLuint pipeline, GLuint program);
 typedef GLW_APICALL void			(GLW_APIENTRY* glActiveTextureFunc)										(GLenum texture);
@@ -647,6 +647,7 @@ typedef GLW_APICALL void			(GLW_APIENTRY* glReleaseShaderCompilerFunc)								(v
 typedef GLW_APICALL void			(GLW_APIENTRY* glRenderGpuMaskNVFunc)									(GLbitfield mask);
 typedef GLW_APICALL void			(GLW_APIENTRY* glRenderbufferStorageFunc)								(GLenum target, GLenum internalformat, GLsizei width, GLsizei height);
 typedef GLW_APICALL void			(GLW_APIENTRY* glRenderbufferStorageMultisampleFunc)					(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
+typedef GLW_APICALL void			(GLW_APIENTRY* glRenderbufferStorageMultisampleEXTFunc)					(GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height);
 typedef GLW_APICALL void			(GLW_APIENTRY* glResumeTransformFeedbackFunc)							(void);
 typedef GLW_APICALL void			(GLW_APIENTRY* glSampleCoverageFunc)									(GLfloat value, GLboolean invert);
 typedef GLW_APICALL void			(GLW_APIENTRY* glSampleMaskiFunc)										(GLuint maskNumber, GLbitfield mask);
