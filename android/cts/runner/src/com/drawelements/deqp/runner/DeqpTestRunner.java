@@ -81,7 +81,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private static final String INCOMPLETE_LOG_MESSAGE = "Crash: Incomplete test log";
     private static final String SKIPPED_INSTANCE_LOG_MESSAGE = "Configuration skipped";
     private static final String NOT_EXECUTABLE_LOG_MESSAGE = "Abort: Test cannot be executed";
-    private static final String SHELL_DIR = "/sdcard/Android/sandbox/com.drawelements.deqp/";
     private static final String APP_DIR = "/sdcard/";
     private static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
     private static final String LOG_FILE_NAME = "TestLog.qpa";
@@ -1406,9 +1405,9 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
 
         final String testCases = generateTestCaseTrie(batch.tests);
 
-        mDevice.executeShellCommand("rm " + SHELL_DIR + CASE_LIST_FILE_NAME);
-        mDevice.executeShellCommand("rm " + SHELL_DIR + LOG_FILE_NAME);
-        mDevice.pushString(testCases + "\n", SHELL_DIR + CASE_LIST_FILE_NAME);
+        mDevice.executeShellCommand("rm " + APP_DIR + CASE_LIST_FILE_NAME);
+        mDevice.executeShellCommand("rm " + APP_DIR + LOG_FILE_NAME);
+        mDevice.pushString(testCases + "\n", APP_DIR + CASE_LIST_FILE_NAME);
 
         final String instrumentationName =
                 "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
