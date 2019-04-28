@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision b7aee529f02340247e45621e9dbd054817d39c71.
+ * Generated from Khronos GL API description (gl.xml) revision acc85f4b76949b015c0354bd8c20a1076a49b1cf.
  */
 
 GLW_APICALL void GLW_APIENTRY glActiveShaderProgram (GLuint pipeline, GLuint program)
@@ -5591,6 +5591,16 @@ GLW_APICALL void GLW_APIENTRY glRenderbufferStorage (GLenum target, GLenum inter
 }
 
 GLW_APICALL void GLW_APIENTRY glRenderbufferStorageMultisample (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height)
+{
+	DE_UNREF(target);
+	DE_UNREF(samples);
+	DE_UNREF(internalformat);
+	DE_UNREF(width);
+	DE_UNREF(height);
+
+}
+
+GLW_APICALL void GLW_APIENTRY glRenderbufferStorageMultisampleEXT (GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height)
 {
 	DE_UNREF(target);
 	DE_UNREF(samples);

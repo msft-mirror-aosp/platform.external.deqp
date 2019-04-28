@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision b7aee529f02340247e45621e9dbd054817d39c71.
+ * Generated from Khronos GL API description (gl.xml) revision acc85f4b76949b015c0354bd8c20a1076a49b1cf.
  */
 glActiveShaderProgramFunc								activeShaderProgram;
 glActiveTextureFunc										activeTexture;
@@ -647,6 +647,7 @@ glReleaseShaderCompilerFunc								releaseShaderCompiler;
 glRenderGpuMaskNVFunc									renderGpuMaskNV;
 glRenderbufferStorageFunc								renderbufferStorage;
 glRenderbufferStorageMultisampleFunc					renderbufferStorageMultisample;
+glRenderbufferStorageMultisampleEXTFunc					renderbufferStorageMultisampleEXT;
 glResumeTransformFeedbackFunc							resumeTransformFeedback;
 glSampleCoverageFunc									sampleCoverage;
 glSampleMaskiFunc										sampleMaski;

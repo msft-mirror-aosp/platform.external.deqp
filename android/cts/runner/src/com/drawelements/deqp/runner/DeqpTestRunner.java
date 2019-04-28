@@ -2003,8 +2003,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private void setupTestEnvironment() throws DeviceNotAvailableException {
         try {
             // Get the system into a known state.
-            // FIXME -- b/115906203 -- Skia Vulkan workaround
-            mDevice.executeShellCommand("setprop debug.hwui.renderer none");
             // Clear ANGLE Global.Settings values
             mDevice.executeShellCommand("settings put global angle_gl_driver_selection_pkgs \"\"");
             mDevice.executeShellCommand("settings put global angle_gl_driver_selection_values \"\"");
@@ -2012,8 +2010,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             // ANGLE
             if (mAngle.equals(ANGLE_VULKAN)) {
                 CLog.i("Configuring ANGLE to use: " + mAngle);
-                // FIXME -- b/115906203 -- Skia Vulkan workaround
-                mDevice.executeShellCommand("setprop debug.hwui.renderer skiavk");
                 // Force dEQP to use ANGLE
                 mDevice.executeShellCommand(
                     "settings put global angle_gl_driver_selection_pkgs " + DEQP_ONDEVICE_PKG);
@@ -2047,10 +2043,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         try {
             if (!mAngle.equals(ANGLE_NONE)) {
                 CLog.i("Cleaning up ANGLE");
-                if (mAngle.equals(ANGLE_VULKAN)) {
-                    // FIXME -- b/115906203 -- Undo Skia Vulkan workaround
-                    mDevice.executeShellCommand("setprop debug.hwui.renderer none");
-                }
                 // Stop forcing dEQP to use ANGLE
                 mDevice.executeShellCommand("settings put global angle_gl_driver_selection_pkgs \"\"");
                 mDevice.executeShellCommand("settings put global angle_gl_driver_selection_values \"\"");
