@@ -59,8 +59,6 @@ namespace api
 namespace
 {
 
-#include "vkApiExtensionDependencyInfo.inl"
-
 using namespace vk;
 using std::vector;
 using std::set;
@@ -766,38 +764,6 @@ void checkDeviceExtensions (tcu::ResultCollector& results, const vector<string>&
 	checkDuplicateExtensions(results, extensions);
 }
 
-void checkInstanceExtensionDependencies(tcu::ResultCollector& results,
-										int dependencyLength,
-										const std::pair<const char*, const char*>* dependencies,
-										const vector<VkExtensionProperties>& extensionProperties)
-{
-	for (int ndx = 0; ndx < dependencyLength; ndx++)
-	{
-		if (isExtensionSupported(extensionProperties, RequiredExtension(dependencies[ndx].first)) &&
-			!isExtensionSupported(extensionProperties, RequiredExtension(dependencies[ndx].second)))
-		{
-			results.fail("Extension " + string(dependencies[ndx].first) + " is missing dependency: " + string(dependencies[ndx].second));
-		}
-	}
-}
-
-void checkDeviceExtensionDependencies(tcu::ResultCollector& results,
-									  int dependencyLength,
-									  const std::pair<const char*, const char*>* dependencies,
-									  const vector<VkExtensionProperties>& instanceExtensionProperties,
-									  const vector<VkExtensionProperties>& deviceExtensionProperties)
-{
-	for (int ndx = 0; ndx < dependencyLength; ndx++)
-	{
-		if (isExtensionSupported(deviceExtensionProperties, RequiredExtension(dependencies[ndx].first)) &&
-			!isExtensionSupported(deviceExtensionProperties, RequiredExtension(dependencies[ndx].second)) &&
-			!isExtensionSupported(instanceExtensionProperties, RequiredExtension(dependencies[ndx].second)))
-		{
-			results.fail("Extension " + string(dependencies[ndx].first) + " is missing dependency: " + string(dependencies[ndx].second));
-		}
-	}
-}
-
 tcu::TestStatus enumerateInstanceLayers (Context& context)
 {
 	TestLog&						log					= context.getTestContext().getLog();
@@ -837,19 +803,6 @@ tcu::TestStatus enumerateInstanceExtensions (Context& context)
 
 		checkInstanceExtensions(results, extensionNames);
 		CheckEnumerateInstanceExtensionPropertiesIncompleteResult()(context, results, properties.size());
-
-		if (context.contextSupports(vk::ApiVersion(1, 1, 0)))
-		{
-			checkInstanceExtensionDependencies(results,
-											   DE_LENGTH_OF_ARRAY(instanceExtensionDependencies_1_1),
-											   instanceExtensionDependencies_1_1, properties);
-		}
-		else if (context.contextSupports(vk::ApiVersion(1, 0, 0)))
-		{
-			checkInstanceExtensionDependencies(results,
-											   DE_LENGTH_OF_ARRAY(instanceExtensionDependencies_1_0),
-											   instanceExtensionDependencies_1_0, properties);
-		}
 	}
 
 	{
@@ -944,37 +897,19 @@ tcu::TestStatus enumerateDeviceExtensions (Context& context)
 	tcu::ResultCollector	results	(log);
 
 	{
-		const ScopedLogSection				section						(log, "Global", "Global Extensions");
-		const vector<VkExtensionProperties>	instanceExtensionProperties	= enumerateInstanceExtensionProperties(context.getPlatformInterface(), DE_NULL);
-		const vector<VkExtensionProperties>	deviceExtensionProperties	= enumerateDeviceExtensionProperties(context.getInstanceInterface(), context.getPhysicalDevice(), DE_NULL);
-		vector<string>						deviceExtensionNames;
+		const ScopedLogSection				section		(log, "Global", "Global Extensions");
+		const vector<VkExtensionProperties>	properties	= enumerateDeviceExtensionProperties(context.getInstanceInterface(), context.getPhysicalDevice(), DE_NULL);
+		vector<string>						extensionNames;
 
-		for (size_t ndx = 0; ndx < deviceExtensionProperties.size(); ndx++)
+		for (size_t ndx = 0; ndx < properties.size(); ndx++)
 		{
-			log << TestLog::Message << ndx << ": " << deviceExtensionProperties[ndx] << TestLog::EndMessage;
+			log << TestLog::Message << ndx << ": " << properties[ndx] << TestLog::EndMessage;
 
-			deviceExtensionNames.push_back(deviceExtensionProperties[ndx].extensionName);
+			extensionNames.push_back(properties[ndx].extensionName);
 		}
 
-		checkDeviceExtensions(results, deviceExtensionNames);
-		CheckEnumerateDeviceExtensionPropertiesIncompleteResult()(context, results, deviceExtensionProperties.size());
-
-		if (context.contextSupports(vk::ApiVersion(1, 1, 0)))
-		{
-			checkDeviceExtensionDependencies(results,
-											 DE_LENGTH_OF_ARRAY(deviceExtensionDependencies_1_1),
-											 deviceExtensionDependencies_1_1,
-											 instanceExtensionProperties,
-											 deviceExtensionProperties);
-		}
-		else if (context.contextSupports(vk::ApiVersion(1, 0, 0)))
-		{
-			checkDeviceExtensionDependencies(results,
-											 DE_LENGTH_OF_ARRAY(deviceExtensionDependencies_1_0),
-											 deviceExtensionDependencies_1_0,
-											 instanceExtensionProperties,
-											 deviceExtensionProperties);
-		}
+		checkDeviceExtensions(results, extensionNames);
+		CheckEnumerateDeviceExtensionPropertiesIncompleteResult()(context, results, properties.size());
 	}
 
 	{
