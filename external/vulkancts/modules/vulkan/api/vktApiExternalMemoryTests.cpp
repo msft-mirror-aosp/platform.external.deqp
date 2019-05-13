@@ -3908,7 +3908,7 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 			const size_t	bit	= numOfUsageFlags + createFlagNdx;
 			if ((combo & (1u << bit)) == 0)
 				continue;
-			if (((createFlags[createFlagNdx] & vk::VK_IMAGE_CREATE_PROTECTED_BIT) == vk::VK_IMAGE_CREATE_PROTECTED_BIT ) && 
+			if (((createFlags[createFlagNdx] & vk::VK_IMAGE_CREATE_PROTECTED_BIT) == vk::VK_IMAGE_CREATE_PROTECTED_BIT ) &&
 				(protectedFeatures.protectedMemory == VK_FALSE))
 				continue;
 			createFlag |= createFlags[createFlagNdx];
@@ -4019,6 +4019,9 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 				ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, &anhUsage, DE_NULL);
 				TCU_CHECK(ahbFormat == ahbApi->vkFormatToAhbFormat(format));
 				TCU_CHECK((anhUsage & requiredAhbUsage) == requiredAhbUsage);
+
+				// Let watchdog know we're alive
+				context.getTestContext().touchWatchdog();
 			}
 
 			if (properties.imageFormatProperties.maxMipLevels > 1u)
