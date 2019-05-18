@@ -58,8 +58,6 @@ set(DEQP_VK_API_SRCS
 	vktApiPipelineTests.cpp
 	vktApiMemoryRequirementInvarianceTests.cpp
 	vktApiMemoryRequirementInvarianceTests.hpp
-	vktApiExtensionDependenciesTests.cpp
-	vktApiExtensionDependenciesTests.hpp
 	)
 
 set(DEQP_VK_API_LIBS
