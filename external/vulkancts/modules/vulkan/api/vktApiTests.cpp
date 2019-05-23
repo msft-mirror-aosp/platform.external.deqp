@@ -31,7 +31,6 @@
 #include "vktApiBufferTests.hpp"
 #include "vktApiBufferViewCreateTests.hpp"
 #include "vktApiBufferViewAccessTests.hpp"
-#include "vktApiExtensionDependenciesTests.hpp"
 #include "vktApiFeatureInfo.hpp"
 #include "vktApiCommandBuffersTests.hpp"
 #include "vktApiCopiesAndBlittingTests.hpp"
@@ -89,7 +88,6 @@ void createApiTests (tcu::TestCaseGroup* apiTests)
 	apiTests->addChild(createDescriptorSetTests					(testCtx));
 	apiTests->addChild(createPipelineTests						(testCtx));
 	apiTests->addChild(createMemoryRequirementInvarianceTests	(testCtx));
-	apiTests->addChild(createExtensionDependenciesTests			(testCtx));
 }
 
 } // anonymous
