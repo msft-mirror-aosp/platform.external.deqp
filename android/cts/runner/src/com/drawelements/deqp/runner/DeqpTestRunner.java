@@ -42,6 +42,7 @@ import com.android.tradefed.testtype.IRuntimeHintProvider;
 import com.android.tradefed.testtype.IShardableTest;
 import com.android.tradefed.testtype.ITestCollector;
 import com.android.tradefed.testtype.ITestFilterReceiver;
+import com.android.tradefed.testtype.NativeCodeCoverageListener;
 import com.android.tradefed.util.AbiUtils;
 import com.android.tradefed.util.IRunUtil;
 import com.android.tradefed.util.RunInterruptedException;
@@ -147,6 +148,13 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             description="ANGLE backend ('none', 'vulkan', 'opengles'). Defaults to 'none' (don't use ANGLE)",
             importance=Option.Importance.NEVER)
     private String mAngle = "none";
+
+    @Option(
+            name = "native-coverage",
+            description =
+                    "Collect code coverage for this test run. Note that the build under test must"
+                        + " be a coverage build or else this will fail.")
+    private boolean mCoverage = false;
 
     private Collection<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
@@ -2069,6 +2077,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             loadTests();
         }
 
+        listener = addNativeCoverageListenerIfEnabled(mDevice, listener);
+
         mRemainingTests = new LinkedList<>(mTestInstances.keySet());
         long startTime = System.currentTimeMillis();
         listener.testRunStarted(getId(), mRemainingTests.size());
@@ -2175,6 +2185,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         mCollectTestsOnly = collectTests;
     }
 
+    public void setNativeCoverage(boolean coverage) { mCoverage = coverage; }
+
     private static void copyOptions(DeqpTestRunner destination, DeqpTestRunner source) {
         destination.mDeqpPackage = source.mDeqpPackage;
         destination.mConfigName = source.mConfigName;
@@ -2190,6 +2202,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         destination.mLogData = source.mLogData;
         destination.mCollectTestsOnly = source.mCollectTestsOnly;
         destination.mAngle = source.mAngle;
+        destination.mCoverage = source.mCoverage;
     }
 
     /**
@@ -2261,5 +2274,20 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         // Tests normally take something like ~100ms. Some take a
         // second. Let's guess 200ms per test.
         return 200 * mTestInstances.size();
+    }
+
+    /**
+     * Adds a {@link NativeCodeCoverageListener} to the chain if code coverage is enabled.
+     *
+     * @param device the device to pull coverage results from
+     * @param listener the original listener
+     * @return a chained listener if code coverage is enabled, otherwise the original listener
+     */
+    ITestInvocationListener addNativeCoverageListenerIfEnabled(
+            ITestDevice device, ITestInvocationListener listener) {
+        if (mCoverage) {
+            return new NativeCodeCoverageListener(device, listener);
+        }
+        return listener;
     }
 }
