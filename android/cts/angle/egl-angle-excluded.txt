@@ -1,18 +1,4 @@
 # EGL Tests to exclude when Testing ANGLE.
 
-# b/124910588
-dEQP-EGL.functional.hdr_metadata.smpte2086
-dEQP-EGL.functional.hdr_metadata.cta861_3
-
 # anglebug.com/3059
 dEQP-EGL.functional.sharing.gles2.multithread.*
-
-# b/124910588
-dEQP-EGL.functional.wide_color.pbuffer_1010102_colorspace_default
-dEQP-EGL.functional.wide_color.pbuffer_8888_colorspace_default
-dEQP-EGL.functional.wide_color.pbuffer_888_colorspace_default
-dEQP-EGL.functional.wide_color.pbuffer_fp16_default_colorspace
-dEQP-EGL.functional.wide_color.window_1010102_colorspace_default
-dEQP-EGL.functional.wide_color.window_8888_colorspace_default
-dEQP-EGL.functional.wide_color.window_888_colorspace_default
-dEQP-EGL.functional.wide_color.window_fp16_default_colorspace
