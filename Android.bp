@@ -83,7 +83,7 @@ android_test {
 
     srcs: ["android/package/src/**/*.java"],
     resource_dirs: ["android/package/res"],
-    manifest: "android/package/AndroidManifest.xml",
+    manifest: "android/package/AndroidManifest-integration.xml",
 
     asset_dirs: [
         "data",
