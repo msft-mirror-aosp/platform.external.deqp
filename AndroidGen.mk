@@ -62,6 +62,7 @@ LOCAL_SRC_FILES := \
 	external/vulkancts/modules/vulkan/api/vktApiCopiesAndBlittingTests.cpp \
 	external/vulkancts/modules/vulkan/api/vktApiDescriptorPoolTests.cpp \
 	external/vulkancts/modules/vulkan/api/vktApiDeviceInitializationTests.cpp \
+	external/vulkancts/modules/vulkan/api/vktApiDriverPropertiesTests.cpp \
 	external/vulkancts/modules/vulkan/api/vktApiExternalMemoryTests.cpp \
 	external/vulkancts/modules/vulkan/api/vktApiFeatureInfo.cpp \
 	external/vulkancts/modules/vulkan/api/vktApiFillBufferTests.cpp \
