@@ -24,6 +24,7 @@
  *//*--------------------------------------------------------------------*/
 
 #include "vkDefs.hpp"
+#include "vkObjUtil.hpp"
 #include "vkMemUtil.hpp"
 #include "vkRef.hpp"
 #include "vkRefUtil.hpp"
@@ -132,47 +133,11 @@ deUint32						getImageSizeInBytes					(const vk::VkExtent3D&				baseExtents,
 																	 const deUint32						mipmapLevelsCount		= 1u,
 																	 const deUint32						mipmapMemoryAlignment	= 1u);
 
-vk::Move<vk::VkCommandPool>		makeCommandPool						(const vk::DeviceInterface&			vk,
-																	 const vk::VkDevice					device,
-																	 const deUint32						queueFamilyIndex);
-
-vk::Move<vk::VkPipelineLayout>	makePipelineLayout					(const vk::DeviceInterface&			vk,
-																	 const vk::VkDevice					device,
-																	 const vk::VkDescriptorSetLayout	descriptorSetLayout = DE_NULL);
-
 vk::Move<vk::VkPipeline>		makeComputePipeline					(const vk::DeviceInterface&			vk,
 																	 const vk::VkDevice					device,
 																	 const vk::VkPipelineLayout			pipelineLayout,
 																	 const vk::VkShaderModule			shaderModule,
 																	 const vk::VkSpecializationInfo*	specializationInfo	= 0);
-
-vk::Move<vk::VkBufferView>		makeBufferView						(const vk::DeviceInterface&			vk,
-																	 const vk::VkDevice					device,
-																	 const vk::VkBuffer					buffer,
-																	 const vk::VkFormat					format,
-																	 const vk::VkDeviceSize				offset,
-																	 const vk::VkDeviceSize				size);
-
-vk::Move<vk::VkImageView>		makeImageView						(const vk::DeviceInterface&			vk,
-																	 const vk::VkDevice					device,
-																	 const vk::VkImage					image,
-																	 const vk::VkImageViewType			imageViewType,
-																	 const vk::VkFormat					format,
-																	 const vk::VkImageSubresourceRange	subresourceRange);
-
-vk::Move<vk::VkDescriptorSet>	makeDescriptorSet					(const vk::DeviceInterface&			vk,
-																	 const vk::VkDevice					device,
-																	 const vk::VkDescriptorPool			descriptorPool,
-																	 const vk::VkDescriptorSetLayout	setLayout);
-
-vk::Move<vk::VkFramebuffer>		makeFramebuffer						(const vk::DeviceInterface&			vk,
-																	 const vk::VkDevice					device,
-																	 const vk::VkRenderPass				renderPass,
-																	 const deUint32						attachmentCount,
-																	 const vk::VkImageView*				pAttachments,
-																	 const deUint32						width,
-																	 const deUint32						height,
-																	 const deUint32						layers = 1u);
 
 de::MovePtr<vk::Allocation>		bindImage							(const vk::DeviceInterface&			vk,
 																	 const vk::VkDevice					device,
@@ -185,9 +150,6 @@ de::MovePtr<vk::Allocation>		bindBuffer							(const vk::DeviceInterface&			vk,
 																	 vk::Allocator&						allocator,
 																	 const vk::VkBuffer					buffer,
 																	 const vk::MemoryRequirement		requirement);
-
-vk::VkBufferCreateInfo			makeBufferCreateInfo				(const vk::VkDeviceSize				bufferSize,
-																	 const vk::VkBufferUsageFlags		usage);
 
 vk::VkBufferImageCopy			makeBufferImageCopy					(const vk::VkExtent3D				extent,
 																	 const deUint32						layersCount,

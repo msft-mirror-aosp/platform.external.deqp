@@ -1,6 +1,7 @@
 
 include_directories(
 	..
+	../amber
 	)
 
 set(DEQP_VK_PIPELINE_SRCS
@@ -74,18 +75,25 @@ set(DEQP_VK_PIPELINE_SRCS
 	vktPipelineVertexInputTests.hpp
 	vktPipelineTimestampTests.cpp
 	vktPipelineTimestampTests.hpp
+	vktPipelineVertexOnlyTests.cpp
+	vktPipelineVertexOnlyTests.hpp
 	vktPipelineVertexUtil.cpp
 	vktPipelineVertexUtil.hpp
 	vktPipelineCacheTests.cpp
 	vktPipelineCacheTests.hpp
 	vktPipelineMakeUtil.cpp
 	vktPipelineMakeUtil.hpp
+	vktPipelineCreationFeedbackTests.cpp
+	vktPipelineCreationFeedbackTests.hpp
+	vktPipelineDepthRangeUnrestrictedTests.cpp
+	vktPipelineDepthRangeUnrestrictedTests.hpp
 	)
 
 set(DEQP_VK_PIPELINE_LIBS
 	tcutil
 	vkutil
 	referencerenderer
+	libamber
 	)
 
 PCH(DEQP_VK_PIPELINE_SRCS ../pch.cpp)

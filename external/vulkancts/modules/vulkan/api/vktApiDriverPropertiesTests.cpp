@@ -65,6 +65,10 @@ static const deUint32 knownDriverIds[] =
 
 static const VkConformanceVersionKHR knownConformanceVersions[] =
 {
+	makeConformanceVersionKHR(1, 1, 5, 0),
+	makeConformanceVersionKHR(1, 1, 4, 2),
+	makeConformanceVersionKHR(1, 1, 4, 1),
+	makeConformanceVersionKHR(1, 1, 4, 0),
 	makeConformanceVersionKHR(1, 1, 3, 2),
 	makeConformanceVersionKHR(1, 1, 3, 1),
 	makeConformanceVersionKHR(1, 1, 3, 0),
@@ -77,13 +81,6 @@ static const VkConformanceVersionKHR knownConformanceVersions[] =
 	makeConformanceVersionKHR(1, 1, 1, 1),
 	makeConformanceVersionKHR(1, 1, 1, 0),
 	makeConformanceVersionKHR(1, 1, 0, 3),
-	makeConformanceVersionKHR(1, 0, 2, 6),
-	makeConformanceVersionKHR(1, 0, 2, 5),
-	makeConformanceVersionKHR(1, 0, 2, 4),
-	makeConformanceVersionKHR(1, 0, 2, 3),
-	makeConformanceVersionKHR(1, 0, 2, 2),
-	makeConformanceVersionKHR(1, 0, 2, 1),
-	makeConformanceVersionKHR(1, 0, 2, 0),
 };
 
 DE_INLINE bool isNullTerminated(const char* str, const deUint32 maxSize)
@@ -102,10 +99,7 @@ DE_INLINE bool operator==(const VkConformanceVersionKHR& a, const VkConformanceV
 void checkSupport (Context& context, const TestType config)
 {
 	DE_UNREF(config);
-
-	// Check extension support
-	if (!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_driver_properties"))
-		TCU_THROW(NotSupportedError, "Unsupported extension: VK_KHR_driver_properties");
+	context.requireDeviceExtension("VK_KHR_driver_properties");
 }
 
 void testDriverMatch (const VkPhysicalDeviceDriverPropertiesKHR& deviceDriverProperties)

@@ -39,6 +39,7 @@
 #include "vkTypeUtil.hpp"
 #include "vkQueryUtil.hpp"
 #include "vkCmdUtil.hpp"
+#include "vkObjUtil.hpp"
 
 #include "tcuTextureUtil.hpp"
 #include "tcuTexture.hpp"
@@ -361,7 +362,7 @@ void GraphicsAttachmentsTestInstance::transcode (std::vector<deUint8>& srcData, 
 	const Unique<VkShaderModule>			vertShaderModule		(createShaderModule(vk, device, m_context.getBinaryCollection().get("vert"), 0));
 	const Unique<VkShaderModule>			fragShaderModule		(createShaderModule(vk, device, m_context.getBinaryCollection().get("frag"), 0));
 
-	const Unique<VkRenderPass>				renderPass				(makeRenderPass(vk, device, m_parameters.featuredFormat, m_parameters.featuredFormat));
+	const Unique<VkRenderPass>				renderPass				(vkt::image::makeRenderPass(vk, device, m_parameters.featuredFormat, m_parameters.featuredFormat));
 
 	const Move<VkDescriptorSetLayout>		descriptorSetLayout		(DescriptorSetLayoutBuilder()
 																		.addSingleBinding(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT)
@@ -385,7 +386,7 @@ void GraphicsAttachmentsTestInstance::transcode (std::vector<deUint8>& srcData, 
 	const VkBufferImageCopy					dstCopyRegion			= makeBufferImageCopy(m_parameters.size[0], m_parameters.size[1]);
 
 	const VkImageView						attachmentBindInfos[]	= { *srcImageView, *dstImageView };
-	const Move<VkFramebuffer>				framebuffer				(makeFramebuffer(vk, device, *renderPass, DE_LENGTH_OF_ARRAY(attachmentBindInfos), attachmentBindInfos, renderSize, SINGLE_LAYER));
+	const Move<VkFramebuffer>				framebuffer				(makeFramebuffer(vk, device, *renderPass, DE_LENGTH_OF_ARRAY(attachmentBindInfos), attachmentBindInfos, renderSize.width, renderSize.height, SINGLE_LAYER));
 
 	DE_ASSERT(srcImageSizeInBytes == dstImageSizeInBytes);
 
@@ -642,7 +643,7 @@ void GraphicsTextureTestInstance::transcode (std::vector<deUint8>& srcData, std:
 	const VkBufferImageCopy					dstCopyRegion			= makeBufferImageCopy(m_parameters.size[0], m_parameters.size[1]);
 
 	const VkExtent2D						framebufferSize			(makeExtent2D(m_parameters.size[0], m_parameters.size[1]));
-	const Move<VkFramebuffer>				framebuffer				(makeFramebuffer(vk, device, *renderPass, 0, DE_NULL, framebufferSize, SINGLE_LAYER));
+	const Move<VkFramebuffer>				framebuffer				(makeFramebuffer(vk, device, *renderPass, 0, DE_NULL, framebufferSize.width, framebufferSize.height, SINGLE_LAYER));
 
 	DE_ASSERT(srcImageSizeInBytes == dstImageSizeInBytes);
 

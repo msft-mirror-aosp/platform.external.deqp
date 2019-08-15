@@ -1,10 +1,10 @@
 # dEQP cmake file
 
 # Module FindGit requires cmake >= 2.8.2
-cmake_minimum_required(VERSION 2.8.2)
+cmake_minimum_required(VERSION 3.0)
 
 find_package(Git)
-find_package(PythonInterp 2)
+find_package(PythonInterp 3)
 
 # dEQP Target.
 set(DEQP_TARGET "default" CACHE STRING "dEQP Target (default, android...)")
@@ -95,23 +95,16 @@ add_subdirectory(external/glslang)
 # spirv-tools
 add_subdirectory(external/spirv-tools)
 
-# VkRunner
-if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/vkrunner/src")
-	message(STATUS "VkRunner found, integration enabled")
-	set(DEQP_HAVE_VKRUNNER 1)
-	add_definitions("-DDEQP_HAVE_VKRUNNER=1")
-	add_subdirectory(external/vkrunner)
-	include_directories(external/vkrunner/src)
-else()
-	message(STATUS "VkRunner not found, integration disabled")
-endif ()
-
 # spirv-headers
 set(SPIRV_INCLUDE_PATH "${PROJECT_SOURCE_DIR}/external/spirv-headers/src/include")
 if (NOT EXISTS ${SPIRV_INCLUDE_PATH})
 	message(FATAL_ERROR "SPIR-V headers not found, please run external/fetch_sources.py")
 endif()
 include_directories(${SPIRV_INCLUDE_PATH})
+
+# Amber
+add_subdirectory(external/amber)
+include_directories(external/amber)
 
 # RenderDoc API
 include_directories(external/renderdoc/src)

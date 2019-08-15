@@ -43,6 +43,7 @@
 #include "deMemory.h"
 #include "deUniquePtr.hpp"
 #include "tcuTestLog.hpp"
+#include "tcuCommandLine.hpp"
 #include <vector>
 
 namespace vkt
@@ -74,28 +75,36 @@ struct TestParams
 
 void checkAllSupported (const Extensions& supportedExtensions, const vector<string>& requiredExtensions)
 {
-	for (vector<string>::const_iterator requiredExtName = requiredExtensions.begin(); requiredExtName != requiredExtensions.end(); ++requiredExtName)
+	for (auto& requiredExtName : requiredExtensions)
 	{
-		if (!isExtensionSupported(supportedExtensions, RequiredExtension(*requiredExtName)))
-			TCU_THROW(NotSupportedError, (*requiredExtName + " is not supported").c_str());
+		if (!isExtensionSupported(supportedExtensions, RequiredExtension(requiredExtName)))
+			TCU_THROW(NotSupportedError, (requiredExtName + " is not supported").c_str());
 	}
 }
 
-Move<VkInstance> createInstanceWithGetPhysicalDeviceProperties2 (const PlatformInterface&	vkp,
-																 deUint32					version,
+Move<VkInstance> createInstanceWithGetPhysicalDeviceProperties2 (const Context&				context,
+																 const PlatformInterface&	vkp,
 																 const Extensions&			supportedExtensions)
 {
-	vector<string> extensions;
+	vector<string> requiredExtensions = { "VK_KHR_get_physical_device_properties2" };
+	checkAllSupported(supportedExtensions, requiredExtensions);
 
-	if (!isCoreInstanceExtension(version, "VK_KHR_get_physical_device_properties2"))
-		extensions.push_back("VK_KHR_get_physical_device_properties2");
+	vector<string> enabledLayers;
+	if (context.getTestContext().getCommandLine().isValidationEnabled())
+	{
+		enabledLayers = vkt::getValidationLayers(vkp);
+	}
 
-	checkAllSupported(supportedExtensions, extensions);
-
-	return createDefaultInstance(vkp, version, vector<string>(), extensions);
+	return createDefaultInstance(vkp, context.getUsedApiVersion(), enabledLayers, requiredExtensions);
 }
 
-Move<VkDevice> createDeviceWithPushDescriptor (const PlatformInterface&		vkp,
+const char *innerCString(const string &str)
+{
+	return str.c_str();
+}
+
+Move<VkDevice> createDeviceWithPushDescriptor (const Context&				context,
+											   const PlatformInterface&		vkp,
 											   VkInstance					instance,
 											   const InstanceInterface&		vki,
 											   VkPhysicalDevice				physicalDevice,
@@ -103,8 +112,8 @@ Move<VkDevice> createDeviceWithPushDescriptor (const PlatformInterface&		vkp,
 											   const deUint32				queueFamilyIndex)
 {
 
-	const float						queuePriority	= 1.0f;
-	const VkDeviceQueueCreateInfo	queueInfo		=
+	const float						queuePriority			= 1.0f;
+	const VkDeviceQueueCreateInfo	queueInfo				=
 	{
 		VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
 		DE_NULL,
@@ -117,10 +126,21 @@ Move<VkDevice> createDeviceWithPushDescriptor (const PlatformInterface&		vkp,
 	VkPhysicalDeviceFeatures		features;
 	deMemset(&features, 0, sizeof(features));
 
-	const char* const				extensions[]	=
+	vector<string>					requiredExtensionsStr	= { "VK_KHR_push_descriptor" };
+	vector<const char *>			requiredExtensions;
+	checkAllSupported(supportedExtensions, requiredExtensionsStr);
+	// We need the contents of requiredExtensionsStr as a vector<const char*> in VkDeviceCreateInfo.
+	transform(begin(requiredExtensionsStr), end(requiredExtensionsStr), back_inserter(requiredExtensions), innerCString);
+
+	// Enable validation layers on this device if validation has been requested from the command line.
+	vector<string>					enabledLayersStr;
+	vector<const char*>				enabledLayers;
+	if (context.getTestContext().getCommandLine().isValidationEnabled())
 	{
-		"VK_KHR_push_descriptor"
-	};
+		// We need the contents of enabledLayersStr as a vector<const char*> in VkDeviceCreateInfo.
+		enabledLayersStr = vkt::getValidationLayers(vki, physicalDevice);
+		transform(begin(enabledLayersStr), end(enabledLayersStr), back_inserter(enabledLayers), innerCString);
+	}
 
 	const VkDeviceCreateInfo		deviceParams    =
 	{
@@ -129,15 +149,12 @@ Move<VkDevice> createDeviceWithPushDescriptor (const PlatformInterface&		vkp,
 		(VkDeviceCreateFlags)0,
 		1u,
 		&queueInfo,
-		0u,
-		DE_NULL,
-		1u,
-		extensions,
+		static_cast<deUint32>(enabledLayers.size()),
+		(enabledLayers.empty() ? DE_NULL : enabledLayers.data()),
+		static_cast<deUint32>(requiredExtensions.size()),
+		(requiredExtensions.empty() ? DE_NULL : requiredExtensions.data()),
 		&features
 	};
-
-	if (!isExtensionSupported(supportedExtensions, RequiredExtension(extensions[0])))
-		TCU_THROW(NotSupportedError, (string(extensions[0]) + " is not supported").c_str());
 
 	return createDevice(vkp, instance, vki, physicalDevice, &deviceParams, DE_NULL);
 }
@@ -257,12 +274,12 @@ PushDescriptorBufferGraphicsTestInstance::PushDescriptorBufferGraphicsTestInstan
 	, m_params				(params)
 	, m_vkp					(context.getPlatformInterface())
 	, m_instanceExtensions	(enumerateInstanceExtensionProperties(m_vkp, DE_NULL))
-	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(m_vkp, context.getUsedApiVersion(), m_instanceExtensions))
+	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(context, m_vkp, m_instanceExtensions))
 	, m_vki					(m_vkp, *m_instance)
 	, m_physicalDevice		(chooseDevice(m_vki, *m_instance, context.getTestContext().getCommandLine()))
 	, m_queueFamilyIndex	(findQueueFamilyIndexWithCaps(m_vki, m_physicalDevice, VK_QUEUE_GRAPHICS_BIT))
 	, m_deviceExtensions	(enumerateDeviceExtensionProperties(m_vki, m_physicalDevice, DE_NULL))
-	, m_device				(createDeviceWithPushDescriptor(m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
+	, m_device				(createDeviceWithPushDescriptor(context, m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
 	, m_vkd					(m_vkp, *m_instance, *m_device)
 	, m_queue				(getDeviceQueue(m_vkd, *m_device, m_queueFamilyIndex, 0u))
 	, m_allocator			(m_vkd, *m_device, getPhysicalDeviceMemoryProperties(m_vki, m_physicalDevice))
@@ -577,7 +594,8 @@ tcu::TestStatus PushDescriptorBufferGraphicsTestInstance::verifyImage (void)
 			for (deUint32 vertexIdx = 0; vertexIdx < 6; vertexIdx++)
 				m_vertices[quadIdx * 6 + vertexIdx].color.xyzw() = defaultTestColors[quadIdx];
 
-		refRenderer.draw(rr::RenderState(refRenderer.getViewportState()), rr::PRIMITIVETYPE_TRIANGLES, m_vertices);
+		refRenderer.draw(rr::RenderState(refRenderer.getViewportState(), m_context.getDeviceProperties().limits.subPixelPrecisionBits),
+						 rr::PRIMITIVETYPE_TRIANGLES, m_vertices);
 	}
 
 	// Compare result with reference image
@@ -636,7 +654,7 @@ TestInstance* PushDescriptorBufferGraphicsTest::createInstance (Context& context
 
 void PushDescriptorBufferGraphicsTest::initPrograms (SourceCollections& sourceCollections) const
 {
-	const string	bufferType	= m_params.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ? "uniform" : "buffer";
+	const string	bufferType	= m_params.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ? "uniform" : "readonly buffer";
 	const string	vertexSrc	=
 		"#version 450\n"
 		"layout(location = 0) in highp vec4 position;\n"
@@ -709,12 +727,12 @@ PushDescriptorBufferComputeTestInstance::PushDescriptorBufferComputeTestInstance
 	, m_params				(params)
 	, m_vkp					(context.getPlatformInterface())
 	, m_instanceExtensions	(enumerateInstanceExtensionProperties(m_vkp, DE_NULL))
-	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(m_vkp, context.getUsedApiVersion(), m_instanceExtensions))
+	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(context, m_vkp, m_instanceExtensions))
 	, m_vki					(m_vkp, *m_instance)
 	, m_physicalDevice		(chooseDevice(m_vki, *m_instance, context.getTestContext().getCommandLine()))
 	, m_queueFamilyIndex	(findQueueFamilyIndexWithCaps(m_vki, m_physicalDevice, VK_QUEUE_COMPUTE_BIT))
 	, m_deviceExtensions	(enumerateDeviceExtensionProperties(m_vki, m_physicalDevice, DE_NULL))
-	, m_device				(createDeviceWithPushDescriptor(m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
+	, m_device				(createDeviceWithPushDescriptor(context, m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
 	, m_vkd					(m_vkp, *m_instance, *m_device)
 	, m_queue				(getDeviceQueue(m_vkd, *m_device, m_queueFamilyIndex, 0u))
 	, m_allocator			(m_vkd, *m_device, getPhysicalDeviceMemoryProperties(m_vki, m_physicalDevice))
@@ -1060,12 +1078,12 @@ PushDescriptorImageGraphicsTestInstance::PushDescriptorImageGraphicsTestInstance
 	, m_params				(params)
 	, m_vkp					(context.getPlatformInterface())
 	, m_instanceExtensions	(enumerateInstanceExtensionProperties(m_vkp, DE_NULL))
-	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(m_vkp, context.getUsedApiVersion(), m_instanceExtensions))
+	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(context, m_vkp, m_instanceExtensions))
 	, m_vki					(m_vkp, *m_instance)
 	, m_physicalDevice		(chooseDevice(m_vki, *m_instance, context.getTestContext().getCommandLine()))
 	, m_queueFamilyIndex	(findQueueFamilyIndexWithCaps(m_vki, m_physicalDevice, VK_QUEUE_GRAPHICS_BIT))
 	, m_deviceExtensions	(enumerateDeviceExtensionProperties(m_vki, m_physicalDevice, DE_NULL))
-	, m_device				(createDeviceWithPushDescriptor(m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
+	, m_device				(createDeviceWithPushDescriptor(context, m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
 	, m_vkd					(m_vkp, *m_instance, *m_device)
 	, m_queue				(getDeviceQueue(m_vkd, *m_device, m_queueFamilyIndex, 0u))
 	, m_allocator			(m_vkd, *m_device, getPhysicalDeviceMemoryProperties(m_vki, m_physicalDevice))
@@ -1716,7 +1734,8 @@ tcu::TestStatus PushDescriptorImageGraphicsTestInstance::verifyImage (void)
 		if (hasBorder)
 			refQuadsOuter.insert(refQuadsOuter.end(), refQuadsInner.begin(), refQuadsInner.end());
 
-		refRenderer.draw(rr::RenderState(refRenderer.getViewportState()), rr::PRIMITIVETYPE_TRIANGLES, refQuadsOuter);
+		refRenderer.draw(rr::RenderState(refRenderer.getViewportState(), m_context.getDeviceProperties().limits.subPixelPrecisionBits),
+						 rr::PRIMITIVETYPE_TRIANGLES, refQuadsOuter);
 	}
 
 	// Compare result with reference image
@@ -1904,12 +1923,12 @@ PushDescriptorImageComputeTestInstance::PushDescriptorImageComputeTestInstance (
 	, m_params				(params)
 	, m_vkp					(context.getPlatformInterface())
 	, m_instanceExtensions	(enumerateInstanceExtensionProperties(m_vkp, DE_NULL))
-	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(m_vkp, context.getUsedApiVersion(), m_instanceExtensions))
+	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(context, m_vkp, m_instanceExtensions))
 	, m_vki					(m_vkp, *m_instance)
 	, m_physicalDevice		(chooseDevice(m_vki, *m_instance, context.getTestContext().getCommandLine()))
 	, m_queueFamilyIndex	(findQueueFamilyIndexWithCaps(m_vki, m_physicalDevice, VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT))
 	, m_deviceExtensions	(enumerateDeviceExtensionProperties(m_vki, m_physicalDevice, DE_NULL))
-	, m_device				(createDeviceWithPushDescriptor(m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
+	, m_device				(createDeviceWithPushDescriptor(context, m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
 	, m_vkd					(m_vkp, *m_instance, *m_device)
 	, m_queue				(getDeviceQueue(m_vkd, *m_device, m_queueFamilyIndex, 0u))
 	, m_allocator			(m_vkd, *m_device, getPhysicalDeviceMemoryProperties(m_vki, m_physicalDevice))
@@ -2670,12 +2689,12 @@ PushDescriptorTexelBufferGraphicsTestInstance::PushDescriptorTexelBufferGraphics
 	, m_params				(params)
 	, m_vkp					(context.getPlatformInterface())
 	, m_instanceExtensions	(enumerateInstanceExtensionProperties(m_vkp, DE_NULL))
-	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(m_vkp, context.getUsedApiVersion(), m_instanceExtensions))
+	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(context, m_vkp, m_instanceExtensions))
 	, m_vki					(m_vkp, *m_instance)
 	, m_physicalDevice		(chooseDevice(m_vki, *m_instance, context.getTestContext().getCommandLine()))
 	, m_queueFamilyIndex	(findQueueFamilyIndexWithCaps(m_vki, m_physicalDevice, VK_QUEUE_GRAPHICS_BIT))
 	, m_deviceExtensions	(enumerateDeviceExtensionProperties(m_vki, m_physicalDevice, DE_NULL))
-	, m_device				(createDeviceWithPushDescriptor(m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
+	, m_device				(createDeviceWithPushDescriptor(context, m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
 	, m_vkd					(m_vkp, *m_instance, *m_device)
 	, m_queue				(getDeviceQueue(m_vkd, *m_device, m_queueFamilyIndex, 0u))
 	, m_allocator			(m_vkd, *m_device, getPhysicalDeviceMemoryProperties(m_vki, m_physicalDevice))
@@ -2997,7 +3016,8 @@ tcu::TestStatus PushDescriptorTexelBufferGraphicsTestInstance::verifyImage (void
 			for (deUint32 vertexIdx = 0; vertexIdx < 6; vertexIdx++)
 				m_vertices[quadIdx * 6 + vertexIdx].color.xyzw() = defaultTestColors[quadIdx];
 
-		refRenderer.draw(rr::RenderState(refRenderer.getViewportState()), rr::PRIMITIVETYPE_TRIANGLES, m_vertices);
+		refRenderer.draw(rr::RenderState(refRenderer.getViewportState(), m_context.getDeviceProperties().limits.subPixelPrecisionBits),
+						 rr::PRIMITIVETYPE_TRIANGLES, m_vertices);
 	}
 
 	// Compare result with reference image
@@ -3146,12 +3166,12 @@ PushDescriptorTexelBufferComputeTestInstance::PushDescriptorTexelBufferComputeTe
 	, m_params				(params)
 	, m_vkp					(context.getPlatformInterface())
 	, m_instanceExtensions	(enumerateInstanceExtensionProperties(m_vkp, DE_NULL))
-	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(m_vkp, context.getUsedApiVersion(), m_instanceExtensions))
+	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(context, m_vkp, m_instanceExtensions))
 	, m_vki					(m_vkp, *m_instance)
 	, m_physicalDevice		(chooseDevice(m_vki, *m_instance, context.getTestContext().getCommandLine()))
 	, m_queueFamilyIndex	(findQueueFamilyIndexWithCaps(m_vki, m_physicalDevice, VK_QUEUE_COMPUTE_BIT))
 	, m_deviceExtensions	(enumerateDeviceExtensionProperties(m_vki, m_physicalDevice, DE_NULL))
-	, m_device				(createDeviceWithPushDescriptor(m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
+	, m_device				(createDeviceWithPushDescriptor(context, m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
 	, m_vkd					(m_vkp, *m_instance, *m_device)
 	, m_queue				(getDeviceQueue(m_vkd, *m_device, m_queueFamilyIndex, 0u))
 	, m_allocator			(m_vkd, *m_device, getPhysicalDeviceMemoryProperties(m_vki, m_physicalDevice))
@@ -3519,12 +3539,12 @@ PushDescriptorInputAttachmentGraphicsTestInstance::PushDescriptorInputAttachment
 	, m_params				(params)
 	, m_vkp					(context.getPlatformInterface())
 	, m_instanceExtensions	(enumerateInstanceExtensionProperties(m_vkp, DE_NULL))
-	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(m_vkp, context.getUsedApiVersion(), m_instanceExtensions))
+	, m_instance			(createInstanceWithGetPhysicalDeviceProperties2(context, m_vkp, m_instanceExtensions))
 	, m_vki					(m_vkp, *m_instance)
 	, m_physicalDevice		(chooseDevice(m_vki, *m_instance, context.getTestContext().getCommandLine()))
 	, m_queueFamilyIndex	(findQueueFamilyIndexWithCaps(m_vki, m_physicalDevice, VK_QUEUE_GRAPHICS_BIT))
 	, m_deviceExtensions	(enumerateDeviceExtensionProperties(m_vki, m_physicalDevice, DE_NULL))
-	, m_device				(createDeviceWithPushDescriptor(m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
+	, m_device				(createDeviceWithPushDescriptor(context, m_vkp, *m_instance, m_vki, m_physicalDevice, m_deviceExtensions, m_queueFamilyIndex))
 	, m_vkd					(m_vkp, *m_instance, *m_device)
 	, m_queue				(getDeviceQueue(m_vkd, *m_device, m_queueFamilyIndex, 0u))
 	, m_allocator			(m_vkd, *m_device, getPhysicalDeviceMemoryProperties(m_vki, m_physicalDevice))
@@ -4047,7 +4067,8 @@ tcu::TestStatus PushDescriptorInputAttachmentGraphicsTestInstance::verifyImage (
 				refQuads[idx].color.xyzw() = colors[quadIdx];
 			}
 
-		refRenderer.draw(rr::RenderState(refRenderer.getViewportState()), rr::PRIMITIVETYPE_TRIANGLES, refQuads);
+		refRenderer.draw(rr::RenderState(refRenderer.getViewportState(), m_context.getDeviceProperties().limits.subPixelPrecisionBits),
+						 rr::PRIMITIVETYPE_TRIANGLES, refQuads);
 	}
 
 	// Compare result with reference image

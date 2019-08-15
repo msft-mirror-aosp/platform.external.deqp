@@ -48,6 +48,7 @@
 #include "deStringUtil.hpp"
 #include "deUniquePtr.hpp"
 #include "deMath.h"
+#include "deRandom.hpp"
 #include "tcuStringTemplate.hpp"
 
 #include "vktSpvAsmCrossStageInterfaceTests.hpp"
@@ -71,6 +72,8 @@
 #include "vktSpvAsmCompositeInsertTests.hpp"
 #include "vktSpvAsmVaryingNameTests.hpp"
 #include "vktSpvAsmWorkgroupMemoryTests.hpp"
+#include "vktSpvAsmSignedIntCompareTests.hpp"
+#include "vktSpvAsmPtrAccessChainTests.hpp"
 
 #include <cmath>
 #include <limits>
@@ -110,7 +113,7 @@ static void fillRandomScalars (de::Random& rnd, T minValue, T maxValue, void* ds
 {
 	T* const typedPtr = (T*)dst;
 	for (int ndx = 0; ndx < numValues; ndx++)
-		typedPtr[offset + ndx] = randomScalar<T>(rnd, minValue, maxValue);
+		typedPtr[offset + ndx] = de::randomScalar<T>(rnd, minValue, maxValue);
 }
 
 // Filter is a function that returns true if a value should pass, false otherwise.
@@ -122,7 +125,7 @@ static void fillRandomScalars (de::Random& rnd, T minValue, T maxValue, void* ds
 	for (int ndx = 0; ndx < numValues; ndx++)
 	{
 		do
-			value = randomScalar<T>(rnd, minValue, maxValue);
+			value = de::randomScalar<T>(rnd, minValue, maxValue);
 		while (!filter(value));
 
 		typedPtr[offset + ndx] = value;
@@ -377,6 +380,128 @@ tcu::TestCaseGroup* createOpNopGroup (tcu::TestContext& testCtx)
 	return group.release();
 }
 
+tcu::TestCaseGroup* createUnusedVariableComputeTests (tcu::TestContext& testCtx)
+{
+	de::MovePtr<tcu::TestCaseGroup>	group			(new tcu::TestCaseGroup(testCtx, "unused_variables", "Compute shaders with unused variables"));
+	de::Random						rnd				(deStringHash(group->getName()));
+	const int						numElements		= 100;
+	vector<float>					positiveFloats	(numElements, 0);
+	vector<float>					negativeFloats	(numElements, 0);
+
+	fillRandomScalars(rnd, 1.f, 100.f, &positiveFloats[0], numElements);
+
+	for (size_t ndx = 0; ndx < numElements; ++ndx)
+		negativeFloats[ndx] = -positiveFloats[ndx];
+
+	const VariableLocation			testLocations[] =
+	{
+		// Set		Binding
+		{ 0,		5			},
+		{ 5,		5			},
+	};
+
+	for (size_t locationNdx = 0; locationNdx < DE_LENGTH_OF_ARRAY(testLocations); ++locationNdx)
+	{
+		const VariableLocation& location = testLocations[locationNdx];
+
+		// Unused variable.
+		{
+			ComputeShaderSpec				spec;
+
+			spec.assembly =
+				string(getComputeAsmShaderPreamble()) +
+
+				"OpDecorate %id BuiltIn GlobalInvocationId\n"
+
+				+ getUnusedDecorations(location)
+
+				+ string(getComputeAsmInputOutputBufferTraits()) + string(getComputeAsmCommonTypes())
+
+				+ getUnusedTypesAndConstants()
+
+				+ string(getComputeAsmInputOutputBuffer())
+
+				+ getUnusedBuffer() +
+
+				"%id        = OpVariable %uvec3ptr Input\n"
+				"%zero      = OpConstant %i32 0\n"
+
+				"%main      = OpFunction %void None %voidf\n"
+				"%label     = OpLabel\n"
+				"%idval     = OpLoad %uvec3 %id\n"
+				"%x         = OpCompositeExtract %u32 %idval 0\n"
+
+				"%inloc     = OpAccessChain %f32ptr %indata %zero %x\n"
+				"%inval     = OpLoad %f32 %inloc\n"
+				"%neg       = OpFNegate %f32 %inval\n"
+				"%outloc    = OpAccessChain %f32ptr %outdata %zero %x\n"
+				"             OpStore %outloc %neg\n"
+				"             OpReturn\n"
+				"             OpFunctionEnd\n";
+			spec.inputs.push_back(BufferSp(new Float32Buffer(positiveFloats)));
+			spec.outputs.push_back(BufferSp(new Float32Buffer(negativeFloats)));
+			spec.numWorkGroups = IVec3(numElements, 1, 1);
+
+			std::string testName		= "variable_" + location.toString();
+			std::string testDescription	= "Unused variable test with " + location.toDescription();
+
+			group->addChild(new SpvAsmComputeShaderCase(testCtx, testName.c_str(), testDescription.c_str(), spec));
+		}
+
+		// Unused function.
+		{
+			ComputeShaderSpec				spec;
+
+			spec.assembly =
+				string(getComputeAsmShaderPreamble("", "", "", getUnusedEntryPoint())) +
+
+				"OpDecorate %id BuiltIn GlobalInvocationId\n"
+
+				+ getUnusedDecorations(location)
+
+				+ string(getComputeAsmInputOutputBufferTraits()) + string(getComputeAsmCommonTypes())
+
+				+ getUnusedTypesAndConstants() +
+
+				"%c_i32_0 = OpConstant %i32 0\n"
+				"%c_i32_1 = OpConstant %i32 1\n"
+
+				+ string(getComputeAsmInputOutputBuffer())
+
+				+ getUnusedBuffer() +
+
+				"%id        = OpVariable %uvec3ptr Input\n"
+				"%zero      = OpConstant %i32 0\n"
+
+				"%main      = OpFunction %void None %voidf\n"
+				"%label     = OpLabel\n"
+				"%idval     = OpLoad %uvec3 %id\n"
+				"%x         = OpCompositeExtract %u32 %idval 0\n"
+
+				"%inloc     = OpAccessChain %f32ptr %indata %zero %x\n"
+				"%inval     = OpLoad %f32 %inloc\n"
+				"%neg       = OpFNegate %f32 %inval\n"
+				"%outloc    = OpAccessChain %f32ptr %outdata %zero %x\n"
+				"             OpStore %outloc %neg\n"
+				"             OpReturn\n"
+				"             OpFunctionEnd\n"
+
+				+ getUnusedFunctionBody();
+
+			spec.inputs.push_back(BufferSp(new Float32Buffer(positiveFloats)));
+			spec.outputs.push_back(BufferSp(new Float32Buffer(negativeFloats)));
+			spec.numWorkGroups = IVec3(numElements, 1, 1);
+
+			std::string testName		= "function_" + location.toString();
+			std::string testDescription	= "Unused function test with " + location.toDescription();
+
+			group->addChild(new SpvAsmComputeShaderCase(testCtx, testName.c_str(), testDescription.c_str(), spec));
+		}
+	}
+
+	return group.release();
+}
+
 template<bool nanSupported>
 bool compareFUnord (const std::vector<Resource>& inputs, const vector<AllocationSp>& outputAllocs, const std::vector<Resource>& expectedOutputs, TestLog& log)
 {
@@ -431,17 +556,17 @@ do { \
 	cases.push_back(OpFUnordCase(#NAME, OPCODE, compare_##NAME::compare)); \
 } while (deGetFalse())
 
-tcu::TestCaseGroup* createOpFUnordGroup (tcu::TestContext& testCtx, const bool nanSupported)
+tcu::TestCaseGroup* createOpFUnordGroup (tcu::TestContext& testCtx, const bool testWithNan)
 {
-	const string					nan				= nanSupported ? "_nan" : "";
+	const string					nan				= testWithNan ? "_nan" : "";
 	const string					groupName		= "opfunord" + nan;
 	de::MovePtr<tcu::TestCaseGroup>	group			(new tcu::TestCaseGroup(testCtx, groupName.c_str(), "Test the OpFUnord* opcodes"));
 	de::Random						rnd				(deStringHash(group->getName()));
 	const int						numElements		= 100;
 	vector<OpFUnordCase>			cases;
-	string							extensions		= nanSupported ? "OpExtension \"SPV_KHR_float_controls\"\n" : "";
-	string							capabilities	= nanSupported ? "OpCapability SignedZeroInfNanPreserve\n" : "";
-	string                          exeModes        = nanSupported ? "OpExecutionMode %main SignedZeroInfNanPreserve 32\n" : "";
+	string							extensions		= testWithNan ? "OpExtension \"SPV_KHR_float_controls\"\n" : "";
+	string							capabilities	= testWithNan ? "OpCapability SignedZeroInfNanPreserve\n" : "";
+	string							exeModes		= testWithNan ? "OpExecutionMode %main SignedZeroInfNanPreserve 32\n" : "";
 	const StringTemplate			shaderTemplate	(
 		string(getComputeAsmShaderPreamble(capabilities, extensions, exeModes)) +
 		"OpSource GLSL 430\n"
@@ -534,13 +659,15 @@ tcu::TestCaseGroup* createOpFUnordGroup (tcu::TestContext& testCtx, const bool n
 		spec.inputs.push_back(BufferSp(new Float32Buffer(inputFloats1)));
 		spec.inputs.push_back(BufferSp(new Float32Buffer(inputFloats2)));
 		spec.outputs.push_back(BufferSp(new Int32Buffer(expectedInts)));
-		spec.numWorkGroups = IVec3(numElements, 1, 1);
-		spec.verifyIO = nanSupported ? &compareFUnord<true> : &compareFUnord<false>;
-		if (nanSupported)
+		spec.numWorkGroups	= IVec3(numElements, 1, 1);
+		spec.verifyIO		= testWithNan ? &compareFUnord<true> : &compareFUnord<false>;
+
+		if (testWithNan)
 		{
 			spec.extensions.push_back("VK_KHR_shader_float_controls");
 			spec.requestedVulkanFeatures.floatControlsProperties.shaderSignedZeroInfNanPreserveFloat32 = DE_TRUE;
 		}
+
 		group->addChild(new SpvAsmComputeShaderCase(testCtx, cases[caseNdx].name, cases[caseNdx].name, spec));
 	}
 
@@ -8193,6 +8320,93 @@ tcu::TestCaseGroup* createModuleTests(tcu::TestContext& testCtx)
 	return moduleTests.release();
 }
 
+std::string getUnusedVarTestNamePiece(const std::string& prefix, ShaderTask task)
+{
+	switch (task)
+	{
+		case SHADER_TASK_NONE:			return "";
+		case SHADER_TASK_NORMAL:		return prefix + "_normal";
+		case SHADER_TASK_UNUSED_VAR:	return prefix + "_unused_var";
+		case SHADER_TASK_UNUSED_FUNC:	return prefix + "_unused_func";
+		default:						DE_ASSERT(DE_FALSE);
+	}
+	// unreachable
+	return "";
+}
+
+std::string getShaderTaskIndexName(ShaderTaskIndex index)
+{
+	switch (index)
+	{
+	case SHADER_TASK_INDEX_VERTEX:			return "vertex";
+	case SHADER_TASK_INDEX_GEOMETRY:		return "geom";
+	case SHADER_TASK_INDEX_TESS_CONTROL:	return "tessc";
+	case SHADER_TASK_INDEX_TESS_EVAL:		return "tesse";
+	case SHADER_TASK_INDEX_FRAGMENT:		return "frag";
+	default:								DE_ASSERT(DE_FALSE);
+	}
+	// unreachable
+	return "";
+}
+
+std::string getUnusedVarTestName(const ShaderTaskArray& shaderTasks, const VariableLocation& location)
+{
+	std::string testName = location.toString();
+
+	for (size_t i = 0; i < DE_LENGTH_OF_ARRAY(shaderTasks); ++i)
+	{
+		if (shaderTasks[i] != SHADER_TASK_NONE)
+		{
+			testName += "_" + getUnusedVarTestNamePiece(getShaderTaskIndexName((ShaderTaskIndex)i), shaderTasks[i]);
+		}
+	}
+
+	return testName;
+}
+
+tcu::TestCaseGroup* createUnusedVariableTests(tcu::TestContext& testCtx)
+{
+	de::MovePtr<tcu::TestCaseGroup>		moduleTests				(new tcu::TestCaseGroup(testCtx, "unused_variables", "Graphics shaders with unused variables"));
+
+	ShaderTaskArray						shaderCombinations[]	=
+	{
+		// Vertex					Geometry					Tess. Control				Tess. Evaluation			Fragment
+		{ SHADER_TASK_UNUSED_VAR,	SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NORMAL	},
+		{ SHADER_TASK_UNUSED_FUNC,	SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NORMAL	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_UNUSED_VAR	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_UNUSED_FUNC	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_UNUSED_VAR,		SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NORMAL	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_UNUSED_FUNC,	SHADER_TASK_NONE,			SHADER_TASK_NONE,			SHADER_TASK_NORMAL	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_NONE,			SHADER_TASK_UNUSED_VAR,		SHADER_TASK_NORMAL,			SHADER_TASK_NORMAL	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_NONE,			SHADER_TASK_UNUSED_FUNC,	SHADER_TASK_NORMAL,			SHADER_TASK_NORMAL	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_NONE,			SHADER_TASK_NORMAL,			SHADER_TASK_UNUSED_VAR,		SHADER_TASK_NORMAL	},
+		{ SHADER_TASK_NORMAL,		SHADER_TASK_NONE,			SHADER_TASK_NORMAL,			SHADER_TASK_UNUSED_FUNC,	SHADER_TASK_NORMAL	}
+	};
+
+	const VariableLocation				testLocations[] =
+	{
+		// Set		Binding
+		{ 0,		5			},
+		{ 5,		5			},
+	};
+
+	for (size_t combNdx = 0; combNdx < DE_LENGTH_OF_ARRAY(shaderCombinations); ++combNdx)
+	{
+		for (size_t locationNdx = 0; locationNdx < DE_LENGTH_OF_ARRAY(testLocations); ++locationNdx)
+		{
+			const ShaderTaskArray&	shaderTasks		= shaderCombinations[combNdx];
+			const VariableLocation&	location		= testLocations[locationNdx];
+			std::string				testName		= getUnusedVarTestName(shaderTasks, location);
+
+			addFunctionCaseWithPrograms<UnusedVariableContext>(
+				moduleTests.get(), testName, "", createUnusedVariableModules, runAndVerifyUnusedVariablePipeline,
+				createUnusedVariableContext(shaderTasks, location));
+		}
+	}
+
+	return moduleTests.release();
+}
+
 tcu::TestCaseGroup* createLoopTests(tcu::TestContext& testCtx)
 {
 	de::MovePtr<tcu::TestCaseGroup> testGroup(new tcu::TestCaseGroup(testCtx, "loop", "Looping control flow"));
@@ -9673,6 +9887,9 @@ tcu::TestCaseGroup* createConvertGraphicsTests (tcu::TestContext& testCtx, const
 		extensions.push_back		("VK_KHR_storage_buffer_storage_class");
 
 		getVulkanFeaturesAndExtensions(test->m_fromType, test->m_toType, vulkanFeatures, extensions);
+
+		vulkanFeatures.coreFeatures.vertexPipelineStoresAndAtomics	= true;
+		vulkanFeatures.coreFeatures.fragmentStoresAndAtomics		= true;
 
 		createTestsForAllStages(
 			test->m_name, defaultColors, defaultColors, fragments, noSpecConstants,
@@ -18071,6 +18288,292 @@ tcu::TestCaseGroup* createOpMemberNameAbuseTests (tcu::TestContext& testCtx)
 	return abuseGroup.release();
 }
 
+vector<deUint32> getSparseIdsAbuseData (const deUint32 numDataPoints, const deUint32 seed)
+{
+	vector<deUint32>	result;
+	de::Random			rnd		(seed);
+
+	result.reserve(numDataPoints);
+
+	for (deUint32 dataPointNdx = 0; dataPointNdx < numDataPoints; ++dataPointNdx)
+		result.push_back(rnd.getUint32());
+
+	return result;
+}
+
+vector<deUint32> getSparseIdsAbuseResults (const vector<deUint32>& inData1, const vector<deUint32>& inData2)
+{
+	vector<deUint32>	result;
+
+	result.reserve(inData1.size());
+
+	for (size_t dataPointNdx = 0; dataPointNdx < inData1.size(); ++dataPointNdx)
+		result.push_back(inData1[dataPointNdx] + inData2[dataPointNdx]);
+
+	return result;
+}
+
+template<class SpecResource>
+void createSparseIdsAbuseTest (tcu::TestContext& testCtx, de::MovePtr<tcu::TestCaseGroup>& testGroup)
+{
+	const deUint32			numDataPoints	= 16;
+	const std::string		testName		("sparse_ids");
+	const deUint32			seed			(deStringHash(testName.c_str()));
+	const vector<deUint32>	inData1			(getSparseIdsAbuseData(numDataPoints, seed + 1));
+	const vector<deUint32>	inData2			(getSparseIdsAbuseData(numDataPoints, seed + 2));
+	const vector<deUint32>	outData			(getSparseIdsAbuseResults(inData1, inData2));
+	const StringTemplate	preMain
+	(
+		"%c_i32_ndp = OpConstant %i32 ${num_data_points}\n"
+		"   %up_u32 = OpTypePointer Uniform %u32\n"
+		"   %ra_u32 = OpTypeArray %u32 %c_i32_ndp\n"
+		"   %SSBO32 = OpTypeStruct %ra_u32\n"
+		"%up_SSBO32 = OpTypePointer Uniform %SSBO32\n"
+		"%ssbo_src0 = OpVariable %up_SSBO32 Uniform\n"
+		"%ssbo_src1 = OpVariable %up_SSBO32 Uniform\n"
+		" %ssbo_dst = OpVariable %up_SSBO32 Uniform\n"
+	);
+	const StringTemplate	decoration
+	(
+		"OpDecorate %ra_u32 ArrayStride 4\n"
+		"OpMemberDecorate %SSBO32 0 Offset 0\n"
+		"OpDecorate %SSBO32 BufferBlock\n"
+		"OpDecorate %ssbo_src0 DescriptorSet 0\n"
+		"OpDecorate %ssbo_src0 Binding 0\n"
+		"OpDecorate %ssbo_src1 DescriptorSet 0\n"
+		"OpDecorate %ssbo_src1 Binding 1\n"
+		"OpDecorate %ssbo_dst DescriptorSet 0\n"
+		"OpDecorate %ssbo_dst Binding 2\n"
+	);
+	const StringTemplate	testFun
+	(
+		"%test_code = OpFunction %v4f32 None %v4f32_v4f32_function\n"
+		"    %param = OpFunctionParameter %v4f32\n"
+
+		"    %entry = OpLabel\n"
+		"        %i = OpVariable %fp_i32 Function\n"
+		"             OpStore %i %c_i32_0\n"
+		"             OpBranch %loop\n"
+
+		"     %loop = OpLabel\n"
+		"    %i_cmp = OpLoad %i32 %i\n"
+		"       %lt = OpSLessThan %bool %i_cmp %c_i32_ndp\n"
+		"             OpLoopMerge %merge %next None\n"
+		"             OpBranchConditional %lt %write %merge\n"
+
+		"    %write = OpLabel\n"
+		"      %ndx = OpLoad %i32 %i\n"
+
+		"      %127 = OpAccessChain %up_u32 %ssbo_src0 %c_i32_0 %ndx\n"
+		"      %128 = OpLoad %u32 %127\n"
+
+		// The test relies on SPIR-V compiler option SPV_TEXT_TO_BINARY_OPTION_PRESERVE_NUMERIC_IDS set in assembleSpirV()
+		"  %4194000 = OpAccessChain %up_u32 %ssbo_src1 %c_i32_0 %ndx\n"
+		"  %4194001 = OpLoad %u32 %4194000\n"
+
+		"  %2097151 = OpIAdd %u32 %128 %4194001\n"
+		"  %2097152 = OpAccessChain %up_u32 %ssbo_dst %c_i32_0 %ndx\n"
+		"             OpStore %2097152 %2097151\n"
+		"             OpBranch %next\n"
+
+		"     %next = OpLabel\n"
+		"    %i_cur = OpLoad %i32 %i\n"
+		"    %i_new = OpIAdd %i32 %i_cur %c_i32_1\n"
+		"             OpStore %i %i_new\n"
+		"             OpBranch %loop\n"
+
+		"    %merge = OpLabel\n"
+		"             OpReturnValue %param\n"
+
+		"             OpFunctionEnd\n"
+	);
+	SpecResource			specResource;
+	map<string, string>		specs;
+	VulkanFeatures			features;
+	map<string, string>		fragments;
+	vector<string>			extensions;
+
+	specs["num_data_points"]	= de::toString(numDataPoints);
+
+	fragments["decoration"]		= decoration.specialize(specs);
+	fragments["pre_main"]		= preMain.specialize(specs);
+	fragments["testfun"]		= testFun.specialize(specs);
+
+	specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inData1)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+	specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inData2)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+	specResource.outputs.push_back(Resource(BufferSp(new Uint32Buffer(outData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+
+	features.coreFeatures.vertexPipelineStoresAndAtomics	= true;
+	features.coreFeatures.fragmentStoresAndAtomics			= true;
+
+	finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
+}
+
+vector<deUint32> getLotsIdsAbuseData (const deUint32 numDataPoints, const deUint32 seed)
+{
+	vector<deUint32>	result;
+	de::Random			rnd		(seed);
+
+	result.reserve(numDataPoints);
+
+	// Fixed value
+	result.push_back(1u);
+
+	// Random values
+	for (deUint32 dataPointNdx = 1; dataPointNdx < numDataPoints; ++dataPointNdx)
+		result.push_back(rnd.getUint8());
+
+	return result;
+}
+
+vector<deUint32> getLotsIdsAbuseResults (const vector<deUint32>& inData1, const vector<deUint32>& inData2, const deUint32 count)
+{
+	vector<deUint32>	result;
+
+	result.reserve(inData1.size());
+
+	for (size_t dataPointNdx = 0; dataPointNdx < inData1.size(); ++dataPointNdx)
+		result.push_back(inData1[dataPointNdx] + count * inData2[dataPointNdx]);
+
+	return result;
+}
+
+template<class SpecResource>
+void createLotsIdsAbuseTest (tcu::TestContext& testCtx, de::MovePtr<tcu::TestCaseGroup>& testGroup)
+{
+	const deUint32			numDataPoints	= 16;
+	const deUint32			firstNdx		= 100u;
+	const deUint32			sequenceCount	= 10000u;
+	const std::string		testName		("lots_ids");
+	const deUint32			seed			(deStringHash(testName.c_str()));
+	const vector<deUint32>	inData1			(getLotsIdsAbuseData(numDataPoints, seed + 1));
+	const vector<deUint32>	inData2			(getLotsIdsAbuseData(numDataPoints, seed + 2));
+	const vector<deUint32>	outData			(getLotsIdsAbuseResults(inData1, inData2, sequenceCount));
+	const StringTemplate preMain
+	(
+		"%c_i32_ndp = OpConstant %i32 ${num_data_points}\n"
+		"   %up_u32 = OpTypePointer Uniform %u32\n"
+		"   %ra_u32 = OpTypeArray %u32 %c_i32_ndp\n"
+		"   %SSBO32 = OpTypeStruct %ra_u32\n"
+		"%up_SSBO32 = OpTypePointer Uniform %SSBO32\n"
+		"%ssbo_src0 = OpVariable %up_SSBO32 Uniform\n"
+		"%ssbo_src1 = OpVariable %up_SSBO32 Uniform\n"
+		" %ssbo_dst = OpVariable %up_SSBO32 Uniform\n"
+	);
+	const StringTemplate decoration
+	(
+		"OpDecorate %ra_u32 ArrayStride 4\n"
+		"OpMemberDecorate %SSBO32 0 Offset 0\n"
+		"OpDecorate %SSBO32 BufferBlock\n"
+		"OpDecorate %ssbo_src0 DescriptorSet 0\n"
+		"OpDecorate %ssbo_src0 Binding 0\n"
+		"OpDecorate %ssbo_src1 DescriptorSet 0\n"
+		"OpDecorate %ssbo_src1 Binding 1\n"
+		"OpDecorate %ssbo_dst DescriptorSet 0\n"
+		"OpDecorate %ssbo_dst Binding 2\n"
+	);
+	const StringTemplate testFun
+	(
+		"%test_code = OpFunction %v4f32 None %v4f32_v4f32_function\n"
+		"    %param = OpFunctionParameter %v4f32\n"
+
+		"    %entry = OpLabel\n"
+		"        %i = OpVariable %fp_i32 Function\n"
+		"             OpStore %i %c_i32_0\n"
+		"             OpBranch %loop\n"
+
+		"     %loop = OpLabel\n"
+		"    %i_cmp = OpLoad %i32 %i\n"
+		"       %lt = OpSLessThan %bool %i_cmp %c_i32_ndp\n"
+		"             OpLoopMerge %merge %next None\n"
+		"             OpBranchConditional %lt %write %merge\n"
+
+		"    %write = OpLabel\n"
+		"      %ndx = OpLoad %i32 %i\n"
+
+		"       %90 = OpAccessChain %up_u32 %ssbo_src1 %c_i32_0 %ndx\n"
+		"       %91 = OpLoad %u32 %90\n"
+
+		"       %98 = OpAccessChain %up_u32 %ssbo_src0 %c_i32_0 %ndx\n"
+		"       %${zeroth_id} = OpLoad %u32 %98\n"
+
+		"${seq}\n"
+
+		// The test relies on SPIR-V compiler option SPV_TEXT_TO_BINARY_OPTION_PRESERVE_NUMERIC_IDS set in assembleSpirV()
+		"      %dst = OpAccessChain %up_u32 %ssbo_dst %c_i32_0 %ndx\n"
+		"             OpStore %dst %${last_id}\n"
+		"             OpBranch %next\n"
+
+		"     %next = OpLabel\n"
+		"    %i_cur = OpLoad %i32 %i\n"
+		"    %i_new = OpIAdd %i32 %i_cur %c_i32_1\n"
+		"             OpStore %i %i_new\n"
+		"             OpBranch %loop\n"
+
+		"    %merge = OpLabel\n"
+		"             OpReturnValue %param\n"
+
+		"             OpFunctionEnd\n"
+	);
+	deUint32				lastId			= firstNdx;
+	SpecResource			specResource;
+	map<string, string>		specs;
+	VulkanFeatures			features;
+	map<string, string>		fragments;
+	vector<string>			extensions;
+	std::string				sequence;
+
+	for (deUint32 sequenceNdx = 0; sequenceNdx < sequenceCount; ++sequenceNdx)
+	{
+		const deUint32		sequenceId		= sequenceNdx + firstNdx;
+		const std::string	sequenceIdStr	= de::toString(sequenceId);
+
+		sequence += "%" + sequenceIdStr + " = OpIAdd %u32 %91 %" + de::toString(sequenceId - 1) + "\n";
+		lastId = sequenceId;
+
+		if (sequenceNdx == 0)
+			sequence.reserve((10 + sequence.length()) * sequenceCount);
+	}
+
+	specs["num_data_points"]	= de::toString(numDataPoints);
+	specs["zeroth_id"]			= de::toString(firstNdx - 1);
+	specs["last_id"]			= de::toString(lastId);
+	specs["seq"]				= sequence;
+
+	fragments["decoration"]		= decoration.specialize(specs);
+	fragments["pre_main"]		= preMain.specialize(specs);
+	fragments["testfun"]		= testFun.specialize(specs);
+
+	specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inData1)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+	specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inData2)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+	specResource.outputs.push_back(Resource(BufferSp(new Uint32Buffer(outData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+
+	features.coreFeatures.vertexPipelineStoresAndAtomics	= true;
+	features.coreFeatures.fragmentStoresAndAtomics			= true;
+
+	finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
+}
+
+tcu::TestCaseGroup* createSpirvIdsAbuseTests (tcu::TestContext& testCtx)
+{
+	de::MovePtr<tcu::TestCaseGroup>	testGroup	(new tcu::TestCaseGroup(testCtx, "spirv_ids_abuse", "SPIR-V abuse tests"));
+
+	createSparseIdsAbuseTest<GraphicsResources>(testCtx, testGroup);
+	createLotsIdsAbuseTest<GraphicsResources>(testCtx, testGroup);
+
+	return testGroup.release();
+}
+
+tcu::TestCaseGroup* createSpirvIdsAbuseGroup (tcu::TestContext& testCtx)
+{
+	de::MovePtr<tcu::TestCaseGroup>	testGroup	(new tcu::TestCaseGroup(testCtx, "spirv_ids_abuse", "SPIR-V abuse tests"));
+
+	createSparseIdsAbuseTest<ComputeShaderSpec>(testCtx, testGroup);
+	createLotsIdsAbuseTest<ComputeShaderSpec>(testCtx, testGroup);
+
+	return testGroup.release();
+}
+
 tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 {
 	const bool testComputePipeline = true;
@@ -18083,6 +18586,7 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	computeTests->addChild(createLocalSizeGroup(testCtx));
 	computeTests->addChild(createOpNopGroup(testCtx));
 	computeTests->addChild(createOpFUnordGroup(testCtx, TEST_WITHOUT_NAN));
+	computeTests->addChild(createOpFUnordGroup(testCtx, TEST_WITH_NAN));
 	computeTests->addChild(createOpAtomicGroup(testCtx, false));
 	computeTests->addChild(createOpAtomicGroup(testCtx, true));					// Using new StorageBuffer decoration
 	computeTests->addChild(createOpAtomicGroup(testCtx, false, 1024, true));	// Return value validation
@@ -18145,6 +18649,7 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	computeTests->addChild(createConditionalBranchComputeGroup(testCtx));
 	computeTests->addChild(createIndexingComputeGroup(testCtx));
 	computeTests->addChild(createVariablePointersComputeGroup(testCtx));
+	computeTests->addChild(createPhysicalPointersComputeGroup(testCtx));
 	computeTests->addChild(createImageSamplerComputeGroup(testCtx));
 	computeTests->addChild(createOpNameGroup(testCtx));
 	computeTests->addChild(createOpMemberNameGroup(testCtx));
@@ -18152,6 +18657,10 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	computeTests->addChild(createFloat16Group(testCtx));
 	computeTests->addChild(createBoolGroup(testCtx));
 	computeTests->addChild(createWorkgroupMemoryComputeGroup(testCtx));
+	computeTests->addChild(createSpirvIdsAbuseGroup(testCtx));
+	computeTests->addChild(createSignedIntCompareGroup(testCtx));
+	computeTests->addChild(createUnusedVariableComputeTests(testCtx));
+	computeTests->addChild(createPtrAccessChainGroup(testCtx));
 
 	graphicsTests->addChild(createCrossStageInterfaceTests(testCtx));
 	graphicsTests->addChild(createSpivVersionCheckTests(testCtx, !testComputePipeline));
@@ -18167,6 +18676,7 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	graphicsTests->addChild(createOpUndefTests(testCtx));
 	graphicsTests->addChild(createSelectionBlockOrderTests(testCtx));
 	graphicsTests->addChild(createModuleTests(testCtx));
+	graphicsTests->addChild(createUnusedVariableTests(testCtx));
 	graphicsTests->addChild(createSwitchBlockOrderTests(testCtx));
 	graphicsTests->addChild(createOpPhiTests(testCtx));
 	graphicsTests->addChild(createNoContractionTests(testCtx));
@@ -18211,8 +18721,8 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	graphicsTests->addChild(createConvertGraphicsTests(testCtx, "OpConvertFToU", "convertftou"));
 	graphicsTests->addChild(createPointerParameterGraphicsGroup(testCtx));
 	graphicsTests->addChild(createVaryingNameGraphicsGroup(testCtx));
-
 	graphicsTests->addChild(createFloat16Tests(testCtx));
+	graphicsTests->addChild(createSpirvIdsAbuseTests(testCtx));
 
 	instructionTests->addChild(computeTests.release());
 	instructionTests->addChild(graphicsTests.release());

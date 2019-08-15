@@ -55,6 +55,8 @@ enum ProtectionMode {
 typedef std::vector<vk::VkVertexInputBindingDescription>	VertexBindings;
 typedef std::vector<vk::VkVertexInputAttributeDescription>	VertexAttribs;
 
+void								checkProtectedQueueSupport			(Context& context);
+
 vk::Move<vk::VkInstance>			makeProtectedMemInstance			(const vk::PlatformInterface&		vkp,
 																		 const vkt::Context&				context,
 																		 const std::vector<std::string>&	extraExtensions = std::vector<std::string>());
@@ -119,14 +121,6 @@ vk::VkResult						queueSubmit							(ProtectedContext&					context,
 																		 vk::VkCommandBuffer				cmdBuffer,
 																		 vk::VkFence						fence,
 																		 deUint64							timeout);
-
-vk::Move<vk::VkDescriptorSet>		makeDescriptorSet					(const vk::DeviceInterface&			vk,
-																		 const vk::VkDevice					device,
-																		 const vk::VkDescriptorPool			descriptorPool,
-																		 const vk::VkDescriptorSetLayout	setLayout);
-vk::Move<vk::VkPipelineLayout>		makePipelineLayout					(const vk::DeviceInterface&			vk,
-																		 const vk::VkDevice					device,
-																		 const vk::VkDescriptorSetLayout	descriptorSetLayout);
 
 vk::Move<vk::VkPipeline>			makeComputePipeline					(const vk::DeviceInterface&			vk,
 																		 const vk::VkDevice					device,

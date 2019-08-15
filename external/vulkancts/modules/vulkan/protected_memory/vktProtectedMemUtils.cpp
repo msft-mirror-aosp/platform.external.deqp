@@ -49,37 +49,6 @@ namespace ProtectedMem
 
 typedef std::vector<vk::VkExtensionProperties> Extensions;
 
-std::vector<std::string> getValidationLayers (const vk::PlatformInterface& vkp)
-{
-	static const char*	s_magicLayer		= "VK_LAYER_LUNARG_standard_validation";
-	static const char*	s_defaultLayers[]	=
-	{
-		"VK_LAYER_GOOGLE_threading",
-		"VK_LAYER_LUNARG_parameter_validation",
-		"VK_LAYER_LUNARG_device_limits",
-		"VK_LAYER_LUNARG_object_tracker",
-		"VK_LAYER_LUNARG_image",
-		"VK_LAYER_LUNARG_core_validation",
-		"VK_LAYER_LUNARG_swapchain",
-		"VK_LAYER_GOOGLE_unique_objects"
-	};
-	const std::vector<vk::VkLayerProperties>	supportedLayers	(enumerateInstanceLayerProperties(vkp));
-	std::vector<std::string>					enabledLayers;
-
-	if (isLayerSupported(supportedLayers, vk::RequiredLayer(s_magicLayer)))
-		enabledLayers.push_back(s_magicLayer);
-	else
-	{
-		for (int ndx = 0; ndx < DE_LENGTH_OF_ARRAY(s_defaultLayers); ++ndx)
-		{
-			if (isLayerSupported(supportedLayers, vk::RequiredLayer(s_defaultLayers[ndx])))
-				enabledLayers.push_back(s_defaultLayers[ndx]);
-		}
-	}
-
-	return enabledLayers;
-}
-
 vk::Move<vk::VkInstance> makeProtectedMemInstance (const vk::PlatformInterface& vkp, const vkt::Context& context, const std::vector<std::string>& extraExtensions)
 {
 	const Extensions			supportedExtensions(vk::enumerateInstanceExtensionProperties(vkp, DE_NULL));
@@ -92,7 +61,7 @@ vk::Move<vk::VkInstance> makeProtectedMemInstance (const vk::PlatformInterface& 
 		if (!vk::isDebugReportSupported(vkp))
 			TCU_THROW(NotSupportedError, "VK_EXT_debug_report is not supported");
 
-		enabledLayers = getValidationLayers(vkp);
+		enabledLayers = vkt::getValidationLayers(vkp);
 		if (enabledLayers.empty())
 			TCU_THROW(NotSupportedError, "No validation layers found");
 	}
@@ -109,6 +78,30 @@ vk::Move<vk::VkInstance> makeProtectedMemInstance (const vk::PlatformInterface& 
 	}
 
 	return vk::createDefaultInstance(vkp, context.getUsedApiVersion(), enabledLayers, requiredExtensions);
+}
+
+void checkProtectedQueueSupport (Context& context)
+{
+#ifdef NOT_PROTECTED
+	return;
+#endif
+
+	const vk::InstanceInterface&				vkd				= context.getInstanceInterface();
+	vk::VkPhysicalDevice						physDevice		= context.getPhysicalDevice();
+	std::vector<vk::VkQueueFamilyProperties>	properties;
+	deUint32									numFamilies		= 0;
+
+	vkd.getPhysicalDeviceQueueFamilyProperties(physDevice, &numFamilies, DE_NULL);
+	DE_ASSERT(numFamilies > 0);
+	properties.resize(numFamilies);
+
+	vkd.getPhysicalDeviceQueueFamilyProperties(physDevice, &numFamilies, properties.data());
+
+	for (auto prop: properties)
+		if (prop.queueFlags & vk::VK_QUEUE_PROTECTED_BIT)
+			return;
+
+	TCU_THROW(NotSupportedError, "No protected queue found.");
 }
 
 deUint32 chooseProtectedMemQueueFamilyIndex	(const vk::InstanceDriver&	vkd,
@@ -487,39 +480,6 @@ vk::VkResult queueSubmit (ProtectedContext&		context,
 
 	VK_CHECK(vk.queueSubmit(queue, 1u, &submitInfo, fence));
 	return vk.waitForFences(device, 1u, &fence, DE_TRUE, timeout);
-}
-
-vk::Move<vk::VkDescriptorSet> makeDescriptorSet (const vk::DeviceInterface&			vk,
-												 const vk::VkDevice					device,
-												 const vk::VkDescriptorPool			descriptorPool,
-												 const vk::VkDescriptorSetLayout	setLayout)
-{
-	const vk::VkDescriptorSetAllocateInfo allocateParams =
-	{
-		vk::VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,	// VkStructureType				sType;
-		DE_NULL,											// const void*					pNext;
-		descriptorPool,										// VkDescriptorPool				descriptorPool;
-		1u,													// deUint32						setLayoutCount;
-		&setLayout,											// const VkDescriptorSetLayout*	pSetLayouts;
-	};
-	return vk::allocateDescriptorSet(vk, device, &allocateParams);
-}
-
-vk::Move<vk::VkPipelineLayout> makePipelineLayout (const vk::DeviceInterface&		vk,
-												   const vk::VkDevice				device,
-												   const vk::VkDescriptorSetLayout	descriptorSetLayout)
-{
-	const vk::VkPipelineLayoutCreateInfo info =
-	{
-		vk::VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,	// VkStructureType				sType;
-		DE_NULL,											// const void*					pNext;
-		(vk::VkPipelineLayoutCreateFlags)0,					// VkPipelineLayoutCreateFlags	flags;
-		1u,													// deUint32						setLayoutCount;
-		&descriptorSetLayout,								// const VkDescriptorSetLayout*	pSetLayouts;
-		0u,													// deUint32						pushConstantRangeCount;
-		DE_NULL,											// const VkPushConstantRange*	pPushConstantRanges;
-	};
-	return vk::createPipelineLayout(vk, device, &info);
 }
 
 vk::Move<vk::VkPipeline> makeComputePipeline (const vk::DeviceInterface&		vk,

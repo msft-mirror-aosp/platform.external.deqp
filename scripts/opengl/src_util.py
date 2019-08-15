@@ -61,6 +61,7 @@ EXTENSIONS			= [
 	'GL_EXT_primitive_bounding_box',
 	'GL_EXT_texture_compression_s3tc',
 	'GL_EXT_texture_type_2_10_10_10_REV',
+	'GL_EXT_clip_control',
 	'GL_EXT_copy_image',
 	'GL_EXT_depth_bounds_test',
 	'GL_EXT_direct_state_access',
@@ -177,9 +178,17 @@ def getHybridInterface (stripAliasedExtCommands = True):
 
 	return iface
 
+def versionCheck(version):
+	if type(version) is bool:
+		if version == False:
+			return True
+	if type(version) is str:
+		return version < "3.2"
+	raise "Version check failed"
+
 def getInterface (registry, api, version=None, profile=None, **kwargs):
 	spec = khr_util.registry.spec(registry, api, version, profile, **kwargs)
-	if api == 'gl' and profile == 'core' and version < "3.2":
+	if api == 'gl' and profile == 'core' and versionCheck(version):
 		gl32 = registry.features['GL_VERSION_3_2']
 		for eRemove in gl32.xpath('remove'):
 			spec.addComponent(eRemove)

@@ -70,6 +70,7 @@ typedef deUint64	VkDeviceSize;
 typedef deUint32	VkSampleMask;
 typedef deUint32	VkBool32;
 typedef deUint32	VkFlags;
+typedef deUint64	VkDeviceAddress;
 
 // enum HandleType { HANDLE_TYPE_INSTANCE, ... };
 #include "vkHandleType.inl"
@@ -126,7 +127,6 @@ enum Type
 	TYPE_XLIB = 0,
 	TYPE_XCB,
 	TYPE_WAYLAND,
-	TYPE_MIR,
 	TYPE_ANDROID,
 	TYPE_WIN32,
 	TYPE_MACOS,
@@ -167,6 +167,11 @@ typedef VKAPI_ATTR VkBool32	(VKAPI_CALL* PFN_vkDebugReportCallbackEXT)			(VkDebu
 																				 const char*				pMessage,
 																				 void*						pUserData);
 
+typedef VKAPI_ATTR VkBool32 (VKAPI_CALL *PFN_vkDebugUtilsMessengerCallbackEXT)	(VkDebugUtilsMessageSeverityFlagBitsEXT				messageSeverity,
+																				 VkDebugUtilsMessageTypeFlagsEXT					messageTypes,
+																				 const struct VkDebugUtilsMessengerCallbackDataEXT*	pCallbackData,
+																				 void*												pUserData);
+
 #include "vkStructTypes.inl"
 
 extern "C"
@@ -179,12 +184,14 @@ class PlatformInterface
 public:
 #include "vkVirtualPlatformInterface.inl"
 
+	virtual	GetInstanceProcAddrFunc	getGetInstanceProcAddr	() const = 0;
+
 protected:
-						PlatformInterface	(void) {}
+									PlatformInterface		(void) {}
 
 private:
-						PlatformInterface	(const PlatformInterface&);
-	PlatformInterface&	operator=			(const PlatformInterface&);
+									PlatformInterface		(const PlatformInterface&);
+	PlatformInterface&				operator=				(const PlatformInterface&);
 };
 
 class InstanceInterface

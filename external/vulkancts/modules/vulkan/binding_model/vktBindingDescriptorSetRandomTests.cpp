@@ -42,6 +42,8 @@
 #include "vkBuilderUtil.hpp"
 #include "vkCmdUtil.hpp"
 #include "vkTypeUtil.hpp"
+#include "vkObjUtil.hpp"
+
 #include "vktTestGroupUtil.hpp"
 #include "vktTestCase.hpp"
 
@@ -765,40 +767,6 @@ TestInstance* DescriptorSetRandomTestCase::createInstance (Context& context) con
 	return new DescriptorSetRandomTestInstance(context, m_data);
 }
 
-VkBufferCreateInfo makeBufferCreateInfo (const VkDeviceSize			bufferSize,
-										 const VkBufferUsageFlags	usage)
-{
-	const VkBufferCreateInfo bufferCreateInfo =
-	{
-		VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,	// VkStructureType		sType;
-		DE_NULL,								// const void*			pNext;
-		(VkBufferCreateFlags)0,					// VkBufferCreateFlags	flags;
-		bufferSize,								// VkDeviceSize			size;
-		usage,									// VkBufferUsageFlags	usage;
-		VK_SHARING_MODE_EXCLUSIVE,				// VkSharingMode		sharingMode;
-		0u,										// deUint32				queueFamilyIndexCount;
-		DE_NULL,								// const deUint32*		pQueueFamilyIndices;
-	};
-	return bufferCreateInfo;
-}
-
-Move<VkDescriptorSet> makeDescriptorSet (const DeviceInterface&			vk,
-										 const VkDevice					device,
-										 const void*					pNext,
-										 const VkDescriptorPool			descriptorPool,
-										 const VkDescriptorSetLayout	setLayout)
-{
-	const VkDescriptorSetAllocateInfo allocateParams =
-	{
-		VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,		// VkStructureType				sType;
-		pNext,												// const void*					pNext;
-		descriptorPool,										// VkDescriptorPool				descriptorPool;
-		1u,													// deUint32						setLayoutCount;
-		&setLayout,											// const VkDescriptorSetLayout*	pSetLayouts;
-	};
-	return allocateDescriptorSet(vk, device, &allocateParams);
-}
-
 VkBufferImageCopy makeBufferImageCopy (const VkExtent3D					extent,
 									   const VkImageSubresourceLayers	subresourceLayers)
 {
@@ -969,7 +937,7 @@ tcu::TestStatus DescriptorSetRandomTestInstance::iterate (void)
 			pNext = &variableCountInfo;
 		}
 
-		descriptorSets[s] = makeDescriptorSet(vk, device, pNext, *descriptorPools[s], *descriptorSetLayouts[s]);
+		descriptorSets[s] = makeDescriptorSet(vk, device, *descriptorPools[s], *descriptorSetLayouts[s], pNext);
 	}
 
 
@@ -1757,6 +1725,7 @@ tcu::TestCaseGroup*	createDescriptorSetRandomTests (tcu::TestContext& testCtx)
 	TestGroupCase uabCases[] =
 	{
 		{ UPDATE_AFTER_BIND_DISABLED,	"nouab",	"no update after bind"		},
+		{ UPDATE_AFTER_BIND_ENABLED,	"uab",		"enable update after bind"	},
 	};
 
 	for (int setsNdx = 0; setsNdx < DE_LENGTH_OF_ARRAY(setsCases); setsNdx++)

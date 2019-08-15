@@ -46,6 +46,9 @@
 #include "vktPipelineFramebufferAttachmentTests.hpp"
 #include "vktPipelineStencilExportTests.hpp"
 #include "vktPipelineDerivativeTests.hpp"
+#include "vktPipelineCreationFeedbackTests.hpp"
+#include "vktPipelineDepthRangeUnrestrictedTests.hpp"
+#include "vktPipelineVertexOnlyTests.hpp"
 #include "vktTestGroupUtil.hpp"
 
 namespace vkt
@@ -83,6 +86,9 @@ void createChildren (tcu::TestCaseGroup* pipelineTests)
 	pipelineTests->addChild(createFramebufferAttachmentTests	(testCtx));
 	pipelineTests->addChild(createStencilExportTests			(testCtx));
 	pipelineTests->addChild(createDerivativeTests				(testCtx));
+	pipelineTests->addChild(createCreationFeedbackTests			(testCtx));
+	pipelineTests->addChild(createDepthRangeUnrestrictedTests	(testCtx));
+	pipelineTests->addChild(createVertexOnlyTests				(testCtx));
 }
 
 } // anonymous

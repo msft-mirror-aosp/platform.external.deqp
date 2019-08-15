@@ -122,14 +122,14 @@ public:
 	}
 };
 
-void renderReferenceTriangle (const tcu::PixelBufferAccess& dst, const tcu::Vec4(&vertices)[3])
+void renderReferenceTriangle (const tcu::PixelBufferAccess& dst, const tcu::Vec4(&vertices)[3], const int subpixelBits)
 {
 	const RefVertexShader					vertShader;
 	const RefFragmentShader					fragShader;
 	const rr::Program						program(&vertShader, &fragShader);
 	const rr::MultisamplePixelBufferAccess	colorBuffer = rr::MultisamplePixelBufferAccess::fromSinglesampleAccess(dst);
 	const rr::RenderTarget					renderTarget(colorBuffer);
-	const rr::RenderState					renderState((rr::ViewportState(colorBuffer)));
+	const rr::RenderState					renderState((rr::ViewportState(colorBuffer)), subpixelBits);
 	const rr::Renderer						renderer;
 	const rr::VertexAttrib					vertexAttribs[] =
 	{
@@ -214,31 +214,7 @@ void DeviceGroupTestInstance::getDeviceLayers (vector<string>& enabledLayers)
 	const tcu::CommandLine& cmdLine = m_context.getTestContext().getCommandLine();
 	if (cmdLine.isValidationEnabled())
 	{
-		const vector<VkLayerProperties> layerProperties = enumerateDeviceLayerProperties(m_context.getInstanceInterface(), m_context.getPhysicalDevice());
-
-		static const char*	s_magicLayer = "VK_LAYER_LUNARG_standard_validation";
-		static const char*	s_defaultLayers[] =
-		{
-			"VK_LAYER_GOOGLE_threading",
-			"VK_LAYER_LUNARG_parameter_validation",
-			"VK_LAYER_LUNARG_device_limits",
-			"VK_LAYER_LUNARG_object_tracker",
-			"VK_LAYER_LUNARG_image",
-			"VK_LAYER_LUNARG_core_validation",
-			"VK_LAYER_LUNARG_swapchain",
-			"VK_LAYER_GOOGLE_unique_objects",
-		};
-
-		if (isLayerSupported(layerProperties, RequiredLayer(s_magicLayer)))
-			enabledLayers.push_back(s_magicLayer);
-		else
-		{
-			for (deUint32 ndx = 0; ndx < DE_LENGTH_OF_ARRAY(s_defaultLayers); ++ndx)
-			{
-				if (isLayerSupported(layerProperties, RequiredLayer(s_defaultLayers[ndx])))
-					enabledLayers.push_back(s_defaultLayers[ndx]);
-			}
-		}
+		enabledLayers = vkt::getValidationLayers(m_context.getInstanceInterface(), m_context.getPhysicalDevice());
 		if (enabledLayers.empty())
 			TCU_THROW(NotSupportedError, "No device validation layers found");
 	}
@@ -774,7 +750,7 @@ tcu::TestStatus DeviceGroupTestInstance::iterate (void)
 				VK_IMAGE_TYPE_2D,														// type
 				VK_IMAGE_TILING_OPTIMAL,												// tiling
 				VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT,	// usage
-				VK_IMAGE_CREATE_BIND_SFR_BIT,											// flags
+				VK_IMAGE_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT,						// flags
 				&properties) != VK_SUCCESS)												// properties
 			{
 				TCU_THROW(NotSupportedError, "Format not supported for SFR");
@@ -783,7 +759,7 @@ tcu::TestStatus DeviceGroupTestInstance::iterate (void)
 			VkImageCreateFlags	imageCreateFlags = VK_IMAGE_CREATE_ALIAS_BIT;	// The image objects alias same memory
 			if ((m_testMode & TEST_MODE_SFR) && (m_physicalDeviceCount > 1))
 			{
-				imageCreateFlags |= VK_IMAGE_CREATE_BIND_SFR_BIT;
+				imageCreateFlags |= VK_IMAGE_CREATE_SPLIT_INSTANCE_BIND_REGIONS_BIT;
 			}
 
 			const VkImageCreateInfo		imageParams =
@@ -1654,7 +1630,7 @@ tcu::TestStatus DeviceGroupTestInstance::iterate (void)
 					const tcu::IVec3	posDeviation(1, 1, 0);
 
 					tcu::clear(refImage.getAccess(), clearColor);
-					renderReferenceTriangle(refImage.getAccess(), triVertices);
+					renderReferenceTriangle(refImage.getAccess(), triVertices, m_context.getDeviceProperties().limits.subPixelPrecisionBits);
 
 					iterateResultSuccess = tcu::intThresholdPositionDeviationCompare(m_context.getTestContext().getLog(),
 						"ComparisonResult",

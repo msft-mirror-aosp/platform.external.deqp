@@ -423,7 +423,7 @@ BuildStats buildPrograms (tcu::TestContext&			testCtx,
 				if (iterator.getState() == tcu::TestHierarchyIterator::STATE_ENTER_NODE &&
 					tcu::isTestNodeTypeExecutable(iterator.getNode()->getNodeType()))
 				{
-					const TestCase* const		testCase					= dynamic_cast<TestCase*>(iterator.getNode());
+					TestCase* const				testCase					= dynamic_cast<TestCase*>(iterator.getNode());
 					const string				casePath					= iterator.getNodePath();
 					vk::ShaderBuildOptions		defaultGlslBuildOptions		(usedVulkanVersion, baselineSpirvVersion, 0u);
 					vk::ShaderBuildOptions		defaultHlslBuildOptions		(usedVulkanVersion, baselineSpirvVersion, 0u);
@@ -432,6 +432,7 @@ BuildStats buildPrograms (tcu::TestContext&			testCtx,
 
 					try
 					{
+						testCase->delayedInit();
 						testCase->initPrograms(sourcePrograms);
 					}
 					catch (const tcu::NotSupportedError& )
@@ -666,7 +667,7 @@ int main (int argc, const char* argv[])
 	try
 	{
 		tcu::DirArchive			archive					(".");
-		tcu::TestLog			log						(deqpCmdLine.getLogFileName(), deqpCmdLine.getLogFlags());
+		tcu::TestLog			log					(deqpCmdLine.getLogFileName(), (argc - 1), (char **)(argv + 1), deqpCmdLine.getLogFlags());
 		tcu::Platform			platform;
 		tcu::TestContext		testCtx					(platform, archive, log, deqpCmdLine, DE_NULL);
 		vk::SpirvVersion		baselineSpirvVersion	= vk::getBaselineSpirvVersion(cmdLine.getOption<opt::VulkanVersion>());

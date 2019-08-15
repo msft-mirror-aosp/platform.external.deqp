@@ -38,6 +38,7 @@
 #include "vkBuilderUtil.hpp"
 #include "vkTypeUtil.hpp"
 #include "vkCmdUtil.hpp"
+#include "vkObjUtil.hpp"
 
 #include "deStringUtil.hpp"
 #include "deUniquePtr.hpp"
@@ -90,6 +91,7 @@ public:
 
 	void			initPrograms					(SourceCollections&		sourceCollections) const;
 	TestInstance*	createInstance					(Context&				context) const;
+	virtual void	checkSupport					(Context&				context) const;
 
 private:
 	const	deUint32			m_bufferSizeInBytes;
@@ -108,6 +110,12 @@ BufferSparseMemoryAliasingCase::BufferSparseMemoryAliasingCase (tcu::TestContext
 	, m_glslVersion			(glslVersion)
 	, m_useDeviceGroups		(useDeviceGroups)
 {
+}
+
+void BufferSparseMemoryAliasingCase::checkSupport (Context& context) const
+{
+	context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_SPARSE_BINDING);
+	context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_SPARSE_RESIDENCY_ALIASED);
 }
 
 void BufferSparseMemoryAliasingCase::initPrograms (SourceCollections& sourceCollections) const
@@ -172,17 +180,10 @@ tcu::TestStatus BufferSparseMemoryAliasingInstance::iterate (void)
 
 		createDeviceSupportingQueues(queueRequirements);
 	}
-	const vk::VkPhysicalDevice&	physicalDevice		= getPhysicalDevice();
-
-	if (!getPhysicalDeviceFeatures(instance, physicalDevice).sparseBinding)
-		TCU_THROW(NotSupportedError, "Sparse binding not supported");
-
-	if (!getPhysicalDeviceFeatures(instance, physicalDevice).sparseResidencyAliased)
-		TCU_THROW(NotSupportedError, "Sparse memory aliasing not supported");
-
-	const DeviceInterface&	deviceInterface	= getDeviceInterface();
-	const Queue&			sparseQueue		= getQueue(VK_QUEUE_SPARSE_BINDING_BIT, 0);
-	const Queue&			computeQueue	= getQueue(VK_QUEUE_COMPUTE_BIT, 0);
+	const vk::VkPhysicalDevice&	physicalDevice	= getPhysicalDevice();
+	const DeviceInterface&		deviceInterface	= getDeviceInterface();
+	const Queue&				sparseQueue		= getQueue(VK_QUEUE_SPARSE_BINDING_BIT, 0);
+	const Queue&				computeQueue	= getQueue(VK_QUEUE_COMPUTE_BIT, 0);
 
 	// Go through all physical devices
 	for (deUint32 physDevID = 0; physDevID < m_numPhysicalDevices; physDevID++)

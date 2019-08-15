@@ -98,20 +98,20 @@ public:
 						WideColorTest				(EglTestContext& eglTestCtx, const char* name, const char* description);
 						~WideColorTest				(void);
 
-	void				init								(void);
-	void				deinit								(void);
+	void				init						(void);
+	void				deinit						(void);
 	void				checkPixelFloatSupport				(void);
 	void				checkColorSpaceSupport				(void);
 	void				checkDisplayP3Support				(void);
-	void				checkDisplayP3PassthroughSupport	(void);
-	void				check1010102Support					(void);
-	void				checkFP16Support					(void);
-	void				checkSCRGBSupport					(void);
+	void				checkDisplayP3PassthroughSupport		(void);
+	void				check1010102Support				(void);
+	void				checkFP16Support				(void);
+	void				checkSCRGBSupport				(void);
 	void				checkSCRGBLinearSupport				(void);
-	void				checkbt2020linear					(void);
-	void				checkbt2020pq						(void);
-	void				checkSMPTE2086						(void);
-	void				checkCTA861_3						(void);
+	void				checkbt2020linear				(void);
+	void				checkbt2020pq					(void);
+	void				checkSMPTE2086					(void);
+	void				checkCTA861_3					(void);
 
 protected:
 	void				initEGLSurface				(EGLConfig config);
@@ -577,19 +577,19 @@ public:
 	void				addTestAttributes		(const EGLint* attributes);
 
 protected:
-	void				readPixels						(const glw::Functions& gl, float* dataPtr);
-	void				readPixels						(const glw::Functions& gl, deUint32* dataPtr);
-	void				readPixels						(const glw::Functions& gl, deUint8* dataPtr);
+	void				readPixels					(const glw::Functions& gl, float* dataPtr);
+	void				readPixels					(const glw::Functions& gl, deUint32* dataPtr);
+	void				readPixels					(const glw::Functions& gl, deUint8* dataPtr);
 	deUint32			expectedUint10					(float reference);
 	deUint32			expectedUint2					(float reference);
 	deUint8				expectedUint8					(float reference);
 	deUint8				expectedAlpha8					(float reference);
 	bool				checkWithThreshold8				(deUint8 value, deUint8 reference, deUint8 threshold = 1);
-	bool				checkWithThreshold10			(deUint32 value, deUint32 reference, deUint32 threshold = 1);
-	bool				checkWithThresholdFloat			(float value, float reference, float threshold);
-	void				doClearTest						(EGLSurface surface);
-	void				testPixels						(float reference, float increment);
-	void				testFramebufferColorEncoding	();
+	bool				checkWithThreshold10				(deUint32 value, deUint32 reference, deUint32 threshold = 1);
+	bool				checkWithThresholdFloat				(float value, float reference, float threshold);
+	void				doClearTest					(EGLSurface surface);
+	void				testPixels					(float reference, float increment);
+	void				testFramebufferColorEncoding			();
 	void				writeEglConfig					(EGLConfig config);
 
 private:
@@ -1115,14 +1115,13 @@ void WideColorSurfaceTest::testPixels (float reference, float increment)
 
 void WideColorSurfaceTest::testFramebufferColorEncoding()
 {
-
 	GLint framebufferColorEncoding;
 	m_gl.getFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_BACK, GL_FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING, &framebufferColorEncoding);
 	GLU_EXPECT_NO_ERROR(m_gl.getError(), "Get framebuffer color encoding");
-	bool correct = true;
+	bool correct = false;
 	if (m_colorSpace == EGL_GL_COLORSPACE_SRGB_KHR || m_colorSpace == EGL_GL_COLORSPACE_DISPLAY_P3_EXT)
 	{
-		if (m_redSize == 8)
+		if (m_redSize == 8 || m_redSize == 10)
 		{
 			correct = framebufferColorEncoding == GL_SRGB;
 		}
@@ -1482,6 +1481,7 @@ void WideColorTests::init (void)
 	addChild(new WideColorSurfaceTest(m_eglTestCtx, "window_888_colorspace_default", "888 window surface, default (sRGB) colorspace", windowAttribList888, EGL_NONE, iterations));
 	addChild(new WideColorSurfaceTest(m_eglTestCtx, "window_888_colorspace_srgb", "888 window surface, explicit sRGB colorspace", windowAttribList888, EGL_GL_COLORSPACE_SRGB_KHR, iterations));
 	addChild(new WideColorSurfaceTest(m_eglTestCtx, "window_888_colorspace_p3", "888 window surface, explicit Display-P3 colorspace", windowAttribList888, EGL_GL_COLORSPACE_DISPLAY_P3_EXT, iterations));
+	addChild(new WideColorSurfaceTest(m_eglTestCtx, "window_888_colorspace_p3_passthrough", "888 window surface, explicit Display-P3 colorspace", windowAttribList888, EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT, iterations));
 
 	const EGLint pbufferAttribList888[] =
 	{
@@ -1495,6 +1495,7 @@ void WideColorTests::init (void)
 	addChild(new WideColorSurfaceTest(m_eglTestCtx, "pbuffer_888_colorspace_default", "888 pbuffer surface, default (sRGB) colorspace", pbufferAttribList888, EGL_NONE, iterations));
 	addChild(new WideColorSurfaceTest(m_eglTestCtx, "pbuffer_888_colorspace_srgb", "888 pbuffer surface, explicit sRGB colorspace", pbufferAttribList888, EGL_GL_COLORSPACE_SRGB_KHR, iterations));
 	addChild(new WideColorSurfaceTest(m_eglTestCtx, "pbuffer_888_colorspace_p3", "888 pbuffer surface, explicit Display-P3 colorspace", pbufferAttribList888, EGL_GL_COLORSPACE_DISPLAY_P3_EXT, iterations));
+	addChild(new WideColorSurfaceTest(m_eglTestCtx, "pbuffer_888_colorspace_p3_passthrough", "888 pbuffer surface, explicit Display-P3 colorspace", pbufferAttribList888, EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT, iterations));
 
 }
 
