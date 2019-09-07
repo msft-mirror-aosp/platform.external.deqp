@@ -457,6 +457,7 @@ const char* getStructureTypeName (VkStructureType value)
 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COVERAGE_REDUCTION_MODE_FEATURES_NV:				return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COVERAGE_REDUCTION_MODE_FEATURES_NV";
 		case VK_STRUCTURE_TYPE_PIPELINE_COVERAGE_REDUCTION_STATE_CREATE_INFO_NV:				return "VK_STRUCTURE_TYPE_PIPELINE_COVERAGE_REDUCTION_STATE_CREATE_INFO_NV";
 		case VK_STRUCTURE_TYPE_FRAMEBUFFER_MIXED_SAMPLES_COMBINATION_NV:						return "VK_STRUCTURE_TYPE_FRAMEBUFFER_MIXED_SAMPLES_COMBINATION_NV";
+		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT:			return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT";
 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT:					return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT";
 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR:		return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR";
 		case VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT:							return "VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_INFO_EXT";
@@ -464,6 +465,14 @@ const char* getStructureTypeName (VkStructureType value)
 		case VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_WIN32_INFO_EXT:					return "VK_STRUCTURE_TYPE_SURFACE_FULL_SCREEN_EXCLUSIVE_WIN32_INFO_EXT";
 		case VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT:								return "VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT";
 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT:					return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT";
+		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT:					return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT";
+		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT:	return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT";
+		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR:		return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR";
+		case VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR:												return "VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR";
+		case VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_PROPERTIES_KHR:								return "VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_PROPERTIES_KHR";
+		case VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INFO_KHR:									return "VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INFO_KHR";
+		case VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_STATISTIC_KHR:								return "VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_STATISTIC_KHR";
+		case VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INTERNAL_REPRESENTATION_KHR:					return "VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INTERNAL_REPRESENTATION_KHR";
 		case VK_STRUCTURE_TYPE_MAX_ENUM:														return "VK_STRUCTURE_TYPE_MAX_ENUM";
 		default:																				return DE_NULL;
 	}
@@ -1201,6 +1210,7 @@ const char* getIndexTypeName (VkIndexType value)
 		case VK_INDEX_TYPE_UINT16:		return "VK_INDEX_TYPE_UINT16";
 		case VK_INDEX_TYPE_UINT32:		return "VK_INDEX_TYPE_UINT32";
 		case VK_INDEX_TYPE_NONE_NV:		return "VK_INDEX_TYPE_NONE_NV";
+		case VK_INDEX_TYPE_UINT8_EXT:	return "VK_INDEX_TYPE_UINT8_EXT";
 		case VK_INDEX_TYPE_MAX_ENUM:	return "VK_INDEX_TYPE_MAX_ENUM";
 		default:						return DE_NULL;
 	}
@@ -1402,6 +1412,19 @@ const char* getDriverIdKHRName (VkDriverIdKHR value)
 		case VK_DRIVER_ID_GGP_PROPRIETARY_KHR:				return "VK_DRIVER_ID_GGP_PROPRIETARY_KHR";
 		case VK_DRIVER_ID_MAX_ENUM_KHR:						return "VK_DRIVER_ID_MAX_ENUM_KHR";
 		default:											return DE_NULL;
+	}
+}
+
+const char* getPipelineExecutableStatisticFormatKHRName (VkPipelineExecutableStatisticFormatKHR value)
+{
+	switch (value)
+	{
+		case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_BOOL32_KHR:	return "VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_BOOL32_KHR";
+		case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_INT64_KHR:		return "VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_INT64_KHR";
+		case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_UINT64_KHR:	return "VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_UINT64_KHR";
+		case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_FLOAT64_KHR:	return "VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_FLOAT64_KHR";
+		case VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_MAX_ENUM_KHR:	return "VK_PIPELINE_EXECUTABLE_STATISTIC_FORMAT_MAX_ENUM_KHR";
+		default:													return DE_NULL;
 	}
 }
 
@@ -2182,15 +2205,17 @@ tcu::Format::Bitfield<32> getPipelineCreateFlagsStr (VkPipelineCreateFlags value
 {
 	static const tcu::Format::BitDesc s_desc[] =
 	{
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT,				"VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT,					"VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DERIVATIVE_BIT,							"VK_PIPELINE_CREATE_DERIVATIVE_BIT"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT,		"VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DISPATCH_BASE,							"VK_PIPELINE_CREATE_DISPATCH_BASE"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DEFER_COMPILE_BIT_NV,					"VK_PIPELINE_CREATE_DEFER_COMPILE_BIT_NV"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT_KHR,	"VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT_KHR"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DISPATCH_BASE_KHR,						"VK_PIPELINE_CREATE_DISPATCH_BASE_KHR"),
-		tcu::Format::BitDesc(VK_PIPELINE_CREATE_FLAG_BITS_MAX_ENUM,						"VK_PIPELINE_CREATE_FLAG_BITS_MAX_ENUM"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT,					"VK_PIPELINE_CREATE_DISABLE_OPTIMIZATION_BIT"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT,						"VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DERIVATIVE_BIT,								"VK_PIPELINE_CREATE_DERIVATIVE_BIT"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT,			"VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DISPATCH_BASE,								"VK_PIPELINE_CREATE_DISPATCH_BASE"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DEFER_COMPILE_BIT_NV,						"VK_PIPELINE_CREATE_DEFER_COMPILE_BIT_NV"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR,					"VK_PIPELINE_CREATE_CAPTURE_STATISTICS_BIT_KHR"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_CAPTURE_INTERNAL_REPRESENTATIONS_BIT_KHR,	"VK_PIPELINE_CREATE_CAPTURE_INTERNAL_REPRESENTATIONS_BIT_KHR"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT_KHR,		"VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT_KHR"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_DISPATCH_BASE_KHR,							"VK_PIPELINE_CREATE_DISPATCH_BASE_KHR"),
+		tcu::Format::BitDesc(VK_PIPELINE_CREATE_FLAG_BITS_MAX_ENUM,							"VK_PIPELINE_CREATE_FLAG_BITS_MAX_ENUM"),
 	};
 	return tcu::Format::Bitfield<32>(value, DE_ARRAY_BEGIN(s_desc), DE_ARRAY_END(s_desc));
 }
@@ -6121,6 +6146,88 @@ std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceUniformBufferSt
 	return s;
 }
 
+std::ostream& operator<< (std::ostream& s, const VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR& value)
+{
+	s << "VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tpipelineExecutableInfo = " << value.pipelineExecutableInfo << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPipelineInfoKHR& value)
+{
+	s << "VkPipelineInfoKHR = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tpipeline = " << value.pipeline << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPipelineExecutablePropertiesKHR& value)
+{
+	s << "VkPipelineExecutablePropertiesKHR = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tstages = " << getShaderStageFlagsStr(value.stages) << '\n';
+	s << "\tname = " << '\n' << tcu::formatArray(tcu::Format::HexIterator<char>(DE_ARRAY_BEGIN(value.name)), tcu::Format::HexIterator<char>(DE_ARRAY_END(value.name))) << '\n';
+	s << "\tdescription = " << (const char*)value.description << '\n';
+	s << "\tsubgroupSize = " << value.subgroupSize << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPipelineExecutableInfoKHR& value)
+{
+	s << "VkPipelineExecutableInfoKHR = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tpipeline = " << value.pipeline << '\n';
+	s << "\texecutableIndex = " << value.executableIndex << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPipelineExecutableStatisticValueKHR& value)
+{
+	s << "VkPipelineExecutableStatisticValueKHR = {\n";
+	s << "\tb32 = " << value.b32 << '\n';
+	s << "\ti64 = " << value.i64 << '\n';
+	s << "\tu64 = " << value.u64 << '\n';
+	s << "\tf64 = " << value.f64 << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPipelineExecutableStatisticKHR& value)
+{
+	s << "VkPipelineExecutableStatisticKHR = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tname = " << '\n' << tcu::formatArray(tcu::Format::HexIterator<char>(DE_ARRAY_BEGIN(value.name)), tcu::Format::HexIterator<char>(DE_ARRAY_END(value.name))) << '\n';
+	s << "\tdescription = " << (const char*)value.description << '\n';
+	s << "\tformat = " << value.format << '\n';
+	s << "\tvalue = " << value.value << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPipelineExecutableInternalRepresentationKHR& value)
+{
+	s << "VkPipelineExecutableInternalRepresentationKHR = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tname = " << '\n' << tcu::formatArray(tcu::Format::HexIterator<char>(DE_ARRAY_BEGIN(value.name)), tcu::Format::HexIterator<char>(DE_ARRAY_END(value.name))) << '\n';
+	s << "\tdescription = " << (const char*)value.description << '\n';
+	s << "\tisText = " << value.isText << '\n';
+	s << "\tdataSize = " << value.dataSize << '\n';
+	s << "\tpData = " << value.pData << '\n';
+	s << '}';
+	return s;
+}
+
 std::ostream& operator<< (std::ostream& s, const VkDebugReportCallbackCreateInfoEXT& value)
 {
 	s << "VkDebugReportCallbackCreateInfoEXT = {\n";
@@ -8096,6 +8203,18 @@ std::ostream& operator<< (std::ostream& s, const VkFramebufferMixedSamplesCombin
 	return s;
 }
 
+std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT& value)
+{
+	s << "VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tfragmentShaderSampleInterlock = " << value.fragmentShaderSampleInterlock << '\n';
+	s << "\tfragmentShaderPixelInterlock = " << value.fragmentShaderPixelInterlock << '\n';
+	s << "\tfragmentShaderShadingRateInterlock = " << value.fragmentShaderShadingRateInterlock << '\n';
+	s << '}';
+	return s;
+}
+
 std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceYcbcrImageArraysFeaturesEXT& value)
 {
 	s << "VkPhysicalDeviceYcbcrImageArraysFeaturesEXT = {\n";
@@ -8122,6 +8241,26 @@ std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceHostQueryResetF
 	s << "\tsType = " << value.sType << '\n';
 	s << "\tpNext = " << value.pNext << '\n';
 	s << "\thostQueryReset = " << value.hostQueryReset << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceIndexTypeUint8FeaturesEXT& value)
+{
+	s << "VkPhysicalDeviceIndexTypeUint8FeaturesEXT = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tindexTypeUint8 = " << value.indexTypeUint8 << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT& value)
+{
+	s << "VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tshaderDemoteToHelperInvocation = " << value.shaderDemoteToHelperInvocation << '\n';
 	s << '}';
 	return s;
 }

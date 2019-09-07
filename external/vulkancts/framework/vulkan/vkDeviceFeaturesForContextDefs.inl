@@ -30,9 +30,13 @@ const vk::VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV&	Context::g
 const vk::VkPhysicalDeviceBufferDeviceAddressFeaturesEXT&				Context::getBufferDeviceAddressFeatures					(void) const { return m_device->getBufferDeviceAddressFeatures();				}
 const vk::VkPhysicalDeviceCooperativeMatrixFeaturesNV&					Context::getCooperativeMatrixFeatures					(void) const { return m_device->getCooperativeMatrixFeatures();					}
 const vk::VkPhysicalDeviceCoverageReductionModeFeaturesNV&				Context::getCoverageReductionModeFeatures				(void) const { return m_device->getCoverageReductionModeFeatures();				}
+const vk::VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT&			Context::getFragmentShaderInterlockFeatures				(void) const { return m_device->getFragmentShaderInterlockFeatures();			}
 const vk::VkPhysicalDeviceYcbcrImageArraysFeaturesEXT&					Context::getYcbcrImageArraysFeatures					(void) const { return m_device->getYcbcrImageArraysFeatures();					}
 const vk::VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR&		Context::getUniformBufferStandardLayoutFeatures			(void) const { return m_device->getUniformBufferStandardLayoutFeatures();		}
 const vk::VkPhysicalDeviceHostQueryResetFeaturesEXT&					Context::getHostQueryResetFeatures						(void) const { return m_device->getHostQueryResetFeatures();					}
+const vk::VkPhysicalDeviceIndexTypeUint8FeaturesEXT&					Context::getIndexTypeUint8Features						(void) const { return m_device->getIndexTypeUint8Features();					}
+const vk::VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT&	Context::getShaderDemoteToHelperInvocationFeatures		(void) const { return m_device->getShaderDemoteToHelperInvocationFeatures();	}
+const vk::VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR&		Context::getPipelineExecutablePropertiesFeatures		(void) const { return m_device->getPipelineExecutablePropertiesFeatures();		}
 const vk::VkPhysicalDeviceMultiviewFeatures&							Context::getMultiviewFeatures							(void) const { return m_device->getMultiviewFeatures();							}
 const vk::VkPhysicalDevice16BitStorageFeatures&							Context::get16BitStorageFeatures						(void) const { return m_device->get16BitStorageFeatures();						}
 const vk::VkPhysicalDeviceVariablePointersFeatures&						Context::getVariablePointersFeatures					(void) const { return m_device->getVariablePointersFeatures();					}

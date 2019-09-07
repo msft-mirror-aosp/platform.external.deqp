@@ -816,6 +816,36 @@ template<> VkStructureType getStructureType<VkPhysicalDeviceUniformBufferStandar
 	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR;
 }
 
+template<> VkStructureType getStructureType<VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PIPELINE_EXECUTABLE_PROPERTIES_FEATURES_KHR;
+}
+
+template<> VkStructureType getStructureType<VkPipelineInfoKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PIPELINE_INFO_KHR;
+}
+
+template<> VkStructureType getStructureType<VkPipelineExecutablePropertiesKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_PROPERTIES_KHR;
+}
+
+template<> VkStructureType getStructureType<VkPipelineExecutableInfoKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INFO_KHR;
+}
+
+template<> VkStructureType getStructureType<VkPipelineExecutableStatisticKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_STATISTIC_KHR;
+}
+
+template<> VkStructureType getStructureType<VkPipelineExecutableInternalRepresentationKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PIPELINE_EXECUTABLE_INTERNAL_REPRESENTATION_KHR;
+}
+
 template<> VkStructureType getStructureType<VkDebugReportCallbackCreateInfoEXT> (void)
 {
 	return VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT;
@@ -1511,6 +1541,11 @@ template<> VkStructureType getStructureType<VkFramebufferMixedSamplesCombination
 	return VK_STRUCTURE_TYPE_FRAMEBUFFER_MIXED_SAMPLES_COMBINATION_NV;
 }
 
+template<> VkStructureType getStructureType<VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT> (void)
+{
+	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADER_INTERLOCK_FEATURES_EXT;
+}
+
 template<> VkStructureType getStructureType<VkPhysicalDeviceYcbcrImageArraysFeaturesEXT> (void)
 {
 	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_IMAGE_ARRAYS_FEATURES_EXT;
@@ -1524,6 +1559,16 @@ template<> VkStructureType getStructureType<VkHeadlessSurfaceCreateInfoEXT> (voi
 template<> VkStructureType getStructureType<VkPhysicalDeviceHostQueryResetFeaturesEXT> (void)
 {
 	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES_EXT;
+}
+
+template<> VkStructureType getStructureType<VkPhysicalDeviceIndexTypeUint8FeaturesEXT> (void)
+{
+	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INDEX_TYPE_UINT8_FEATURES_EXT;
+}
+
+template<> VkStructureType getStructureType<VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT> (void)
+{
+	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT;
 }
 
 template<> VkStructureType getStructureType<VkAndroidSurfaceCreateInfoKHR> (void)

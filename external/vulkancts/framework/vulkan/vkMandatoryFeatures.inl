@@ -6,6 +6,10 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 	if ( !vk::isInstanceExtensionSupported(context.getUsedApiVersion(), context.getInstanceExtensions(), "VK_KHR_get_physical_device_properties2") )
 		TCU_THROW(NotSupportedError, "Extension VK_KHR_get_physical_device_properties2 is not present");
 
+	VkPhysicalDevice					physicalDevice		= context.getPhysicalDevice();
+	const InstanceInterface&			vki					= context.getInstanceInterface();
+	const vector<VkExtensionProperties>	deviceExtensions	= enumerateDeviceExtensionProperties(vki, physicalDevice, DE_NULL);
+
 	tcu::TestLog& log = context.getTestContext().getLog();
 	vk::VkPhysicalDeviceFeatures2 coreFeatures;
 	deMemset(&coreFeatures, 0, sizeof(coreFeatures));
@@ -13,64 +17,81 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 	void** nextPtr = &coreFeatures.pNext;
 
 	vk::VkPhysicalDevice8BitStorageFeaturesKHR physicalDevice8BitStorageFeaturesKHR;
-	if (vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_8bit_storage"))
+	deMemset(&physicalDevice8BitStorageFeaturesKHR, 0, sizeof(physicalDevice8BitStorageFeaturesKHR));
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_8bit_storage")) )
 	{
-		deMemset(&physicalDevice8BitStorageFeaturesKHR, 0, sizeof(physicalDevice8BitStorageFeaturesKHR));
-		physicalDevice8BitStorageFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES_KHR;
+		physicalDevice8BitStorageFeaturesKHR.sType = getStructureType<VkPhysicalDevice8BitStorageFeaturesKHR>();
 		*nextPtr = &physicalDevice8BitStorageFeaturesKHR;
 		nextPtr  = &physicalDevice8BitStorageFeaturesKHR.pNext;
 	}
 
 	vk::VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeaturesEXT;
-	if (vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing"))
+	deMemset(&physicalDeviceDescriptorIndexingFeaturesEXT, 0, sizeof(physicalDeviceDescriptorIndexingFeaturesEXT));
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
-		deMemset(&physicalDeviceDescriptorIndexingFeaturesEXT, 0, sizeof(physicalDeviceDescriptorIndexingFeaturesEXT));
-		physicalDeviceDescriptorIndexingFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+		physicalDeviceDescriptorIndexingFeaturesEXT.sType = getStructureType<VkPhysicalDeviceDescriptorIndexingFeaturesEXT>();
 		*nextPtr = &physicalDeviceDescriptorIndexingFeaturesEXT;
 		nextPtr  = &physicalDeviceDescriptorIndexingFeaturesEXT.pNext;
 	}
 
 	vk::VkPhysicalDeviceInlineUniformBlockFeaturesEXT physicalDeviceInlineUniformBlockFeaturesEXT;
-	if (vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_inline_uniform_block"))
+	deMemset(&physicalDeviceInlineUniformBlockFeaturesEXT, 0, sizeof(physicalDeviceInlineUniformBlockFeaturesEXT));
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_inline_uniform_block")) )
 	{
-		deMemset(&physicalDeviceInlineUniformBlockFeaturesEXT, 0, sizeof(physicalDeviceInlineUniformBlockFeaturesEXT));
-		physicalDeviceInlineUniformBlockFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INLINE_UNIFORM_BLOCK_FEATURES_EXT;
+		physicalDeviceInlineUniformBlockFeaturesEXT.sType = getStructureType<VkPhysicalDeviceInlineUniformBlockFeaturesEXT>();
 		*nextPtr = &physicalDeviceInlineUniformBlockFeaturesEXT;
 		nextPtr  = &physicalDeviceInlineUniformBlockFeaturesEXT.pNext;
 	}
 
 	vk::VkPhysicalDeviceMultiviewFeatures physicalDeviceMultiviewFeatures;
-	if (vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_multiview"))
+	deMemset(&physicalDeviceMultiviewFeatures, 0, sizeof(physicalDeviceMultiviewFeatures));
+
+	if ( context.contextSupports(vk::ApiVersion(1, 1, 0)) || isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_multiview")) )
 	{
-		deMemset(&physicalDeviceMultiviewFeatures, 0, sizeof(physicalDeviceMultiviewFeatures));
-		physicalDeviceMultiviewFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_FEATURES;
+		physicalDeviceMultiviewFeatures.sType = getStructureType<VkPhysicalDeviceMultiviewFeatures>();
 		*nextPtr = &physicalDeviceMultiviewFeatures;
 		nextPtr  = &physicalDeviceMultiviewFeatures.pNext;
 	}
 
-	vk::VkPhysicalDeviceScalarBlockLayoutFeaturesEXT physicalDeviceScalarBlockLayoutFeaturesEXT;
-	if (vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_scalar_block_layout"))
+	vk::VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR physicalDevicePipelineExecutablePropertiesFeaturesKHR;
+	deMemset(&physicalDevicePipelineExecutablePropertiesFeaturesKHR, 0, sizeof(physicalDevicePipelineExecutablePropertiesFeaturesKHR));
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_pipeline_executable_properties")) )
 	{
-		deMemset(&physicalDeviceScalarBlockLayoutFeaturesEXT, 0, sizeof(physicalDeviceScalarBlockLayoutFeaturesEXT));
-		physicalDeviceScalarBlockLayoutFeaturesEXT.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT;
+		physicalDevicePipelineExecutablePropertiesFeaturesKHR.sType = getStructureType<VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR>();
+		*nextPtr = &physicalDevicePipelineExecutablePropertiesFeaturesKHR;
+		nextPtr  = &physicalDevicePipelineExecutablePropertiesFeaturesKHR.pNext;
+	}
+
+	vk::VkPhysicalDeviceScalarBlockLayoutFeaturesEXT physicalDeviceScalarBlockLayoutFeaturesEXT;
+	deMemset(&physicalDeviceScalarBlockLayoutFeaturesEXT, 0, sizeof(physicalDeviceScalarBlockLayoutFeaturesEXT));
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_scalar_block_layout")) )
+	{
+		physicalDeviceScalarBlockLayoutFeaturesEXT.sType = getStructureType<VkPhysicalDeviceScalarBlockLayoutFeaturesEXT>();
 		*nextPtr = &physicalDeviceScalarBlockLayoutFeaturesEXT;
 		nextPtr  = &physicalDeviceScalarBlockLayoutFeaturesEXT.pNext;
 	}
 
 	vk::VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR physicalDeviceUniformBufferStandardLayoutFeaturesKHR;
-	if (vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_uniform_buffer_standard_layout"))
+	deMemset(&physicalDeviceUniformBufferStandardLayoutFeaturesKHR, 0, sizeof(physicalDeviceUniformBufferStandardLayoutFeaturesKHR));
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_uniform_buffer_standard_layout")) )
 	{
-		deMemset(&physicalDeviceUniformBufferStandardLayoutFeaturesKHR, 0, sizeof(physicalDeviceUniformBufferStandardLayoutFeaturesKHR));
-		physicalDeviceUniformBufferStandardLayoutFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR;
+		physicalDeviceUniformBufferStandardLayoutFeaturesKHR.sType = getStructureType<VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR>();
 		*nextPtr = &physicalDeviceUniformBufferStandardLayoutFeaturesKHR;
 		nextPtr  = &physicalDeviceUniformBufferStandardLayoutFeaturesKHR.pNext;
 	}
 
 	vk::VkPhysicalDeviceVariablePointersFeatures physicalDeviceVariablePointersFeatures;
-	if (vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_variable_pointers"))
+	deMemset(&physicalDeviceVariablePointersFeatures, 0, sizeof(physicalDeviceVariablePointersFeatures));
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_variable_pointers")) )
 	{
-		deMemset(&physicalDeviceVariablePointersFeatures, 0, sizeof(physicalDeviceVariablePointersFeatures));
-		physicalDeviceVariablePointersFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES;
+		physicalDeviceVariablePointersFeatures.sType = getStructureType<VkPhysicalDeviceVariablePointersFeatures>();
 		*nextPtr = &physicalDeviceVariablePointersFeatures;
 		nextPtr  = &physicalDeviceVariablePointersFeatures.pNext;
 	}
@@ -86,7 +107,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( coreFeatures.features.shaderSampledImageArrayDynamicIndexing == VK_FALSE )
 		{
@@ -95,7 +116,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( coreFeatures.features.shaderStorageBufferArrayDynamicIndexing == VK_FALSE )
 		{
@@ -104,7 +125,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_8bit_storage") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_8bit_storage")) )
 	{
 		if ( physicalDevice8BitStorageFeaturesKHR.storageBuffer8BitAccess == VK_FALSE )
 		{
@@ -113,7 +134,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_multiview") )
+	if ( context.contextSupports(vk::ApiVersion(1, 1, 0)) )
 	{
 		if ( physicalDeviceMultiviewFeatures.multiview == VK_FALSE )
 		{
@@ -122,7 +143,16 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_variable_pointers") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_multiview")) )
+	{
+		if ( physicalDeviceMultiviewFeatures.multiview == VK_FALSE )
+		{
+			log << tcu::TestLog::Message << "Mandatory feature multiview not supported" << tcu::TestLog::EndMessage;
+			result = false;
+		}
+	}
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_variable_pointers")) )
 	{
 		if ( physicalDeviceVariablePointersFeatures.variablePointersStorageBuffer == VK_FALSE )
 		{
@@ -131,7 +161,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.shaderUniformTexelBufferArrayDynamicIndexing == VK_FALSE )
 		{
@@ -140,7 +170,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.shaderStorageTexelBufferArrayDynamicIndexing == VK_FALSE )
 		{
@@ -149,7 +179,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.shaderSampledImageArrayNonUniformIndexing == VK_FALSE )
 		{
@@ -158,7 +188,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.shaderStorageBufferArrayNonUniformIndexing == VK_FALSE )
 		{
@@ -167,7 +197,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.shaderUniformTexelBufferArrayNonUniformIndexing == VK_FALSE )
 		{
@@ -176,7 +206,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.descriptorBindingSampledImageUpdateAfterBind == VK_FALSE )
 		{
@@ -185,7 +215,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.descriptorBindingStorageImageUpdateAfterBind == VK_FALSE )
 		{
@@ -194,7 +224,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.descriptorBindingStorageBufferUpdateAfterBind == VK_FALSE )
 		{
@@ -203,7 +233,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.descriptorBindingUniformTexelBufferUpdateAfterBind == VK_FALSE )
 		{
@@ -212,7 +242,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.descriptorBindingStorageTexelBufferUpdateAfterBind == VK_FALSE )
 		{
@@ -221,7 +251,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.descriptorBindingUpdateUnusedWhilePending == VK_FALSE )
 		{
@@ -230,7 +260,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.descriptorBindingPartiallyBound == VK_FALSE )
 		{
@@ -239,7 +269,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceDescriptorIndexingFeaturesEXT.runtimeDescriptorArray == VK_FALSE )
 		{
@@ -248,7 +278,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_inline_uniform_block") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_inline_uniform_block")) )
 	{
 		if ( physicalDeviceInlineUniformBlockFeaturesEXT.inlineUniformBlock == VK_FALSE )
 		{
@@ -257,7 +287,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_inline_uniform_block") && vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_descriptor_indexing") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_inline_uniform_block")) && isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_descriptor_indexing")) )
 	{
 		if ( physicalDeviceInlineUniformBlockFeaturesEXT.descriptorBindingInlineUniformBlockUpdateAfterBind == VK_FALSE )
 		{
@@ -266,7 +296,7 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_scalar_block_layout") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_EXT_scalar_block_layout")) )
 	{
 		if ( physicalDeviceScalarBlockLayoutFeaturesEXT.scalarBlockLayout == VK_FALSE )
 		{
@@ -275,11 +305,20 @@ bool checkMandatoryFeatures(const vkt::Context& context)
 		}
 	}
 
-	if ( vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_uniform_buffer_standard_layout") )
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_uniform_buffer_standard_layout")) )
 	{
 		if ( physicalDeviceUniformBufferStandardLayoutFeaturesKHR.uniformBufferStandardLayout == VK_FALSE )
 		{
 			log << tcu::TestLog::Message << "Mandatory feature uniformBufferStandardLayout not supported" << tcu::TestLog::EndMessage;
+			result = false;
+		}
+	}
+
+	if ( isExtensionSupported(deviceExtensions, RequiredExtension("VK_KHR_pipeline_executable_properties")) )
+	{
+		if ( physicalDevicePipelineExecutablePropertiesFeaturesKHR.pipelineExecutableInfo == VK_FALSE )
+		{
+			log << tcu::TestLog::Message << "Mandatory feature pipelineExecutableInfo not supported" << tcu::TestLog::EndMessage;
 			result = false;
 		}
 	}

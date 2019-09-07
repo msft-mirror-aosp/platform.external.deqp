@@ -30,9 +30,13 @@ const vk::VkPhysicalDeviceDedicatedAllocationImageAliasingFeaturesNV&	getDedicat
 const vk::VkPhysicalDeviceBufferDeviceAddressFeaturesEXT&				getBufferDeviceAddressFeatures				(void) const;
 const vk::VkPhysicalDeviceCooperativeMatrixFeaturesNV&					getCooperativeMatrixFeatures				(void) const;
 const vk::VkPhysicalDeviceCoverageReductionModeFeaturesNV&				getCoverageReductionModeFeatures			(void) const;
+const vk::VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT&			getFragmentShaderInterlockFeatures			(void) const;
 const vk::VkPhysicalDeviceYcbcrImageArraysFeaturesEXT&					getYcbcrImageArraysFeatures					(void) const;
 const vk::VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR&		getUniformBufferStandardLayoutFeatures		(void) const;
 const vk::VkPhysicalDeviceHostQueryResetFeaturesEXT&					getHostQueryResetFeatures					(void) const;
+const vk::VkPhysicalDeviceIndexTypeUint8FeaturesEXT&					getIndexTypeUint8Features					(void) const;
+const vk::VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT&	getShaderDemoteToHelperInvocationFeatures	(void) const;
+const vk::VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR&		getPipelineExecutablePropertiesFeatures		(void) const;
 const vk::VkPhysicalDeviceMultiviewFeatures&							getMultiviewFeatures						(void) const;
 const vk::VkPhysicalDevice16BitStorageFeatures&							get16BitStorageFeatures						(void) const;
 const vk::VkPhysicalDeviceVariablePointersFeatures&						getVariablePointersFeatures					(void) const;

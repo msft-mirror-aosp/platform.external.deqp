@@ -2310,6 +2310,67 @@ struct VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR
 	VkBool32		uniformBufferStandardLayout;
 };
 
+struct VkPhysicalDevicePipelineExecutablePropertiesFeaturesKHR
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		pipelineExecutableInfo;
+};
+
+struct VkPipelineInfoKHR
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	VkPipeline		pipeline;
+};
+
+struct VkPipelineExecutablePropertiesKHR
+{
+	VkStructureType		sType;
+	void*				pNext;
+	VkShaderStageFlags	stages;
+	char				name[VK_MAX_DESCRIPTION_SIZE];
+	char				description[VK_MAX_DESCRIPTION_SIZE];
+	deUint32			subgroupSize;
+};
+
+struct VkPipelineExecutableInfoKHR
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	VkPipeline		pipeline;
+	deUint32		executableIndex;
+};
+
+union VkPipelineExecutableStatisticValueKHR
+{
+	VkBool32	b32;
+	deInt64		i64;
+	deUint64	u64;
+	double		f64;
+};
+
+struct VkPipelineExecutableStatisticKHR
+{
+	VkStructureType							sType;
+	void*									pNext;
+	char									name[VK_MAX_DESCRIPTION_SIZE];
+	char									description[VK_MAX_DESCRIPTION_SIZE];
+	VkPipelineExecutableStatisticFormatKHR	format;
+	VkPipelineExecutableStatisticValueKHR	value;
+};
+
+struct VkPipelineExecutableInternalRepresentationKHR
+{
+	VkStructureType	sType;
+	void*			pNext;
+	char			name[VK_MAX_DESCRIPTION_SIZE];
+	char			description[VK_MAX_DESCRIPTION_SIZE];
+	VkBool32		isText;
+	deUintptr		dataSize;
+	void*			pData;
+};
+
 struct VkDebugReportCallbackCreateInfoEXT
 {
 	VkStructureType					sType;
@@ -3784,6 +3845,15 @@ struct VkFramebufferMixedSamplesCombinationNV
 	VkSampleCountFlags			colorSamples;
 };
 
+struct VkPhysicalDeviceFragmentShaderInterlockFeaturesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		fragmentShaderSampleInterlock;
+	VkBool32		fragmentShaderPixelInterlock;
+	VkBool32		fragmentShaderShadingRateInterlock;
+};
+
 struct VkPhysicalDeviceYcbcrImageArraysFeaturesEXT
 {
 	VkStructureType	sType;
@@ -3803,6 +3873,20 @@ struct VkPhysicalDeviceHostQueryResetFeaturesEXT
 	VkStructureType	sType;
 	void*			pNext;
 	VkBool32		hostQueryReset;
+};
+
+struct VkPhysicalDeviceIndexTypeUint8FeaturesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		indexTypeUint8;
+};
+
+struct VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		shaderDemoteToHelperInvocation;
 };
 
 struct VkAndroidSurfaceCreateInfoKHR

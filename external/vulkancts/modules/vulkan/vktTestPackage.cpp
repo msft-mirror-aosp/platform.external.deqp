@@ -93,6 +93,7 @@
 #include "vktTransformFeedbackTests.hpp"
 #include "vktDescriptorIndexingTests.hpp"
 #include "vktImagelessFramebufferTests.hpp"
+#include "vktFragmentShaderInterlockTests.hpp"
 
 #include <vector>
 #include <sstream>
@@ -434,6 +435,7 @@ void createGlslTests (tcu::TestCaseGroup* glslTests)
 	// ShaderRenderCase-based tests
 	glslTests->addChild(sr::createDerivateTests			(testCtx));
 	glslTests->addChild(sr::createDiscardTests			(testCtx));
+	glslTests->addChild(sr::createDemoteTests			(testCtx));
 	glslTests->addChild(sr::createIndexingTests			(testCtx));
 	glslTests->addChild(sr::createLimitTests			(testCtx));
 	glslTests->addChild(sr::createLoopTests				(testCtx));
@@ -508,6 +510,7 @@ void TestPackage::init (void)
 	addChild(TransformFeedback::createTests		(m_testCtx));
 	addChild(DescriptorIndexing::createTests	(m_testCtx));
 	addChild(imageless::createTests				(m_testCtx));
+	addChild(FragmentShaderInterlock::createTests(m_testCtx));
 }
 
 } // vkt
