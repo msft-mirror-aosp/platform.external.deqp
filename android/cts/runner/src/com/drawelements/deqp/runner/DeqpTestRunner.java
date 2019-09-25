@@ -157,6 +157,12 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                         + " be a coverage build or else this will fail.")
     private boolean mCoverage = false;
 
+    @Option(
+            name = "disable-watchdog",
+            description =
+                    "Disable the native testrunner's per-test watchdog.")
+    private boolean mDisableWatchdog = false;
+
     private Collection<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
     private final TestInstanceResultListener mInstanceListerner = new TestInstanceResultListener();
@@ -1431,7 +1437,9 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             deqpCmdLine.append(" --deqp-log-images=disable");
         }
 
-        deqpCmdLine.append(" --deqp-watchdog=enable");
+        if (!mDisableWatchdog) {
+            deqpCmdLine.append(" --deqp-watchdog=enable");
+        }
 
         final String command = String.format(
                 "am instrument %s -w -e deqpLogFileName \"%s\" -e deqpCmdLine \"%s\""
@@ -2200,6 +2208,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         destination.mCollectTestsOnly = source.mCollectTestsOnly;
         destination.mAngle = source.mAngle;
         destination.mCoverage = source.mCoverage;
+        destination.mDisableWatchdog = source.mDisableWatchdog;
     }
 
     /**
