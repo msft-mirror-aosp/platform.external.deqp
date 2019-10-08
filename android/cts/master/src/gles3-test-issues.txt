@@ -149,6 +149,3 @@ dEQP-GLES3.functional.shaders.texture_functions.texturegrad.isamplercube_fragmen
 
 # Bug 26651667
 dEQP-GLES3.functional.draw.draw_elements_instanced.indices.buffer.index_byte
-
-# b/73070970
-dEQP-GLES3.functional.shaders.declarations.unspecified_precision.*

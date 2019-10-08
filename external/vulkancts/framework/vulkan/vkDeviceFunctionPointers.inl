@@ -1,6 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  */
+GetDeviceProcAddrFunc							getDeviceProcAddr;
 DestroyDeviceFunc								destroyDevice;
 GetDeviceQueueFunc								getDeviceQueue;
 QueueSubmitFunc									queueSubmit;
@@ -175,6 +176,8 @@ CmdDrawIndexedIndirectCountAMDFunc				cmdDrawIndexedIndirectCountAMD;
 CmdDrawIndirectCountKHRFunc						cmdDrawIndirectCountKHR;
 CmdDrawIndexedIndirectCountKHRFunc				cmdDrawIndexedIndirectCountKHR;
 GetMemoryWin32HandleNVFunc						getMemoryWin32HandleNV;
+CmdBeginConditionalRenderingEXTFunc				cmdBeginConditionalRenderingEXT;
+CmdEndConditionalRenderingEXTFunc				cmdEndConditionalRenderingEXT;
 CmdProcessCommandsNVXFunc						cmdProcessCommandsNVX;
 CmdReserveSpaceForCommandsNVXFunc				cmdReserveSpaceForCommandsNVX;
 CreateIndirectCommandsLayoutNVXFunc				createIndirectCommandsLayoutNVX;
@@ -197,5 +200,6 @@ CreateValidationCacheEXTFunc					createValidationCacheEXT;
 DestroyValidationCacheEXTFunc					destroyValidationCacheEXT;
 MergeValidationCachesEXTFunc					mergeValidationCachesEXT;
 GetValidationCacheDataEXTFunc					getValidationCacheDataEXT;
+GetMemoryHostPointerPropertiesEXTFunc			getMemoryHostPointerPropertiesEXT;
 GetAndroidHardwareBufferPropertiesANDROIDFunc	getAndroidHardwareBufferPropertiesANDROID;
 GetMemoryAndroidHardwareBufferANDROIDFunc		getMemoryAndroidHardwareBufferANDROID;

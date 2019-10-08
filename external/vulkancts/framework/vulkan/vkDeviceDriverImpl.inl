@@ -2,6 +2,11 @@
  * be lost! Modify the generating script instead.
  */
 
+PFN_vkVoidFunction DeviceDriver::getDeviceProcAddr (VkDevice device, const char* pName) const
+{
+	return m_vk.getDeviceProcAddr(device, pName);
+}
+
 void DeviceDriver::destroyDevice (VkDevice device, const VkAllocationCallbacks* pAllocator) const
 {
 	m_vk.destroyDevice(device, pAllocator);
@@ -872,6 +877,16 @@ VkResult DeviceDriver::getMemoryWin32HandleNV (VkDevice device, VkDeviceMemory m
 	return m_vk.getMemoryWin32HandleNV(device, memory, handleType, pHandle);
 }
 
+void DeviceDriver::cmdBeginConditionalRenderingEXT (VkCommandBuffer commandBuffer, const VkConditionalRenderingBeginInfoEXT* pConditionalRenderingBegin) const
+{
+	m_vk.cmdBeginConditionalRenderingEXT(commandBuffer, pConditionalRenderingBegin);
+}
+
+void DeviceDriver::cmdEndConditionalRenderingEXT (VkCommandBuffer commandBuffer) const
+{
+	m_vk.cmdEndConditionalRenderingEXT(commandBuffer);
+}
+
 void DeviceDriver::cmdProcessCommandsNVX (VkCommandBuffer commandBuffer, const VkCmdProcessCommandsInfoNVX* pProcessCommandsInfo) const
 {
 	m_vk.cmdProcessCommandsNVX(commandBuffer, pProcessCommandsInfo);
@@ -980,6 +995,11 @@ VkResult DeviceDriver::mergeValidationCachesEXT (VkDevice device, VkValidationCa
 VkResult DeviceDriver::getValidationCacheDataEXT (VkDevice device, VkValidationCacheEXT validationCache, deUintptr* pDataSize, void* pData) const
 {
 	return m_vk.getValidationCacheDataEXT(device, validationCache, pDataSize, pData);
+}
+
+VkResult DeviceDriver::getMemoryHostPointerPropertiesEXT (VkDevice device, VkExternalMemoryHandleTypeFlagBits handleType, const void* pHostPointer, VkMemoryHostPointerPropertiesEXT* pMemoryHostPointerProperties) const
+{
+	return m_vk.getMemoryHostPointerPropertiesEXT(device, handleType, pHostPointer, pMemoryHostPointerProperties);
 }
 
 VkResult DeviceDriver::getAndroidHardwareBufferPropertiesANDROID (VkDevice device, const struct pt::AndroidHardwareBufferPtr buffer, VkAndroidHardwareBufferPropertiesANDROID* pProperties) const

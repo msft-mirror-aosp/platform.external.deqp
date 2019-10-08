@@ -36,6 +36,14 @@ genrule {
     cmd: "for i in $(in); do cp $$i $(genDir)/nyc-$$(basename $$i); done",
 }
 
+filegroup {
+    name: "deqp_angle_exclude_caselists",
+    srcs: [
+        "angle/*.txt",
+    ],
+    path: "angle",
+}
+
 java_test_host {
     name: "CtsDeqpTestCases",
 
@@ -56,5 +64,6 @@ java_test_host {
     data: [
         ":deqp_master_caselists",
         ":deqp_nyc_caselists",
+        ":deqp_angle_exclude_caselists",
     ],
 }
