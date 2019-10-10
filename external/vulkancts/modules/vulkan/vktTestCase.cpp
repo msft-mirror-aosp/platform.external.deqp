@@ -482,4 +482,8 @@ void TestCase::initPrograms (SourceCollections&) const
 {
 }
 
+void TestCase::checkSupport (Context&) const
+{
+}
+
 } // vkt
