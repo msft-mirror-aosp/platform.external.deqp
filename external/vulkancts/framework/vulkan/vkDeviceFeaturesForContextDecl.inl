@@ -16,12 +16,14 @@ const vk::VkPhysicalDeviceShadingRateImageFeaturesNV&					getShadingRateImageFea
 const vk::VkPhysicalDeviceRepresentativeFragmentTestFeaturesNV&			getRepresentativeFragmentTestFeatures		(void) const;
 const vk::VkPhysicalDevice8BitStorageFeaturesKHR&						get8BitStorageFeatures						(void) const;
 const vk::VkPhysicalDeviceShaderAtomicInt64FeaturesKHR&					getShaderAtomicInt64Features				(void) const;
+const vk::VkPhysicalDeviceShaderClockFeaturesKHR&						getShaderClockFeatures						(void) const;
 const vk::VkPhysicalDeviceVertexAttributeDivisorFeaturesEXT&			getVertexAttributeDivisorFeatures			(void) const;
 const vk::VkPhysicalDeviceComputeShaderDerivativesFeaturesNV&			getComputeShaderDerivativesFeatures			(void) const;
 const vk::VkPhysicalDeviceMeshShaderFeaturesNV&							getMeshShaderFeatures						(void) const;
 const vk::VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV&			getFragmentShaderBarycentricFeatures		(void) const;
 const vk::VkPhysicalDeviceShaderImageFootprintFeaturesNV&				getShaderImageFootprintFeatures				(void) const;
 const vk::VkPhysicalDeviceExclusiveScissorFeaturesNV&					getExclusiveScissorFeatures					(void) const;
+const vk::VkPhysicalDeviceTimelineSemaphoreFeaturesKHR&					getTimelineSemaphoreFeatures				(void) const;
 const vk::VkPhysicalDeviceVulkanMemoryModelFeaturesKHR&					getVulkanMemoryModelFeatures				(void) const;
 const vk::VkPhysicalDeviceFragmentDensityMapFeaturesEXT&				getFragmentDensityMapFeatures				(void) const;
 const vk::VkPhysicalDeviceScalarBlockLayoutFeaturesEXT&					getScalarBlockLayoutFeatures				(void) const;

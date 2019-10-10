@@ -1026,7 +1026,7 @@ bool BasicComputeTestInstance::decompressImage (const VkCommandBuffer&	cmdBuffer
 	{
 		const bool						layoutShaderReadOnly	= (layerNdx % 2u) == 1;
 		const deUint32					imageNdx				= layerNdx + mipNdx * getLayerCount();
-		const VkExtent3D				extentCompressed		= makeExtent3D(mipMapSizes[mipNdx]);
+		const VkExtent3D				extentCompressed		= imageType == VK_IMAGE_TYPE_1D ? makeExtent3D(mipMapSizes[mipNdx].x(), 1, mipMapSizes[mipNdx].z()) : makeExtent3D(mipMapSizes[mipNdx]);
 		const VkImage&					uncompressed			= imageData[m_parameters.imagesCount -1].getImage(imageNdx);
 		const VkExtent3D				extentUncompressed		= imageData[m_parameters.imagesCount -1].getImageInfo(imageNdx).extent;
 		const VkDeviceSize				bufferSizeComp			= getCompressedImageSizeInBytes(m_parameters.formatCompressed, mipMapSizes[mipNdx]);
@@ -2605,13 +2605,13 @@ void TexelViewCompatibleCase::initPrograms (vk::SourceCollections&	programCollec
 					{
 						// IMAGE_TYPE_1D
 						"    const int     pos = int(gl_GlobalInvocationID.x);\n"
-						"    const float coord = float(gl_GlobalInvocationID.x) / pixels_resolution.x;\n",
+						"    const float coord = (float(gl_GlobalInvocationID.x) + 0.5) / pixels_resolution.x;\n",
 						// IMAGE_TYPE_2D
 						"    const ivec2  pos = ivec2(gl_GlobalInvocationID.xy);\n"
-						"    const vec2 coord = vec2(gl_GlobalInvocationID.xy) / vec2(pixels_resolution);\n",
+						"    const vec2 coord = (vec2(gl_GlobalInvocationID.xy) + 0.5) / vec2(pixels_resolution);\n",
 						// IMAGE_TYPE_3D
 						"    const ivec3  pos = ivec3(gl_GlobalInvocationID.xy, 0);\n"
-						"    const vec2    v2 = vec2(gl_GlobalInvocationID.xy) / vec2(pixels_resolution);\n"
+						"    const vec2    v2 = (vec2(gl_GlobalInvocationID.xy) + 0.5) / vec2(pixels_resolution);\n"
 						"    const vec3 coord = vec3(v2, 0.0);\n",
 					};
 
@@ -2866,7 +2866,7 @@ TestInstance* TexelViewCompatibleCase::createInstance (Context& context) const
 
 		if (VK_ERROR_FORMAT_NOT_SUPPORTED == vk.getPhysicalDeviceImageFormatProperties(physicalDevice, m_parameters.formatCompressed,
 												mapImageType(m_parameters.imageType), VK_IMAGE_TILING_OPTIMAL,
-												VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+												m_parameters.compressedImageUsage,
 												VK_IMAGE_CREATE_BLOCK_TEXEL_VIEW_COMPATIBLE_BIT_KHR | VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT_KHR,
 												&imageFormatProperties))
 			TCU_THROW(NotSupportedError, "Operation not supported with this image format");
