@@ -99,7 +99,7 @@ MultisampledRenderToTextureReadPixelsCase::IterateResult MultisampledRenderToTex
 	GLuint depthStencil = 0;
 	gl.genRenderbuffers(1, &depthStencil);
 	gl.bindRenderbuffer(GL_RENDERBUFFER, depthStencil);
-	gl.renderbufferStorageMultisample(GL_RENDERBUFFER, max_samples, GL_DEPTH24_STENCIL8, 1, 1);
+	gl.renderbufferStorageMultisampleEXT(GL_RENDERBUFFER, max_samples, GL_DEPTH24_STENCIL8, 1, 1);
 	gl.framebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depthStencil);
 	gl.framebufferRenderbuffer(GL_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthStencil);
 	if (gl.checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {

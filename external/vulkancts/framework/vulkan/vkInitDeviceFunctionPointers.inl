@@ -1,6 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  */
+m_vk.getDeviceProcAddr							= (GetDeviceProcAddrFunc)							GET_PROC_ADDR("vkGetDeviceProcAddr");
 m_vk.destroyDevice								= (DestroyDeviceFunc)								GET_PROC_ADDR("vkDestroyDevice");
 m_vk.getDeviceQueue								= (GetDeviceQueueFunc)								GET_PROC_ADDR("vkGetDeviceQueue");
 m_vk.queueSubmit								= (QueueSubmitFunc)									GET_PROC_ADDR("vkQueueSubmit");
@@ -205,6 +206,8 @@ m_vk.cmdDrawIndexedIndirectCountAMD				= (CmdDrawIndexedIndirectCountAMDFunc)			
 m_vk.cmdDrawIndirectCountKHR					= (CmdDrawIndirectCountKHRFunc)						GET_PROC_ADDR("vkCmdDrawIndirectCountKHR");
 m_vk.cmdDrawIndexedIndirectCountKHR				= (CmdDrawIndexedIndirectCountKHRFunc)				GET_PROC_ADDR("vkCmdDrawIndexedIndirectCountKHR");
 m_vk.getMemoryWin32HandleNV						= (GetMemoryWin32HandleNVFunc)						GET_PROC_ADDR("vkGetMemoryWin32HandleNV");
+m_vk.cmdBeginConditionalRenderingEXT			= (CmdBeginConditionalRenderingEXTFunc)				GET_PROC_ADDR("vkCmdBeginConditionalRenderingEXT");
+m_vk.cmdEndConditionalRenderingEXT				= (CmdEndConditionalRenderingEXTFunc)				GET_PROC_ADDR("vkCmdEndConditionalRenderingEXT");
 m_vk.cmdProcessCommandsNVX						= (CmdProcessCommandsNVXFunc)						GET_PROC_ADDR("vkCmdProcessCommandsNVX");
 m_vk.cmdReserveSpaceForCommandsNVX				= (CmdReserveSpaceForCommandsNVXFunc)				GET_PROC_ADDR("vkCmdReserveSpaceForCommandsNVX");
 m_vk.createIndirectCommandsLayoutNVX			= (CreateIndirectCommandsLayoutNVXFunc)				GET_PROC_ADDR("vkCreateIndirectCommandsLayoutNVX");
@@ -227,5 +230,6 @@ m_vk.createValidationCacheEXT					= (CreateValidationCacheEXTFunc)					GET_PROC_
 m_vk.destroyValidationCacheEXT					= (DestroyValidationCacheEXTFunc)					GET_PROC_ADDR("vkDestroyValidationCacheEXT");
 m_vk.mergeValidationCachesEXT					= (MergeValidationCachesEXTFunc)					GET_PROC_ADDR("vkMergeValidationCachesEXT");
 m_vk.getValidationCacheDataEXT					= (GetValidationCacheDataEXTFunc)					GET_PROC_ADDR("vkGetValidationCacheDataEXT");
+m_vk.getMemoryHostPointerPropertiesEXT			= (GetMemoryHostPointerPropertiesEXTFunc)			GET_PROC_ADDR("vkGetMemoryHostPointerPropertiesEXT");
 m_vk.getAndroidHardwareBufferPropertiesANDROID	= (GetAndroidHardwareBufferPropertiesANDROIDFunc)	GET_PROC_ADDR("vkGetAndroidHardwareBufferPropertiesANDROID");
 m_vk.getMemoryAndroidHardwareBufferANDROID		= (GetMemoryAndroidHardwareBufferANDROIDFunc)		GET_PROC_ADDR("vkGetMemoryAndroidHardwareBufferANDROID");

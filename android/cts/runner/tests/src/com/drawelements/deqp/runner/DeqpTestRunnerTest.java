@@ -68,8 +68,9 @@ import java.util.concurrent.TimeUnit;
 public class DeqpTestRunnerTest extends TestCase {
     private static final String NAME = "dEQP-GLES3";
     private static final IAbi ABI = new Abi("armeabi-v7a", "32");
-    private static final String CASE_LIST_FILE_NAME = "/sdcard/dEQP-TestCaseList.txt";
-    private static final String LOG_FILE_NAME = "/sdcard/TestLog.qpa";
+    private static final String APP_DIR = "/sdcard/";
+    private static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
+    private static final String LOG_FILE_NAME = "TestLog.qpa";
     private static final String INSTRUMENTATION_NAME =
             "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
     private static final String QUERY_INSTRUMENTATION_NAME =
@@ -229,8 +230,6 @@ public class DeqpTestRunnerTest extends TestCase {
         if (majorVersion > requiredMajorVersion
                 || (majorVersion == requiredMajorVersion && minorVersion >= requiredMinorVersion)) {
 
-            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-                andReturn("").once();
             EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
                 andReturn("").once();
             EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -245,7 +244,7 @@ public class DeqpTestRunnerTest extends TestCase {
                     + "--deqp-surface-type=window "
                     + "--deqp-log-images=disable "
                     + "--deqp-watchdog=enable",
-                    CASE_LIST_FILE_NAME);
+                    APP_DIR + CASE_LIST_FILE_NAME);
 
             runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine,
                     output);
@@ -373,15 +372,13 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "--deqp-surface-type=window "
                 + "--deqp-log-images=disable "
                 + "--deqp-watchdog=enable",
-                CASE_LIST_FILE_NAME);
+                APP_DIR + CASE_LIST_FILE_NAME);
 
         runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, output);
 
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -537,15 +534,13 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "--deqp-surface-type=window "
                 + "--deqp-log-images=disable "
                 + "--deqp-watchdog=enable",
-                CASE_LIST_FILE_NAME);
+                APP_DIR + CASE_LIST_FILE_NAME);
 
         runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, output);
 
         mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -631,8 +626,6 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), expectedTests.size());
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -868,7 +861,7 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "--deqp-surface-type=window "
                 + "--deqp-log-images=disable "
                 + "--deqp-watchdog=enable",
-                CASE_LIST_FILE_NAME);
+                APP_DIR + CASE_LIST_FILE_NAME);
 
         // first try
         runInstrumentationLineAndAnswer(mockDevice, mockIDevice,
@@ -887,8 +880,6 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -950,8 +941,6 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -999,8 +988,6 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -1098,7 +1085,7 @@ public class DeqpTestRunnerTest extends TestCase {
                     + "--deqp-surface-type=window "
                     + "--deqp-log-images=disable "
                     + "--deqp-watchdog=enable",
-                    CASE_LIST_FILE_NAME, rotation);
+                    APP_DIR + CASE_LIST_FILE_NAME, rotation);
 
             runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine,
                     output);
@@ -1107,8 +1094,6 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -1323,8 +1308,6 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -1689,8 +1672,6 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -1737,8 +1718,6 @@ public class DeqpTestRunnerTest extends TestCase {
             mockListener.testRunStarted(getTestId(shard), shardTests.size());
             EasyMock.expectLastCall().once();
 
-            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-                andReturn("").once();
             EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
                 andReturn("").once();
             EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -1887,7 +1866,7 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "--deqp-surface-type=window "
                 + "--deqp-log-images=disable "
                 + "--deqp-watchdog=enable",
-                CASE_LIST_FILE_NAME);
+                APP_DIR + CASE_LIST_FILE_NAME);
 
         runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine,
                 output);
@@ -1895,8 +1874,6 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -2051,15 +2028,13 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "--deqp-surface-type=window "
                 + "--deqp-log-images=disable "
                 + "--deqp-watchdog=enable",
-                CASE_LIST_FILE_NAME);
+                APP_DIR + CASE_LIST_FILE_NAME);
 
         runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, output);
 
         mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("setprop debug.hwui.renderer none"))).
-            andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
             andReturn("").once();
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
@@ -2142,30 +2117,30 @@ public class DeqpTestRunnerTest extends TestCase {
             + "--deqp-surface-type=window "
             + "--deqp-log-images=disable "
             + "--deqp-watchdog=enable",
-            CASE_LIST_FILE_NAME);
+            APP_DIR + CASE_LIST_FILE_NAME);
         runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, cmd, output);
     }
 
     private void runInstrumentationLineAndAnswer(ITestDevice mockDevice, IDevice mockIDevice,
             final String testTrie, final String cmd, final String output) throws Exception {
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + CASE_LIST_FILE_NAME)))
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + APP_DIR + CASE_LIST_FILE_NAME)))
                 .andReturn("").once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + LOG_FILE_NAME)))
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("rm " + APP_DIR + LOG_FILE_NAME)))
                 .andReturn("").once();
 
         if (testTrie == null) {
-            mockDevice.pushString((String)EasyMock.anyObject(), EasyMock.eq(CASE_LIST_FILE_NAME));
+            mockDevice.pushString((String)EasyMock.anyObject(), EasyMock.eq(APP_DIR + CASE_LIST_FILE_NAME));
         }
         else {
-            mockDevice.pushString(testTrie + "\n", CASE_LIST_FILE_NAME);
+            mockDevice.pushString(testTrie + "\n", APP_DIR + CASE_LIST_FILE_NAME);
         }
         EasyMock.expectLastCall().andReturn(true).once();
 
         String command = String.format(
                 "am instrument %s -w -e deqpLogFileName \"%s\" -e deqpCmdLine \"%s\" "
                     + "-e deqpLogData \"%s\" %s",
-                AbiUtils.createAbiFlag(ABI.getName()), LOG_FILE_NAME, cmd, false,
+                AbiUtils.createAbiFlag(ABI.getName()), APP_DIR + LOG_FILE_NAME, cmd, false,
                 INSTRUMENTATION_NAME);
 
         EasyMock.expect(mockDevice.getIDevice()).andReturn(mockIDevice);
