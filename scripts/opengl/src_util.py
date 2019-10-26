@@ -141,6 +141,13 @@ EXTENSIONS			= [
 	'GL_OVR_multiview_multisampled_render_to_texture',
 ]
 
+ALIASING_EXCEPTIONS = [
+	# registry insists that this aliases glRenderbufferStorageMultisample,
+	# and from a desktop GL / GLX perspective it *must*, but for ES they are
+	# unfortunately separate functions with different semantics.
+	'glRenderbufferStorageMultisampleEXT',
+]
+
 def getGLRegistry ():
 	return khr_util.registry_cache.getRegistry(GL_SOURCE)
 
@@ -171,7 +178,7 @@ def getHybridInterface (stripAliasedExtCommands = True):
 		strippedCmds = []
 
 		for command in iface.commands:
-			if command.alias == None:
+			if command.alias == None or command.name in ALIASING_EXCEPTIONS:
 				strippedCmds.append(command)
 
 		iface.commands = strippedCmds
