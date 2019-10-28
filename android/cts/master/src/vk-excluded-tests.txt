@@ -311,3 +311,6 @@ dEQP-VK.tessellation.primitive_discard.triangles_fractional_odd_spacing_ccw_vali
 dEQP-VK.tessellation.primitive_discard.triangles_fractional_odd_spacing_cw_valid_levels
 dEQP-VK.tessellation.primitive_discard.quads_fractional_odd_spacing_ccw_valid_levels
 dEQP-VK.tessellation.primitive_discard.quads_fractional_odd_spacing_cw_valid_levels
+
+# Exclude conformance version from android test, issue 1839
+dEQP-VK.api.driver_properties.conformance_version
