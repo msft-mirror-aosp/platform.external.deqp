@@ -81,31 +81,75 @@ struct CaseDefinition
 	int					opType;
 	VkShaderStageFlags	shaderStage;
 	VkFormat			format;
-	int					direction;
 	de::SharedPtr<bool>	geometryPointSizeSupported;
 };
+
+std::string GetExtHeader(VkFormat format)
+{
+	return	"#extension GL_KHR_shader_subgroup_quad: enable\n"
+			"#extension GL_KHR_shader_subgroup_ballot: enable\n" +
+			subgroups::getAdditionalExtensionForFormat(format);
+}
+
+std::string GetTestSrc(const CaseDefinition &caseDef)
+{
+	const std::string swapTable[OPTYPE_LAST] = {
+		"",
+		"  const uint swapTable[4] = {1, 0, 3, 2};\n",
+		"  const uint swapTable[4] = {2, 3, 0, 1};\n",
+		"  const uint swapTable[4] = {3, 2, 1, 0};\n",
+	};
+
+	const std::string validate =
+		"  if (subgroupBallotBitExtract(mask, otherID) && op !=data[otherID])\n"
+		"    tempRes = 0;\n";
+
+	std::string fmt	= subgroups::getFormatNameForGLSL(caseDef.format);
+	std::string op	= getOpTypeName(caseDef.opType);
+
+	std::ostringstream testSrc;
+	testSrc	<< "  uvec4 mask = subgroupBallot(true);\n"
+			<< swapTable[caseDef.opType]
+			<< "  tempRes = 1;\n";
+
+	if (caseDef.opType == OPTYPE_QUAD_BROADCAST)
+	{
+		for (int i=0; i<4; i++)
+		{
+			testSrc << "  {\n"
+					<< "  " << fmt << " op = " << op << "(data[gl_SubgroupInvocationID], " << i << ");\n"
+					<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + " << i << ";\n"
+					<< validate
+					<< "  }\n";
+		}
+	}
+	else
+	{
+		testSrc << "  " << fmt << " op = " << op << "(data[gl_SubgroupInvocationID]);\n"
+				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + swapTable[gl_SubgroupInvocationID & 0x3];\n"
+				<< validate;
+	}
+
+	return testSrc.str();
+}
 
 void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefinition caseDef)
 {
 	const vk::ShaderBuildOptions	buildOptions	(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u);
-	std::string			swapTable[OPTYPE_LAST];
 
 	subgroups::setFragmentShaderFrameBuffer(programCollection);
 
 	if (VK_SHADER_STAGE_VERTEX_BIT != caseDef.shaderStage)
 		subgroups::setVertexShaderFrameBuffer(programCollection);
 
-	swapTable[OPTYPE_QUAD_BROADCAST] = "";
-	swapTable[OPTYPE_QUAD_SWAP_HORIZONTAL] = "  const uint swapTable[4] = {1, 0, 3, 2};\n";
-	swapTable[OPTYPE_QUAD_SWAP_VERTICAL] = "  const uint swapTable[4] = {2, 3, 0, 1};\n";
-	swapTable[OPTYPE_QUAD_SWAP_DIAGONAL] = "  const uint swapTable[4] = {3, 2, 1, 0};\n";
+	std::string extHeader = GetExtHeader(caseDef.format);
+	std::string testSrc = GetTestSrc(caseDef);
 
 	if (VK_SHADER_STAGE_VERTEX_BIT == caseDef.shaderStage)
 	{
 		std::ostringstream	vertexSrc;
 		vertexSrc << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_450)<<"\n"
-			<< "#extension GL_KHR_shader_subgroup_quad: enable\n"
-			<< "#extension GL_KHR_shader_subgroup_ballot: enable\n"
+			<< extHeader.c_str()
 			<< "layout(location = 0) in highp vec4 in_position;\n"
 			<< "layout(location = 0) out float result;\n"
 			<< "layout(set = 0, binding = 0) uniform Buffer1\n"
@@ -115,30 +159,9 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 			<< "\n"
 			<< "void main (void)\n"
 			<< "{\n"
-			<< "  uvec4 mask = subgroupBallot(true);\n"
-			<< swapTable[caseDef.opType];
-
-		if (OPTYPE_QUAD_BROADCAST == caseDef.opType)
-		{
-			vertexSrc << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID], " << caseDef.direction << ");\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + " << caseDef.direction << ";\n";
-		}
-		else
-		{
-			vertexSrc << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID]);\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + swapTable[gl_SubgroupInvocationID & 0x3];\n";
-		}
-
-		vertexSrc << "  if (subgroupBallotBitExtract(mask, otherID))\n"
-			<< "  {\n"
-			<< "    result = (op == data[otherID]) ? 1.0f : 0.0f;\n"
-			<< "  }\n"
-			<< "  else\n"
-			<< "  {\n"
-			<< "    result = 1.0f;\n" // Invocation we read from was inactive, so we can't verify results!
-			<< "  }\n"
+			<< "  uint tempRes;\n"
+			<< testSrc
+			<< "  result = float(tempRes);\n"
 			<< "  gl_Position = in_position;\n"
 			<< "  gl_PointSize = 1.0f;\n"
 			<< "}\n";
@@ -150,8 +173,7 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 		std::ostringstream geometry;
 
 		geometry << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_450)<<"\n"
-			<< "#extension GL_KHR_shader_subgroup_quad: enable\n"
-			<< "#extension GL_KHR_shader_subgroup_ballot: enable\n"
+			<< extHeader.c_str()
 			<< "layout(points) in;\n"
 			<< "layout(points, max_vertices = 1) out;\n"
 			<< "layout(location = 0) out float out_color;\n"
@@ -163,30 +185,9 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 			<< "\n"
 			<< "void main (void)\n"
 			<< "{\n"
-			<< "  uvec4 mask = subgroupBallot(true);\n"
-			<< swapTable[caseDef.opType];
-
-		if (OPTYPE_QUAD_BROADCAST == caseDef.opType)
-		{
-			geometry << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID], " << caseDef.direction << ");\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + " << caseDef.direction << ";\n";
-		}
-		else
-		{
-			geometry << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID]);\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + swapTable[gl_SubgroupInvocationID & 0x3];\n";
-		}
-
-		geometry << "  if (subgroupBallotBitExtract(mask, otherID))\n"
-			<< "  {\n"
-			<< "    out_color = (op == data[otherID]) ? 1.0 : 0.0;\n"
-			<< "  }\n"
-			<< "  else\n"
-			<< "  {\n"
-			<< "    out_color = 1.0;\n" // Invocation we read from was inactive, so we can't verify results!
-			<< "  }\n"
+			<< "  uint tempRes;\n"
+			<< testSrc
+			<< "  out_color = float(tempRes);\n"
 			<< "  gl_Position = gl_in[0].gl_Position;\n"
 			<< (*caseDef.geometryPointSizeSupported ? "  gl_PointSize = gl_in[0].gl_PointSize;\n" : "")
 			<< "  EmitVertex();\n"
@@ -201,8 +202,7 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 		std::ostringstream controlSource;
 
 		controlSource << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_450)<<"\n"
-			<< "#extension GL_KHR_shader_subgroup_quad: enable\n"
-			<< "#extension GL_KHR_shader_subgroup_ballot: enable\n"
+			<< extHeader.c_str()
 			<< "layout(vertices = 2) out;\n"
 			<< "layout(location = 0) out float out_color[];\n"
 			<< "layout(set = 0, binding = 0) uniform Buffer1\n"
@@ -217,30 +217,9 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 			<< "    gl_TessLevelOuter[0] = 1.0f;\n"
 			<< "    gl_TessLevelOuter[1] = 1.0f;\n"
 			<< "  }\n"
-			<< "  uvec4 mask = subgroupBallot(true);\n"
-			<< swapTable[caseDef.opType];
-
-		if (OPTYPE_QUAD_BROADCAST == caseDef.opType)
-		{
-			controlSource << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID], " << caseDef.direction << ");\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + " << caseDef.direction << ";\n";
-		}
-		else
-		{
-			controlSource << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID]);\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + swapTable[gl_SubgroupInvocationID & 0x3];\n";
-		}
-
-		controlSource << "  if (subgroupBallotBitExtract(mask, otherID))\n"
-			<< "  {\n"
-			<< "    out_color[gl_InvocationID] = (op == data[otherID]) ? 1.0 : 0.0;\n"
-			<< "  }\n"
-			<< "  else\n"
-			<< "  {\n"
-			<< "    out_color[gl_InvocationID] = 1.0; \n"// Invocation we read from was inactive, so we can't verify results!
-			<< "  }\n"
+			<< "  uint tempRes;\n"
+			<< testSrc
+			<< "  out_color[gl_InvocationID] = float(tempRes);\n"
 			<< "  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
 			<< "}\n";
 
@@ -252,8 +231,7 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 	{
 		ostringstream evaluationSource;
 		evaluationSource << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_450)<<"\n"
-			<< "#extension GL_KHR_shader_subgroup_quad: enable\n"
-			<< "#extension GL_KHR_shader_subgroup_ballot: enable\n"
+			<< extHeader.c_str()
 			<< "layout(isolines, equal_spacing, ccw ) in;\n"
 			<< "layout(location = 0) out float out_color;\n"
 			<< "layout(set = 0, binding = 0) uniform Buffer1\n"
@@ -263,30 +241,9 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 			<< "\n"
 			<< "void main (void)\n"
 			<< "{\n"
-			<< "  uvec4 mask = subgroupBallot(true);\n"
-			<< swapTable[caseDef.opType];
-
-		if (OPTYPE_QUAD_BROADCAST == caseDef.opType)
-		{
-			evaluationSource << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID], " << caseDef.direction << ");\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + " << caseDef.direction << ";\n";
-		}
-		else
-		{
-			evaluationSource << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID]);\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + swapTable[gl_SubgroupInvocationID & 0x3];\n";
-		}
-
-		evaluationSource << "  if (subgroupBallotBitExtract(mask, otherID))\n"
-			<< "  {\n"
-			<< "    out_color = (op == data[otherID]) ? 1.0 : 0.0;\n"
-			<< "  }\n"
-			<< "  else\n"
-			<< "  {\n"
-			<< "    out_color = 1.0;\n" // Invocation we read from was inactive, so we can't verify results!
-			<< "  }\n"
+			<< "  uint tempRes;\n"
+			<< testSrc
+			<< "  out_color = float(tempRes);\n"
 			<< "  gl_Position = mix(gl_in[0].gl_Position, gl_in[1].gl_Position, gl_TessCoord.x);\n"
 			<< "}\n";
 
@@ -302,19 +259,17 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 
 void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 {
-	std::string swapTable[OPTYPE_LAST];
-	swapTable[OPTYPE_QUAD_BROADCAST] = "";
-	swapTable[OPTYPE_QUAD_SWAP_HORIZONTAL] = "  const uint swapTable[4] = {1, 0, 3, 2};\n";
-	swapTable[OPTYPE_QUAD_SWAP_VERTICAL] = "  const uint swapTable[4] = {2, 3, 0, 1};\n";
-	swapTable[OPTYPE_QUAD_SWAP_DIAGONAL] = "  const uint swapTable[4] = {3, 2, 1, 0};\n";
+	const vk::ShaderBuildOptions	buildOptions	(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u);
+
+	std::string extHeader = GetExtHeader(caseDef.format);
+	std::string sourceType = GetTestSrc(caseDef);
 
 	if (VK_SHADER_STAGE_COMPUTE_BIT == caseDef.shaderStage)
 	{
 		std::ostringstream src;
 
 		src << "#version 450\n"
-			<< "#extension GL_KHR_shader_subgroup_quad: enable\n"
-			<< "#extension GL_KHR_shader_subgroup_ballot: enable\n"
+			<< extHeader.c_str()
 			<< "layout (local_size_x_id = 0, local_size_y_id = 1, "
 			"local_size_z_id = 2) in;\n"
 			<< "layout(set = 0, binding = 0, std430) buffer Buffer1\n"
@@ -332,58 +287,19 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 			<< "  highp uint offset = globalSize.x * ((globalSize.y * "
 			"gl_GlobalInvocationID.z) + gl_GlobalInvocationID.y) + "
 			"gl_GlobalInvocationID.x;\n"
-			<< "  uvec4 mask = subgroupBallot(true);\n"
-			<< swapTable[caseDef.opType];
-
-
-		if (OPTYPE_QUAD_BROADCAST == caseDef.opType)
-		{
-			src << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID], " << caseDef.direction << ");\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + " << caseDef.direction << ";\n";
-		}
-		else
-		{
-			src << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID]);\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + swapTable[gl_SubgroupInvocationID & 0x3];\n";
-		}
-
-		src << "  if (subgroupBallotBitExtract(mask, otherID))\n"
-			<< "  {\n"
-			<< "    result[offset] = (op == data[otherID]) ? 1 : 0;\n"
-			<< "  }\n"
-			<< "  else\n"
-			<< "  {\n"
-			<< "    result[offset] = 1; // Invocation we read from was inactive, so we can't verify results!\n"
-			<< "  }\n"
+			<< "  uint tempRes;\n"
+			<< sourceType
+			<< "  result[offset] = tempRes;\n"
 			<< "}\n";
 
-		programCollection.glslSources.add("comp")
-				<< glu::ComputeSource(src.str()) << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u);
+		programCollection.glslSources.add("comp") << glu::ComputeSource(src.str()) << buildOptions;
 	}
 	else
 	{
-		std::ostringstream src;
-		if (OPTYPE_QUAD_BROADCAST == caseDef.opType)
-		{
-			src << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID], " << caseDef.direction << ");\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + " << caseDef.direction << ";\n";
-		}
-		else
-		{
-			src << "  " << subgroups::getFormatNameForGLSL(caseDef.format) << " op = "
-				<< getOpTypeName(caseDef.opType) << "(data[gl_SubgroupInvocationID]);\n"
-				<< "  uint otherID = (gl_SubgroupInvocationID & ~0x3) + swapTable[gl_SubgroupInvocationID & 0x3];\n";
-		}
-		const string sourceType = src.str();
-
 		{
 			const string vertex =
 				"#version 450\n"
-				"#extension GL_KHR_shader_subgroup_quad: enable\n"
-				"#extension GL_KHR_shader_subgroup_ballot: enable\n"
+				+ extHeader +
 				"layout(set = 0, binding = 0, std430) buffer Buffer1\n"
 				"{\n"
 				"  uint result[];\n"
@@ -395,31 +311,21 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"\n"
 				"void main (void)\n"
 				"{\n"
-				"  uvec4 mask = subgroupBallot(true);\n"
-				+ swapTable[caseDef.opType]
+				"  uint tempRes;\n"
 				+ sourceType +
-				"  if (subgroupBallotBitExtract(mask, otherID))\n"
-				"  {\n"
-				"    result[gl_VertexIndex] = (op == data[otherID]) ? 1 : 0;\n"
-				"  }\n"
-				"  else\n"
-				"  {\n"
-				"    result[gl_VertexIndex] = 1; // Invocation we read from was inactive, so we can't verify results!\n"
-				"  }\n"
+				"  result[gl_VertexIndex] = tempRes;\n"
 				"  float pixelSize = 2.0f/1024.0f;\n"
 				"  float pixelPosition = pixelSize/2.0f - 1.0f;\n"
 				"  gl_Position = vec4(float(gl_VertexIndex) * pixelSize + pixelPosition, 0.0f, 0.0f, 1.0f);\n"
 				"  gl_PointSize = 1.0f;\n"
 				"}\n";
-			programCollection.glslSources.add("vert")
-				<< glu::VertexSource(vertex) << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u);
+			programCollection.glslSources.add("vert") << glu::VertexSource(vertex) << buildOptions;
 		}
 
 		{
 			const string tesc =
 				"#version 450\n"
-				"#extension GL_KHR_shader_subgroup_quad: enable\n"
-				"#extension GL_KHR_shader_subgroup_ballot: enable\n"
+				+ extHeader +
 				"layout(vertices=1) out;\n"
 				"layout(set = 0, binding = 1, std430) buffer Buffer1\n"
 				"{\n"
@@ -432,17 +338,9 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"\n"
 				"void main (void)\n"
 				"{\n"
-				"  uvec4 mask = subgroupBallot(true);\n"
-				+ swapTable[caseDef.opType]
+				"  uint tempRes;\n"
 				+ sourceType +
-				"  if (subgroupBallotBitExtract(mask, otherID))\n"
-				"  {\n"
-				"    result[gl_PrimitiveID] = (op == data[otherID]) ? 1 : 0;\n"
-				"  }\n"
-				"  else\n"
-				"  {\n"
-				"    result[gl_PrimitiveID] = 1; // Invocation we read from was inactive, so we can't verify results!\n"
-				"  }\n"
+				"  result[gl_PrimitiveID] = tempRes;\n"
 				"  if (gl_InvocationID == 0)\n"
 				"  {\n"
 				"    gl_TessLevelOuter[0] = 1.0f;\n"
@@ -450,15 +348,13 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"  }\n"
 				"  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
 				"}\n";
-			programCollection.glslSources.add("tesc")
-					<< glu::TessellationControlSource(tesc) << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u);
+			programCollection.glslSources.add("tesc") << glu::TessellationControlSource(tesc) << buildOptions;
 		}
 
 		{
 			const string tese =
 				"#version 450\n"
-				"#extension GL_KHR_shader_subgroup_quad: enable\n"
-				"#extension GL_KHR_shader_subgroup_ballot: enable\n"
+				+ extHeader +
 				"layout(isolines) in;\n"
 				"layout(set = 0, binding = 2, std430)  buffer Buffer1\n"
 				"{\n"
@@ -471,29 +367,19 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"\n"
 				"void main (void)\n"
 				"{\n"
-				"  uvec4 mask = subgroupBallot(true);\n"
-				+ swapTable[caseDef.opType]
+				"  uint tempRes;\n"
 				+ sourceType +
-				"  if (subgroupBallotBitExtract(mask, otherID))\n"
-				"  {\n"
-				"    result[gl_PrimitiveID * 2 + uint(gl_TessCoord.x + 0.5)] = (op == data[otherID]) ? 1 : 0;\n"
-				"  }\n"
-				"  else\n"
-				"  {\n"
-				"    result[gl_PrimitiveID * 2 + uint(gl_TessCoord.x + 0.5)] = 1; // Invocation we read from was inactive, so we can't verify results!\n"
-				"  }\n"
+				"  result[gl_PrimitiveID * 2 + uint(gl_TessCoord.x + 0.5)] = tempRes;\n"
 				"  float pixelSize = 2.0f/1024.0f;\n"
 				"  gl_Position = gl_in[0].gl_Position + gl_TessCoord.x * pixelSize / 2.0f;\n"
 				"}\n";
-			programCollection.glslSources.add("tese")
-					<< glu::TessellationEvaluationSource(tese) << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u);
+			programCollection.glslSources.add("tese") << glu::TessellationEvaluationSource(tese) << buildOptions;
 		}
 
 		{
 			const string geometry =
 				"#version 450\n"
-				"#extension GL_KHR_shader_subgroup_quad: enable\n"
-				"#extension GL_KHR_shader_subgroup_ballot: enable\n"
+				+ extHeader +
 				"layout(${TOPOLOGY}) in;\n"
 				"layout(points, max_vertices = 1) out;\n"
 				"layout(set = 0, binding = 3, std430) buffer Buffer1\n"
@@ -507,30 +393,20 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"\n"
 				"void main (void)\n"
 				"{\n"
-				"  uvec4 mask = subgroupBallot(true);\n"
-				+ swapTable[caseDef.opType]
+				"  uint tempRes;\n"
 				+ sourceType +
-				"  if (subgroupBallotBitExtract(mask, otherID))\n"
-				"  {\n"
-				"    result[gl_PrimitiveIDIn] = (op == data[otherID]) ? 1 : 0;\n"
-				"  }\n"
-				"  else\n"
-				"  {\n"
-				"    result[gl_PrimitiveIDIn] = 1; // Invocation we read from was inactive, so we can't verify results!\n"
-				"  }\n"
+				"  result[gl_PrimitiveIDIn] = tempRes;\n"
 				"  gl_Position = gl_in[0].gl_Position;\n"
 				"  EmitVertex();\n"
 				"  EndPrimitive();\n"
 				"}\n";
-			subgroups::addGeometryShadersFromTemplate(geometry, vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u),
-													  programCollection.glslSources);
+			subgroups::addGeometryShadersFromTemplate(geometry, buildOptions, programCollection.glslSources);
 		}
 
 		{
 			const string fragment =
 				"#version 450\n"
-				"#extension GL_KHR_shader_subgroup_quad: enable\n"
-				"#extension GL_KHR_shader_subgroup_ballot: enable\n"
+				+ extHeader +
 				"layout(location = 0) out uint result;\n"
 				"layout(set = 0, binding = 4, std430) readonly buffer Buffer2\n"
 				"{\n"
@@ -538,20 +414,11 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"};\n"
 				"void main (void)\n"
 				"{\n"
-				"  uvec4 mask = subgroupBallot(true);\n"
-				+ swapTable[caseDef.opType]
+				"  uint tempRes;\n"
 				+ sourceType +
-				"  if (subgroupBallotBitExtract(mask, otherID))\n"
-				"  {\n"
-				"    result = (op == data[otherID]) ? 1 : 0;\n"
-				"  }\n"
-				"  else\n"
-				"  {\n"
-				"    result = 1; // Invocation we read from was inactive, so we can't verify results!\n"
-				"  }\n"
+				"  result = tempRes;\n"
 				"}\n";
-			programCollection.glslSources.add("fragment")
-				<< glu::FragmentSource(fragment)<< vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_3, 0u);
+			programCollection.glslSources.add("fragment") << glu::FragmentSource(fragment)<< buildOptions;
 		}
 		subgroups::addNoSubgroupShader(programCollection);
 	}
@@ -565,12 +432,8 @@ void supportedCheck (Context& context, CaseDefinition caseDef)
 	if (!subgroups::isSubgroupFeatureSupportedForDevice(context, VK_SUBGROUP_FEATURE_QUAD_BIT))
 		TCU_THROW(NotSupportedError, "Device does not support subgroup quad operations");
 
-
-	if (subgroups::isDoubleFormat(caseDef.format) &&
-			!subgroups::isDoubleSupportedForDevice(context))
-	{
-		TCU_THROW(NotSupportedError, "Device does not support subgroup double operations");
-	}
+	if (!subgroups::isFormatSupportedForDevice(context, caseDef.format))
+		TCU_THROW(NotSupportedError, "Device does not support the specified format in subgroup operations");
 
 	*caseDef.geometryPointSizeSupported = subgroups::isTessellationAndGeometryPointSizeSupported(context);
 }
@@ -683,19 +546,6 @@ tcu::TestCaseGroup* createSubgroupsQuadTests(tcu::TestContext& testCtx)
 	de::MovePtr<tcu::TestCaseGroup> framebufferGroup(new tcu::TestCaseGroup(
 		testCtx, "framebuffer", "Subgroup arithmetic category tests: framebuffer"));
 
-	const VkFormat formats[] =
-	{
-		VK_FORMAT_R32_SINT, VK_FORMAT_R32G32_SINT, VK_FORMAT_R32G32B32_SINT,
-		VK_FORMAT_R32G32B32A32_SINT, VK_FORMAT_R32_UINT, VK_FORMAT_R32G32_UINT,
-		VK_FORMAT_R32G32B32_UINT, VK_FORMAT_R32G32B32A32_UINT,
-		VK_FORMAT_R32_SFLOAT, VK_FORMAT_R32G32_SFLOAT,
-		VK_FORMAT_R32G32B32_SFLOAT, VK_FORMAT_R32G32B32A32_SFLOAT,
-		VK_FORMAT_R64_SFLOAT, VK_FORMAT_R64G64_SFLOAT,
-		VK_FORMAT_R64G64B64_SFLOAT, VK_FORMAT_R64G64B64A64_SFLOAT,
-		VK_FORMAT_R8_USCALED, VK_FORMAT_R8G8_USCALED,
-		VK_FORMAT_R8G8B8_USCALED, VK_FORMAT_R8G8B8A8_USCALED,
-	};
-
 	const VkShaderStageFlags stages[] =
 	{
 		VK_SHADER_STAGE_VERTEX_BIT,
@@ -704,57 +554,42 @@ tcu::TestCaseGroup* createSubgroupsQuadTests(tcu::TestContext& testCtx)
 		VK_SHADER_STAGE_GEOMETRY_BIT,
 	};
 
-	for (int direction = 0; direction < 4; ++direction)
+	const std::vector<VkFormat> formats = subgroups::getAllFormats();
+
+	for (size_t formatIndex = 0; formatIndex < formats.size(); ++formatIndex)
 	{
-		for (int formatIndex = 0; formatIndex < DE_LENGTH_OF_ARRAY(formats); ++formatIndex)
+		const VkFormat format = formats[formatIndex];
+
+		for (int opTypeIndex = 0; opTypeIndex < OPTYPE_LAST; ++opTypeIndex)
 		{
-			const VkFormat format = formats[formatIndex];
+			const std::string op = de::toLower(getOpTypeName(opTypeIndex));
+			std::ostringstream name;
+			name << de::toLower(op);
 
-			for (int opTypeIndex = 0; opTypeIndex < OPTYPE_LAST; ++opTypeIndex)
+			name << "_" << subgroups::getFormatNameForGLSL(format);
+
 			{
-				const std::string op = de::toLower(getOpTypeName(opTypeIndex));
-				std::ostringstream name;
-				name << de::toLower(op);
-
-				if (OPTYPE_QUAD_BROADCAST == opTypeIndex)
-				{
-					name << "_" << direction;
-				}
-				else
-				{
-					if (0 != direction)
-					{
-						// We don't need direction for swap operations.
-						continue;
-					}
-				}
-
-				name << "_" << subgroups::getFormatNameForGLSL(format);
-
-				{
-					const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_COMPUTE_BIT, format, direction, de::SharedPtr<bool>(new bool)};
-					addFunctionCaseWithPrograms(computeGroup.get(), name.str(), "", supportedCheck, initPrograms, test, caseDef);
-				}
-
-				{
-					const CaseDefinition caseDef =
-					{
-						opTypeIndex,
-						VK_SHADER_STAGE_ALL_GRAPHICS,
-						format,
-						direction,
-						de::SharedPtr<bool>(new bool)
-					};
-					addFunctionCaseWithPrograms(graphicGroup.get(), name.str(), "", supportedCheck, initPrograms, test, caseDef);
-				}
-				for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(stages); ++stageIndex)
-				{
-					const CaseDefinition caseDef = {opTypeIndex, stages[stageIndex], format, direction, de::SharedPtr<bool>(new bool)};
-					addFunctionCaseWithPrograms(framebufferGroup.get(), name.str()+"_"+ getShaderStageName(caseDef.shaderStage), "",
-												supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
-				}
-
+				const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_COMPUTE_BIT, format, de::SharedPtr<bool>(new bool)};
+				addFunctionCaseWithPrograms(computeGroup.get(), name.str(), "", supportedCheck, initPrograms, test, caseDef);
 			}
+
+			{
+				const CaseDefinition caseDef =
+				{
+					opTypeIndex,
+					VK_SHADER_STAGE_ALL_GRAPHICS,
+					format,
+					de::SharedPtr<bool>(new bool)
+				};
+				addFunctionCaseWithPrograms(graphicGroup.get(), name.str(), "", supportedCheck, initPrograms, test, caseDef);
+			}
+			for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(stages); ++stageIndex)
+			{
+				const CaseDefinition caseDef = {opTypeIndex, stages[stageIndex], format, de::SharedPtr<bool>(new bool)};
+				addFunctionCaseWithPrograms(framebufferGroup.get(), name.str()+"_"+ getShaderStageName(caseDef.shaderStage), "",
+											supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
+			}
+
 		}
 	}
 

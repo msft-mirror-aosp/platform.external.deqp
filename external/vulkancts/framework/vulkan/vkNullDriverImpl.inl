@@ -1533,6 +1533,29 @@ VKAPI_ATTR void VKAPI_CALL cmdDrawIndexedIndirectCountKHR (VkCommandBuffer comma
 	DE_UNREF(stride);
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL getSemaphoreCounterValueKHR (VkDevice device, VkSemaphore semaphore, deUint64* pValue)
+{
+	DE_UNREF(device);
+	DE_UNREF(semaphore);
+	DE_UNREF(pValue);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL waitSemaphoresKHR (VkDevice device, const VkSemaphoreWaitInfoKHR* pWaitInfo, deUint64 timeout)
+{
+	DE_UNREF(device);
+	DE_UNREF(pWaitInfo);
+	DE_UNREF(timeout);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL signalSemaphoreKHR (VkDevice device, const VkSemaphoreSignalInfoKHR* pSignalInfo)
+{
+	DE_UNREF(device);
+	DE_UNREF(pSignalInfo);
+	return VK_SUCCESS;
+}
+
 VKAPI_ATTR VkResult VKAPI_CALL getPipelineExecutablePropertiesKHR (VkDevice device, const VkPipelineInfoKHR* pPipelineInfo, deUint32* pExecutableCount, VkPipelineExecutablePropertiesKHR* pProperties)
 {
 	DE_UNREF(device);
@@ -1557,29 +1580,6 @@ VKAPI_ATTR VkResult VKAPI_CALL getPipelineExecutableInternalRepresentationsKHR (
 	DE_UNREF(pExecutableInfo);
 	DE_UNREF(pInternalRepresentationCount);
 	DE_UNREF(pInternalRepresentations);
-	return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL getSemaphoreCounterValueKHR (VkDevice device, VkSemaphore semaphore, deUint64* pValue)
-{
-	DE_UNREF(device);
-	DE_UNREF(semaphore);
-	DE_UNREF(pValue);
-	return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL waitSemaphoresKHR (VkDevice device, const VkSemaphoreWaitInfoKHR* pWaitInfo, deUint64 timeout)
-{
-	DE_UNREF(device);
-	DE_UNREF(pWaitInfo);
-	DE_UNREF(timeout);
-	return VK_SUCCESS;
-}
-
-VKAPI_ATTR VkResult VKAPI_CALL signalSemaphoreKHR (VkDevice device, const VkSemaphoreSignalInfoKHR* pSignalInfo)
-{
-	DE_UNREF(device);
-	DE_UNREF(pSignalInfo);
 	return VK_SUCCESS;
 }
 
@@ -2172,6 +2172,69 @@ VKAPI_ATTR void VKAPI_CALL getQueueCheckpointDataNV (VkQueue queue, deUint32* pC
 	DE_UNREF(pCheckpointData);
 }
 
+VKAPI_ATTR VkResult VKAPI_CALL initializePerformanceApiINTEL (VkDevice device, const VkInitializePerformanceApiInfoINTEL* pInitializeInfo)
+{
+	DE_UNREF(device);
+	DE_UNREF(pInitializeInfo);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR void VKAPI_CALL uninitializePerformanceApiINTEL (VkDevice device)
+{
+	DE_UNREF(device);
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL cmdSetPerformanceMarkerINTEL (VkCommandBuffer commandBuffer, const VkPerformanceMarkerInfoINTEL* pMarkerInfo)
+{
+	DE_UNREF(commandBuffer);
+	DE_UNREF(pMarkerInfo);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL cmdSetPerformanceStreamMarkerINTEL (VkCommandBuffer commandBuffer, const VkPerformanceStreamMarkerInfoINTEL* pMarkerInfo)
+{
+	DE_UNREF(commandBuffer);
+	DE_UNREF(pMarkerInfo);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL cmdSetPerformanceOverrideINTEL (VkCommandBuffer commandBuffer, const VkPerformanceOverrideInfoINTEL* pOverrideInfo)
+{
+	DE_UNREF(commandBuffer);
+	DE_UNREF(pOverrideInfo);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL acquirePerformanceConfigurationINTEL (VkDevice device, const VkPerformanceConfigurationAcquireInfoINTEL* pAcquireInfo, VkPerformanceConfigurationINTEL* pConfiguration)
+{
+	DE_UNREF(device);
+	DE_UNREF(pAcquireInfo);
+	DE_UNREF(pConfiguration);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL releasePerformanceConfigurationINTEL (VkDevice device, VkPerformanceConfigurationINTEL configuration)
+{
+	DE_UNREF(device);
+	DE_UNREF(configuration);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL queueSetPerformanceConfigurationINTEL (VkQueue queue, VkPerformanceConfigurationINTEL configuration)
+{
+	DE_UNREF(queue);
+	DE_UNREF(configuration);
+	return VK_SUCCESS;
+}
+
+VKAPI_ATTR VkResult VKAPI_CALL getPerformanceParameterINTEL (VkDevice device, VkPerformanceParameterTypeINTEL parameter, VkPerformanceValueINTEL* pValue)
+{
+	DE_UNREF(device);
+	DE_UNREF(parameter);
+	DE_UNREF(pValue);
+	return VK_SUCCESS;
+}
+
 VKAPI_ATTR void VKAPI_CALL setLocalDimmingAMD (VkDevice device, VkSwapchainKHR swapChain, VkBool32 localDimmingEnable)
 {
 	DE_UNREF(device);
@@ -2200,6 +2263,13 @@ VKAPI_ATTR VkResult VKAPI_CALL getPhysicalDeviceSupportedFramebufferMixedSamples
 	DE_UNREF(pCombinationCount);
 	DE_UNREF(pCombinations);
 	return VK_SUCCESS;
+}
+
+VKAPI_ATTR void VKAPI_CALL cmdSetLineStippleEXT (VkCommandBuffer commandBuffer, deUint32 lineStippleFactor, deUint16 lineStipplePattern)
+{
+	DE_UNREF(commandBuffer);
+	DE_UNREF(lineStippleFactor);
+	DE_UNREF(lineStipplePattern);
 }
 
 VKAPI_ATTR void VKAPI_CALL resetQueryPoolEXT (VkDevice device, VkQueryPool queryPool, deUint32 firstQuery, deUint32 queryCount)
@@ -2632,12 +2702,12 @@ static const tcu::StaticFunctionLibrary::Entry s_deviceFunctions[] =
 	VK_NULL_FUNC_ENTRY(vkGetDescriptorSetLayoutSupportKHR,					getDescriptorSetLayoutSupport),
 	VK_NULL_FUNC_ENTRY(vkCmdDrawIndirectCountKHR,							cmdDrawIndirectCountKHR),
 	VK_NULL_FUNC_ENTRY(vkCmdDrawIndexedIndirectCountKHR,					cmdDrawIndexedIndirectCountKHR),
-	VK_NULL_FUNC_ENTRY(vkGetPipelineExecutablePropertiesKHR,				getPipelineExecutablePropertiesKHR),
-	VK_NULL_FUNC_ENTRY(vkGetPipelineExecutableStatisticsKHR,				getPipelineExecutableStatisticsKHR),
-	VK_NULL_FUNC_ENTRY(vkGetPipelineExecutableInternalRepresentationsKHR,	getPipelineExecutableInternalRepresentationsKHR),
 	VK_NULL_FUNC_ENTRY(vkGetSemaphoreCounterValueKHR,						getSemaphoreCounterValueKHR),
 	VK_NULL_FUNC_ENTRY(vkWaitSemaphoresKHR,									waitSemaphoresKHR),
 	VK_NULL_FUNC_ENTRY(vkSignalSemaphoreKHR,								signalSemaphoreKHR),
+	VK_NULL_FUNC_ENTRY(vkGetPipelineExecutablePropertiesKHR,				getPipelineExecutablePropertiesKHR),
+	VK_NULL_FUNC_ENTRY(vkGetPipelineExecutableStatisticsKHR,				getPipelineExecutableStatisticsKHR),
+	VK_NULL_FUNC_ENTRY(vkGetPipelineExecutableInternalRepresentationsKHR,	getPipelineExecutableInternalRepresentationsKHR),
 	VK_NULL_FUNC_ENTRY(vkDebugMarkerSetObjectTagEXT,						debugMarkerSetObjectTagEXT),
 	VK_NULL_FUNC_ENTRY(vkDebugMarkerSetObjectNameEXT,						debugMarkerSetObjectNameEXT),
 	VK_NULL_FUNC_ENTRY(vkCmdDebugMarkerBeginEXT,							cmdDebugMarkerBeginEXT),
@@ -2710,8 +2780,18 @@ static const tcu::StaticFunctionLibrary::Entry s_deviceFunctions[] =
 	VK_NULL_FUNC_ENTRY(vkCmdSetExclusiveScissorNV,							cmdSetExclusiveScissorNV),
 	VK_NULL_FUNC_ENTRY(vkCmdSetCheckpointNV,								cmdSetCheckpointNV),
 	VK_NULL_FUNC_ENTRY(vkGetQueueCheckpointDataNV,							getQueueCheckpointDataNV),
+	VK_NULL_FUNC_ENTRY(vkInitializePerformanceApiINTEL,						initializePerformanceApiINTEL),
+	VK_NULL_FUNC_ENTRY(vkUninitializePerformanceApiINTEL,					uninitializePerformanceApiINTEL),
+	VK_NULL_FUNC_ENTRY(vkCmdSetPerformanceMarkerINTEL,						cmdSetPerformanceMarkerINTEL),
+	VK_NULL_FUNC_ENTRY(vkCmdSetPerformanceStreamMarkerINTEL,				cmdSetPerformanceStreamMarkerINTEL),
+	VK_NULL_FUNC_ENTRY(vkCmdSetPerformanceOverrideINTEL,					cmdSetPerformanceOverrideINTEL),
+	VK_NULL_FUNC_ENTRY(vkAcquirePerformanceConfigurationINTEL,				acquirePerformanceConfigurationINTEL),
+	VK_NULL_FUNC_ENTRY(vkReleasePerformanceConfigurationINTEL,				releasePerformanceConfigurationINTEL),
+	VK_NULL_FUNC_ENTRY(vkQueueSetPerformanceConfigurationINTEL,				queueSetPerformanceConfigurationINTEL),
+	VK_NULL_FUNC_ENTRY(vkGetPerformanceParameterINTEL,						getPerformanceParameterINTEL),
 	VK_NULL_FUNC_ENTRY(vkSetLocalDimmingAMD,								setLocalDimmingAMD),
 	VK_NULL_FUNC_ENTRY(vkGetBufferDeviceAddressEXT,							getBufferDeviceAddressEXT),
+	VK_NULL_FUNC_ENTRY(vkCmdSetLineStippleEXT,								cmdSetLineStippleEXT),
 	VK_NULL_FUNC_ENTRY(vkResetQueryPoolEXT,									resetQueryPoolEXT),
 	VK_NULL_FUNC_ENTRY(vkGetAndroidHardwareBufferPropertiesANDROID,			getAndroidHardwareBufferPropertiesANDROID),
 	VK_NULL_FUNC_ENTRY(vkGetMemoryAndroidHardwareBufferANDROID,				getMemoryAndroidHardwareBufferANDROID),

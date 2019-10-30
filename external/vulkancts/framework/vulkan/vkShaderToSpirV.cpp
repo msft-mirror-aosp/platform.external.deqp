@@ -28,24 +28,20 @@
 #include "deClock.h"
 #include "qpDebugOut.h"
 
-#if defined(DEQP_HAVE_GLSLANG)
-#	include "SPIRV/GlslangToSpv.h"
-#	include "SPIRV/disassemble.h"
-#	include "SPIRV/SPVRemapper.h"
-#	include "SPIRV/doc.h"
-#	include "glslang/Include/InfoSink.h"
-#	include "glslang/Include/ShHandle.h"
-#	include "glslang/MachineIndependent/localintermediate.h"
-#	include "glslang/Public/ShaderLang.h"
-#endif
+#include "SPIRV/GlslangToSpv.h"
+#include "SPIRV/disassemble.h"
+#include "SPIRV/SPVRemapper.h"
+#include "SPIRV/doc.h"
+#include "glslang/Include/InfoSink.h"
+#include "glslang/Include/ShHandle.h"
+#include "glslang/MachineIndependent/localintermediate.h"
+#include "glslang/Public/ShaderLang.h"
 
 namespace vk
 {
 
 using std::string;
 using std::vector;
-
-#if defined(DEQP_HAVE_GLSLANG)
 
 namespace
 {
@@ -60,6 +56,12 @@ EShLanguage getGlslangStage (glu::ShaderType type)
 		EShLangTessControl,
 		EShLangTessEvaluation,
 		EShLangCompute,
+		EShLangRayGenNV,
+		EShLangAnyHitNV,
+		EShLangClosestHitNV,
+		EShLangMissNV,
+		EShLangIntersectNV,
+		EShLangCallableNV,
 	};
 	return de::getSizedArrayElement<glu::SHADERTYPE_LAST>(stageMap, type);
 }
@@ -291,6 +293,9 @@ bool compileShaderToSpirV (const std::vector<std::string>* sources, const Shader
 			case SPIRV_VERSION_1_3:
 				shader.setEnvTarget(glslang::EshTargetSpv, (glslang::EShTargetLanguageVersion)0x10300);
 				break;
+			case SPIRV_VERSION_1_4:
+				shader.setEnvTarget(glslang::EshTargetSpv, (glslang::EShTargetLanguageVersion)0x10400);
+				break;
 			default:
 				TCU_THROW(InternalError, "Unsupported SPIR-V target version");
 			}
@@ -360,24 +365,5 @@ void stripSpirVDebugInfo (const size_t numSrcInstrs, const deUint32* srcInstrs, 
 	std::copy(srcInstrs, srcInstrs+numSrcInstrs, dst->begin());
 	remapper.remap(*dst, spv::spirvbin_base_t::STRIP);
 }
-
-#else // defined(DEQP_HAVE_GLSLANG)
-
-bool compileGlslToSpirV (const GlslSource&, std::vector<deUint32>*, glu::ShaderProgramInfo*)
-{
-	TCU_THROW(NotSupportedError, "GLSL to SPIR-V compilation not supported (DEQP_HAVE_GLSLANG not defined)");
-}
-
-bool compileHlslToSpirV (const HlslSource&, std::vector<deUint32>*, glu::ShaderProgramInfo*)
-{
-	TCU_THROW(NotSupportedError, "HLSL to SPIR-V compilation not supported (DEQP_HAVE_GLSLANG not defined)");
-}
-
-void stripSpirVDebugInfo (const size_t, const deUint32*, std::vector<deUint32>*)
-{
-	TCU_THROW(NotSupportedError, "SPIR-V stripping not supported (DEQP_HAVE_GLSLANG not defined)");
-}
-
-#endif // defined(DEQP_HAVE_GLSLANG)
 
 } // vk

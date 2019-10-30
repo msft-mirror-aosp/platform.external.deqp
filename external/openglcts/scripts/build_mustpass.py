@@ -79,6 +79,12 @@ CTS_KHR_MP_NOCTX_DEVICE_DIR		= "gl_cts/data/mustpass/gles/khronos_mustpass_noctx
 
 CTS_KHR_MP_NOCTX_ES_PROJECT		= Project(name = "Khronos Mustpass ES NoContext", path = CTS_KHR_MP_NOCTX_DATA_DIR, incpath = CTS_MP_INC_DIR, devicepath = CTS_KHR_MP_NOCTX_DEVICE_DIR, copyright = COPYRIGHT_DECLARATION)
 
+CTS_KHR_MP_SINGLE_DATA_DIR		= os.path.join(DEQP_DIR, "external", "openglcts", "data", "mustpass", "gles", "khronos_mustpass_single")
+
+CTS_KHR_MP_SINGLE_DEVICE_DIR	= "gl_cts/data/mustpass/gles/khronos_mustpass_single"
+
+CTS_KHR_MP_SINGLE_ES_PROJECT		= Project(name = "Khronos Mustpass ES Single Config", path = CTS_KHR_MP_SINGLE_DATA_DIR, incpath = CTS_MP_INC_DIR, devicepath = CTS_KHR_MP_SINGLE_DEVICE_DIR, copyright = COPYRIGHT_DECLARATION)
+
 EGL_MODULE						= getModuleByName("dEQP-EGL")
 ES2CTS_MODULE					= getModuleByName("dEQP-GLES2")
 ES3CTS_MODULE					= getModuleByName("dEQP-GLES3")
@@ -90,6 +96,7 @@ ES31KHR_MODULE					= getModuleByName("KHR-GLES31")
 ES32KHR_MODULE					= getModuleByName("KHR-GLES32")
 NOCTX_ES2_KHR_MODULE			= getModuleByName("KHR-NOCTX-ES2")
 NOCTX_ES32_KHR_MODULE			= getModuleByName("KHR-NOCTX-ES32")
+SINGLE_ES32_KHR_MODULE			= getModuleByName("KHR-Single-GLES32")
 
 ES2GTF_MODULE					= getModuleByName("GTF-GLES2")
 ES3GTF_MODULE					= getModuleByName("GTF-GLES3")
@@ -159,6 +166,7 @@ GLCTS_3_2_2_GLES3_PKG					= Package(module = ES3CTS_MODULE, configurations = [
 					rotation		= "unspecified",
 					surfacewidth	= "256",
 					surfaceheight	= "256",
+					skip			= "x11",
 					filters			= [include("gles3-master.txt"),
 									   include("gles3-pixelformat.txt"),
 									   exclude("gles3-pixelformat-issues.txt")]),
@@ -215,6 +223,7 @@ GLCTS_3_2_2_GLES31_PKG					= Package(module = ES31CTS_MODULE, configurations = [
 					rotation		= "unspecified",
 					surfacewidth	= "256",
 					surfaceheight	= "256",
+					skip			= "x11",
 					filters			= [include("gles31-master.txt"), include("gles31-pixelformat.txt")]),
 	])
 
@@ -310,6 +319,7 @@ GLCTS_3_2_3_GLES3_PKG				= Package(module = ES3CTS_MODULE, configurations = [
 					rotation	= "unspecified",
 					surfacewidth	= "256",
 					surfaceheight	= "256",
+					skip			= "x11",
 					filters		= GLCTS_3_2_3_GLES3_COMMON_FILTERS + [include("gles3-pixelformat.txt")]),
 
 	])
@@ -377,6 +387,7 @@ GLCTS_3_2_3_GLES31_PKG				= Package(module = ES31CTS_MODULE, configurations = [
 					rotation	= "unspecified",
 					surfacewidth	= "256",
 					surfaceheight	= "256",
+					skip			= "x11",
 					filters		= GLCTS_3_2_3_GLES31_COMMON_FILTERS + [include("gles31-pixelformat.txt")]),
 	])
 
@@ -512,6 +523,7 @@ MASTER_GLES3_PKG				= Package(module = ES3CTS_MODULE, configurations = [
 					rotation	= "unspecified",
 					surfacewidth	= "256",
 					surfaceheight	= "256",
+					skip			= "x11",
 					filters		= MASTER_GLES3_COMMON_FILTERS + [include("gles3-pixelformat.txt")]),
 	])
 MASTER_GLES31_COMMON_FILTERS             = [
@@ -573,6 +585,7 @@ MASTER_GLES31_PKG				= Package(module = ES31CTS_MODULE, configurations = [
 					rotation	= "unspecified",
 					surfacewidth	= "256",
 					surfaceheight	= "256",
+					skip			= "x11",
 					filters		= MASTER_GLES31_COMMON_FILTERS + [include("gles31-pixelformat.txt")]),
 	])
 
@@ -877,6 +890,16 @@ GLCTS_NOCTX_ES32_KHR_PKG		= Package(module = NOCTX_ES32_KHR_MODULE, configuratio
 					filters			= MASTER_GLES32_COMMON_FILTERS),
 	])
 
+GLCTS_SINGLE_ES32_KHR_PKG		= Package(module = SINGLE_ES32_KHR_MODULE, configurations = [
+		# Master
+		Configuration(name			= "khr-single",
+					surfacewidth	= "64",
+					surfaceheight	= "64",
+					baseseed		= "1",
+					filters			= [include("gles32-khr-single.txt")]),
+	])
+
+
 ES_MUSTPASS_LISTS		= [
 	# 3.2.2.x
 	Mustpass(project = CTS_KHR_MP_ES_PROJECT,	version = "3.2.2.x", isCurrent=False,
@@ -973,9 +996,9 @@ ES_MUSTPASS_LISTS		= [
 	Mustpass(project = CTS_AOSP_MP_EGL_PROJECT, version = "3.2.5.x", isCurrent=False,
 			packages = [GLCTS_3_2_3_EGL_PKG]),
 
-	# master
+	# 3.2.6.x
 
-	Mustpass(project = CTS_KHR_MP_ES_PROJECT,	version = "master", isCurrent=True,
+	Mustpass(project = CTS_KHR_MP_ES_PROJECT,   version = "3.2.6.x", isCurrent=True,
 			packages = [GLCTS_GLES2_KHR_PKG_1CFG,
 						GLCTS_GLES2_KHR_PKG_N1CFG,
 						GLCTS_GLES3_KHR_PKG_1CFG,
@@ -986,13 +1009,41 @@ ES_MUSTPASS_LISTS		= [
 						GLCTS_GLES32_KHR_PKG_N1CFG,
 						]),
 
-	Mustpass(project = CTS_KHR_MP_NOCTX_ES_PROJECT, version = "master", isCurrent=True,
+	Mustpass(project = CTS_KHR_MP_NOCTX_ES_PROJECT, version = "3.2.6.x", isCurrent=True,
 			packages = [GLCTS_NOCTX_ES2_KHR_PKG, GLCTS_NOCTX_ES32_KHR_PKG]),
 
-	Mustpass(project = CTS_AOSP_MP_ES_PROJECT, version = "master", isCurrent=True,
+	Mustpass(project = CTS_KHR_MP_SINGLE_ES_PROJECT, version = "3.2.6.x", isCurrent=True,
+			packages = [GLCTS_SINGLE_ES32_KHR_PKG]),
+
+	Mustpass(project = CTS_AOSP_MP_ES_PROJECT, version = "3.2.6.x", isCurrent=True,
+			packages = [GLCTS_3_2_3_GLES2_PKG, GLCTS_3_2_3_GLES3_PKG, GLCTS_3_2_3_GLES31_PKG]),
+
+	Mustpass(project = CTS_AOSP_MP_EGL_PROJECT, version = "3.2.6.x", isCurrent=True,
+			packages = [GLCTS_3_2_3_EGL_PKG]),
+
+	# master
+
+	Mustpass(project = CTS_KHR_MP_ES_PROJECT,	version = "master", isCurrent=False,
+			packages = [GLCTS_GLES2_KHR_PKG_1CFG,
+						GLCTS_GLES2_KHR_PKG_N1CFG,
+						GLCTS_GLES3_KHR_PKG_1CFG,
+						GLCTS_GLES3_KHR_PKG_N1CFG,
+						GLCTS_GLES31_KHR_PKG_1CFG,
+						GLCTS_GLES31_KHR_PKG_N1CFG,
+						GLCTS_GLES32_KHR_PKG_1CFG,
+						GLCTS_GLES32_KHR_PKG_N1CFG,
+						]),
+
+	Mustpass(project = CTS_KHR_MP_NOCTX_ES_PROJECT, version = "master", isCurrent=False,
+			packages = [GLCTS_NOCTX_ES2_KHR_PKG, GLCTS_NOCTX_ES32_KHR_PKG]),
+
+	Mustpass(project = CTS_KHR_MP_SINGLE_ES_PROJECT, version = "master", isCurrent=False,
+			packages = [GLCTS_SINGLE_ES32_KHR_PKG]),
+
+	Mustpass(project = CTS_AOSP_MP_ES_PROJECT, version = "master", isCurrent=False,
 			packages = [MASTER_GLES2_PKG, MASTER_GLES3_PKG, MASTER_GLES31_PKG]),
 
-	Mustpass(project = CTS_AOSP_MP_EGL_PROJECT, version = "master", isCurrent=True,
+	Mustpass(project = CTS_AOSP_MP_EGL_PROJECT, version = "master", isCurrent=False,
 			packages = [MASTER_EGL_PKG])
 
 	]
@@ -1014,6 +1065,12 @@ GL_CTS_KHR_MP_NOCTX_DATA_DIR		= os.path.join(DEQP_DIR, "external", "openglcts", 
 GL_CTS_KHR_MP_NOCTX_DEVICE_DIR		= "gl_cts/data/mustpass/gl/khronos_mustpass_noctx"
 
 GL_CTS_NOCTX_PROJECT				= Project(name = "Khronos Mustpass GL NoContext", path = GL_CTS_KHR_MP_NOCTX_DATA_DIR, incpath = GL_CTS_MP_INC_DIR, devicepath = GL_CTS_KHR_MP_NOCTX_DEVICE_DIR, copyright = COPYRIGHT_DECLARATION)
+
+GL_CTS_KHR_MP_SINGLE_DATA_DIR		= os.path.join(DEQP_DIR, "external", "openglcts", "data", "mustpass", "gl", "khronos_mustpass_single")
+
+GL_CTS_KHR_MP_SINGLE_DEVICE_DIR		= "gl_cts/data/mustpass/gl/khronos_mustpass_single"
+
+GL_CTS_KHR_SINGLE_PROJECT			= Project(name = "Khronos Mustpass GL Single Config", path = GL_CTS_KHR_MP_SINGLE_DATA_DIR, incpath = GL_CTS_MP_INC_DIR, devicepath = GL_CTS_KHR_MP_SINGLE_DEVICE_DIR, copyright = COPYRIGHT_DECLARATION)
 
 GL_MODULES							= OrderedDict([
 			('KHR-GL46',		['master',		[include('gl46-master.txt'), exclude('gl46-test-issues.txt'), exclude('gl46-waivers.txt')]]),
@@ -1044,6 +1101,8 @@ NOCTX_GL30_KHR_MODULE			= getModuleByName("KHR-NOCTX-GL30")
 NOCTX_GL40_KHR_MODULE			= getModuleByName("KHR-NOCTX-GL40")
 NOCTX_GL43_KHR_MODULE			= getModuleByName("KHR-NOCTX-GL43")
 NOCTX_GL45_KHR_MODULE			= getModuleByName("KHR-NOCTX-GL45")
+SINGLE_GL45_KHR_MODULE			= getModuleByName("KHR-Single-GL45")
+SINGLE_GL46_KHR_MODULE			= getModuleByName("KHR-Single-GL46")
 
 GLCTS_NOCTX_GL30_KHR_PKG			= Package(module = NOCTX_GL30_KHR_MODULE, configurations = [
 		# Master
@@ -1081,6 +1140,24 @@ GLCTS_NOCTX_GL45_KHR_PKG			= Package(module = NOCTX_GL45_KHR_MODULE, configurati
 					filters			= [include("gl45-khr-master.txt")]),
 	])
 
+GLCTS_SINGLE_GL45_KHR_PKG			= Package(module = SINGLE_GL45_KHR_MODULE, configurations = [
+		# Master
+		Configuration(name			= "khr-single",
+					surfacewidth	= "64",
+					surfaceheight	= "64",
+					baseseed		= "1",
+					filters			= [include("gl45-khr-single.txt")]),
+	])
+
+GLCTS_SINGLE_GL46_KHR_PKG			= Package(module = SINGLE_GL46_KHR_MODULE, configurations = [
+		# Master
+		Configuration(name			= "khr-single",
+					surfacewidth	= "64",
+					surfaceheight	= "64",
+					baseseed		= "1",
+					filters			= [include("gl46-khr-single.txt")]),
+	])
+
 def generateGLMustpass():
 		gl_packages = []
 		for packageName in GL_MODULES:
@@ -1111,6 +1188,7 @@ def generateGLMustpass():
 					Mustpass(project = GL_CTS_NOCTX_PROJECT, version = "4.6.0.x", isCurrent=False, packages = [GLCTS_NOCTX_GL30_KHR_PKG, GLCTS_NOCTX_GL40_KHR_PKG, GLCTS_NOCTX_GL43_KHR_PKG, GLCTS_NOCTX_GL45_KHR_PKG]),
 				    Mustpass(project = GL_CTS_KHR_MP_PROJECT, version = "4.6.1.x", isCurrent=True, packages = gl_packages),
                     Mustpass(project = GL_CTS_NOCTX_PROJECT, version = "4.6.1.x", isCurrent=True, packages = [GLCTS_NOCTX_GL30_KHR_PKG, GLCTS_NOCTX_GL40_KHR_PKG, GLCTS_NOCTX_GL43_KHR_PKG, GLCTS_NOCTX_GL45_KHR_PKG]),
+                    Mustpass(project = GL_CTS_KHR_SINGLE_PROJECT, version = "4.6.1.x", isCurrent=True, packages = [GLCTS_SINGLE_GL45_KHR_PKG, GLCTS_SINGLE_GL46_KHR_PKG]),
 					]
 		return mustpass
 
@@ -1123,4 +1201,3 @@ if __name__ == "__main__":
 	genMustpassLists(ES_MUSTPASS_LISTS, ANY_GENERATOR, ES_BUILD_CONFIG)
 	gl_mustpass_lists = generateGLMustpass()
 	genMustpassLists(gl_mustpass_lists, ANY_GENERATOR, GL_BUILD_CONFIG)
-

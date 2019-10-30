@@ -24,6 +24,7 @@
  */ /*--------------------------------------------------------------------*/
 
 #include "vktSubgroupsTestsUtils.hpp"
+#include "deFloat16.h"
 #include "deRandom.hpp"
 #include "tcuCommandLine.hpp"
 #include "tcuStringTemplate.hpp"
@@ -40,6 +41,26 @@ using namespace vkt;
 
 namespace
 {
+
+deUint32 getMaxWidth ()
+{
+	return 1024u;
+}
+
+deUint32 getNextWidth (const deUint32 width)
+{
+	if (width < 128)
+	{
+		// This ensures we test every value up to 128 (the max subgroup size).
+		return width + 1;
+	}
+	else
+	{
+		// And once we hit 128 we increment to only power of 2's to reduce testing time.
+		return width * 2;
+	}
+}
+
 deUint32 getFormatSizeInBytes(const VkFormat format)
 {
 	switch (format)
@@ -47,40 +68,69 @@ deUint32 getFormatSizeInBytes(const VkFormat format)
 		default:
 			DE_FATAL("Unhandled format!");
 			return 0;
+		case VK_FORMAT_R8_SINT:
+		case VK_FORMAT_R8_UINT:
+			return static_cast<deUint32>(sizeof(deInt8));
+		case VK_FORMAT_R8G8_SINT:
+		case VK_FORMAT_R8G8_UINT:
+			return static_cast<deUint32>(sizeof(deInt8) * 2);
+		case VK_FORMAT_R8G8B8_SINT:
+		case VK_FORMAT_R8G8B8_UINT:
+		case VK_FORMAT_R8G8B8A8_SINT:
+		case VK_FORMAT_R8G8B8A8_UINT:
+			return static_cast<deUint32>(sizeof(deInt8) * 4);
+		case VK_FORMAT_R16_SINT:
+		case VK_FORMAT_R16_UINT:
+		case VK_FORMAT_R16_SFLOAT:
+			return static_cast<deUint32>(sizeof(deInt16));
+		case VK_FORMAT_R16G16_SINT:
+		case VK_FORMAT_R16G16_UINT:
+		case VK_FORMAT_R16G16_SFLOAT:
+			return static_cast<deUint32>(sizeof(deInt16) * 2);
+		case VK_FORMAT_R16G16B16_UINT:
+		case VK_FORMAT_R16G16B16_SINT:
+		case VK_FORMAT_R16G16B16_SFLOAT:
+		case VK_FORMAT_R16G16B16A16_SINT:
+		case VK_FORMAT_R16G16B16A16_UINT:
+		case VK_FORMAT_R16G16B16A16_SFLOAT:
+			return static_cast<deUint32>(sizeof(deInt16) * 4);
 		case VK_FORMAT_R32_SINT:
 		case VK_FORMAT_R32_UINT:
-			return sizeof(deInt32);
+		case VK_FORMAT_R32_SFLOAT:
+			return static_cast<deUint32>(sizeof(deInt32));
 		case VK_FORMAT_R32G32_SINT:
 		case VK_FORMAT_R32G32_UINT:
+		case VK_FORMAT_R32G32_SFLOAT:
 			return static_cast<deUint32>(sizeof(deInt32) * 2);
 		case VK_FORMAT_R32G32B32_SINT:
 		case VK_FORMAT_R32G32B32_UINT:
+		case VK_FORMAT_R32G32B32_SFLOAT:
 		case VK_FORMAT_R32G32B32A32_SINT:
 		case VK_FORMAT_R32G32B32A32_UINT:
-			return static_cast<deUint32>(sizeof(deInt32) * 4);
-		case VK_FORMAT_R32_SFLOAT:
-			return 4;
-		case VK_FORMAT_R32G32_SFLOAT:
-			return 8;
-		case VK_FORMAT_R32G32B32_SFLOAT:
-			return 16;
 		case VK_FORMAT_R32G32B32A32_SFLOAT:
-			return 16;
+			return static_cast<deUint32>(sizeof(deInt32) * 4);
+		case VK_FORMAT_R64_SINT:
+		case VK_FORMAT_R64_UINT:
 		case VK_FORMAT_R64_SFLOAT:
-			return 8;
+			return static_cast<deUint32>(sizeof(deInt64));
+		case VK_FORMAT_R64G64_SINT:
+		case VK_FORMAT_R64G64_UINT:
 		case VK_FORMAT_R64G64_SFLOAT:
-			return 16;
+			return static_cast<deUint32>(sizeof(deInt64) * 2);
+		case VK_FORMAT_R64G64B64_SINT:
+		case VK_FORMAT_R64G64B64_UINT:
 		case VK_FORMAT_R64G64B64_SFLOAT:
-			return 32;
+		case VK_FORMAT_R64G64B64A64_SINT:
+		case VK_FORMAT_R64G64B64A64_UINT:
 		case VK_FORMAT_R64G64B64A64_SFLOAT:
-			return 32;
+			return static_cast<deUint32>(sizeof(deInt64) * 4);
 		// The below formats are used to represent bool and bvec* types. These
 		// types are passed to the shader as int and ivec* types, before the
 		// calculations are done as booleans. We need a distinct type here so
 		// that the shader generators can switch on it and generate the correct
 		// shader source for testing.
 		case VK_FORMAT_R8_USCALED:
-			return sizeof(deInt32);
+			return static_cast<deUint32>(sizeof(deInt32));
 		case VK_FORMAT_R8G8_USCALED:
 			return static_cast<deUint32>(sizeof(deInt32) * 2);
 		case VK_FORMAT_R8G8B8_USCALED:
@@ -217,6 +267,7 @@ Move<VkPipeline> makeGraphicsPipeline(Context&									context,
 
 Move<VkPipeline> makeComputePipeline(Context& context,
 									 const VkPipelineLayout pipelineLayout, const VkShaderModule shaderModule,
+									 const deUint32 pipelineCreateFlags, VkPipeline basePipelineHandle,
 									 deUint32 localSizeX, deUint32 localSizeY, deUint32 localSizeZ)
 {
 	const deUint32 localSize[3] = {localSizeX, localSizeY, localSizeZ};
@@ -238,24 +289,24 @@ Move<VkPipeline> makeComputePipeline(Context& context,
 
 	const vk::VkPipelineShaderStageCreateInfo pipelineShaderStageParams =
 	{
-		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	// VkStructureType					sType;
-		DE_NULL,												// const void*						pNext;
-		0u,														// VkPipelineShaderStageCreateFlags	flags;
-		VK_SHADER_STAGE_COMPUTE_BIT,							// VkShaderStageFlagBits			stage;
-		shaderModule,											// VkShaderModule					module;
-		"main",													// const char*						pName;
-		&info,													// const VkSpecializationInfo*		pSpecializationInfo;
+		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,				// VkStructureType					sType;
+		DE_NULL,															// const void*						pNext;
+		0u,																	// VkPipelineShaderStageCreateFlags	flags;
+		VK_SHADER_STAGE_COMPUTE_BIT,										// VkShaderStageFlagBits			stage;
+		shaderModule,														// VkShaderModule					module;
+		"main",																// const char*						pName;
+		&info,																// const VkSpecializationInfo*		pSpecializationInfo;
 	};
 
 	const vk::VkComputePipelineCreateInfo pipelineCreateInfo =
 	{
 		VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,	// VkStructureType	sType;
 		DE_NULL,										// const void*						pNext;
-		0u,												// VkPipelineCreateFlags			flags;
+		pipelineCreateFlags,							// VkPipelineCreateFlags			flags;
 		pipelineShaderStageParams,						// VkPipelineShaderStageCreateInfo	stage;
 		pipelineLayout,									// VkPipelineLayout					layout;
-		DE_NULL,										// VkPipeline						basePipelineHandle;
-		0,												// deInt32							basePipelineIndex;
+		basePipelineHandle,								// VkPipeline						basePipelineHandle;
+		-1,												// deInt32							basePipelineIndex;
 	};
 
 	return createComputePipeline(context.getDeviceInterface(),
@@ -526,6 +577,35 @@ std::string vkt::subgroups::getSharedMemoryBallotHelper()
 			"  }\n"
 			"  subgroupMemoryBarrierShared();\n"
 			"  return superSecretComputeShaderHelper[groupOffset];\n"
+			"}\n";
+}
+
+std::string vkt::subgroups::getSharedMemoryBallotHelperARB()
+{
+	return	"shared uvec4 superSecretComputeShaderHelper[gl_WorkGroupSize.x * gl_WorkGroupSize.y * gl_WorkGroupSize.z];\n"
+			"uint64_t sharedMemoryBallot(bool vote)\n"
+			"{\n"
+			"  uint groupOffset = gl_SubgroupID;\n"
+			"  // One invocation in the group 0's the whole group's data\n"
+			"  if (subgroupElect())\n"
+			"  {\n"
+			"    superSecretComputeShaderHelper[groupOffset] = uvec4(0);\n"
+			"  }\n"
+			"  subgroupMemoryBarrierShared();\n"
+			"  if (vote)\n"
+			"  {\n"
+			"    const highp uint invocationId = gl_SubgroupInvocationID % 32;\n"
+			"    const highp uint bitToSet = 1u << invocationId;\n"
+			"    switch (gl_SubgroupInvocationID / 32)\n"
+			"    {\n"
+			"    case 0: atomicOr(superSecretComputeShaderHelper[groupOffset].x, bitToSet); break;\n"
+			"    case 1: atomicOr(superSecretComputeShaderHelper[groupOffset].y, bitToSet); break;\n"
+			"    case 2: atomicOr(superSecretComputeShaderHelper[groupOffset].z, bitToSet); break;\n"
+			"    case 3: atomicOr(superSecretComputeShaderHelper[groupOffset].w, bitToSet); break;\n"
+			"    }\n"
+			"  }\n"
+			"  subgroupMemoryBarrierShared();\n"
+			"  return packUint2x32(superSecretComputeShaderHelper[groupOffset].xy);\n"
 			"}\n";
 }
 
@@ -945,11 +1025,11 @@ bool vkt::subgroups::isVertexSSBOSupportedForDevice(Context& context)
 	return features.vertexPipelineStoresAndAtomics ? true : false;
 }
 
-bool vkt::subgroups::isDoubleSupportedForDevice(Context& context)
+bool vkt::subgroups::isInt64SupportedForDevice(Context& context)
 {
 	const VkPhysicalDeviceFeatures features = getPhysicalDeviceFeatures(
 				context.getInstanceInterface(), context.getPhysicalDevice());
-	return features.shaderFloat64 ? true : false;
+	return features.shaderInt64 ? true : false;
 }
 
 bool vkt::subgroups::isTessellationAndGeometryPointSizeSupported (Context& context)
@@ -959,17 +1039,77 @@ bool vkt::subgroups::isTessellationAndGeometryPointSizeSupported (Context& conte
 	return features.shaderTessellationAndGeometryPointSize ? true : false;
 }
 
-bool vkt::subgroups::isDoubleFormat(VkFormat format)
+bool vkt::subgroups::isFormatSupportedForDevice(Context& context, vk::VkFormat format)
 {
+	VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR subgroupExtendedTypesFeatures;
+	deMemset(&subgroupExtendedTypesFeatures, 0, sizeof(subgroupExtendedTypesFeatures));
+	subgroupExtendedTypesFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_SUBGROUP_EXTENDED_TYPES_FEATURES_KHR;
+	subgroupExtendedTypesFeatures.pNext = DE_NULL;
+
+	VkPhysicalDeviceShaderFloat16Int8FeaturesKHR float16Int8Features;
+	deMemset(&float16Int8Features, 0, sizeof(float16Int8Features));
+	float16Int8Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES_KHR;
+	float16Int8Features.pNext = DE_NULL;
+
+	VkPhysicalDeviceFeatures2 features2;
+	deMemset(&features2, 0, sizeof(features2));
+	features2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	features2.pNext = DE_NULL;
+
+	if (context.isDeviceFunctionalitySupported("VK_KHR_shader_subgroup_extended_types") &&
+		context.isDeviceFunctionalitySupported("VK_KHR_shader_float16_int8"))
+	{
+		features2.pNext = &subgroupExtendedTypesFeatures;
+		subgroupExtendedTypesFeatures.pNext = &float16Int8Features;
+	}
+
+	const PlatformInterface&		platformInterface		= context.getPlatformInterface();
+	const VkInstance				instance				= context.getInstance();
+	const InstanceDriver			instanceDriver			(platformInterface, instance);
+
+	instanceDriver.getPhysicalDeviceFeatures2(context.getPhysicalDevice(), &features2);
+
 	switch (format)
 	{
 		default:
-			return false;
+			return true;
+		case VK_FORMAT_R16_SFLOAT:
+		case VK_FORMAT_R16G16_SFLOAT:
+		case VK_FORMAT_R16G16B16_SFLOAT:
+		case VK_FORMAT_R16G16B16A16_SFLOAT:
+			return subgroupExtendedTypesFeatures.shaderSubgroupExtendedTypes & float16Int8Features.shaderFloat16 ? true : false;
 		case VK_FORMAT_R64_SFLOAT:
 		case VK_FORMAT_R64G64_SFLOAT:
 		case VK_FORMAT_R64G64B64_SFLOAT:
 		case VK_FORMAT_R64G64B64A64_SFLOAT:
-			return true;
+			return features2.features.shaderFloat64 ? true : false;
+		case VK_FORMAT_R8_SINT:
+		case VK_FORMAT_R8G8_SINT:
+		case VK_FORMAT_R8G8B8_SINT:
+		case VK_FORMAT_R8G8B8A8_SINT:
+		case VK_FORMAT_R8_UINT:
+		case VK_FORMAT_R8G8_UINT:
+		case VK_FORMAT_R8G8B8_UINT:
+		case VK_FORMAT_R8G8B8A8_UINT:
+			return subgroupExtendedTypesFeatures.shaderSubgroupExtendedTypes & float16Int8Features.shaderInt8 ? true : false;
+		case VK_FORMAT_R16_SINT:
+		case VK_FORMAT_R16G16_SINT:
+		case VK_FORMAT_R16G16B16_SINT:
+		case VK_FORMAT_R16G16B16A16_SINT:
+		case VK_FORMAT_R16_UINT:
+		case VK_FORMAT_R16G16_UINT:
+		case VK_FORMAT_R16G16B16_UINT:
+		case VK_FORMAT_R16G16B16A16_UINT:
+			return subgroupExtendedTypesFeatures.shaderSubgroupExtendedTypes & features2.features.shaderInt16 ? true : false;
+		case VK_FORMAT_R64_SINT:
+		case VK_FORMAT_R64G64_SINT:
+		case VK_FORMAT_R64G64B64_SINT:
+		case VK_FORMAT_R64G64B64A64_SINT:
+		case VK_FORMAT_R64_UINT:
+		case VK_FORMAT_R64G64_UINT:
+		case VK_FORMAT_R64G64B64_UINT:
+		case VK_FORMAT_R64G64B64A64_UINT:
+			return subgroupExtendedTypesFeatures.shaderSubgroupExtendedTypes & features2.features.shaderInt64 ? true : false;
 	}
 }
 
@@ -980,6 +1120,38 @@ std::string vkt::subgroups::getFormatNameForGLSL (VkFormat format)
 		default:
 			DE_FATAL("Unhandled format!");
 			return "";
+		case VK_FORMAT_R8_SINT:
+			return "int8_t";
+		case VK_FORMAT_R8G8_SINT:
+			return "i8vec2";
+		case VK_FORMAT_R8G8B8_SINT:
+			return "i8vec3";
+		case VK_FORMAT_R8G8B8A8_SINT:
+			return "i8vec4";
+		case VK_FORMAT_R8_UINT:
+			return "uint8_t";
+		case VK_FORMAT_R8G8_UINT:
+			return "u8vec2";
+		case VK_FORMAT_R8G8B8_UINT:
+			return "u8vec3";
+		case VK_FORMAT_R8G8B8A8_UINT:
+			return "u8vec4";
+		case VK_FORMAT_R16_SINT:
+			return "int16_t";
+		case VK_FORMAT_R16G16_SINT:
+			return "i16vec2";
+		case VK_FORMAT_R16G16B16_SINT:
+			return "i16vec3";
+		case VK_FORMAT_R16G16B16A16_SINT:
+			return "i16vec4";
+		case VK_FORMAT_R16_UINT:
+			return "uint16_t";
+		case VK_FORMAT_R16G16_UINT:
+			return "u16vec2";
+		case VK_FORMAT_R16G16B16_UINT:
+			return "u16vec3";
+		case VK_FORMAT_R16G16B16A16_UINT:
+			return "u16vec4";
 		case VK_FORMAT_R32_SINT:
 			return "int";
 		case VK_FORMAT_R32G32_SINT:
@@ -996,6 +1168,30 @@ std::string vkt::subgroups::getFormatNameForGLSL (VkFormat format)
 			return "uvec3";
 		case VK_FORMAT_R32G32B32A32_UINT:
 			return "uvec4";
+		case VK_FORMAT_R64_SINT:
+			return "int64_t";
+		case VK_FORMAT_R64G64_SINT:
+			return "i64vec2";
+		case VK_FORMAT_R64G64B64_SINT:
+			return "i64vec3";
+		case VK_FORMAT_R64G64B64A64_SINT:
+			return "i64vec4";
+		case VK_FORMAT_R64_UINT:
+			return "uint64_t";
+		case VK_FORMAT_R64G64_UINT:
+			return "u64vec2";
+		case VK_FORMAT_R64G64B64_UINT:
+			return "u64vec3";
+		case VK_FORMAT_R64G64B64A64_UINT:
+			return "u64vec4";
+		case VK_FORMAT_R16_SFLOAT:
+			return "float16_t";
+		case VK_FORMAT_R16G16_SFLOAT:
+			return "f16vec2";
+		case VK_FORMAT_R16G16B16_SFLOAT:
+			return "f16vec3";
+		case VK_FORMAT_R16G16B16A16_SFLOAT:
+			return "f16vec4";
 		case VK_FORMAT_R32_SFLOAT:
 			return "float";
 		case VK_FORMAT_R32G32_SFLOAT:
@@ -1020,6 +1216,177 @@ std::string vkt::subgroups::getFormatNameForGLSL (VkFormat format)
 			return "bvec3";
 		case VK_FORMAT_R8G8B8A8_USCALED:
 			return "bvec4";
+	}
+}
+
+std::string vkt::subgroups::getAdditionalExtensionForFormat (vk::VkFormat format)
+{
+	switch (format)
+	{
+		default:
+			return "";
+		case VK_FORMAT_R8_SINT:
+		case VK_FORMAT_R8G8_SINT:
+		case VK_FORMAT_R8G8B8_SINT:
+		case VK_FORMAT_R8G8B8A8_SINT:
+		case VK_FORMAT_R8_UINT:
+		case VK_FORMAT_R8G8_UINT:
+		case VK_FORMAT_R8G8B8_UINT:
+		case VK_FORMAT_R8G8B8A8_UINT:
+			return "#extension GL_EXT_shader_subgroup_extended_types_int8 : enable\n";
+		case VK_FORMAT_R16_SINT:
+		case VK_FORMAT_R16G16_SINT:
+		case VK_FORMAT_R16G16B16_SINT:
+		case VK_FORMAT_R16G16B16A16_SINT:
+		case VK_FORMAT_R16_UINT:
+		case VK_FORMAT_R16G16_UINT:
+		case VK_FORMAT_R16G16B16_UINT:
+		case VK_FORMAT_R16G16B16A16_UINT:
+			return "#extension GL_EXT_shader_subgroup_extended_types_int16 : enable\n";
+		case VK_FORMAT_R64_SINT:
+		case VK_FORMAT_R64G64_SINT:
+		case VK_FORMAT_R64G64B64_SINT:
+		case VK_FORMAT_R64G64B64A64_SINT:
+		case VK_FORMAT_R64_UINT:
+		case VK_FORMAT_R64G64_UINT:
+		case VK_FORMAT_R64G64B64_UINT:
+		case VK_FORMAT_R64G64B64A64_UINT:
+			return "#extension GL_EXT_shader_subgroup_extended_types_int64 : enable\n";
+		case VK_FORMAT_R16_SFLOAT:
+		case VK_FORMAT_R16G16_SFLOAT:
+		case VK_FORMAT_R16G16B16_SFLOAT:
+		case VK_FORMAT_R16G16B16A16_SFLOAT:
+			return "#extension GL_EXT_shader_subgroup_extended_types_float16 : enable\n";
+	}
+}
+
+const std::vector<vk::VkFormat> vkt::subgroups::getAllFormats()
+{
+	std::vector<VkFormat> formats;
+
+	formats.push_back(VK_FORMAT_R8_SINT);
+	formats.push_back(VK_FORMAT_R8G8_SINT);
+	formats.push_back(VK_FORMAT_R8G8B8_SINT);
+	formats.push_back(VK_FORMAT_R8G8B8A8_SINT);
+	formats.push_back(VK_FORMAT_R8_UINT);
+	formats.push_back(VK_FORMAT_R8G8_UINT);
+	formats.push_back(VK_FORMAT_R8G8B8_UINT);
+	formats.push_back(VK_FORMAT_R8G8B8A8_UINT);
+	formats.push_back(VK_FORMAT_R16_SINT);
+	formats.push_back(VK_FORMAT_R16G16_SINT);
+	formats.push_back(VK_FORMAT_R16G16B16_SINT);
+	formats.push_back(VK_FORMAT_R16G16B16A16_SINT);
+	formats.push_back(VK_FORMAT_R16_UINT);
+	formats.push_back(VK_FORMAT_R16G16_UINT);
+	formats.push_back(VK_FORMAT_R16G16B16_UINT);
+	formats.push_back(VK_FORMAT_R16G16B16A16_UINT);
+	formats.push_back(VK_FORMAT_R32_SINT);
+	formats.push_back(VK_FORMAT_R32G32_SINT);
+	formats.push_back(VK_FORMAT_R32G32B32_SINT);
+	formats.push_back(VK_FORMAT_R32G32B32A32_SINT);
+	formats.push_back(VK_FORMAT_R32_UINT);
+	formats.push_back(VK_FORMAT_R32G32_UINT);
+	formats.push_back(VK_FORMAT_R32G32B32_UINT);
+	formats.push_back(VK_FORMAT_R32G32B32A32_UINT);
+	formats.push_back(VK_FORMAT_R64_SINT);
+	formats.push_back(VK_FORMAT_R64G64_SINT);
+	formats.push_back(VK_FORMAT_R64G64B64_SINT);
+	formats.push_back(VK_FORMAT_R64G64B64A64_SINT);
+	formats.push_back(VK_FORMAT_R64_UINT);
+	formats.push_back(VK_FORMAT_R64G64_UINT);
+	formats.push_back(VK_FORMAT_R64G64B64_UINT);
+	formats.push_back(VK_FORMAT_R64G64B64A64_UINT);
+	formats.push_back(VK_FORMAT_R16_SFLOAT);
+	formats.push_back(VK_FORMAT_R16G16_SFLOAT);
+	formats.push_back(VK_FORMAT_R16G16B16_SFLOAT);
+	formats.push_back(VK_FORMAT_R16G16B16A16_SFLOAT);
+	formats.push_back(VK_FORMAT_R32_SFLOAT);
+	formats.push_back(VK_FORMAT_R32G32_SFLOAT);
+	formats.push_back(VK_FORMAT_R32G32B32_SFLOAT);
+	formats.push_back(VK_FORMAT_R32G32B32A32_SFLOAT);
+	formats.push_back(VK_FORMAT_R64_SFLOAT);
+	formats.push_back(VK_FORMAT_R64G64_SFLOAT);
+	formats.push_back(VK_FORMAT_R64G64B64_SFLOAT);
+	formats.push_back(VK_FORMAT_R64G64B64A64_SFLOAT);
+	formats.push_back(VK_FORMAT_R8_USCALED);
+	formats.push_back(VK_FORMAT_R8G8_USCALED);
+	formats.push_back(VK_FORMAT_R8G8B8_USCALED);
+	formats.push_back(VK_FORMAT_R8G8B8A8_USCALED);
+
+	return formats;
+}
+
+bool vkt::subgroups::isFormatSigned (VkFormat format)
+{
+	switch (format)
+	{
+		default:
+			return false;
+		case VK_FORMAT_R8_SINT:
+		case VK_FORMAT_R8G8_SINT:
+		case VK_FORMAT_R8G8B8_SINT:
+		case VK_FORMAT_R8G8B8A8_SINT:
+		case VK_FORMAT_R16_SINT:
+		case VK_FORMAT_R16G16_SINT:
+		case VK_FORMAT_R16G16B16_SINT:
+		case VK_FORMAT_R16G16B16A16_SINT:
+		case VK_FORMAT_R32_SINT:
+		case VK_FORMAT_R32G32_SINT:
+		case VK_FORMAT_R32G32B32_SINT:
+		case VK_FORMAT_R32G32B32A32_SINT:
+		case VK_FORMAT_R64_SINT:
+		case VK_FORMAT_R64G64_SINT:
+		case VK_FORMAT_R64G64B64_SINT:
+		case VK_FORMAT_R64G64B64A64_SINT:
+			return true;
+	}
+}
+
+bool vkt::subgroups::isFormatUnsigned (VkFormat format)
+{
+	switch (format)
+	{
+		default:
+			return false;
+		case VK_FORMAT_R8_UINT:
+		case VK_FORMAT_R8G8_UINT:
+		case VK_FORMAT_R8G8B8_UINT:
+		case VK_FORMAT_R8G8B8A8_UINT:
+		case VK_FORMAT_R16_UINT:
+		case VK_FORMAT_R16G16_UINT:
+		case VK_FORMAT_R16G16B16_UINT:
+		case VK_FORMAT_R16G16B16A16_UINT:
+		case VK_FORMAT_R32_UINT:
+		case VK_FORMAT_R32G32_UINT:
+		case VK_FORMAT_R32G32B32_UINT:
+		case VK_FORMAT_R32G32B32A32_UINT:
+		case VK_FORMAT_R64_UINT:
+		case VK_FORMAT_R64G64_UINT:
+		case VK_FORMAT_R64G64B64_UINT:
+		case VK_FORMAT_R64G64B64A64_UINT:
+			return true;
+	}
+}
+
+bool vkt::subgroups::isFormatFloat (VkFormat format)
+{
+	switch (format)
+	{
+		default:
+			return false;
+		case VK_FORMAT_R16_SFLOAT:
+		case VK_FORMAT_R16G16_SFLOAT:
+		case VK_FORMAT_R16G16B16_SFLOAT:
+		case VK_FORMAT_R16G16B16A16_SFLOAT:
+		case VK_FORMAT_R32_SFLOAT:
+		case VK_FORMAT_R32G32_SFLOAT:
+		case VK_FORMAT_R32G32B32_SFLOAT:
+		case VK_FORMAT_R32G32B32A32_SFLOAT:
+		case VK_FORMAT_R64_SFLOAT:
+		case VK_FORMAT_R64G64_SFLOAT:
+		case VK_FORMAT_R64G64B64_SFLOAT:
+		case VK_FORMAT_R64G64B64A64_SFLOAT:
+			return true;
 	}
 }
 
@@ -1127,7 +1494,7 @@ void vkt::subgroups::setTesCtrlShaderFrameBuffer (vk::SourceCollections& program
 		"void main (void)\n"
 		"{\n"
 		"  if (gl_InvocationID == 0)\n"
-		  {\n"
+		"  {\n"
 		"    gl_TessLevelOuter[0] = 1.0f;\n"
 		"    gl_TessLevelOuter[1] = 1.0f;\n"
 		"  }\n"
@@ -1344,10 +1711,54 @@ void initializeMemory(Context& context, const Allocation& alloc, subgroups::SSBO
 			default:
 				DE_FATAL("Illegal buffer format");
 				break;
+			case VK_FORMAT_R8_SINT:
+			case VK_FORMAT_R8G8_SINT:
+			case VK_FORMAT_R8G8B8_SINT:
+			case VK_FORMAT_R8G8B8A8_SINT:
+			case VK_FORMAT_R8_UINT:
+			case VK_FORMAT_R8G8_UINT:
+			case VK_FORMAT_R8G8B8_UINT:
+			case VK_FORMAT_R8G8B8A8_UINT:
+			{
+				deUint8* ptr = reinterpret_cast<deUint8*>(alloc.getHostPtr());
+
+				for (vk::VkDeviceSize k = 0; k < (size / sizeof(deUint8)); k++)
+				{
+					ptr[k] = rnd.getUint8();
+				}
+			}
+			break;
+			case VK_FORMAT_R16_SINT:
+			case VK_FORMAT_R16G16_SINT:
+			case VK_FORMAT_R16G16B16_SINT:
+			case VK_FORMAT_R16G16B16A16_SINT:
+			case VK_FORMAT_R16_UINT:
+			case VK_FORMAT_R16G16_UINT:
+			case VK_FORMAT_R16G16B16_UINT:
+			case VK_FORMAT_R16G16B16A16_UINT:
+			{
+				deUint16* ptr = reinterpret_cast<deUint16*>(alloc.getHostPtr());
+
+				for (vk::VkDeviceSize k = 0; k < (size / sizeof(deUint16)); k++)
+				{
+					ptr[k] = rnd.getUint16();
+				}
+			}
+			break;
 			case VK_FORMAT_R8_USCALED:
 			case VK_FORMAT_R8G8_USCALED:
 			case VK_FORMAT_R8G8B8_USCALED:
 			case VK_FORMAT_R8G8B8A8_USCALED:
+			{
+				deUint32* ptr = reinterpret_cast<deUint32*>(alloc.getHostPtr());
+
+				for (vk::VkDeviceSize k = 0; k < (size / sizeof(deUint32)); k++)
+				{
+					deUint32 r = rnd.getUint32();
+					ptr[k] = (r & 1) ? r : 0;
+				}
+			}
+			break;
 			case VK_FORMAT_R32_SINT:
 			case VK_FORMAT_R32G32_SINT:
 			case VK_FORMAT_R32G32B32_SINT:
@@ -1362,6 +1773,36 @@ void initializeMemory(Context& context, const Allocation& alloc, subgroups::SSBO
 				for (vk::VkDeviceSize k = 0; k < (size / sizeof(deUint32)); k++)
 				{
 					ptr[k] = rnd.getUint32();
+				}
+			}
+			break;
+			case VK_FORMAT_R64_SINT:
+			case VK_FORMAT_R64G64_SINT:
+			case VK_FORMAT_R64G64B64_SINT:
+			case VK_FORMAT_R64G64B64A64_SINT:
+			case VK_FORMAT_R64_UINT:
+			case VK_FORMAT_R64G64_UINT:
+			case VK_FORMAT_R64G64B64_UINT:
+			case VK_FORMAT_R64G64B64A64_UINT:
+			{
+				deUint64* ptr = reinterpret_cast<deUint64*>(alloc.getHostPtr());
+
+				for (vk::VkDeviceSize k = 0; k < (size / sizeof(deUint64)); k++)
+				{
+					ptr[k] = rnd.getUint64();
+				}
+			}
+			break;
+			case VK_FORMAT_R16_SFLOAT:
+			case VK_FORMAT_R16G16_SFLOAT:
+			case VK_FORMAT_R16G16B16_SFLOAT:
+			case VK_FORMAT_R16G16B16A16_SFLOAT:
+			{
+				deFloat16* ptr = reinterpret_cast<deFloat16*>(alloc.getHostPtr());
+
+				for (vk::VkDeviceSize k = 0; k < (size / sizeof(deFloat16)); k++)
+				{
+					ptr[k] = deFloat32To16(rnd.getFloat());
 				}
 			}
 			break;
@@ -1441,7 +1882,7 @@ tcu::TestStatus vkt::subgroups::makeTessellationEvaluationFrameBufferTest (
 {
 	const DeviceInterface&					vk						= context.getDeviceInterface();
 	const VkDevice							device					= context.getDevice();
-	const deUint32							maxWidth				= 1024u;
+	const deUint32							maxWidth				= getMaxWidth();
 	vector<de::SharedPtr<BufferOrImage> >	inputBuffers			(extraDataCount);
 	DescriptorSetLayoutBuilder				layoutBuilder;
 	DescriptorPoolBuilder					poolBuilder;
@@ -1566,15 +2007,15 @@ tcu::TestStatus vkt::subgroups::makeTessellationEvaluationFrameBufferTest (
 		flushAlloc(vk, device, alloc);
 	}
 
-	for (deUint32 width = 1u; width < maxWidth; ++width)
-	{
-		const Unique<VkFramebuffer>	framebuffer			(makeFramebuffer(vk, device, *renderPass, discardableImage.getImageView(), maxWidth, 1u));
-		const VkViewport			viewport			= makeViewport(maxWidth, 1u);
-		const VkRect2D				scissor				= makeRect2D(maxWidth, 1u);
-		const vk::VkDeviceSize		imageResultSize		= tcu::getPixelSize(vk::mapVkFormat(format)) * maxWidth;
-		Buffer						imageBufferResult	(context, imageResultSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-		const VkDeviceSize			vertexBufferOffset	= 0u;
+	const Unique<VkFramebuffer>	framebuffer			(makeFramebuffer(vk, device, *renderPass, discardableImage.getImageView(), maxWidth, 1u));
+	const VkViewport			viewport			= makeViewport(maxWidth, 1u);
+	const VkRect2D				scissor				= makeRect2D(maxWidth, 1u);
+	const vk::VkDeviceSize		imageResultSize		= tcu::getPixelSize(vk::mapVkFormat(format)) * maxWidth;
+	Buffer						imageBufferResult	(context, imageResultSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	const VkDeviceSize			vertexBufferOffset	= 0u;
 
+	for (deUint32 width = 1u; width < maxWidth; width = getNextWidth(width))
+	{
 		totalIterations++;
 
 		beginCommandBuffer(vk, *cmdBuffer);
@@ -1618,8 +2059,10 @@ tcu::TestStatus vkt::subgroups::makeTessellationEvaluationFrameBufferTest (
 
 	if (0 < failedIterations)
 	{
+		unsigned valuesPassed = (failedIterations > totalIterations) ? 0u : (totalIterations - failedIterations);
+
 		context.getTestContext().getLog()
-				<< TestLog::Message << (totalIterations - failedIterations) << " / "
+				<< TestLog::Message << valuesPassed << " / "
 				<< totalIterations << " values passed" << TestLog::EndMessage;
 		return tcu::TestStatus::fail("Failed!");
 	}
@@ -1661,7 +2104,7 @@ tcu::TestStatus vkt::subgroups::makeGeometryFrameBufferTest(
 {
 	const DeviceInterface&					vk						= context.getDeviceInterface();
 	const VkDevice							device					= context.getDevice();
-	const deUint32							maxWidth				= 1024u;
+	const deUint32							maxWidth				= getMaxWidth();
 	vector<de::SharedPtr<BufferOrImage> >	inputBuffers			(extraDataCount);
 	DescriptorSetLayoutBuilder				layoutBuilder;
 	DescriptorPoolBuilder					poolBuilder;
@@ -1778,15 +2221,16 @@ tcu::TestStatus vkt::subgroups::makeGeometryFrameBufferTest(
 		flushAlloc(vk, device, alloc);
 	}
 
-	for (deUint32 width = 1u; width < maxWidth; width++)
+	const Unique<VkFramebuffer>	framebuffer			(makeFramebuffer(vk, device, *renderPass, discardableImage.getImageView(), maxWidth, 1u));
+	const VkViewport			viewport			= makeViewport(maxWidth, 1u);
+	const VkRect2D				scissor				= makeRect2D(maxWidth, 1u);
+	const vk::VkDeviceSize		imageResultSize		= tcu::getPixelSize(vk::mapVkFormat(format)) * maxWidth;
+	Buffer						imageBufferResult	(context, imageResultSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	const VkDeviceSize			vertexBufferOffset	= 0u;
+
+	for (deUint32 width = 1u; width < maxWidth; width = getNextWidth(width))
 	{
 		totalIterations++;
-		const Unique<VkFramebuffer>	framebuffer			(makeFramebuffer(vk, device, *renderPass, discardableImage.getImageView(), maxWidth, 1u));
-		const VkViewport			viewport			= makeViewport(maxWidth, 1u);
-		const VkRect2D				scissor				= makeRect2D(maxWidth, 1u);
-		const vk::VkDeviceSize		imageResultSize		= tcu::getPixelSize(vk::mapVkFormat(format)) * maxWidth;
-		Buffer						imageBufferResult	(context, imageResultSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-		const VkDeviceSize			vertexBufferOffset	= 0u;
 
 		for (deUint32 ndx = 0u; ndx < inputBuffers.size(); ndx++)
 		{
@@ -1836,9 +2280,12 @@ tcu::TestStatus vkt::subgroups::makeGeometryFrameBufferTest(
 
 	if (0 < failedIterations)
 	{
+		unsigned valuesPassed = (failedIterations > totalIterations) ? 0u : (totalIterations - failedIterations);
+
 		context.getTestContext().getLog()
-				<< TestLog::Message << (totalIterations - failedIterations) << " / "
+				<< TestLog::Message << valuesPassed << " / "
 				<< totalIterations << " values passed" << TestLog::EndMessage;
+
 		return tcu::TestStatus::fail("Failed!");
 	}
 
@@ -1854,7 +2301,7 @@ tcu::TestStatus vkt::subgroups::allStages(
 {
 	const DeviceInterface&			vk					= context.getDeviceInterface();
 	const VkDevice					device				= context.getDevice();
-	const deUint32					maxWidth			= 1024u;
+	const deUint32					maxWidth			= getMaxWidth();
 	vector<VkShaderStageFlagBits>	stagesVector;
 	VkShaderStageFlags				shaderStageRequired	= (VkShaderStageFlags)0ull;
 
@@ -2044,7 +2491,7 @@ tcu::TestStatus vkt::subgroups::allStages(
 			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 			resultImage.getImage(), subresourceRange);
 
-		for (deUint32 width = 1u; width < maxWidth; width++)
+		for (deUint32 width = 1u; width < maxWidth; width = getNextWidth(width))
 		{
 			for (deUint32 ndx = stagesCount; ndx < stagesCount + extraDatasCount; ++ndx)
 			{
@@ -2129,7 +2576,7 @@ tcu::TestStatus vkt::subgroups::allStages(
 					}
 				}
 
-				if (!checkResult(datas, width , subgroupSize))
+				if (!checkResult(datas, width, subgroupSize))
 					failedIterations++;
 			}
 
@@ -2138,9 +2585,12 @@ tcu::TestStatus vkt::subgroups::allStages(
 
 		if (0 < failedIterations)
 		{
+			unsigned valuesPassed = (failedIterations > totalIterations) ? 0u : (totalIterations - failedIterations);
+
 			context.getTestContext().getLog()
-					<< TestLog::Message << (totalIterations - failedIterations) << " / "
-					<< totalIterations << " values passed" << TestLog::EndMessage;
+				<< TestLog::Message << valuesPassed << " / "
+				<< totalIterations << " values passed" << TestLog::EndMessage;
+
 			return tcu::TestStatus::fail("Failed!");
 		}
 	}
@@ -2155,8 +2605,8 @@ tcu::TestStatus vkt::subgroups::makeVertexFrameBufferTest(Context& context, vk::
 	const DeviceInterface&					vk						= context.getDeviceInterface();
 	const VkDevice							device					= context.getDevice();
 	const VkQueue							queue					= context.getUniversalQueue();
+	const deUint32							maxWidth				= getMaxWidth();
 	const deUint32							queueFamilyIndex		= context.getUniversalQueueFamilyIndex();
-	const deUint32							maxWidth				= 1024u;
 	vector<de::SharedPtr<BufferOrImage> >	inputBuffers			(extraDataCount);
 	DescriptorSetLayoutBuilder				layoutBuilder;
 	const Unique<VkShaderModule>			vertexShaderModule		(createShaderModule(vk, device, context.getBinaryCollection().get("vert"), 0u));
@@ -2283,15 +2733,16 @@ tcu::TestStatus vkt::subgroups::makeVertexFrameBufferTest(Context& context, vk::
 		flushAlloc(vk, device, alloc);
 	}
 
-	for (deUint32 width = 1u; width < maxWidth; width++)
+	const Unique<VkFramebuffer>	framebuffer			(makeFramebuffer(vk, device, *renderPass, discardableImage.getImageView(), maxWidth, 1u));
+	const VkViewport			viewport			= makeViewport(maxWidth, 1u);
+	const VkRect2D				scissor				= makeRect2D(maxWidth, 1u);
+	const vk::VkDeviceSize		imageResultSize		= tcu::getPixelSize(vk::mapVkFormat(format)) * maxWidth;
+	Buffer						imageBufferResult	(context, imageResultSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	const VkDeviceSize			vertexBufferOffset	= 0u;
+
+	for (deUint32 width = 1u; width < maxWidth; width = getNextWidth(width))
 	{
 		totalIterations++;
-		const Unique<VkFramebuffer>	framebuffer			(makeFramebuffer(vk, device, *renderPass, discardableImage.getImageView(), maxWidth, 1u));
-		const VkViewport			viewport			= makeViewport(maxWidth, 1u);
-		const VkRect2D				scissor				= makeRect2D(maxWidth, 1u);
-		const vk::VkDeviceSize		imageResultSize		= tcu::getPixelSize(vk::mapVkFormat(format)) * maxWidth;
-		Buffer						imageBufferResult	(context, imageResultSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
-		const VkDeviceSize			vertexBufferOffset	= 0u;
 
 		for (deUint32 ndx = 0u; ndx < inputBuffers.size(); ndx++)
 		{
@@ -2341,9 +2792,12 @@ tcu::TestStatus vkt::subgroups::makeVertexFrameBufferTest(Context& context, vk::
 
 	if (0 < failedIterations)
 	{
+		unsigned valuesPassed = (failedIterations > totalIterations) ? 0u : (totalIterations - failedIterations);
+
 		context.getTestContext().getLog()
-				<< TestLog::Message << (totalIterations - failedIterations) << " / "
-				<< totalIterations << " values passed" << TestLog::EndMessage;
+			<< TestLog::Message << valuesPassed << " / "
+			<< totalIterations << " values passed" << TestLog::EndMessage;
+
 		return tcu::TestStatus::fail("Failed!");
 	}
 
@@ -2543,9 +2997,12 @@ tcu::TestStatus vkt::subgroups::makeFragmentFrameBufferTest	(Context& context, V
 
 	if (0 < failedIterations)
 	{
+		unsigned valuesPassed = (failedIterations > totalIterations) ? 0u : (totalIterations - failedIterations);
+
 		context.getTestContext().getLog()
-				<< TestLog::Message << (totalIterations - failedIterations) << " / "
-				<< totalIterations << " values passed" << TestLog::EndMessage;
+			<< TestLog::Message << valuesPassed << " / "
+			<< totalIterations << " values passed" << TestLog::EndMessage;
+
 		return tcu::TestStatus::fail("Failed!");
 	}
 
@@ -2696,22 +3153,33 @@ tcu::TestStatus vkt::subgroups::makeComputeTest(
 		{1, 1, 1} // Isn't used, just here to make double buffering checks easier
 	};
 
-	Move<VkPipeline> lastPipeline(
+	Move<VkPipeline> pipelines[localSizesToTestCount - 1];
+	pipelines[0] =
 		makeComputePipeline(context, *pipelineLayout, *shaderModule,
-							localSizesToTest[0][0], localSizesToTest[0][1], localSizesToTest[0][2]));
+							VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT, (VkPipeline) DE_NULL,
+							localSizesToTest[0][0], localSizesToTest[0][1], localSizesToTest[0][2]);
+
+	for (deUint32 index = 1; index < (localSizesToTestCount - 1); index++)
+	{
+		const deUint32 nextX = localSizesToTest[index][0];
+		const deUint32 nextY = localSizesToTest[index][1];
+		const deUint32 nextZ = localSizesToTest[index][2];
+
+		pipelines[index] =
+			makeComputePipeline(context, *pipelineLayout, *shaderModule,
+								VK_PIPELINE_CREATE_DERIVATIVE_BIT, *pipelines[0],
+								nextX, nextY, nextZ);
+	}
 
 	for (deUint32 index = 0; index < (localSizesToTestCount - 1); index++)
 	{
-		const deUint32 nextX = localSizesToTest[index + 1][0];
-		const deUint32 nextY = localSizesToTest[index + 1][1];
-		const deUint32 nextZ = localSizesToTest[index + 1][2];
 
 		// we are running one test
 		totalIterations++;
 
 		beginCommandBuffer(vk, *cmdBuffer);
 
-		vk.cmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *lastPipeline);
+		vk.cmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *pipelines[index]);
 
 		vk.cmdBindDescriptorSets(*cmdBuffer,
 				VK_PIPELINE_BIND_POINT_COMPUTE, *pipelineLayout, 0u, 1u,
@@ -2720,10 +3188,6 @@ tcu::TestStatus vkt::subgroups::makeComputeTest(
 		vk.cmdDispatch(*cmdBuffer,numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
 
 		endCommandBuffer(vk, *cmdBuffer);
-
-		Move<VkPipeline> nextPipeline(
-			makeComputePipeline(context, *pipelineLayout, *shaderModule,
-								nextX, nextY, nextZ));
 
 		submitCommandsAndWait(vk, device, queue, *cmdBuffer);
 
@@ -2755,15 +3219,16 @@ tcu::TestStatus vkt::subgroups::makeComputeTest(
 		}
 
 		vk.resetCommandBuffer(*cmdBuffer, 0);
-
-		lastPipeline = nextPipeline;
 	}
 
 	if (0 < failedIterations)
 	{
+		unsigned valuesPassed = (failedIterations > totalIterations) ? 0u : (totalIterations - failedIterations);
+
 		context.getTestContext().getLog()
-				<< TestLog::Message << (totalIterations - failedIterations) << " / "
-				<< totalIterations << " values passed" << TestLog::EndMessage;
+			<< TestLog::Message << valuesPassed << " / "
+			<< totalIterations << " values passed" << TestLog::EndMessage;
+
 		return tcu::TestStatus::fail("Failed!");
 	}
 

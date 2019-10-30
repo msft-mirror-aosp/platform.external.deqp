@@ -617,8 +617,7 @@ public:
 
 	VkQueueFlags getQueueFlags (const OperationContext& context) const
 	{
-		if (m_bufferOp == BUFFER_OP_FILL &&
-			!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance1"))
+		if (m_bufferOp == BUFFER_OP_FILL && !context.isDeviceFunctionalitySupported("VK_KHR_maintenance1"))
 		{
 			return VK_QUEUE_COMPUTE_BIT | VK_QUEUE_GRAPHICS_BIT;
 		}
@@ -914,8 +913,8 @@ public:
 
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
-		const DeviceInterface&		vk					= m_context.getDeviceInterface();
-		const VkBufferImageCopy		bufferCopyRegion	= makeBufferImageCopy(m_resource.getImage().subresourceLayers, m_resource.getImage().extent);
+		const DeviceInterface&	vk					= m_context.getDeviceInterface();
+		const VkBufferImageCopy	bufferCopyRegion	= makeBufferImageCopy(m_resource.getImage().extent, m_resource.getImage().subresourceLayers);
 
 		const VkImageMemoryBarrier stagingImageTransferSrcLayoutBarrier = makeImageMemoryBarrier(
 			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
@@ -1797,7 +1796,7 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&	vk					= m_context.getDeviceInterface();
-		const VkBufferImageCopy	bufferCopyRegion	= makeBufferImageCopy(m_resource.getImage().subresourceLayers, m_resource.getImage().extent);
+		const VkBufferImageCopy	bufferCopyRegion	= makeBufferImageCopy(m_resource.getImage().extent, m_resource.getImage().subresourceLayers);
 
 		// Destination image layout
 		{
@@ -2693,7 +2692,7 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&	vk			= m_context.getDeviceInterface();
-		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_resource.getImage().subresourceLayers, m_resource.getImage().extent);
+		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_resource.getImage().extent, m_resource.getImage().subresourceLayers);
 
 		const VkImageMemoryBarrier layoutBarrier = makeImageMemoryBarrier(
 			(VkAccessFlags)0, VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -2769,7 +2768,7 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&	vk			= m_context.getDeviceInterface();
-		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_subresourceLayers, m_imageExtent);
+		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_imageExtent, m_subresourceLayers);
 
 		// Resource -> Image
 		{
@@ -2906,10 +2905,7 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&	vk			= m_context.getDeviceInterface();
-		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_outResource.getImage().subresourceLayers, m_outResource.getImage().extent);
-
-		// Resource -> Image
-		{
+		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_outResource.getImage().extent, m_outResource.getImage().subresourceLayers);
 
 		const VkBufferMemoryBarrier bufferLayoutBarrier =
 			makeBufferMemoryBarrier(
@@ -2924,7 +2920,6 @@ public:
 							  1u, &bufferLayoutBarrier, 1u, &imageLayoutBarrier);
 
 		vk.cmdCopyBufferToImage(cmdBuffer, m_inResource.getBuffer().handle, m_outResource.getImage().handle, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copyRegion);
-		}
 	}
 
 	SyncInfo getInSyncInfo (void) const
@@ -3054,7 +3049,7 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&	vk			= m_context.getDeviceInterface();
-		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_subresourceLayers, m_imageExtent);
+		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_imageExtent, m_subresourceLayers);
 
 		// Host buffer -> Image
 		{
@@ -3139,7 +3134,7 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&	vk			= m_context.getDeviceInterface();
-		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_resource.getImage().subresourceLayers, m_resource.getImage().extent);
+		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_resource.getImage().extent, m_resource.getImage().subresourceLayers);
 
 		vk.cmdCopyImageToBuffer(cmdBuffer, m_resource.getImage().handle, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, **m_hostBuffer, 1u, &copyRegion);
 
@@ -3200,7 +3195,7 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&	vk			= m_context.getDeviceInterface();
-		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_subresourceLayers, m_inResource.getImage().extent);
+		const VkBufferImageCopy	copyRegion	= makeBufferImageCopy(m_inResource.getImage().extent, m_subresourceLayers);
 
 		{
 			const VkImageMemoryBarrier imageLayoutBarrier = makeImageMemoryBarrier(
@@ -4622,7 +4617,8 @@ private:
 } // anonymous ns
 
 OperationContext::OperationContext (Context& context, PipelineCacheData& pipelineCacheData)
-	: m_vki					(context.getInstanceInterface())
+	: m_context				(context)
+	, m_vki					(context.getInstanceInterface())
 	, m_vk					(context.getDeviceInterface())
 	, m_physicalDevice		(context.getPhysicalDevice())
 	, m_device				(context.getDevice())
@@ -4635,7 +4631,8 @@ OperationContext::OperationContext (Context& context, PipelineCacheData& pipelin
 }
 
 OperationContext::OperationContext (Context& context, PipelineCacheData& pipelineCacheData, const DeviceInterface& vk, const VkDevice device, vk::Allocator& allocator)
-	: m_vki					(context.getInstanceInterface())
+	: m_context				(context)
+	, m_vki					(context.getInstanceInterface())
 	, m_vk					(vk)
 	, m_physicalDevice		(context.getPhysicalDevice())
 	, m_device				(device)
@@ -4647,7 +4644,7 @@ OperationContext::OperationContext (Context& context, PipelineCacheData& pipelin
 {
 }
 
-OperationContext::OperationContext (const deUint32					apiVersion,
+OperationContext::OperationContext (Context&						context,
 									const vk::InstanceInterface&	vki,
 									const vk::DeviceInterface&		vkd,
 									vk::VkPhysicalDevice			physicalDevice,
@@ -4656,7 +4653,8 @@ OperationContext::OperationContext (const deUint32					apiVersion,
 									const std::vector<std::string>&	deviceExtensions,
 									vk::BinaryCollection&			programCollection,
 									PipelineCacheData&				pipelineCacheData)
-	: m_vki					(vki)
+	: m_context				(context)
+	, m_vki					(vki)
 	, m_vk					(vkd)
 	, m_physicalDevice		(physicalDevice)
 	, m_device				(device)
@@ -4664,7 +4662,7 @@ OperationContext::OperationContext (const deUint32					apiVersion,
 	, m_progCollection		(programCollection)
 	, m_pipelineCacheData	(pipelineCacheData)
 	, m_deviceExtensions	(deviceExtensions)
-	, m_usedApiVersion		(apiVersion)
+	, m_usedApiVersion		(context.getUsedApiVersion())
 {
 }
 

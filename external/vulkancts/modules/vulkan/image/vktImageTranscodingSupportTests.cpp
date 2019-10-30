@@ -51,6 +51,7 @@
 #include "tcuTestLog.hpp"
 #include "tcuRGBA.hpp"
 #include "tcuSurface.hpp"
+#include "tcuFloat.hpp"
 
 #include <vector>
 #include <iomanip>
@@ -119,6 +120,37 @@ BasicTranscodingTestInstance::BasicTranscodingTestInstance (Context& context, co
 	: TestInstance	(context)
 	, m_parameters	(parameters)
 {
+}
+
+// The templated functions below work with specializations of tcu::Float as class T. See "tcuFloat.hpp".
+
+// Return smallest floating point normal value preserving the existing sign bit.
+// The smallest normal value has the mantissa bits zeroed out and 1 as the exponent (tough constructBits() expects something else).
+template <class T>
+inline T SmallestFloat (T value)
+{
+	return T::constructBits(value.sign(), -(T::EXPONENT_BIAS - 1), typename T::StorageType(0u));
+}
+
+// Return the largest floating point normal value preserving the existing sign bit.
+// The largest normal value has the mantissa bits all set to 1 and the exponent set to the largest even value (see constructBits() for the details).
+template <class T>
+inline T LargestFloat (T value)
+{
+	return T::constructBits(value.sign(), T::EXPONENT_BIAS, typename T::StorageType((1<<T::MANTISSA_BITS)-1));
+}
+
+// Replace Infs and NaNs with the largest normal value.
+// Replace denormal numbers with the smallest normal value.
+// Leave the rest untouched.
+template <class T>
+void fixFloatIfNeeded(deUint8* ptr_)
+{
+	T* ptr = reinterpret_cast<T*>(ptr_);
+	if (ptr->isInf() || ptr->isNaN())
+		*ptr = LargestFloat<T>(*ptr);
+	else if (ptr->isDenorm())
+		*ptr = SmallestFloat<T>(*ptr);
 }
 
 void BasicTranscodingTestInstance::generateData (deUint8* toFill, size_t size, const VkFormat format)
@@ -227,31 +259,15 @@ void BasicTranscodingTestInstance::generateData (deUint8* toFill, size_t size, c
 			if (textureFormat.type == tcu::TextureFormat::HALF_FLOAT)
 			{
 				for (size_t i = 0; i < size; i += 2)
-				{
-					// HALF_FLOAT fix: remove INF and NaN
-					if ((toFill[i+1] & 0x7C) == 0x7C)
-						toFill[i+1] = 0x00;
-				}
+					fixFloatIfNeeded<tcu::Float16>(toFill + i);
 			}
 			else if (textureFormat.type == tcu::TextureFormat::FLOAT)
 			{
 				for (size_t i = 0; i < size; i += 4)
-				{
-					// HALF_FLOAT fix: remove INF and NaN
-					if ((toFill[i+1] & 0x7C) == 0x7C)
-						toFill[i+1] = 0x00;
-				}
+					fixFloatIfNeeded<tcu::Float16>(toFill + i);
 
 				for (size_t i = 0; i < size; i += 4)
-				{
-					// FLOAT fix: remove INF, NaN, and denorm
-					// Little endian fix
-					if (((toFill[i+3] & 0x7F) == 0x7F && (toFill[i+2] & 0x80) == 0x80) || ((toFill[i+3] & 0x7F) == 0x00 && (toFill[i+2] & 0x80) == 0x00))
-						toFill[i+3] = 0x01;
-					// Big endian fix
-					if (((toFill[i+0] & 0x7F) == 0x7F && (toFill[i+1] & 0x80) == 0x80) || ((toFill[i+0] & 0x7F) == 0x00 && (toFill[i+1] & 0x80) == 0x00))
-						toFill[i+0] = 0x01;
-				}
+					fixFloatIfNeeded<tcu::Float32>(toFill + i);
 			}
 		}
 	}
@@ -714,6 +730,7 @@ public:
 														 const TestParameters&		parameters);
 	void					initPrograms				(SourceCollections&			programCollection) const;
 	TestInstance*			createInstance				(Context&					context) const;
+	virtual void			checkSupport				(Context&					context) const;
 	bool					isFormatUsageFlagSupported	(Context&					context,
 														 const VkFormat				format,
 														 VkImageUsageFlags			formatUsageFlags) const;
@@ -827,22 +844,23 @@ bool ImageTranscodingCase::isFormatUsageFlagSupported (Context& context, const V
 	return (queryResult == VK_SUCCESS);
 }
 
+void ImageTranscodingCase::checkSupport (Context& context) const
+{
+	context.requireDeviceFunctionality("VK_KHR_maintenance2");
+
+	if (!isFormatUsageFlagSupported(context, m_parameters.featuredFormat, m_parameters.testedImageUsageFeature))
+		TCU_THROW(NotSupportedError, "Test skipped due to feature is not supported by the format");
+
+	if (!isFormatUsageFlagSupported(context, m_parameters.featuredFormat, m_parameters.testedImageUsage | m_parameters.pairedImageUsage))
+		TCU_THROW(NotSupportedError, "Required image usage flags are not supported by the format");
+}
+
 TestInstance* ImageTranscodingCase::createInstance (Context& context) const
 {
-	VkFormat					featuredFormat		= m_parameters.featuredFormat;
 	VkFormat					featurelessFormat	= VK_FORMAT_UNDEFINED;
 	bool						differenceFound		= false;
 
 	DE_ASSERT(m_parameters.testedImageUsageFeature != 0);
-
-	if (!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance2"))
-		TCU_THROW(NotSupportedError, "Extension VK_KHR_maintenance2 not supported");
-
-	if (!isFormatUsageFlagSupported(context, featuredFormat, m_parameters.testedImageUsageFeature))
-		TCU_THROW(NotSupportedError, "Test skipped due to feature is not supported by the format");
-
-	if (!isFormatUsageFlagSupported(context, featuredFormat, m_parameters.testedImageUsage | m_parameters.pairedImageUsage))
-		TCU_THROW(NotSupportedError, "Required image usage flags are not supported by the format");
 
 	for (deUint32 i = 0; m_parameters.compatibleFormats[i] != VK_FORMAT_UNDEFINED; i++)
 	{

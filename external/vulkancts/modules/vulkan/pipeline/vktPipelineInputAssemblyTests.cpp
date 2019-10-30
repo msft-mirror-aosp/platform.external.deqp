@@ -75,6 +75,7 @@ public:
 																 VkIndexType			indexType);
 	virtual								~InputAssemblyTest		(void) {}
 	virtual void						initPrograms			(SourceCollections& sourceCollections) const;
+	virtual void						checkSupport			(Context& context) const;
 	virtual TestInstance*				createInstance			(Context& context) const;
 	static bool							isRestartIndex			(VkIndexType indexType, deUint32 indexValue);
 	static deUint32						getRestartIndex			(VkIndexType indexType);
@@ -220,6 +221,29 @@ InputAssemblyTest::InputAssemblyTest (tcu::TestContext&		testContext,
 	, m_testPrimitiveRestart	(testPrimitiveRestart)
 	, m_indexType				(indexType)
 {
+}
+
+void InputAssemblyTest::checkSupport (Context& context) const
+{
+	if (m_indexType == VK_INDEX_TYPE_UINT8_EXT)
+		context.requireDeviceFunctionality("VK_EXT_index_type_uint8");
+
+	switch (m_primitiveTopology)
+	{
+		case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
+		case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
+		case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
+		case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
+			context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_GEOMETRY_SHADER);
+			break;
+
+		case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
+			context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_TESSELLATION_SHADER);
+			break;
+
+		default:
+			break;
+	}
 }
 
 TestInstance* InputAssemblyTest::createInstance (Context& context) const
@@ -934,28 +958,6 @@ InputAssemblyInstance::InputAssemblyInstance (Context&							context,
 	const deUint32					queueFamilyIndex		= context.getUniversalQueueFamilyIndex();
 	SimpleAllocator					memAlloc				(vk, vkDevice, getPhysicalDeviceMemoryProperties(context.getInstanceInterface(), context.getPhysicalDevice()));
 	const VkComponentMapping		componentMappingRGBA	= { VK_COMPONENT_SWIZZLE_R, VK_COMPONENT_SWIZZLE_G, VK_COMPONENT_SWIZZLE_B, VK_COMPONENT_SWIZZLE_A };
-
-	if (m_indexType == VK_INDEX_TYPE_UINT8_EXT)
-		context.requireDeviceExtension("VK_EXT_index_type_uint8");
-
-	switch (m_primitiveTopology)
-	{
-		case VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY:
-		case VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY:
-		case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY:
-		case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY:
-			if (!context.getDeviceFeatures().geometryShader)
-				throw tcu::NotSupportedError("Geometry shaders are not supported");
-			break;
-
-		case VK_PRIMITIVE_TOPOLOGY_PATCH_LIST:
-			if (!context.getDeviceFeatures().tessellationShader)
-				throw tcu::NotSupportedError("Tessellation shaders are not supported");
-			break;
-
-		default:
-			break;
-	}
 
 	// Create color image
 	{

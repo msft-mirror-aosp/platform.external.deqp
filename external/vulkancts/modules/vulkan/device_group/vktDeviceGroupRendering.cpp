@@ -23,6 +23,7 @@
 *//*--------------------------------------------------------------------*/
 
 #include "vktDeviceGroupTests.hpp"
+#include "vktCustomInstancesDevices.hpp"
 
 #include "vkDefs.hpp"
 #include "vkDeviceUtil.hpp"
@@ -151,7 +152,6 @@ public:
 private:
 			void						init						(void);
 			deUint32					getMemoryIndex				(deUint32 memoryTypeBits, deUint32 memoryPropertyFlag);
-			void						getDeviceLayers				(vector<string>& enabledLayers);
 			bool						isPeerFetchAllowed			(deUint32 memoryTypeIndex, deUint32 firstdeviceID, deUint32 seconddeviceID);
 			void						SubmitBufferAndWaitForIdle	(const DeviceDriver& vk, VkCommandBuffer cmdBuf, deUint32 deviceMask);
 	virtual	tcu::TestStatus				iterate						(void);
@@ -209,20 +209,9 @@ bool DeviceGroupTestInstance::isPeerFetchAllowed (deUint32 memoryTypeIndex, deUi
 	return (peerMemFeatures1 & VK_PEER_MEMORY_FEATURE_GENERIC_SRC_BIT) && (peerMemFeatures2 & VK_PEER_MEMORY_FEATURE_GENERIC_SRC_BIT);
 }
 
-void DeviceGroupTestInstance::getDeviceLayers (vector<string>& enabledLayers)
-{
-	const tcu::CommandLine& cmdLine = m_context.getTestContext().getCommandLine();
-	if (cmdLine.isValidationEnabled())
-	{
-		enabledLayers = vkt::getValidationLayers(m_context.getInstanceInterface(), m_context.getPhysicalDevice());
-		if (enabledLayers.empty())
-			TCU_THROW(NotSupportedError, "No device validation layers found");
-	}
-}
-
 void DeviceGroupTestInstance::init (void)
 {
-	if (!isInstanceExtensionSupported(m_context.getUsedApiVersion(), m_context.getInstanceExtensions(), "VK_KHR_device_group_creation"))
+	if (!m_context.isInstanceFunctionalitySupported("VK_KHR_device_group_creation"))
 		TCU_THROW(NotSupportedError, "Device Group tests are not supported, no device group extension present.");
 
 	const InstanceInterface&		instanceInterface	= m_context.getInstanceInterface();
@@ -235,7 +224,7 @@ void DeviceGroupTestInstance::init (void)
 	vector<string>					deviceExtensions;
 	vector<string>					enabledLayers;
 
-	if (!isDeviceExtensionSupported(m_context.getUsedApiVersion(), m_context.getDeviceExtensions(), "VK_KHR_device_group"))
+	if (!m_context.isDeviceFunctionalitySupported("VK_KHR_device_group"))
 		TCU_THROW(NotSupportedError, "Missing extension: VK_KHR_device_group");
 
 	if (!isCoreDeviceExtension(m_context.getUsedApiVersion(), "VK_KHR_device_group"))
@@ -243,7 +232,7 @@ void DeviceGroupTestInstance::init (void)
 
 	if(m_useDedicated)
 	{
-		if (!isDeviceExtensionSupported(m_context.getUsedApiVersion(), m_context.getDeviceExtensions(), "VK_KHR_dedicated_allocation"))
+		if (!m_context.isDeviceFunctionalitySupported("VK_KHR_dedicated_allocation"))
 			TCU_THROW(NotSupportedError, "Missing extension: VK_KHR_dedicated_allocation");
 
 		if (!isCoreDeviceExtension(m_context.getUsedApiVersion(), "VK_KHR_dedicated_allocation"))
@@ -303,12 +292,6 @@ void DeviceGroupTestInstance::init (void)
 		for (size_t ndx = 0; ndx < deviceExtensions.size(); ++ndx)
 			extensionPtrs[ndx] = deviceExtensions[ndx].c_str();
 
-		// Get Layers
-		getDeviceLayers(enabledLayers);
-		layerPtrs.resize(enabledLayers.size());
-		for (size_t ndx = 0; ndx < enabledLayers.size(); ++ndx)
-			layerPtrs[ndx] = enabledLayers[ndx].c_str();
-
 		const VkDeviceCreateInfo	deviceCreateInfo =
 		{
 			VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,					//sType;
@@ -316,13 +299,13 @@ void DeviceGroupTestInstance::init (void)
 			(VkDeviceCreateFlags)0u,								//flags
 			1,														//queueRecordCount;
 			&deviceQueueCreateInfo,									//pRequestedQueues;
-			(deUint32)layerPtrs.size(),								//layerCount;
-			(layerPtrs.empty() ? DE_NULL : &layerPtrs[0]),			//ppEnabledLayerNames;
+			0u,														//layerCount;
+			DE_NULL,												//ppEnabledLayerNames;
 			(deUint32)extensionPtrs.size(),							//extensionCount;
 			(extensionPtrs.empty() ? DE_NULL : &extensionPtrs[0]),	//ppEnabledExtensionNames;
 			&enabledDeviceFeatures,									//pEnabledFeatures;
 		};
-		m_deviceGroup = createDevice(m_context.getPlatformInterface(), m_context.getInstance(), instanceInterface, physicalDevice, &deviceCreateInfo);
+		m_deviceGroup = createCustomDevice(m_context.getTestContext().getCommandLine().isValidationEnabled(), m_context.getPlatformInterface(), m_context.getInstance(), instanceInterface, physicalDevice, &deviceCreateInfo);
 	}
 
 	deviceDriver = de::MovePtr<vk::DeviceDriver>(new vk::DeviceDriver(m_context.getPlatformInterface(), m_context.getInstance(), *m_deviceGroup));

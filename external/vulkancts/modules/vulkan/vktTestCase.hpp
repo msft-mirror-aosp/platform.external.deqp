@@ -29,6 +29,8 @@
 #include "deUniquePtr.hpp"
 #include "vkPrograms.hpp"
 #include "vkApiVersion.hpp"
+#include "vkDebugReportUtil.hpp"
+#include "vkPlatform.hpp"
 #include "vktTestCaseDefs.hpp"
 #include <vector>
 #include <string>
@@ -47,10 +49,6 @@ struct SourceCollections;
 
 namespace vkt
 {
-
-std::vector<std::string> getValidationLayers (const vk::PlatformInterface& vkp);
-
-std::vector<std::string> getValidationLayers (const vk::InstanceInterface& vki, vk::VkPhysicalDevice physicalDevice);
 
 class DefaultDevice;
 
@@ -77,6 +75,9 @@ public:
 	const vk::VkPhysicalDeviceFeatures&			getDeviceFeatures					(void) const;
 	const vk::VkPhysicalDeviceFeatures2&		getDeviceFeatures2					(void) const;
 
+	bool										isInstanceFunctionalitySupported	(const std::string& extension) const;
+	bool										isDeviceFunctionalitySupported		(const std::string& extension) const;
+
 #include "vkDeviceFeaturesForContextDecl.inl"
 
 	const vk::VkPhysicalDeviceProperties&		getDeviceProperties					(void) const;
@@ -92,11 +93,14 @@ public:
 	bool										contextSupports						(const deUint32 majorNum, const deUint32 minorNum, const deUint32 patchNum) const;
 	bool										contextSupports						(const vk::ApiVersion version) const;
 	bool										contextSupports						(const deUint32 requiredApiVersionBits) const;
-	bool										requireDeviceExtension				(const std::string& required);
-	bool										requireInstanceExtension			(const std::string& required);
+	bool										requireDeviceFunctionality			(const std::string& required);
+	bool										requireInstanceFunctionality		(const std::string& required);
 	bool										requireDeviceCoreFeature			(const DeviceCoreFeature requiredDeviceCoreFeature);
 
 	void*										getInstanceProcAddr					();
+
+	bool										resultSetOnValidation			() const		{ return m_resultSetOnValidation;	}
+	void										resultSetOnValidation			(bool value)	{ m_resultSetOnValidation = value;	}
 
 protected:
 	tcu::TestContext&							m_testCtx;
@@ -105,6 +109,8 @@ protected:
 
 	const de::UniquePtr<DefaultDevice>			m_device;
 	const de::UniquePtr<vk::Allocator>			m_allocator;
+
+	bool										m_resultSetOnValidation;
 
 private:
 												Context								(const Context&); // Not allowed
@@ -153,6 +159,8 @@ inline TestCase::TestCase (tcu::TestContext& testCtx, tcu::TestNodeType type, co
 	: tcu::TestCase(testCtx, type, name.c_str(), description.c_str())
 {
 }
+
+void collectAndReportDebugMessages(vk::DebugReportRecorder &debugReportRecorder, Context& context);
 
 } // vkt
 

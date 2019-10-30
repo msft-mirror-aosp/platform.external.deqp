@@ -25,6 +25,7 @@
 #include "vktImageLoadStoreUtil.hpp"
 #include "vktTestCaseUtil.hpp"
 #include "vktImageTexture.hpp"
+#include "vktCustomInstancesDevices.hpp"
 
 #include "vkBuilderUtil.hpp"
 #include "vkQueryUtil.hpp"
@@ -44,6 +45,7 @@
 #include "tcuTestLog.hpp"
 #include "tcuTextureUtil.hpp"
 #include "tcuPlatform.hpp"
+#include "tcuCommandLine.hpp"
 
 #include <string>
 #include <vector>
@@ -552,12 +554,6 @@ Move<VkImage> makeImage (const DeviceInterface&		vk,
 	return createImage(vk, device, &imageParams);
 }
 
-inline Move<VkBuffer> makeBuffer (const DeviceInterface& vk, const VkDevice device, const VkDeviceSize bufferSize, const VkBufferUsageFlags usage)
-{
-	const VkBufferCreateInfo bufferCreateInfo = makeBufferCreateInfo(bufferSize, usage);
-	return createBuffer(vk, device, &bufferCreateInfo);
-}
-
 inline VkImageSubresourceRange makeColorSubresourceRange (const int baseArrayLayer, const int layerCount)
 {
 	return makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, static_cast<deUint32>(baseArrayLayer), static_cast<deUint32>(layerCount));
@@ -754,20 +750,6 @@ Move<VkCommandBuffer> makeCommandBuffer	(const DeviceInterface& vk, const VkDevi
 	return allocateCommandBuffer(vk, device, commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 }
 
-MovePtr<Allocation> bindImage (const DeviceInterface& vk, const VkDevice device, Allocator& allocator, const VkImage image, const MemoryRequirement requirement)
-{
-	MovePtr<Allocation> alloc = allocator.allocate(getImageMemoryRequirements(vk, device, image), requirement);
-	VK_CHECK(vk.bindImageMemory(device, image, alloc->getMemory(), alloc->getOffset()));
-	return alloc;
-}
-
-MovePtr<Allocation> bindBuffer (const DeviceInterface& vk, const VkDevice device, Allocator& allocator, const VkBuffer buffer, const MemoryRequirement requirement)
-{
-	MovePtr<Allocation> alloc(allocator.allocate(getBufferMemoryRequirements(vk, device, buffer), requirement));
-	VK_CHECK(vk.bindBufferMemory(device, buffer, alloc->getMemory(), alloc->getOffset()));
-	return alloc;
-}
-
 vector<Vec4> genVertexData (const CaseDef& caseDef)
 {
 	vector<Vec4>	vectorData;
@@ -885,7 +867,7 @@ class UploadDownloadExecutor
 public:
 	UploadDownloadExecutor(Context& context, VkDevice device, VkQueue queue, deUint32 queueFamilyIndex, const CaseDef& caseSpec) :
 	m_caseDef(caseSpec),
-	m_haveMaintenance2(isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance2")),
+	m_haveMaintenance2(context.isDeviceFunctionalitySupported("VK_KHR_maintenance2")),
 	m_vk(context.getDeviceInterface()),
 	m_device(device),
 	m_queue(queue),
@@ -1622,15 +1604,54 @@ void UploadDownloadExecutor::copyImageToBuffer(VkImage				sourceImage,
 
 tcu::TestStatus testMutable (Context& context, const CaseDef caseDef)
 {
-	const DeviceInterface&			vk			= context.getDeviceInterface();
+	const DeviceInterface&		vk					= context.getDeviceInterface();
+	const VkDevice				device				= context.getDevice();
+	Allocator&					allocator			= context.getDefaultAllocator();
+
+	// Create a color buffer for host-inspection of results
+	// For the Copy download method, this is the target of the download, for other
+	// download methods, pixel data will be copied to this buffer from the download
+	// target
+	const VkDeviceSize			colorBufferSize		= caseDef.size.x() * caseDef.size.y() * caseDef.size.z() * caseDef.numLayers * tcu::getPixelSize(mapVkFormat(caseDef.imageFormat));
+	const Unique<VkBuffer>		colorBuffer			(makeBuffer(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
+	const UniquePtr<Allocation>	colorBufferAlloc	(bindBuffer(vk, device, allocator, *colorBuffer, MemoryRequirement::HostVisible));
+	deMemset(colorBufferAlloc->getHostPtr(), 0, static_cast<std::size_t>(colorBufferSize));
+	flushAlloc(vk, device, *colorBufferAlloc);
+
+	// Execute the test
+	UploadDownloadExecutor executor(context, device, context.getUniversalQueue(), context.getUniversalQueueFamilyIndex(), caseDef);
+	executor.run(context, *colorBuffer);
+
+	// Verify results
+	{
+		invalidateAlloc(vk, device, *colorBufferAlloc);
+
+		// For verification purposes, we use the format of the upload to generate the expected image
+		const VkFormat						format			= caseDef.upload == UPLOAD_CLEAR || caseDef.upload == UPLOAD_COPY ? caseDef.imageFormat : caseDef.viewFormat;
+		const tcu::TextureFormat			tcuFormat		= mapVkFormat(format);
+		const bool							isIntegerFormat	= isUintFormat(format) || isIntFormat(format);
+		const tcu::ConstPixelBufferAccess	resultImage		(tcuFormat, caseDef.size.x(), caseDef.size.y(), caseDef.numLayers, colorBufferAlloc->getHostPtr());
+		tcu::TextureLevel					textureLevel	(tcuFormat, caseDef.size.x(), caseDef.size.y(), caseDef.numLayers);
+		const tcu::PixelBufferAccess		expectedImage	= textureLevel.getAccess();
+		generateExpectedImage(expectedImage, caseDef);
+
+		bool ok;
+		if (isIntegerFormat)
+			ok = tcu::intThresholdCompare(context.getTestContext().getLog(), "Image comparison", "", expectedImage, resultImage, tcu::UVec4(1), tcu::COMPARE_LOG_RESULT);
+		else
+			ok = tcu::floatThresholdCompare(context.getTestContext().getLog(), "Image comparison", "", expectedImage, resultImage, tcu::Vec4(0.01f), tcu::COMPARE_LOG_RESULT);
+		return ok ? tcu::TestStatus::pass("Pass") : tcu::TestStatus::fail("Fail");
+	}
+}
+
+void checkSupport (Context& context, const CaseDef caseDef)
+{
 	const InstanceInterface&		vki			= context.getInstanceInterface();
-	const VkDevice					device		= context.getDevice();
 	const VkPhysicalDevice			physDevice	= context.getPhysicalDevice();
-	Allocator&						allocator	= context.getDefaultAllocator();
 
 	// If this is a VK_KHR_image_format_list test, check that the extension is supported
-	if (caseDef.isFormatListTest && !de::contains(context.getDeviceExtensions().begin(), context.getDeviceExtensions().end(), "VK_KHR_image_format_list"))
-		TCU_THROW(NotSupportedError, "VK_KHR_image_format_list not supported");
+	if (caseDef.isFormatListTest)
+		context.requireDeviceFunctionality("VK_KHR_image_format_list");
 
 	// Check required features on the format for the required upload/download methods
 	VkFormatProperties	imageFormatProps, viewFormatProps;
@@ -1685,7 +1706,7 @@ tcu::TestStatus testMutable (Context& context, const CaseDef caseDef)
 	if ((viewFormatProps.optimalTilingFeatures & viewFormatFeatureFlags) != viewFormatFeatureFlags)
 		TCU_THROW(NotSupportedError, "View format doesn't support upload/download method");
 
-	const bool haveMaintenance2 = isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance2");
+	const bool haveMaintenance2 = context.isDeviceFunctionalitySupported("VK_KHR_maintenance2");
 
 	// We don't use the base image for anything other than transfer
 	// operations so there are no features to check.  However, The Vulkan
@@ -1703,41 +1724,6 @@ tcu::TestStatus testMutable (Context& context, const CaseDef caseDef)
 	if (imageFormatProps.optimalTilingFeatures == 0)
 	{
 		TCU_THROW(NotSupportedError, "Base image format is not supported");
-	}
-
-	// Create a color buffer for host-inspection of results
-	// For the Copy download method, this is the target of the download, for other
-	// download methods, pixel data will be copied to this buffer from the download
-	// target
-	const VkDeviceSize			colorBufferSize		= caseDef.size.x() * caseDef.size.y() * caseDef.size.z() * caseDef.numLayers * tcu::getPixelSize(mapVkFormat(caseDef.imageFormat));
-	const Unique<VkBuffer>		colorBuffer			(makeBuffer(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
-	const UniquePtr<Allocation>	colorBufferAlloc	(bindBuffer(vk, device, allocator, *colorBuffer, MemoryRequirement::HostVisible));
-	deMemset(colorBufferAlloc->getHostPtr(), 0, static_cast<std::size_t>(colorBufferSize));
-	flushAlloc(vk, device, *colorBufferAlloc);
-
-	// Execute the test
-	UploadDownloadExecutor executor(context, device, context.getUniversalQueue(), context.getUniversalQueueFamilyIndex(), caseDef);
-	executor.run(context, *colorBuffer);
-
-	// Verify results
-	{
-		invalidateAlloc(vk, device, *colorBufferAlloc);
-
-		// For verification purposes, we use the format of the upload to generate the expected image
-		const VkFormat						format			= caseDef.upload == UPLOAD_CLEAR || caseDef.upload == UPLOAD_COPY ? caseDef.imageFormat : caseDef.viewFormat;
-		const tcu::TextureFormat			tcuFormat		= mapVkFormat(format);
-		const bool							isIntegerFormat	= isUintFormat(format) || isIntFormat(format);
-		const tcu::ConstPixelBufferAccess	resultImage		(tcuFormat, caseDef.size.x(), caseDef.size.y(), caseDef.numLayers, colorBufferAlloc->getHostPtr());
-		tcu::TextureLevel					textureLevel	(tcuFormat, caseDef.size.x(), caseDef.size.y(), caseDef.numLayers);
-		const tcu::PixelBufferAccess		expectedImage	= textureLevel.getAccess();
-		generateExpectedImage(expectedImage, caseDef);
-
-		bool ok;
-		if (isIntegerFormat)
-			ok = tcu::intThresholdCompare(context.getTestContext().getLog(), "Image comparison", "", expectedImage, resultImage, tcu::UVec4(1), tcu::COMPARE_LOG_RESULT);
-		else
-			ok = tcu::floatThresholdCompare(context.getTestContext().getLog(), "Image comparison", "", expectedImage, resultImage, tcu::Vec4(0.01f), tcu::COMPARE_LOG_RESULT);
-		return ok ? tcu::TestStatus::pass("Pass") : tcu::TestStatus::fail("Fail");
 	}
 }
 
@@ -1781,11 +1767,11 @@ tcu::TestCaseGroup* createImageMutableTests (TestContext& testCtx)
 
 						std::string caseName = getFormatShortString(s_formats[imageFormatNdx]) + "_" + getFormatShortString(s_formats[viewFormatNdx]) +
 							"_" + getUploadString(upload) + "_" + getDownloadString(download);
-						addFunctionCaseWithPrograms(groupByImageViewType.get(), caseName, "", initPrograms, testMutable, caseDef);
+						addFunctionCaseWithPrograms(groupByImageViewType.get(), caseName, "", checkSupport, initPrograms, testMutable, caseDef);
 
 						caseDef.isFormatListTest = true;
 						caseName += "_format_list";
-						addFunctionCaseWithPrograms(groupByImageViewType.get(), caseName, "", initPrograms, testMutable, caseDef);
+						addFunctionCaseWithPrograms(groupByImageViewType.get(), caseName, "", checkSupport, initPrograms, testMutable, caseDef);
 					}
 				}
 			}
@@ -1810,11 +1796,10 @@ void checkAllSupported(const Extensions& supportedExtensions, const vector<strin
 	}
 }
 
-Move<VkInstance> createInstanceWithWsi(const PlatformInterface&		vkp,
-									   deUint32						version,
-									   const Extensions&			supportedExtensions,
-									   Type							wsiType,
-									   const VkAllocationCallbacks*	pAllocator = DE_NULL)
+CustomInstance createInstanceWithWsi(Context&						context,
+									 const Extensions&				supportedExtensions,
+									 Type							wsiType,
+									 const VkAllocationCallbacks*	pAllocator = DE_NULL)
 {
 	vector<string>	extensions;
 
@@ -1836,7 +1821,7 @@ Move<VkInstance> createInstanceWithWsi(const PlatformInterface&		vkp,
 
 	checkAllSupported(supportedExtensions, extensions);
 
-	return vk::createDefaultInstance(vkp, version, vector<string>(), extensions, pAllocator);
+	return createCustomInstanceWithExtensions(context, extensions, pAllocator);
 }
 
 
@@ -1846,7 +1831,8 @@ Move<VkDevice> createDeviceWithWsi(const PlatformInterface&		vkp,
 								   VkPhysicalDevice				physicalDevice,
 								   const Extensions&			supportedExtensions,
 								   const deUint32				queueFamilyIndex,
-								   const VkAllocationCallbacks*	pAllocator = DE_NULL)
+								   const VkAllocationCallbacks*	pAllocator,
+								   bool							enableValidation)
 {
 	const float						queuePriorities[] = { 1.0f };
 	const VkDeviceQueueCreateInfo	queueInfos[] =
@@ -1864,6 +1850,7 @@ Move<VkDevice> createDeviceWithWsi(const PlatformInterface&		vkp,
 	deMemset(&features, 0x0, sizeof(features));
 
 	const char* const				extensions[] = { "VK_KHR_swapchain", "VK_KHR_swapchain_mutable_format" };
+
 	const VkDeviceCreateInfo		deviceParams =
 	{
 		VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
@@ -1884,7 +1871,7 @@ Move<VkDevice> createDeviceWithWsi(const PlatformInterface&		vkp,
 			TCU_THROW(NotSupportedError, (string(extensions[ndx]) + " is not supported").c_str());
 	}
 
-	return createDevice(vkp, instance, vki, physicalDevice, &deviceParams, pAllocator);
+	return createCustomDevice(enableValidation, vkp, instance, vki, physicalDevice, &deviceParams, pAllocator);
 }
 
 deUint32 getNumQueueFamilyIndices(const InstanceInterface& vki, VkPhysicalDevice physicalDevice)
@@ -1923,18 +1910,17 @@ deUint32 chooseQueueFamilyIndex(const InstanceInterface& vki, VkPhysicalDevice p
 struct InstanceHelper
 {
 	const vector<VkExtensionProperties>	supportedExtensions;
-	const Unique<VkInstance>			instance;
-	const InstanceDriver				vki;
+	const CustomInstance				instance;
+	const InstanceDriver&				vki;
 
 	InstanceHelper(Context& context, Type wsiType, const VkAllocationCallbacks* pAllocator = DE_NULL)
 		: supportedExtensions(enumerateInstanceExtensionProperties(context.getPlatformInterface(),
 			DE_NULL))
-		, instance(createInstanceWithWsi(context.getPlatformInterface(),
-			context.getUsedApiVersion(),
+		, instance(createInstanceWithWsi(context,
 			supportedExtensions,
 			wsiType,
 			pAllocator))
-		, vki(context.getPlatformInterface(), *instance)
+		, vki(instance.getDriver())
 	{}
 };
 
@@ -1960,7 +1946,8 @@ struct DeviceHelper
 			physicalDevice,
 			enumerateDeviceExtensionProperties(vki, physicalDevice, DE_NULL),
 			queueFamilyIndex,
-			pAllocator))
+			pAllocator,
+			context.getTestContext().getCommandLine().isValidationEnabled()))
 		, vkd(context.getPlatformInterface(), context.getInstance(), *device)
 		, queue(getDeviceQueue(vkd, *device, queueFamilyIndex, 0))
 	{
@@ -2079,21 +2066,15 @@ tcu::TestStatus testSwapchainMutable(Context& context, CaseDef caseDef)
 	const tcu::UVec2				desiredSize(256, 256);
 	const InstanceHelper			instHelper(context, wsiType);
 	const NativeObjects				native(context, instHelper.supportedExtensions, wsiType, tcu::just(desiredSize));
-	const Unique<VkSurfaceKHR>		surface(createSurface(instHelper.vki, *instHelper.instance, wsiType, *native.display, *native.window));
-	const DeviceHelper				devHelper(context, instHelper.vki, *instHelper.instance, *surface);
+	const Unique<VkSurfaceKHR>		surface(createSurface(instHelper.vki, instHelper.instance, wsiType, *native.display, *native.window));
+	const DeviceHelper				devHelper(context, instHelper.vki, instHelper.instance, *surface);
 	const DeviceInterface&			vk = devHelper.vkd;
 	const InstanceDriver&			vki = instHelper.vki;
 	const VkDevice					device = *devHelper.device;
 	const VkPhysicalDevice			physDevice = devHelper.physicalDevice;
+	SimpleAllocator					allocator(vk, device, getPhysicalDeviceMemoryProperties(vki, context.getPhysicalDevice()));
 
-	SimpleAllocator				allocator(vk, device, getPhysicalDeviceMemoryProperties(vki, context.getPhysicalDevice()));
-
-	// Check required features on the format for the required upload/download methods
-	VkFormatProperties	imageFormatProps, viewFormatProps;
-	vki.getPhysicalDeviceFormatProperties(physDevice, caseDef.imageFormat, &imageFormatProps);
-	vki.getPhysicalDeviceFormatProperties(physDevice, caseDef.viewFormat, &viewFormatProps);
-
-	const VkImageUsageFlags				imageUsage = getImageUsageForTestCase(caseDef);
+	const VkImageUsageFlags			imageUsage = getImageUsageForTestCase(caseDef);
 
 	{
 		VkImageFormatProperties properties;
@@ -2122,12 +2103,12 @@ tcu::TestStatus testSwapchainMutable(Context& context, CaseDef caseDef)
 		caseDef.numLayers = capabilities.maxImageArrayLayers;
 
 	// Check support for requested formats by swapchain surface
-	const vector<VkSurfaceFormatKHR>	surfaceFormats = getPhysicalDeviceSurfaceFormats(vki,
-																					 physDevice,
-																					 *surface);
+	const vector<VkSurfaceFormatKHR>surfaceFormats = getPhysicalDeviceSurfaceFormats(vki,
+																						 physDevice,
+																						 *surface);
 
-	const VkSurfaceFormatKHR*			surfaceFormat = DE_NULL;
-	const VkFormat*						viewFormat = DE_NULL;
+	const VkSurfaceFormatKHR*		surfaceFormat = DE_NULL;
+	const VkFormat*					viewFormat = DE_NULL;
 
 	for (vector<VkSurfaceFormatKHR>::size_type i = 0; i < surfaceFormats.size(); i++)
 	{
@@ -2162,74 +2143,6 @@ tcu::TestStatus testSwapchainMutable(Context& context, CaseDef caseDef)
 			2)
 		);
 	const vector<VkImage>			swapchainImages = getSwapchainImages(vk, device, *swapchain);
-
-	VkFormatFeatureFlags			viewFormatFeatureFlags = 0u;
-	switch (caseDef.upload)
-	{
-	case UPLOAD_DRAW:
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT;
-		break;
-	case UPLOAD_STORE:
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
-		break;
-	case UPLOAD_CLEAR:
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-		break;
-	case UPLOAD_COPY:
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-		break;
-	default:
-		DE_FATAL("Invalid upload method");
-		break;
-	}
-	switch (caseDef.download)
-	{
-	case DOWNLOAD_TEXTURE:
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT;
-		// For the texture case we write the samples read to a separate output image with the same view format
-		// so we need to check that we can also use the view format for storage
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
-		break;
-	case DOWNLOAD_LOAD:
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT;
-		break;
-	case DOWNLOAD_COPY:
-		viewFormatFeatureFlags |= VK_FORMAT_FEATURE_TRANSFER_DST_BIT;
-		break;
-	default:
-		DE_FATAL("Invalid download method");
-		break;
-	}
-
-	if ((viewFormatFeatureFlags & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT) &&
-		isStorageImageExtendedFormat(caseDef.viewFormat) &&
-		!getPhysicalDeviceFeatures(vki, physDevice).shaderStorageImageExtendedFormats)
-	{
-		TCU_THROW(NotSupportedError, "View format requires shaderStorageImageExtended");
-	}
-
-	if ((viewFormatProps.optimalTilingFeatures & viewFormatFeatureFlags) != viewFormatFeatureFlags)
-		TCU_THROW(NotSupportedError, "View format doesn't support upload/download method");
-
-	const bool haveMaintenance2 = isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance2");
-
-	// We don't use the base image for anything other than transfer
-	// operations so there are no features to check.  However, The Vulkan
-	// 1.0 spec does not allow us to create an image view with usage that
-	// is not supported by the main format.  With VK_KHR_maintenance2, we
-	// can do this via VK_IMAGE_CREATE_EXTENDED_USAGE_BIT_KHR.
-	if ((imageFormatProps.optimalTilingFeatures & viewFormatFeatureFlags) != viewFormatFeatureFlags &&
-		!haveMaintenance2)
-	{
-		TCU_THROW(NotSupportedError, "Image format doesn't support upload/download method");
-	}
-
-	// If no format feature flags are supported, the format itself is not supported,
-	// and images of that format cannot be created.
-	if (imageFormatProps.optimalTilingFeatures == 0)
-	{
-		TCU_THROW(NotSupportedError, "Base image format is not supported");
-	}
 
 	// Create a color buffer for host-inspection of results
 	// For the Copy download method, this is the target of the download, for other
@@ -2317,7 +2230,7 @@ tcu::TestCaseGroup* createSwapchainImageMutableTests(TestContext& testCtx)
 								std::string caseName = getFormatShortString(s_swapchainFormats[imageFormatNdx]) + "_" + getFormatShortString(s_swapchainFormats[viewFormatNdx]) +
 									"_" + getUploadString(upload) + "_" + getDownloadString(download) + "_format_list";
 
-								addFunctionCaseWithPrograms(groupByImageViewType.get(), caseName, "", initPrograms, testSwapchainMutable, caseDef);
+								addFunctionCaseWithPrograms(groupByImageViewType.get(), caseName, "", checkSupport, initPrograms, testSwapchainMutable, caseDef);
 							}
 						}
 					}

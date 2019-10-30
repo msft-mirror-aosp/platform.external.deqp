@@ -1,7 +1,7 @@
 /* WARNING: This is auto-generated file. Do not modify, since changes will
  * be lost! Modify the generating script instead.
  *
- * Generated from Khronos GL API description (gl.xml) revision acc85f4b76949b015c0354bd8c20a1076a49b1cf.
+ * Generated from Khronos GL API description (gl.xml) revision 9d534f9312e56c72df763207e449c6719576fd54.
  */
 
 if (de::contains(extSet, "GL_KHR_blend_equation_advanced"))
@@ -122,7 +122,7 @@ if (de::contains(extSet, "GL_EXT_texture_border_clamp"))
 if (de::contains(extSet, "GL_EXT_multisampled_render_to_texture"))
 {
 	gl->framebufferTexture2DMultisampleEXT	= (glFramebufferTexture2DMultisampleEXTFunc)	loader->get("glFramebufferTexture2DMultisampleEXT");
-	gl->renderbufferStorageMultisampleEXT	= (glRenderbufferStorageMultisampleEXTFunc)		loader->get("glRenderbufferStorageMultisampleEXT");
+	gl->renderbufferStorageMultisample		= (glRenderbufferStorageMultisampleFunc)		loader->get("glRenderbufferStorageMultisampleEXT");
 }
 
 if (de::contains(extSet, "GL_EXT_debug_marker"))

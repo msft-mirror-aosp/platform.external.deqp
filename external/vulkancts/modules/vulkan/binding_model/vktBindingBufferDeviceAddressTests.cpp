@@ -175,7 +175,7 @@ void BufferAddressTestCase::checkSupport (Context& context) const
 
 #if ENABLE_RAYTRACING
 	if (m_data.stage == STAGE_RAYGEN &&
-		!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_NV_ray_tracing"))
+		!context.isDeviceFunctionalitySupported("VK_NV_ray_tracing"))
 	{
 		TCU_THROW(NotSupportedError, "Ray tracing not supported");
 	}
@@ -439,21 +439,6 @@ VkBufferCreateInfo makeBufferCreateInfo (const void*				pNext,
 	return bufferCreateInfo;
 }
 
-VkBufferImageCopy makeBufferImageCopy (const VkExtent3D					extent,
-									   const VkImageSubresourceLayers	subresourceLayers)
-{
-	const VkBufferImageCopy copyParams =
-	{
-		0ull,										//	VkDeviceSize				bufferOffset;
-		0u,											//	deUint32					bufferRowLength;
-		0u,											//	deUint32					bufferImageHeight;
-		subresourceLayers,							//	VkImageSubresourceLayers	imageSubresource;
-		makeOffset3D(0, 0, 0),						//	VkOffset3D					imageOffset;
-		extent,										//	VkExtent3D					imageExtent;
-	};
-	return copyParams;
-}
-
 tcu::TestStatus BufferAddressTestInstance::iterate (void)
 {
 	const DeviceInterface&	vk						= m_context.getDeviceInterface();
@@ -481,7 +466,7 @@ tcu::TestStatus BufferAddressTestInstance::iterate (void)
 	deMemset(&rayTracingProperties, 0, sizeof(rayTracingProperties));
 	rayTracingProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PROPERTIES_NV;
 
-	if (isDeviceExtensionSupported(m_context.getUsedApiVersion(), m_context.getDeviceExtensions(), "VK_NV_ray_tracing"))
+	if (m_context.isDeviceFunctionalitySupported("VK_NV_ray_tracing"))
 	{
 		properties.pNext = &rayTracingProperties;
 	}

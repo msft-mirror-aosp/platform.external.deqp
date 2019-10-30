@@ -5628,10 +5628,11 @@ public:
 		ReadPixelsFloat<api>(0, 0, getWindowWidth(), getWindowHeight() / 4, &bufferTest1[0]);
 		result.sub_result(BuffersCompare(bufferTest1, getWindowWidth(), getWindowHeight() / 4, bufferRef1,
 										 getWindowWidth(), getWindowHeight() / 4));
-
-		ReadPixelsFloat<api>(0, (getWindowHeight() + 3) / 4, getWindowWidth(), getWindowHeight() / 2, &bufferTest2[0]);
+		// height = 2 * (getWindowHeight() / 4)  to avoid border pixels
+		// in case the height is not a multiple of 4.
+		ReadPixelsFloat<api>(0, (getWindowHeight() + 3) / 4, getWindowWidth(), 2 * (getWindowHeight() / 4), &bufferTest2[0]);
 		result.sub_result(BuffersCompare(bufferTest2, getWindowWidth(), getWindowHeight() / 2, bufferRef2,
-										 getWindowWidth(), getWindowHeight() / 2));
+										 getWindowWidth(), 2 *(getWindowHeight() / 4)));
 
 		ReadPixelsFloat<api>(0, (getWindowHeight() * 3 + 3) / 4, getWindowWidth(), getWindowHeight() / 4,
 							 &bufferTest1[0]);
@@ -5779,13 +5780,15 @@ class CNonZeroReservedMustBeZeroArray : public DrawIndirectBase
 
 		glDrawArraysIndirect(GL_TRIANGLES, 0);
 
-		CColorArray bufferRef(getWindowWidth() * getWindowHeight(), tcu::Vec4(0.1f, 0.2f, 0.3f, 1.0f));
-		CColorArray bufferTest(getWindowWidth() * getWindowHeight(), tcu::Vec4(0.0f));
-
 		DIResult result;
-		ReadPixelsFloat<api>(0, 0, getWindowWidth(), getWindowHeight(), &bufferTest[0]);
-		result.sub_result(BuffersCompare(bufferTest, getWindowWidth(), getWindowHeight(), bufferRef, getWindowWidth(),
-										 getWindowHeight()));
+		if (glGetError() == GL_NO_ERROR)
+		{
+			//No GL error: undefined
+		}
+		else
+		{
+			result.error() << "Invalid error code returned by a driver";
+		}
 
 		return result.code();
 	}
@@ -5881,13 +5884,15 @@ struct CNonZeroReservedMustBeZeroElements : public DrawIndirectBase
 
 		glDrawElementsIndirect(GL_TRIANGLES, GL_UNSIGNED_INT, 0);
 
-		CColorArray bufferRef(getWindowWidth() * getWindowHeight(), tcu::Vec4(0.1f, 0.2f, 0.3f, 1.0f));
-		CColorArray bufferTest(getWindowWidth() * getWindowHeight(), tcu::Vec4(0.0f));
-
 		DIResult result;
-		ReadPixelsFloat<api>(0, 0, getWindowWidth(), getWindowHeight(), &bufferTest[0]);
-		result.sub_result(BuffersCompare(bufferTest, getWindowWidth(), getWindowHeight(), bufferRef, getWindowWidth(),
-										 getWindowHeight()));
+		if (glGetError() == GL_NO_ERROR)
+		{
+			//No GL error: undefined
+		}
+		else
+		{
+			result.error() << "Invalid error code returned by a driver";
+		}
 
 		return result.code();
 	}
@@ -7167,7 +7172,7 @@ public:
 		indirectArrays.count					 = static_cast<GLuint>(coords.size());
 		indirectArrays.primCount				 = 1;
 		indirectArrays.first					 = 0;
-		indirectArrays.reservedMustBeZero		 = 2312;
+		indirectArrays.reservedMustBeZero		 = 0;
 
 		glGenBuffers(1, &_bufferIndirect);
 		glBindBuffer(GL_DRAW_INDIRECT_BUFFER, _bufferIndirect);

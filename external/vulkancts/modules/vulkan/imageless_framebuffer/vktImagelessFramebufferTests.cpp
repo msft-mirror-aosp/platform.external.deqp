@@ -342,8 +342,8 @@ Move<VkRenderPass> makeRenderPass (const DeviceInterface&				vk,
 		{
 			VK_STRUCTURE_TYPE_SUBPASS_DESCRIPTION_DEPTH_STENCIL_RESOLVE_KHR,	//  VkStructureType						sType;
 			DE_NULL,															//  const void*							pNext;
-			VK_RESOLVE_MODE_AVERAGE_BIT_KHR,									//  VkResolveModeFlagBitsKHR			depthResolveMode;
-			VK_RESOLVE_MODE_MAX_BIT_KHR,										//  VkResolveModeFlagBitsKHR			stencilResolveMode;
+			VK_RESOLVE_MODE_SAMPLE_ZERO_BIT_KHR,								//  VkResolveModeFlagBitsKHR			depthResolveMode;
+			VK_RESOLVE_MODE_SAMPLE_ZERO_BIT_KHR,								//  VkResolveModeFlagBitsKHR			stencilResolveMode;
 			&depthStencilResolveAttachmentRef2									//  const VkAttachmentReference2KHR*	pDepthStencilResolveAttachment;
 		};
 		const VkSubpassDescription2KHR						subpassDescription2						=
@@ -779,45 +779,6 @@ VkBufferMemoryBarrier makeBufferMemoryBarrier (const VkAccessFlags	srcAccessMask
 	return barrier;
 }
 
-VkBufferImageCopy makeBufferImageCopy (const VkExtent3D					extent,
-									   const VkImageSubresourceLayers	subresourceLayers)
-{
-	const VkBufferImageCopy copyParams =
-	{
-		0ull,										//	VkDeviceSize				bufferOffset;
-		0u,											//	deUint32					bufferRowLength;
-		0u,											//	deUint32					bufferImageHeight;
-		subresourceLayers,							//	VkImageSubresourceLayers	imageSubresource;
-		makeOffset3D(0, 0, 0),						//	VkOffset3D					imageOffset;
-		extent,										//	VkExtent3D					imageExtent;
-	};
-	return copyParams;
-}
-
-inline Move<VkBuffer> makeBuffer (const DeviceInterface& vk, const VkDevice device, const VkBufferCreateInfo& createInfo)
-{
-	return createBuffer(vk, device, &createInfo);
-}
-
-inline Move<VkImage> makeImage (const DeviceInterface& vk, const VkDevice device, const VkImageCreateInfo& createInfo)
-{
-	return createImage(vk, device, &createInfo);
-}
-
-MovePtr<Allocation> bindImage (const DeviceInterface& vk, const VkDevice device, Allocator& allocator, const VkImage image, const MemoryRequirement requirement)
-{
-	MovePtr<Allocation> alloc = allocator.allocate(getImageMemoryRequirements(vk, device, image), requirement);
-	VK_CHECK(vk.bindImageMemory(device, image, alloc->getMemory(), alloc->getOffset()));
-	return alloc;
-}
-
-MovePtr<Allocation> bindBuffer (const DeviceInterface& vk, const VkDevice device, Allocator& allocator, const VkBuffer buffer, const MemoryRequirement requirement)
-{
-	MovePtr<Allocation> alloc(allocator.allocate(getBufferMemoryRequirements(vk, device, buffer), requirement));
-	VK_CHECK(vk.bindBufferMemory(device, buffer, alloc->getMemory(), alloc->getOffset()));
-	return alloc;
-}
-
 Move<VkSampler> makeSampler (const DeviceInterface& vk, const VkDevice& device)
 {
 	const VkSamplerCreateInfo createInfo =
@@ -992,7 +953,7 @@ protected:
 
 ColorImagelessTestInstance::ColorImagelessTestInstance (Context& context, const TestParameters& parameters)
 	: TestInstance				(context)
-	, m_extensions				(context.requireDeviceExtension("VK_KHR_imageless_framebuffer"))
+	, m_extensions				(context.requireDeviceFunctionality("VK_KHR_imageless_framebuffer"))
 	, m_imageExtent2D			(makeExtent2D(32u, 32u))
 	, m_parameters				(parameters)
 	, m_colorImageUsage			(VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT)
@@ -1067,7 +1028,7 @@ void ColorImagelessTestInstance::readOneSampleFromMultisampleImage (const VkForm
 	const std::vector<float>			vertexArray			(getFullQuadVertices());
 	const deUint32						vertexCount			(static_cast<deUint32>(vertexArray.size() / 4u));
 	const VkDeviceSize					vertexArraySize		(vertexArray.size() * sizeof(vertexArray[0]));
-	const Unique<VkBuffer>				vertexBuffer		(makeBuffer				(vk, device, makeBufferCreateInfo(vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)));
+	const Unique<VkBuffer>				vertexBuffer		(makeBuffer				(vk, device, vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 	const UniquePtr<Allocation>			vertexBufferAlloc	(bindBuffer				(vk, device, allocator, *vertexBuffer, MemoryRequirement::HostVisible));
 	const VkDeviceSize					vertexBufferOffset	(0u);
 
@@ -1245,7 +1206,7 @@ tcu::TestStatus ColorImagelessTestInstance::iterate (void)
 	const Unique<VkImage>			colorImage			(makeImage				(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 	const UniquePtr<Allocation>		colorImageAlloc		(bindImage				(vk, device, allocator, *colorImage, MemoryRequirement::Any));
 	const Unique<VkImageView>		colorAttachment		(makeImageView			(vk, device, *colorImage, VK_IMAGE_VIEW_TYPE_2D, colorFormat, colorSubresRange));
-	const Unique<VkBuffer>			colorBuffer			(makeBuffer				(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			colorBuffer			(makeBuffer				(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		colorBufferAlloc	(bindBuffer				(vk, device, allocator, *colorBuffer, MemoryRequirement::HostVisible));
 
 	const Unique<VkShaderModule>	vertModule			(createShaderModule		(vk, device, m_context.getBinaryCollection().get("vert"), 0u));
@@ -1260,7 +1221,7 @@ tcu::TestStatus ColorImagelessTestInstance::iterate (void)
 	const std::vector<float>		vertexArray			(getVertices());
 	const deUint32					vertexCount			(static_cast<deUint32>(vertexArray.size() / 4u));
 	const VkDeviceSize				vertexArraySize		(vertexArray.size() * sizeof(vertexArray[0]));
-	const Unique<VkBuffer>			vertexBuffer		(makeBuffer				(vk, device, makeBufferCreateInfo(vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)));
+	const Unique<VkBuffer>			vertexBuffer		(makeBuffer				(vk, device, vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 	const UniquePtr<Allocation>		vertexBufferAlloc	(bindBuffer				(vk, device, allocator, *vertexBuffer, MemoryRequirement::HostVisible));
 	const VkDeviceSize				vertexBufferOffset	(0u);
 
@@ -1457,7 +1418,7 @@ tcu::TestStatus DepthImagelessTestInstance::iterate (void)
 	const Unique<VkImage>			colorImage			(makeImage				(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 	const UniquePtr<Allocation>		colorImageAlloc		(bindImage				(vk, device, allocator, *colorImage, MemoryRequirement::Any));
 	const Unique<VkImageView>		colorAttachment		(makeImageView			(vk, device, *colorImage, VK_IMAGE_VIEW_TYPE_2D, colorFormat, colorSubresRange));
-	const Unique<VkBuffer>			colorBuffer			(makeBuffer				(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			colorBuffer			(makeBuffer				(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		colorBufferAlloc	(bindBuffer				(vk, device, allocator, *colorBuffer, MemoryRequirement::HostVisible));
 
 	const float						clearDepth			= 1.0f;
@@ -1475,9 +1436,9 @@ tcu::TestStatus DepthImagelessTestInstance::iterate (void)
 	const Unique<VkImage>			dsImage				(makeImage				(vk, device, makeImageCreateInfo(dsFormat, m_imageExtent2D, m_dsImageUsage)));
 	const UniquePtr<Allocation>		dsImageAlloc		(bindImage				(vk, device, allocator, *dsImage, MemoryRequirement::Any));
 	const Unique<VkImageView>		dsAttachment		(makeImageView			(vk, device, *dsImage, VK_IMAGE_VIEW_TYPE_2D, dsFormat, dsSubresRange));
-	const Unique<VkBuffer>			depthBuffer			(makeBuffer				(vk, device, makeBufferCreateInfo(depthBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			depthBuffer			(makeBuffer				(vk, device, depthBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		depthBufferAlloc	(bindBuffer				(vk, device, allocator, *depthBuffer, MemoryRequirement::HostVisible));
-	const Unique<VkBuffer>			stencilBuffer		(makeBuffer				(vk, device, makeBufferCreateInfo(stencilBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			stencilBuffer		(makeBuffer				(vk, device, stencilBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		stencilBufferAlloc	(bindBuffer				(vk, device, allocator, *stencilBuffer, MemoryRequirement::HostVisible));
 
 	const Unique<VkShaderModule>	vertModule			(createShaderModule		(vk, device, m_context.getBinaryCollection().get("vert"), 0u));
@@ -1492,7 +1453,7 @@ tcu::TestStatus DepthImagelessTestInstance::iterate (void)
 	const std::vector<float>		vertexArray			(getVertices());
 	const deUint32					vertexCount			(static_cast<deUint32>(vertexArray.size() / 4u));
 	const VkDeviceSize				vertexArraySize		(vertexArray.size() * sizeof(vertexArray[0]));
-	const Unique<VkBuffer>			vertexBuffer		(makeBuffer				(vk, device, makeBufferCreateInfo(vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)));
+	const Unique<VkBuffer>			vertexBuffer		(makeBuffer				(vk, device, vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 	const UniquePtr<Allocation>		vertexBufferAlloc	(bindBuffer				(vk, device, allocator, *vertexBuffer, MemoryRequirement::HostVisible));
 	const VkDeviceSize				vertexBufferOffset	(0u);
 
@@ -1619,7 +1580,7 @@ MovePtr<tcu::TextureLevel> ColorResolveImagelessTestInstance::generateReferenceI
 	const tcu::Vec4				colorEdge1		(colorFill);
 	const tcu::Vec4				colorEdge2		(colorDraw);
 	const tcu::Vec4				colorEdge3		(colorFill);
-	const tcu::Vec4				colorEdgeR		((colorDraw.x() + colorFill.x()) / 2, (colorDraw.y() + colorFill.y()) / 2, (colorDraw.z() + colorFill.z()) / 2, colorDraw.w());
+	const tcu::Vec4				colorEdgeR		((colorDraw.x() + colorFill.x()) / 2, (colorDraw.y() + colorFill.y()) / 2, (colorDraw.z() + colorFill.z()) / 2, colorDraw.w()); // AVERAGE
 	const tcu::Vec4&			colorEdge		= sample == 0 ? colorEdge0
 												: sample == 1 ? colorEdge1
 												: sample == 2 ? colorEdge2
@@ -1680,7 +1641,7 @@ tcu::TestStatus ColorResolveImagelessTestInstance::iterate (void)
 	const Unique<VkImage>			colorResolveImage		(makeImage				(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 	const UniquePtr<Allocation>		colorResolveImageAlloc	(bindImage				(vk, device, allocator, *colorResolveImage, MemoryRequirement::Any));
 	const Unique<VkImageView>		colorResolveAttachment	(makeImageView			(vk, device, *colorResolveImage, VK_IMAGE_VIEW_TYPE_2D, colorFormat, colorSubresRange));
-	const Unique<VkBuffer>			colorResolveBuffer		(makeBuffer				(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			colorResolveBuffer		(makeBuffer				(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		colorResolveBufferAlloc	(bindBuffer				(vk, device, allocator, *colorResolveBuffer, MemoryRequirement::HostVisible));
 
 	const Unique<VkShaderModule>	vertModule				(createShaderModule		(vk, device, m_context.getBinaryCollection().get("vert"), 0u));
@@ -1695,7 +1656,7 @@ tcu::TestStatus ColorResolveImagelessTestInstance::iterate (void)
 	const std::vector<float>		vertexArray				(getVertices());
 	const deUint32					vertexCount				(static_cast<deUint32>(vertexArray.size() / 4u));
 	const VkDeviceSize				vertexArraySize			(vertexArray.size() * sizeof(vertexArray[0]));
-	const Unique<VkBuffer>			vertexBuffer			(makeBuffer				(vk, device, makeBufferCreateInfo(vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)));
+	const Unique<VkBuffer>			vertexBuffer			(makeBuffer				(vk, device, vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 	const UniquePtr<Allocation>		vertexBufferAlloc		(bindBuffer				(vk, device, allocator, *vertexBuffer, MemoryRequirement::HostVisible));
 	const VkDeviceSize				vertexBufferOffset		(0u);
 
@@ -1751,7 +1712,7 @@ tcu::TestStatus ColorResolveImagelessTestInstance::iterate (void)
 			const std::string				name				("Color" + de::toString(sampleNdx));
 			const Unique<VkImage>			imageSample			(makeImage	(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 			const UniquePtr<Allocation>		imageSampleAlloc	(bindImage	(vk, device, allocator, *imageSample, MemoryRequirement::Any));
-			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 			const UniquePtr<Allocation>		imageBufferAlloc	(bindBuffer	(vk, device, allocator, *imageBuffer, MemoryRequirement::HostVisible));
 
 			readOneSampleFromMultisampleImage(colorFormat, colorImage, sampleNdx, colorFormat, imageSample, imageBuffer, ASPECT_COLOR);
@@ -1787,7 +1748,7 @@ protected:
 DepthResolveImagelessTestInstance::DepthResolveImagelessTestInstance (Context& context, const TestParameters& parameters)
 	: DepthImagelessTestInstance	(context, parameters)
 {
-	context.requireDeviceExtension("VK_KHR_depth_stencil_resolve");
+	context.requireDeviceFunctionality("VK_KHR_depth_stencil_resolve");
 
 	const InstanceInterface&							vki					= m_context.getInstanceInterface();
 	const VkPhysicalDevice								physDevice			= m_context.getPhysicalDevice();
@@ -1804,12 +1765,6 @@ DepthResolveImagelessTestInstance::DepthResolveImagelessTestInstance (Context& c
 	dsResolveProperties.pNext = DE_NULL;
 
 	vki.getPhysicalDeviceProperties2(physDevice, &deviceProperties);
-
-	if ((dsResolveProperties.supportedDepthResolveModes & VK_RESOLVE_MODE_AVERAGE_BIT_KHR) == 0)
-		TCU_THROW(NotSupportedError, "Depth resolve does not support required VK_RESOLVE_MODE_AVERAGE_BIT_KHR");
-
-	if ((dsResolveProperties.supportedStencilResolveModes & VK_RESOLVE_MODE_MAX_BIT_KHR) == 0)
-		TCU_THROW(NotSupportedError, "Stencil resolve does not support required VK_RESOLVE_MODE_MAX_BIT_KHR");
 
 	m_colorImageUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
 
@@ -1844,7 +1799,7 @@ MovePtr<tcu::TextureLevel> DepthResolveImagelessTestInstance::generateReferenceI
 		const tcu::Vec4		colorEdge1	(colorFill);
 		const tcu::Vec4		colorEdge2	(colorDraw);
 		const tcu::Vec4		colorEdge3	(colorFill);
-		const tcu::Vec4		colorEdgeR	((colorDraw.x() + colorFill.x()) / 2, (colorDraw.y() + colorFill.y()) / 2, (colorDraw.z() + colorFill.z()) / 2, colorDraw.w());
+		const tcu::Vec4		colorEdgeR	((colorDraw.x() + colorFill.x()) / 2, (colorDraw.y() + colorFill.y()) / 2, (colorDraw.z() + colorFill.z()) / 2, colorDraw.w()); // AVERAGE
 		const tcu::Vec4&	colorEdge	= sample == 0 ? colorEdge0
 										: sample == 1 ? colorEdge1
 										: sample == 2 ? colorEdge2
@@ -1867,14 +1822,13 @@ MovePtr<tcu::TextureLevel> DepthResolveImagelessTestInstance::generateReferenceI
 	{
 		const int			colorFillValue	(static_cast<int>(1.00f * 0x100));
 		const int			colorDrawValue	(static_cast<int>(0.00f * 0x100));
-		const int			colorEdgeValue	(static_cast<int>(0.50f * 0x100));
 		const tcu::IVec4	colorFill		(colorFillValue, colorFillValue, colorFillValue, 0xFF);
 		const tcu::IVec4	colorDraw		(colorDrawValue, colorDrawValue, colorDrawValue, 0xFF);
 		const tcu::IVec4	colorEdge0		(colorDraw);
 		const tcu::IVec4	colorEdge1		(colorFill);
 		const tcu::IVec4	colorEdge2		(colorDraw);
 		const tcu::IVec4	colorEdge3		(colorFill);
-		const tcu::IVec4	colorEdgeR		(colorEdgeValue, colorEdgeValue, colorEdgeValue, 0xFF);
+		const tcu::IVec4	colorEdgeR		(colorEdge0); // SAMPLE_ZERO
 		const tcu::IVec4&	colorEdge		= sample == 0 ? colorEdge0
 											: sample == 1 ? colorEdge1
 											: sample == 2 ? colorEdge2
@@ -1897,14 +1851,13 @@ MovePtr<tcu::TextureLevel> DepthResolveImagelessTestInstance::generateReferenceI
 	{
 		const int			colorFillValue	((0 * 0x100) / 4);
 		const int			colorDrawValue	((1 * 0x100) / 4);
-		const int			colorEdgeValue	((1 * 0x100) / 4);
 		const tcu::IVec4	colorFill		(colorFillValue, colorFillValue, colorFillValue, 0xFF);
 		const tcu::IVec4	colorDraw		(colorDrawValue, colorDrawValue, colorDrawValue, 0xFF);
 		const tcu::IVec4	colorEdge0		(colorDraw);
 		const tcu::IVec4	colorEdge1		(colorFill);
 		const tcu::IVec4	colorEdge2		(colorDraw);
 		const tcu::IVec4	colorEdge3		(colorFill);
-		const tcu::IVec4	colorEdgeR		(colorEdgeValue, colorEdgeValue, colorEdgeValue, 0xFF);
+		const tcu::IVec4	colorEdgeR		(colorEdge0); // SAMPLE_ZERO
 		const tcu::IVec4&	colorEdge		= sample == 0 ? colorEdge0
 											: sample == 1 ? colorEdge1
 											: sample == 2 ? colorEdge2
@@ -1964,7 +1917,7 @@ tcu::TestStatus DepthResolveImagelessTestInstance::iterate (void)
 	const Unique<VkImage>			colorResolveImage			(makeImage				(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 	const UniquePtr<Allocation>		colorResolveImageAlloc		(bindImage				(vk, device, allocator, *colorResolveImage, MemoryRequirement::Any));
 	const Unique<VkImageView>		colorResolveAttachment		(makeImageView			(vk, device, *colorResolveImage, VK_IMAGE_VIEW_TYPE_2D, colorFormat, colorSubresRange));
-	const Unique<VkBuffer>			colorResolveBuffer			(makeBuffer				(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			colorResolveBuffer			(makeBuffer				(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		colorResolveBufferAlloc		(bindBuffer				(vk, device, allocator, *colorResolveBuffer, MemoryRequirement::HostVisible));
 
 	const float						clearDepth					= 1.0f;
@@ -1986,9 +1939,9 @@ tcu::TestStatus DepthResolveImagelessTestInstance::iterate (void)
 	const Unique<VkImage>			dsResolveImage				(makeImage				(vk, device, makeImageCreateInfo(dsFormat, m_imageExtent2D, m_dsImageUsage)));
 	const UniquePtr<Allocation>		dsResolveImageAlloc			(bindImage				(vk, device, allocator, *dsResolveImage, MemoryRequirement::Any));
 	const Unique<VkImageView>		dsResolveAttachment			(makeImageView			(vk, device, *dsResolveImage, VK_IMAGE_VIEW_TYPE_2D, dsFormat, dsSubresRange));
-	const Unique<VkBuffer>			depthResolveBuffer			(makeBuffer				(vk, device, makeBufferCreateInfo(depthBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			depthResolveBuffer			(makeBuffer				(vk, device, depthBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		depthResolveBufferAlloc		(bindBuffer				(vk, device, allocator, *depthResolveBuffer, MemoryRequirement::HostVisible));
-	const Unique<VkBuffer>			stencilResolveBuffer		(makeBuffer				(vk, device, makeBufferCreateInfo(stencilBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>			stencilResolveBuffer		(makeBuffer				(vk, device, stencilBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>		stencilResolveBufferAlloc	(bindBuffer				(vk, device, allocator, *stencilResolveBuffer, MemoryRequirement::HostVisible));
 
 	const Unique<VkShaderModule>	vertModule					(createShaderModule		(vk, device, m_context.getBinaryCollection().get("vert"), 0u));
@@ -2003,7 +1956,7 @@ tcu::TestStatus DepthResolveImagelessTestInstance::iterate (void)
 	const std::vector<float>		vertexArray					(getVertices());
 	const deUint32					vertexCount					(static_cast<deUint32>(vertexArray.size() / 4u));
 	const VkDeviceSize				vertexArraySize				(vertexArray.size() * sizeof(vertexArray[0]));
-	const Unique<VkBuffer>			vertexBuffer				(makeBuffer				(vk, device, makeBufferCreateInfo(vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)));
+	const Unique<VkBuffer>			vertexBuffer				(makeBuffer				(vk, device, vertexArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 	const UniquePtr<Allocation>		vertexBufferAlloc			(bindBuffer				(vk, device, allocator, *vertexBuffer, MemoryRequirement::HostVisible));
 	const VkDeviceSize				vertexBufferOffset			(0u);
 
@@ -2086,7 +2039,7 @@ tcu::TestStatus DepthResolveImagelessTestInstance::iterate (void)
 			const std::string				name				("Color" + de::toString(sampleNdx));
 			const Unique<VkImage>			imageSample			(makeImage	(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 			const UniquePtr<Allocation>		imageSampleAlloc	(bindImage	(vk, device, allocator, *imageSample, MemoryRequirement::Any));
-			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 			const UniquePtr<Allocation>		imageBufferAlloc	(bindBuffer	(vk, device, allocator, *imageBuffer, MemoryRequirement::HostVisible));
 
 			readOneSampleFromMultisampleImage(colorFormat, colorImage, sampleNdx, colorFormat, imageSample, imageBuffer, ASPECT_COLOR);
@@ -2101,7 +2054,7 @@ tcu::TestStatus DepthResolveImagelessTestInstance::iterate (void)
 			const std::string				name				("Depth" + de::toString(sampleNdx));
 			const Unique<VkImage>			imageSample			(makeImage	(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 			const UniquePtr<Allocation>		imageSampleAlloc	(bindImage	(vk, device, allocator, *imageSample, MemoryRequirement::Any));
-			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 			const UniquePtr<Allocation>		imageBufferAlloc	(bindBuffer	(vk, device, allocator, *imageBuffer, MemoryRequirement::HostVisible));
 
 			readOneSampleFromMultisampleImage(dsFormat, dsImage, sampleNdx, colorFormat, imageSample, imageBuffer, ASPECT_DEPTH);
@@ -2116,7 +2069,7 @@ tcu::TestStatus DepthResolveImagelessTestInstance::iterate (void)
 			const std::string				name				("Stencil" + de::toString(sampleNdx));
 			const Unique<VkImage>			imageSample			(makeImage	(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage)));
 			const UniquePtr<Allocation>		imageSampleAlloc	(bindImage	(vk, device, allocator, *imageSample, MemoryRequirement::Any));
-			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+			const Unique<VkBuffer>			imageBuffer			(makeBuffer	(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 			const UniquePtr<Allocation>		imageBufferAlloc	(bindBuffer	(vk, device, allocator, *imageBuffer, MemoryRequirement::HostVisible));
 
 			readOneSampleFromMultisampleImage(dsFormat, dsImage, sampleNdx, colorFormat, imageSample, imageBuffer, ASPECT_STENCIL);
@@ -2218,13 +2171,13 @@ tcu::TestStatus MultisubpassTestInstance::iterate (void)
 	const Unique<VkImage>				color0Image			(makeImage				(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)));
 	const UniquePtr<Allocation>			color0ImageAlloc	(bindImage				(vk, device, allocator, *color0Image, MemoryRequirement::Any));
 	const Unique<VkImageView>			color0Attachment	(makeImageView			(vk, device, *color0Image, VK_IMAGE_VIEW_TYPE_2D, colorFormat, colorSubresRange));
-	const Unique<VkBuffer>				color0Buffer		(makeBuffer				(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>				color0Buffer		(makeBuffer				(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>			color0BufferAlloc	(bindBuffer				(vk, device, allocator, *color0Buffer, MemoryRequirement::HostVisible));
 
 	const Unique<VkImage>				color1Image			(makeImage				(vk, device, makeImageCreateInfo(colorFormat, m_imageExtent2D, m_colorImageUsage | VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT)));
 	const UniquePtr<Allocation>			color1ImageAlloc	(bindImage				(vk, device, allocator, *color1Image, MemoryRequirement::Any));
 	const Unique<VkImageView>			color1Attachment	(makeImageView			(vk, device, *color1Image, VK_IMAGE_VIEW_TYPE_2D, colorFormat, colorSubresRange));
-	const Unique<VkBuffer>				color1Buffer		(makeBuffer				(vk, device, makeBufferCreateInfo(colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT)));
+	const Unique<VkBuffer>				color1Buffer		(makeBuffer				(vk, device, colorBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT));
 	const UniquePtr<Allocation>			color1BufferAlloc	(bindBuffer				(vk, device, allocator, *color1Buffer, MemoryRequirement::HostVisible));
 
 	const VkDescriptorType				descriptorType		(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT);
@@ -2259,14 +2212,14 @@ tcu::TestStatus MultisubpassTestInstance::iterate (void)
 	const std::vector<float>			vertex0Array		(getVertices());
 	const deUint32						vertex0Count		(static_cast<deUint32>(vertex0Array.size() / 4u));
 	const VkDeviceSize					vertex0ArraySize	(vertex0Array.size() * sizeof(vertex0Array[0]));
-	const Unique<VkBuffer>				vertex0Buffer		(makeBuffer				(vk, device, makeBufferCreateInfo(vertex0ArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)));
+	const Unique<VkBuffer>				vertex0Buffer		(makeBuffer				(vk, device, vertex0ArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 	const UniquePtr<Allocation>			vertex0BufferAlloc	(bindBuffer				(vk, device, allocator, *vertex0Buffer, MemoryRequirement::HostVisible));
 	const VkDeviceSize					vertex0BufferOffset	(0u);
 
 	const std::vector<float>			vertex1Array		(getFullQuadVertices());
 	const deUint32						vertex1Count		(static_cast<deUint32>(vertex1Array.size() / 4u));
 	const VkDeviceSize					vertex1ArraySize	(vertex1Array.size() * sizeof(vertex1Array[0]));
-	const Unique<VkBuffer>				vertex1Buffer		(makeBuffer				(vk, device, makeBufferCreateInfo(vertex1ArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)));
+	const Unique<VkBuffer>				vertex1Buffer		(makeBuffer				(vk, device, vertex1ArraySize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT));
 	const UniquePtr<Allocation>			vertex1BufferAlloc	(bindBuffer				(vk, device, allocator, *vertex1Buffer, MemoryRequirement::HostVisible));
 	const VkDeviceSize					vertex1BufferOffset	(0u);
 

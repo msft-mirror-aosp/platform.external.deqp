@@ -124,7 +124,7 @@ TYPE_SUBSTITUTIONS		= [
 	("LPCWSTR",		"char*"),
 ]
 
-EXTENSION_POSTFIXES				= ["KHR", "EXT", "NV", "NVX", "KHX", "NN", "MVK", "FUCHSIA", "GGP"]
+EXTENSION_POSTFIXES				= ["KHR", "EXT", "NV", "NVX", "KHX", "NN", "MVK", "FUCHSIA", "GGP", "AMD"]
 EXTENSION_POSTFIXES_STANDARD	= ["KHR"]
 
 def prefixName (prefix, name):
@@ -143,16 +143,16 @@ def prefixName (prefix, name):
 	name = name.replace("TEXTURE_LOD", "TEXTURE_LOD_")
 	name = name.replace("VIEWPORT_W", "VIEWPORT_W_")
 	name = name.replace("_IDPROPERTIES", "_ID_PROPERTIES")
-	name = name.replace("PHYSICAL_DEVICE_FLOAT_16_INT_8_FEATURES", "PHYSICAL_DEVICE_FLOAT16_INT8_FEATURES")
+	name = name.replace("PHYSICAL_DEVICE_SHADER_FLOAT_16_INT_8_FEATURES", "PHYSICAL_DEVICE_SHADER_FLOAT16_INT8_FEATURES")
 	name = name.replace("_PCIBUS_", "_PCI_BUS_")
 	name = name.replace("ASTCD", "ASTC_D")
 	name = name.replace("AABBNV", "AABB_NV")
 	name = name.replace("IMAGE_PIPE", "IMAGEPIPE")
-	name = name.replace("FUNCTIONS_2", "FUNCTIONS2_FEATURES")
 	name = name.replace("SMBUILTINS", "SM_BUILTINS")
 	name = name.replace("ASTCHDRFEATURES", "ASTC_HDR_FEATURES")
 	name = name.replace("UINT_8", "UINT8")
 	name = name.replace("INT_8_", "INT8_")
+	name = name.replace("AABBNV", "AABB_NV")
 
 	return prefix + name
 
@@ -604,10 +604,12 @@ def parseDefinitions (extensionName, src):
 	def skipDefinition (extensionName, definition):
 		if extensionName == None:
 			return True
+		extNameUpper = extensionName.upper()
+		extNameUpper = extNameUpper.replace("VK_INTEL_SHADER_INTEGER_FUNCTIONS2", "VK_INTEL_SHADER_INTEGER_FUNCTIONS_2")
 		# SPEC_VERSION enums
-		if definition[0].startswith(extensionName.upper()) and definition[1].isdigit():
+		if definition[0].startswith(extNameUpper) and definition[1].isdigit():
 			return False
-		if definition[0].startswith(extensionName.upper()):
+		if definition[0].startswith(extNameUpper):
 			return True
 		if definition[1].isdigit():
 			return True
@@ -1537,37 +1539,21 @@ def generateDeviceFeaturesDefs(src):
 	# look for definitions
 	ptrnSType	= r'VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_(\w+)_FEATURES(\w*)\s*='
 	matches		= re.findall(ptrnSType, src, re.M)
-	# remove duplicates
-	i       = 0
-	sType	= 0
-	sSuffix = 1
-	while i < len(matches):
-		j = i + 1
-		while j < len(matches):
-			if matches[i][sType] == matches[j][sType]:
-				if not matches[i][sSuffix]:
-					matches.pop(i)
-					i = i - 1
-					break
-				if not matches[j][sSuffix]:
-					matches.pop(j)
-					j = j - 1
-			j = j + 1
-		i = i + 1
+	matches		= sorted(matches, key=lambda m: m[0])
 	# construct final list
 	defs = []
 	for sType, sSuffix in matches:
 		structName			= re.sub("[_0-9][a-z]", lambda match: match.group(0).upper(), sType.capitalize()).replace('_', '')
-		ptrnStructName		= r'\s*typedef\s+struct\s+(VkPhysicalDevice' + structName + 'Features\w*)'
+		ptrnStructName		= r'\s*typedef\s+struct\s+(VkPhysicalDevice' + structName + 'Features' + sSuffix[1:] + ')'
 		matchStructName		= re.search(ptrnStructName, src, re.M)
 		if matchStructName:
 			# handle special cases
 			if sType == "EXCLUSIVE_SCISSOR":
 				sType = "SCISSOR_EXCLUSIVE"
 			# end handling special cases
-			ptrnExtensionName	= r'^\s*#define\s+(\w+' + sType + '_EXTENSION_NAME).+$'
+			ptrnExtensionName	= r'^\s*#define\s+(\w+' + sSuffix + '_' + sType + '_EXTENSION_NAME).+$'
 			matchExtensionName	= re.search(ptrnExtensionName, src, re.M)
-			ptrnSpecVersion		= r'^\s*#define\s+(\w+' + sType + '_SPEC_VERSION).+$'
+			ptrnSpecVersion		= r'^\s*#define\s+(\w+' + sSuffix + '_' + sType + '_SPEC_VERSION).+$'
 			matchSpecVersion	= re.search(ptrnSpecVersion, src, re.M)
 			defs.append( (sType, sSuffix, matchStructName.group(1), \
 							matchExtensionName.group(0)	if matchExtensionName	else None,
@@ -1655,7 +1641,7 @@ def writeMandatoryFeatures(filename):
 					dictStructs[m[0]].append(allRequirements[0])
 
 	stream.extend(['bool checkMandatoryFeatures(const vkt::Context& context)\n{',
-				   '\tif ( !vk::isInstanceExtensionSupported(context.getUsedApiVersion(), context.getInstanceExtensions(), "VK_KHR_get_physical_device_properties2") )',
+				   '\tif ( !context.isInstanceFunctionalitySupported("VK_KHR_get_physical_device_properties2") )',
 				   '\t\tTCU_THROW(NotSupportedError, "Extension VK_KHR_get_physical_device_properties2 is not present");',
 				   '',
 				   '\tVkPhysicalDevice\t\t\t\t\tphysicalDevice\t\t= context.getPhysicalDevice();',

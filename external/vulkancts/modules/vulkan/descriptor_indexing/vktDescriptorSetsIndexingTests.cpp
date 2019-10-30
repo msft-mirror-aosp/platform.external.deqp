@@ -752,7 +752,8 @@ Move<VkRenderPass> CommonDescriptorInstance::createRenderPass		(const IterateCom
 	DE_UNREF(variables);
 	if ((m_testParams.stageFlags & VK_SHADER_STAGE_VERTEX_BIT) || (m_testParams.stageFlags & VK_SHADER_STAGE_FRAGMENT_BIT))
 	{
-		return vk::makeRenderPass(m_vki, m_vkd, m_colorFormat);
+		// Use VK_ATTACHMENT_LOAD_OP_LOAD to make the utility function select initialLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		return vk::makeRenderPass(m_vki, m_vkd, m_colorFormat, VK_FORMAT_UNDEFINED, VK_ATTACHMENT_LOAD_OP_LOAD);
 	}
 	return Move<VkRenderPass>();
 }
@@ -877,8 +878,22 @@ Move<VkPipeline> CommonDescriptorInstance::createGraphicsPipeline	(VkPipelineLay
 		attributeDescriptions						// pVertexAttributeDescriptions
 	};
 
+	const	VkDynamicState							dynamicStates[]				=
+	{
+		VK_DYNAMIC_STATE_SCISSOR
+	};
+
+	const VkPipelineDynamicStateCreateInfo			dynamicStateCreateInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO,  // sType
+		DE_NULL,											   // pNext
+		0u,													   // flags
+		DE_LENGTH_OF_ARRAY(dynamicStates),					   // dynamicStateCount
+		dynamicStates										   // pDynamicStates
+	};
+
 	const std::vector<VkViewport>	viewports	(1, makeViewport(m_testParams.frameResolution.width, m_testParams.frameResolution.height));
-	const std::vector<VkRect2D>		scissors	(1, makeRect2D(m_testParams.frameResolution.width, m_testParams.frameResolution.height));
+	const std::vector<VkRect2D>		scissors	(1, makeRect2D(0u, 0u));
 
 	DE_ASSERT(m_vertexModule && m_fragmentModule);
 
@@ -897,7 +912,12 @@ Move<VkPipeline> CommonDescriptorInstance::createGraphicsPipeline	(VkPipelineLay
 		VK_PRIMITIVE_TOPOLOGY_POINT_LIST,				// topology
 		0U,												// subpass
 		0U,												// patchControlPoints
-		&vertexInputStateCreateInfo);					// vertexInputStateCreateInfo
+		&vertexInputStateCreateInfo,					// vertexInputStateCreateInfo
+		nullptr,										// rasterizationStateCreateInfo
+		nullptr,										// multisampleStateCreateInfo
+		nullptr,										// depthStencilStateCreateInfo
+		nullptr,										// colorBlendStateCreateInfo
+		&dynamicStateCreateInfo);						// dynamicStateCreateInfo
 }
 
 VkDeviceSize CommonDescriptorInstance::createBuffers				(std::vector<VkDescriptorBufferInfo>&		bufferInfos,
@@ -1201,6 +1221,66 @@ void CommonDescriptorInstance::iterateCommandBegin					(IterateCommonVariables&	
 
 	vk::beginCommandBuffer				(m_vki, *variables.commandBuffer);
 
+	// Clear color attachment, and transition it to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+	if ((m_testParams.stageFlags & VK_SHADER_STAGE_VERTEX_BIT) || (m_testParams.stageFlags & VK_SHADER_STAGE_FRAGMENT_BIT))
+	{
+		const VkImageMemoryBarrier preImageBarrier =
+		{
+			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,				// VkStructureType		sType
+			DE_NULL,											// const void*			pNext
+			0u,													// VkAccessFlags		srcAccessMask
+			VK_ACCESS_TRANSFER_WRITE_BIT,						// VkAccessFlags		dstAccessMask
+			VK_IMAGE_LAYOUT_UNDEFINED,							// VkImageLayout		oldLayout
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,				// VkImageLayout		newLayout
+			VK_QUEUE_FAMILY_IGNORED,							// uint32_t				srcQueueFamilyIndex
+			VK_QUEUE_FAMILY_IGNORED,							// uint32_t				dstQueueFamilyIndex
+			*variables.frameBuffer->image->image,				// VkImage				image
+			{
+				VK_IMAGE_ASPECT_COLOR_BIT,				// VkImageAspectFlags	aspectMask
+				0u,										// uint32_t				baseMipLevel
+				VK_REMAINING_MIP_LEVELS,				// uint32_t				mipLevels,
+				0u,										// uint32_t				baseArray
+				VK_REMAINING_ARRAY_LAYERS,				// uint32_t				arraySize
+			}
+		};
+
+		m_vki.cmdPipelineBarrier(*variables.commandBuffer, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+								(VkDependencyFlags)0,
+								0, (const VkMemoryBarrier*)DE_NULL,
+								0, (const VkBufferMemoryBarrier*)DE_NULL,
+								1, &preImageBarrier);
+
+		const VkClearColorValue	clearColorValue		= makeClearValueColor(m_clearColor).color;
+		m_vki.cmdClearColorImage(*variables.commandBuffer, *variables.frameBuffer->image->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColorValue, 1, &preImageBarrier.subresourceRange);
+
+		const VkImageMemoryBarrier postImageBarrier =
+		{
+			VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,				// VkStructureType		sType
+			DE_NULL,											// const void*			pNext
+			VK_ACCESS_TRANSFER_WRITE_BIT,						// VkAccessFlags		srcAccessMask
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,				// VkAccessFlags		dstAccessMask
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,				// VkImageLayout		oldLayout
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,			// VkImageLayout		newLayout
+			VK_QUEUE_FAMILY_IGNORED,							// uint32_t				srcQueueFamilyIndex
+			VK_QUEUE_FAMILY_IGNORED,							// uint32_t				dstQueueFamilyIndex
+			*variables.frameBuffer->image->image,				// VkImage				image
+			{
+				VK_IMAGE_ASPECT_COLOR_BIT,				// VkImageAspectFlags	aspectMask
+				0u,										// uint32_t				baseMipLevel
+				VK_REMAINING_MIP_LEVELS,				// uint32_t				mipLevels,
+				0u,										// uint32_t				baseArray
+				VK_REMAINING_ARRAY_LAYERS,				// uint32_t				arraySize
+			}
+		};
+
+		m_vki.cmdPipelineBarrier(*variables.commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+								(VkDependencyFlags)0,
+								0, (const VkMemoryBarrier*)DE_NULL,
+								0, (const VkBufferMemoryBarrier*)DE_NULL,
+								1, &postImageBarrier);
+
+	}
+
 	if (m_testParams.calculateInLoop)
 	{
 		deRandom rnd;
@@ -1259,6 +1339,10 @@ tcu::TestStatus	CommonDescriptorInstance::iterate					(void)
 		{
 			v.renderArea.offset.x		= x * m_testParams.frameResolution.width/2;
 			v.renderArea.offset.y		= y * m_testParams.frameResolution.height/2;
+
+			vk::VkRect2D scissor = makeRect2D(v.renderArea.offset.x, v.renderArea.offset.y, v.renderArea.extent.width, v.renderArea.extent.height);
+			m_vki.cmdSetScissor(*v.commandBuffer, 0u, 1u, &scissor);
+
 			vk::beginRenderPass		(m_vki, *v.commandBuffer, *v.renderPass, *v.frameBuffer->buffer, v.renderArea, m_clearColor);
 			m_vki.cmdDraw			(*v.commandBuffer, v.vertexCount, 1u, 0u, 0u);
 			vk::endRenderPass		(m_vki, *v.commandBuffer);
@@ -2147,6 +2231,9 @@ tcu::TestStatus	DynamicBuffersInstance::iterate						(void)
 		v.availableDescriptorCount,				// dynamicOffsetCount
 		dynamicOffsets.data());					// pDynamicOffsets
 
+	vk::VkRect2D scissor = makeRect2D(m_testParams.frameResolution.width, m_testParams.frameResolution.height);
+	m_vki.cmdSetScissor(*v.commandBuffer, 0u, 1u, &scissor);
+
 	vk::beginRenderPass	(m_vki, *v.commandBuffer, *v.renderPass, *v.frameBuffer->buffer, v.renderArea, m_clearColor);
 	m_vki.cmdDraw		(*v.commandBuffer, v.vertexCount, 1, 0, 0);
 	vk::endRenderPass	(m_vki, *v.commandBuffer);
@@ -2296,7 +2383,7 @@ Move<VkRenderPass> InputAttachmentInstance::createRenderPass		(const IterateComm
 		VK_ATTACHMENT_STORE_OP_STORE,				// VkAttachmentStoreOp				storeOp;
 		VK_ATTACHMENT_LOAD_OP_DONT_CARE,			// VkAttachmentLoadOp				stencilLoadOp;
 		VK_ATTACHMENT_STORE_OP_DONT_CARE,			// VkAttachmentStoreOp				stencilStoreOp;
-		VK_IMAGE_LAYOUT_UNDEFINED,					// VkImageLayout					initialLayout;
+		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,	// VkImageLayout					initialLayout;
 		VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,	// VkImageLayout					finalLayout;
 	};
 	const VkAttachmentReference		colorAttachmentRef =
@@ -2938,7 +3025,7 @@ public:
 
 	virtual void checkSupport (vkt::Context& context) const
 	{
-		context.requireDeviceExtension("VK_EXT_descriptor_indexing");
+		context.requireDeviceFunctionality("VK_EXT_descriptor_indexing");
 
 		const vk::VkPhysicalDeviceDescriptorIndexingFeaturesEXT& feats = context.getDescriptorIndexingFeatures();
 

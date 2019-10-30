@@ -557,10 +557,15 @@ std::string getImageTypeName (const ImageType imageType)
 	}
 }
 
+std::string getFormatPrefix (const tcu::TextureFormat& format)
+{
+	return tcu::getTextureChannelClass(format.type) == tcu::TEXTURECHANNELCLASS_UNSIGNED_INTEGER ? "u" :
+		   tcu::getTextureChannelClass(format.type) == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER   ? "i" : "";
+}
+
 std::string getShaderImageType (const tcu::TextureFormat& format, const ImageType imageType, const bool multisample)
 {
-	std::string formatPart = tcu::getTextureChannelClass(format.type) == tcu::TEXTURECHANNELCLASS_UNSIGNED_INTEGER ? "u" :
-							 tcu::getTextureChannelClass(format.type) == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER   ? "i" : "";
+	std::string formatPart = getFormatPrefix(format);
 
 	std::string imageTypePart;
 	if (multisample)
@@ -621,11 +626,15 @@ std::string getShaderImageFormatQualifier (const tcu::TextureFormat& format)
 			case tcu::TextureFormat::HALF_FLOAT:		typePart = "16f";		break;
 
 			case tcu::TextureFormat::UNSIGNED_INT32:	typePart = "32ui";		break;
+			case tcu::TextureFormat::USCALED_INT16:
 			case tcu::TextureFormat::UNSIGNED_INT16:	typePart = "16ui";		break;
+			case tcu::TextureFormat::USCALED_INT8:
 			case tcu::TextureFormat::UNSIGNED_INT8:		typePart = "8ui";		break;
 
 			case tcu::TextureFormat::SIGNED_INT32:		typePart = "32i";		break;
+			case tcu::TextureFormat::SSCALED_INT16:
 			case tcu::TextureFormat::SIGNED_INT16:		typePart = "16i";		break;
+			case tcu::TextureFormat::SSCALED_INT8:
 			case tcu::TextureFormat::SIGNED_INT8:		typePart = "8i";		break;
 
 			case tcu::TextureFormat::UNORM_INT16:		typePart = "16";		break;
@@ -795,7 +804,7 @@ bool isPackedType (const vk::VkFormat format)
 {
 	const tcu::TextureFormat	textureFormat	= mapVkFormat(format);
 
-	DE_STATIC_ASSERT(tcu::TextureFormat::CHANNELTYPE_LAST == 40);
+	DE_STATIC_ASSERT(tcu::TextureFormat::CHANNELTYPE_LAST == 46);
 
 	switch (textureFormat.type)
 	{
@@ -819,6 +828,8 @@ bool isPackedType (const vk::VkFormat format)
 		case tcu::TextureFormat::UNSIGNED_INT_16_8_8:
 		case tcu::TextureFormat::UNSIGNED_INT_24_8:
 		case tcu::TextureFormat::UNSIGNED_INT_24_8_REV:
+		case tcu::TextureFormat::SSCALED_INT_1010102_REV:
+		case tcu::TextureFormat::USCALED_INT_1010102_REV:
 			return true;
 
 		default:

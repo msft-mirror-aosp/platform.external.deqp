@@ -145,7 +145,7 @@ void areFeaturesSupported (const Context& context, deUint32 toCheck)
 	if ((toCheck & EXT16BITSTORAGEFEATURES_INPUT_OUTPUT) != 0 && extensionFeatures.storageInputOutput16 == VK_FALSE)
 		TCU_THROW(NotSupportedError, "Requested 16bit storage features not supported");
 
-	if (!context.getFloat16Int8Features().shaderFloat16)
+	if (!context.getShaderFloat16Int8Features().shaderFloat16)
 		TCU_THROW(NotSupportedError, "Requested 16-bit floats (halfs) are not supported in shader code");
 }
 
@@ -1497,6 +1497,8 @@ public:
 	//! Index of output parameter, or -1 if none of the parameters is output.
 	virtual int			getOutParamIndex		(void)					const { return -1; }
 
+	virtual SpirVCaseT	getSpirvCase			(void)					const { return SPIRV_CASETYPE_NONE; }
+
 	void				printDefinition			(ostream& os)			const
 	{
 		doPrintDefinition(os);
@@ -2302,11 +2304,13 @@ template <class T>
 class Comparison : public InfixOperator < T >
 {
 public:
-	string		getName(void) const { return "comparison"; }
-	string		getSymbol(void) const { return ""; }
+	string		getName			(void) const	{ return "comparison"; }
+	string		getSymbol		(void) const	{ return ""; }
 
-	Interval	doApply(const EvalContext&	ctx,
-		const Signature<int, float, float>::IArgs&		iargs) const
+	SpirVCaseT	getSpirvCase	() const		{ return SPIRV_CASETYPE_COMPARE; }
+
+	Interval	doApply			(const EvalContext&						ctx,
+								 const typename Comparison<T>::IArgs&	iargs) const
 	{
 		DE_UNREF(ctx);
 		if (iargs.a.hasNaN() || iargs.b.hasNaN())
@@ -2596,9 +2600,6 @@ ExprP<T> exp2	(const ExprP<T>& x)	{ return app<Exp2< Signature<T, T> > >(x); }
 template <typename T>
 ExprP<T> exp	(const ExprP<T>& x)	{ return app<Exp< Signature<T, T> > >(x); }
 
-//ExprP<deFloat16> exp2	(const ExprP<deFloat16>& x)	{ return app<Exp2< Signature<deFloat16, deFloat16> > >(x); }
-//ExprP<deFloat16> exp	(const ExprP<deFloat16>& x)	{ return app<Exp< Signature<deFloat16, deFloat16> > >(x); }
-
 template <class T>
 class LogFunc : public CFloatFunc1<T>
 {
@@ -2622,10 +2623,7 @@ double LogFunc<Signature<float, float> >::precision(const EvalContext& ctx, doub
 		return (0.5 <= x && x <= 2.0) ? deLdExp(1.0, -21) : ctx.format.ulp(ret, 3.0);
 	case glu::PRECISION_MEDIUMP:
 	case glu::PRECISION_LAST:
-		if (ctx.isShaderFloat16Int8)
-			return (0.5 <= x && x <= 2.0) ? deLdExp(1.0, -7) : ctx.format.ulp(ret, 3.0);
-		else
-			return (0.5 <= x && x <= 2.0) ? deLdExp(1.0, -7) : ctx.format.ulp(ret, 2.0);
+		return (0.5 <= x && x <= 2.0) ? deLdExp(1.0, -7) : ctx.format.ulp(ret, 3.0);
 	default:
 		DE_FATAL("Impossible");
 	}
@@ -2710,11 +2708,13 @@ ExprP<TRET> NAME (const ExprP<T0>& arg0, const ExprP<T1>& arg1)		\
 	return app<CLASS>(arg0, arg1);									\
 }
 
-#define DEFINE_DERIVED2(CLASS, TRET, NAME, T0, Arg0, T1, Arg1, EXPANSION) \
+#define DEFINE_CASED_DERIVED2(CLASS, TRET, NAME, T0, Arg0, T1, Arg1, EXPANSION, SPIRVCASE) \
 class CLASS : public DerivedFunc<Signature<TRET, T0, T1> > /* NOLINT(CLASS) */ \
 {																		\
 public:																	\
-	string			getName		(void) const		{ return #NAME; }	\
+	string			getName		(void) const	{ return #NAME; }		\
+																		\
+	SpirVCaseT		getSpirvCase(void) const	{ return SPIRVCASE; }	\
 																		\
 protected:																\
 	ExprP<TRET>		doExpand	(ExpandContext&, const ArgExprs& args_) const \
@@ -2726,11 +2726,23 @@ protected:																\
 };																		\
 DEFINE_CONSTRUCTOR2(CLASS, TRET, NAME, T0, T1)
 
+#define DEFINE_DERIVED2(CLASS, TRET, NAME, T0, Arg0, T1, Arg1, EXPANSION) \
+	DEFINE_CASED_DERIVED2(CLASS, TRET, NAME, T0, Arg0, T1, Arg1, EXPANSION, SPIRV_CASETYPE_NONE)
+
 #define DEFINE_DERIVED_FLOAT2(CLASS, NAME, Arg0, Arg1, EXPANSION)		\
 	DEFINE_DERIVED2(CLASS, float, NAME, float, Arg0, float, Arg1, EXPANSION)
 
 #define DEFINE_DERIVED_FLOAT2_16BIT(CLASS, NAME, Arg0, Arg1, EXPANSION)		\
 	DEFINE_DERIVED2(CLASS, deFloat16, NAME, deFloat16, Arg0, deFloat16, Arg1, EXPANSION)
+
+#define DEFINE_CASED_DERIVED_FLOAT2(CLASS, NAME, Arg0, Arg1, EXPANSION, SPIRVCASE) \
+	DEFINE_CASED_DERIVED2(CLASS, float, NAME, float, Arg0, float, Arg1, EXPANSION, SPIRVCASE)
+
+#define DEFINE_CASED_DERIVED_FLOAT2_16BIT(CLASS, NAME, Arg0, Arg1, EXPANSION, SPIRVCASE) \
+	DEFINE_CASED_DERIVED2(CLASS, deFloat16, NAME, deFloat16, Arg0, deFloat16, Arg1, EXPANSION, SPIRVCASE)
+
+#define DEFINE_CASED_DERIVED_DOUBLE2(CLASS, NAME, Arg0, Arg1, EXPANSION, SPIRVCASE) \
+	DEFINE_CASED_DERIVED2(CLASS, double, NAME, double, Arg0, double, Arg1, EXPANSION, SPIRVCASE)
 
 #define DEFINE_CONSTRUCTOR3(CLASS, TRET, NAME, T0, T1, T2)				\
 ExprP<TRET> NAME (const ExprP<T0>& arg0, const ExprP<T1>& arg1, const ExprP<T2>& arg2) \
@@ -2771,7 +2783,7 @@ ExprP<TRET> NAME (const ExprP<T0>& arg0, const ExprP<T1>& arg1,			\
 typedef	 InverseSqrt< Signature<deFloat16, deFloat16> >	InverseSqrt16Bit;
 typedef	 InverseSqrt< Signature<float, float> >			InverseSqrt32Bit;
 
-DEFINE_DERIVED_FLOAT1(Sqrt,				sqrt,		x,		constant(1.0f) / app<InverseSqrt32Bit>(x));
+DEFINE_DERIVED_FLOAT1(Sqrt32Bit,		sqrt,		x,		constant(1.0f) / app<InverseSqrt32Bit>(x));
 DEFINE_DERIVED_FLOAT1_16BIT(Sqrt16Bit,	sqrt,		x,		constant((deFloat16)FLOAT16_1_0) / app<InverseSqrt16Bit>(x));
 DEFINE_DERIVED_FLOAT2(Pow,				pow,		x,	y,	exp2<float>(y * log2(x)));
 DEFINE_DERIVED_FLOAT2_16BIT(Pow16,		pow,		x,	y,	exp2<deFloat16>(y * log2(x)));
@@ -2864,11 +2876,9 @@ Interval TrigFunc<Signature<deFloat16, deFloat16> >::getInputRange(const bool is
 template<>
 double TrigFunc<Signature<float, float> >::precision(const EvalContext& ctx, double ret, double arg) const
 {
-	DE_ASSERT(!ctx.isShaderFloat16Int8 || (-DE_PI_DOUBLE <= arg && arg <= DE_PI_DOUBLE));
-
+	DE_UNREF(ret);
 	if (ctx.floatPrecision == glu::PRECISION_HIGHP)
 	{
-		// Use precision from OpenCL fast relaxed math
 		if (-DE_PI_DOUBLE <= arg && arg <= DE_PI_DOUBLE)
 			return deLdExp(1.0, -11);
 		else
@@ -2883,16 +2893,11 @@ double TrigFunc<Signature<float, float> >::precision(const EvalContext& ctx, dou
 		DE_ASSERT(ctx.floatPrecision == glu::PRECISION_MEDIUMP || ctx.floatPrecision == glu::PRECISION_LAST);
 
 		if (-DE_PI_DOUBLE <= arg && arg <= DE_PI_DOUBLE)
-		{
-			if (ctx.isShaderFloat16Int8)
-				return deLdExp(1.0, -7);
-			else
-				return ctx.format.ulp(ret, 2.0);			// from OpenCL half-float extension specification
-		}
+			return deLdExp(1.0, -7);
 		else
 		{
-			// |x| * 2^-10, slightly larger than 2 ULP at x == pi
-			return deLdExp(deAbs(arg), -10);
+			// |x| * 2^-8, slightly larger than 2^-7 at x == pi
+			return deLdExp(deAbs(arg), -8);
 		}
 	}
 }
@@ -2972,7 +2977,7 @@ double ArcTrigFunc<Signature<deFloat16, deFloat16> >::precision (const EvalConte
 	if (!m_domain.contains(x))
 		return TCU_NAN;
 
-	// Form the spec 5 ULP.
+	// From the spec 5 ULP.
 	return ctx.format.ulp(ret, 5.0);
 }
 
@@ -2985,7 +2990,7 @@ double ArcTrigFunc<Signature<float, float> >::precision(const EvalContext& ctx, 
 	if (ctx.floatPrecision == glu::PRECISION_HIGHP)
 		return ctx.format.ulp(ret, 4096.0);
 	else
-		return ctx.format.ulp(ret, ctx.isShaderFloat16Int8 ? 5.0 : 2.0);
+		return ctx.format.ulp(ret, 5.0);
 }
 
 class ASin : public CFloatFunc1<Signature<float, float> >
@@ -3942,6 +3947,9 @@ public:
 typedef Floor< Signature<float, float> > Floor32Bit;
 typedef Floor< Signature<deFloat16, deFloat16> > Floor16Bit;
 
+typedef Trunc< Signature<float, float> > Trunc32Bit;
+typedef Trunc< Signature<deFloat16, deFloat16> > Trunc16Bit;
+
 DEFINE_DERIVED_FLOAT1(Fract, fract, x, x - app<Floor32Bit>(x));
 DEFINE_DERIVED_FLOAT1_16BIT(Fract16Bit, fract, x, x - app<Floor16Bit>(x));
 
@@ -3954,8 +3962,11 @@ protected:
 	double	precision		(const EvalContext&, double, double, double) const { return 0.0; }
 };
 
-DEFINE_DERIVED_FLOAT2(Mod, mod, x, y, x - y * app<Floor32Bit>(x / y));
+DEFINE_DERIVED_FLOAT2(Mod32Bit, mod, x, y, x - y * app<Floor32Bit>(x / y));
 DEFINE_DERIVED_FLOAT2_16BIT(Mod16Bit, mod, x, y, x - y * app<Floor16Bit>(x / y));
+
+DEFINE_CASED_DERIVED_FLOAT2(FRem32Bit, frem, x, y, x - y * app<Trunc32Bit>(x / y), SPIRV_CASETYPE_FREM);
+DEFINE_CASED_DERIVED_FLOAT2_16BIT(FRem16Bit, frem, x, y, x - y * app<Trunc16Bit>(x / y), SPIRV_CASETYPE_FREM);
 
 template <class T>
 class Modf : public PrimitiveFunc<T>
@@ -4814,6 +4825,11 @@ public:
 
 				GenFunc					(const Func<Sig_>&	scalarFunc) : m_func (scalarFunc) {}
 
+	SpirVCaseT	getSpirvCase			(void) const
+	{
+		return m_func.getSpirvCase();
+	}
+
 	string		getName					(void) const
 	{
 		return m_func.getName();
@@ -4896,6 +4912,11 @@ public:
 	string						getName			(void) const
 	{
 		return this->doGetScalarFunc().getName();
+	}
+
+	SpirVCaseT					getSpirvCase	(void) const
+	{
+		return this->doGetScalarFunc().getSpirvCase();
 	}
 
 protected:
@@ -5120,9 +5141,11 @@ float DefaultSampling<float>::genRandom (const FloatFormat&	format,
 										 Random&			rnd,
 										 const Interval&	inputRange) const
 {
+	DE_UNREF(prec);
+	// No testing of subnormals. TODO: Could integrate float controls for some operations.
 	const int		minExp			= format.getMinExp();
 	const int		maxExp			= format.getMaxExp();
-	const bool		haveSubnormal	= format.hasSubnormal() != tcu::NO;
+	const bool		haveSubnormal	= false;
 	const float		midpoint		= static_cast<float>(inputRange.midpoint());
 
 	// Choose exponent so that the cumulative distribution is cubic.
@@ -5173,34 +5196,7 @@ float DefaultSampling<float>::genRandom (const FloatFormat&	format,
 	// Produce positive numbers more often than negative.
 	value = (rnd.getInt(0, 3) == 0 ? -1.0f : 1.0f) * (base + significand);
 
-	value = inputRange.contains(static_cast<double>(value)) ? value : midpoint;
-
-	//not denormalized values
-	{
-		DE_ASSERT(sizeof(float) == sizeof(deUint32));
-
-		const deUint32 mantissa	= 0x007fffff;
-		const deUint32 exponent	= 0x7f800000;
-		deUint32 valueInt		= 0u;
-		deMemcpy(&valueInt, &value, sizeof(deUint32));
-
-		if((exponent & valueInt) == 0 && (mantissa & valueInt) != 0)
-		{
-			deUint32 toReturn = 0x00800000 | valueInt;
-			deMemcpy(&value, &toReturn, sizeof(float));
-		}
-
-		// For 16bit-but-32bit-storage tests we must also avoid any value that
-		// becomes a denorm in fp16. The tests don't specify a rounding mode so
-		// assume the worst and use round-to-zero. Add an offset to put values
-		// back into the normal range.
-		// NOTE: The large offset means that all denorms will come out equal,
-		// except for differences that will round away in fp16. This catches
-		// some cases of operations incorrectly using the full fp32 precision.
-		if (prec == glu::PRECISION_LAST && isDenorm16(deFloat32To16Round(value, DE_ROUNDINGMODE_TO_ZERO)))
-			value += 1.0099f;
-	}
-	return value;
+	return inputRange.contains(static_cast<double>(value)) ? value : midpoint;
 }
 
 //! Generate a standard set of floats that should always be tested.
@@ -5267,7 +5263,7 @@ deFloat16 DefaultSampling<deFloat16>::genRandom (const FloatFormat& format, cons
 	DE_UNREF(prec);
 	const int		minExp			= format.getMinExp();
 	const int		maxExp			= format.getMaxExp();
-	const bool		haveSubnormal	= format.hasSubnormal() != tcu::NO;
+	const bool		haveSubnormal	= false;
 	const deUint16	midpoint		= deFloat32To16Round(static_cast<float>(inputRange.midpoint()), DE_ROUNDINGMODE_TO_NEAREST_EVEN);
 
 	// Choose exponent so that the cumulative distribution is cubic.
@@ -5318,10 +5314,6 @@ deFloat16 DefaultSampling<deFloat16>::genRandom (const FloatFormat& format, cons
 	// Produce positive numbers more often than negative.
 	float value			= (rnd.getInt(0, 3) == 0 ? -1.0f : 1.0f) * (base + significand);
 	deFloat16 value16b	= deFloat32To16Round(value, DE_ROUNDINGMODE_TO_NEAREST_EVEN);
-
-	// Offset denormalised values to put them into the normal range
-	if (isDenorm16(value16b))
-		value16b = 0x4000 | value16b;
 
 	return inputRange.contains(static_cast<double>(value16b)) ? value16b : midpoint;
 }
@@ -5712,7 +5704,7 @@ tcu::TestStatus BuiltinPrecisionCaseTestInstance<In, Out>::iterate (void)
 		env.lookup(*m_variables.in3) = convert<In3>(fmt, round(fmt, inputs.in3[valueNdx]));
 
 		{
-			EvalContext	ctx (fmt, m_caseCtx.precision, env, 0, m_context.getFloat16Int8Features().shaderFloat16 != 0u);
+			EvalContext	ctx (fmt, m_caseCtx.precision, env, 0, m_context.getShaderFloat16Int8Features().shaderFloat16 != 0u);
 			m_stmt->execute(ctx);
 
 		switch (outCount)
@@ -5771,7 +5763,7 @@ tcu::TestStatus BuiltinPrecisionCaseTestInstance<In, Out>::iterate (void)
 
 			if (outCount > 0)
 			{
-				if (m_executor->isSpirVShader())
+				if (m_executor->spirvCase() == SPIRV_CASETYPE_COMPARE)
 				{
 					builder << "Output:\n"
 							<< comparisonMessage(outputs.out0[valueNdx])
@@ -5843,7 +5835,7 @@ protected:
 	const FloatFormat&	getFormat		(void) const			{ return m_ctx.floatFormat; }
 
 	template <typename In, typename Out>
-	void				testStatement	(const Variables<In, Out>& variables, const Statement& stmt);
+	void				testStatement	(const Variables<In, Out>& variables, const Statement& stmt, SpirVCaseT spirvCase);
 
 	template<typename T>
 	Symbol				makeSymbol		(const Variable<T>& variable)
@@ -5857,7 +5849,7 @@ protected:
 };
 
 template <typename In, typename Out>
-void PrecisionCase::testStatement (const Variables<In, Out>& variables, const Statement& stmt)
+void PrecisionCase::testStatement (const Variables<In, Out>& variables, const Statement& stmt, SpirVCaseT spirvCase)
 {
 	const int		inCount		= numInputs<In>();
 	const int		outCount	= numOutputs<Out>();
@@ -5916,7 +5908,7 @@ void PrecisionCase::testStatement (const Variables<In, Out>& variables, const St
 	}
 
 	m_spec.source = de::toString(stmt);
-	m_spec.spirVShader = isInteger<typename Out::Out0>();
+	m_spec.spirvCase = spirvCase;
 }
 
 template <typename T>
@@ -6141,7 +6133,7 @@ void FuncCase<Sig>::buildTest (void)
 		ExprP<Ret> expr	= applyVar(m_func, m_variables.in0, m_variables.in1, m_variables.in2, m_variables.in3);
 		m_stmt			= variableAssignment(m_variables.out0, expr);
 
-		this->testStatement(m_variables, *m_stmt);
+		this->testStatement(m_variables, *m_stmt, m_func.getSpirvCase());
 	}
 }
 
@@ -6195,7 +6187,7 @@ void InOutFuncCase<Sig>::buildTest (void)
 		ExprP<Ret> expr	= applyVar(m_func, m_variables.in0, m_variables.out1, m_variables.in1, m_variables.in2);
 		m_stmt			= variableAssignment(m_variables.out0, expr);
 
-		this->testStatement(m_variables, *m_stmt);
+		this->testStatement(m_variables, *m_stmt, m_func.getSpirvCase());
 	}
 }
 
@@ -6260,7 +6252,7 @@ private:
 	string				m_name;
 };
 
-template <template <int, class T> class GenF>
+template <template <int, class> class GenF, typename T>
 class TemplateFuncCaseFactory : public FuncCaseFactory
 {
 public:
@@ -6268,34 +6260,15 @@ public:
 	{
 		TestCaseGroup*	group = new TestCaseGroup(ctx.testContext, ctx.name.c_str(), ctx.name.c_str());
 
-		group->addChild(createFuncCase(ctx, "scalar", instance<GenF<1, float> >()));
-		group->addChild(createFuncCase(ctx, "vec2", instance<GenF<2, float> >()));
-		group->addChild(createFuncCase(ctx, "vec3", instance<GenF<3, float> >()));
-		group->addChild(createFuncCase(ctx, "vec4", instance<GenF<4, float> >()));
+		group->addChild(createFuncCase(ctx, "scalar", instance<GenF<1, T> >()));
+		group->addChild(createFuncCase(ctx, "vec2", instance<GenF<2, T> >()));
+		group->addChild(createFuncCase(ctx, "vec3", instance<GenF<3, T> >()));
+		group->addChild(createFuncCase(ctx, "vec4", instance<GenF<4, T> >()));
 
 		return MovePtr<TestNode>(group);
 	}
 
-	const FuncBase&		getFunc			(void) const { return instance<GenF<1, float> >(); }
-};
-
-template <template <int, class T> class GenF>
-class TemplateFuncCaseFactory16Bit : public FuncCaseFactory
-{
-public:
-	MovePtr<TestNode>	createCase		(const CaseContext& ctx) const
-	{
-		TestCaseGroup*	group = new TestCaseGroup(ctx.testContext, ctx.name.c_str(), ctx.name.c_str());
-
-		group->addChild(createFuncCase(ctx, "scalar", instance<GenF<1, deFloat16> >()));
-		group->addChild(createFuncCase(ctx, "vec2", instance<GenF<2, deFloat16> >()));
-		group->addChild(createFuncCase(ctx, "vec3", instance<GenF<3, deFloat16> >()));
-		group->addChild(createFuncCase(ctx, "vec4", instance<GenF<4, deFloat16> >()));
-
-		return MovePtr<TestNode>(group);
-	}
-
-	const FuncBase&		getFunc			(void) const { return instance<GenF<1, deFloat16> >(); }
+	const FuncBase&		getFunc			(void) const { return instance<GenF<1, T> >(); }
 };
 
 template <template <int> class GenF>
@@ -6319,7 +6292,7 @@ public:
 	const FuncBase&		getFunc			(void) const { return instance<GenF<2> >(); }
 };
 
-template <template <int, int, class> class GenF>
+template <template <int, int, class> class GenF, typename T>
 class MatrixFuncCaseFactory : public FuncCaseFactory
 {
 public:
@@ -6327,55 +6300,23 @@ public:
 	{
 		TestCaseGroup*	const group = new TestCaseGroup(ctx.testContext, ctx.name.c_str(), ctx.name.c_str());
 
-		this->addCase<2, 2, float >(ctx, group);
-		this->addCase<3, 2, float >(ctx, group);
-		this->addCase<4, 2, float >(ctx, group);
-		this->addCase<2, 3, float >(ctx, group);
-		this->addCase<3, 3, float >(ctx, group);
-		this->addCase<4, 3, float >(ctx, group);
-		this->addCase<2, 4, float >(ctx, group);
-		this->addCase<3, 4, float >(ctx, group);
-		this->addCase<4, 4, float >(ctx, group);
+		this->addCase<2, 2>(ctx, group);
+		this->addCase<3, 2>(ctx, group);
+		this->addCase<4, 2>(ctx, group);
+		this->addCase<2, 3>(ctx, group);
+		this->addCase<3, 3>(ctx, group);
+		this->addCase<4, 3>(ctx, group);
+		this->addCase<2, 4>(ctx, group);
+		this->addCase<3, 4>(ctx, group);
+		this->addCase<4, 4>(ctx, group);
 
 		return MovePtr<TestNode>(group);
 	}
 
-	const FuncBase&		getFunc			(void) const { return instance<GenF<2,2, float> >(); }
+	const FuncBase&		getFunc			(void) const { return instance<GenF<2,2, T> >(); }
 
 private:
-	template <int Rows, int Cols, class T>
-	void				addCase			(const CaseContext& ctx, TestCaseGroup* group) const
-	{
-		const char*	const name = dataTypeNameOf<Matrix<float, Rows, Cols> >();
-		group->addChild(createFuncCase(ctx, name, instance<GenF<Rows, Cols, T> >()));
-	}
-};
-
-template <template <int, int, class> class GenF>
-class MatrixFuncCaseFactory16Bit : public FuncCaseFactory
-{
-public:
-	MovePtr<TestNode>	createCase		(const CaseContext& ctx) const
-	{
-		TestCaseGroup*	const group = new TestCaseGroup(ctx.testContext, ctx.name.c_str(), ctx.name.c_str());
-
-		this->addCase<2, 2, deFloat16 >(ctx, group);
-		this->addCase<3, 2, deFloat16 >(ctx, group);
-		this->addCase<4, 2, deFloat16 >(ctx, group);
-		this->addCase<2, 3, deFloat16 >(ctx, group);
-		this->addCase<3, 3, deFloat16 >(ctx, group);
-		this->addCase<4, 3, deFloat16 >(ctx, group);
-		this->addCase<2, 4, deFloat16 >(ctx, group);
-		this->addCase<3, 4, deFloat16 >(ctx, group);
-		this->addCase<4, 4, deFloat16 >(ctx, group);
-
-		return MovePtr<TestNode>(group);
-	}
-
-	const FuncBase&		getFunc			(void) const { return instance<GenF<2, 2, deFloat16> >(); }
-
-private:
-	template <int Rows, int Cols, class T>
+	template <int Rows, int Cols>
 	void				addCase			(const CaseContext& ctx, TestCaseGroup* group) const
 	{
 		const char*	const name = dataTypeNameOf<Matrix<float, Rows, Cols> >();
@@ -6479,19 +6420,20 @@ MovePtr<const CaseFactories> createBuiltinCases (bool is16BitTest = false)
 	addScalarFactory<Log< Signature<float, float> > >(*funcs);
 	addScalarFactory<Exp2<Signature<float, float> > >(*funcs);
 	addScalarFactory<Log2< Signature<float, float> > >(*funcs);
-	addScalarFactory<Sqrt>(*funcs);
+	addScalarFactory<Sqrt32Bit>(*funcs);
 	addScalarFactory<InverseSqrt< Signature<float, float> > >(*funcs);
 
 	addScalarFactory<Abs< Signature<float, float> > >(*funcs);
 	addScalarFactory<Sign< Signature<float, float> > >(*funcs);
 	addScalarFactory<Floor32Bit>(*funcs);
-	addScalarFactory<Trunc< Signature<float, float> > >(*funcs);
+	addScalarFactory<Trunc32Bit>(*funcs);
 	addScalarFactory<Round< Signature<float, float> > >(*funcs);
 	addScalarFactory<RoundEven< Signature<float, float> > >(*funcs);
 	addScalarFactory<Ceil< Signature<float, float> > >(*funcs);
 	addScalarFactory<Fract>(*funcs);
 
-	addScalarFactory<Mod>(*funcs);
+	addScalarFactory<Mod32Bit>(*funcs);
+	addScalarFactory<FRem32Bit>(*funcs);
 
 	funcs->addFactory(createSimpleFuncCaseFactory<Modf32Bit>());
 	addScalarFactory<Min< Signature<float, float, float> > >(*funcs);
@@ -6501,18 +6443,18 @@ MovePtr<const CaseFactories> createBuiltinCases (bool is16BitTest = false)
 	addScalarFactory<Step< Signature<float, float, float> > >(*funcs);
 	addScalarFactory<SmoothStep< Signature<float, float, float, float> > >(*funcs);
 
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Length>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Distance>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Dot>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Length, float>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Distance, float>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Dot, float>()));
 	funcs->addFactory(createSimpleFuncCaseFactory<Cross>());
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Normalize>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<FaceForward>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Reflect>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Refract>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Normalize, float>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<FaceForward, float>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Reflect, float>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Refract, float>()));
 
-	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<MatrixCompMult>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<OuterProduct>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<Transpose>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<MatrixCompMult, float>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<OuterProduct, float>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<Transpose, float>()));
 	funcs->addFactory(SharedPtr<const CaseFactory>(new SquareMatrixFuncCaseFactory<Determinant>()));
 	funcs->addFactory(SharedPtr<const CaseFactory>(new SquareMatrixFuncCaseFactory<Inverse>()));
 
@@ -6562,13 +6504,14 @@ MovePtr<const CaseFactories> createBuiltinCases16Bit(void)
 	addScalarFactory<Abs< Signature<deFloat16, deFloat16> > >(*funcs);
 	addScalarFactory<Sign< Signature<deFloat16, deFloat16> > >(*funcs);
 	addScalarFactory<Floor16Bit>(*funcs);
-	addScalarFactory<Trunc< Signature<deFloat16, deFloat16> > >(*funcs);
+	addScalarFactory<Trunc16Bit>(*funcs);
 	addScalarFactory<Round< Signature<deFloat16, deFloat16> > >(*funcs);
 	addScalarFactory<RoundEven< Signature<deFloat16, deFloat16> > >(*funcs);
 	addScalarFactory<Ceil< Signature<deFloat16, deFloat16> > >(*funcs);
 	addScalarFactory<Fract16Bit>(*funcs);
 
 	addScalarFactory<Mod16Bit>(*funcs);
+	addScalarFactory<FRem16Bit>(*funcs);
 
 	funcs->addFactory(createSimpleFuncCaseFactory<Modf16Bit>());
 	addScalarFactory<Min< Signature<deFloat16, deFloat16, deFloat16> > >(*funcs);
@@ -6578,17 +6521,17 @@ MovePtr<const CaseFactories> createBuiltinCases16Bit(void)
 	addScalarFactory<Step< Signature<deFloat16, deFloat16, deFloat16> > >(*funcs);
 	addScalarFactory<SmoothStep< Signature<deFloat16, deFloat16, deFloat16, deFloat16> > >(*funcs);
 
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory16Bit<Length>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory16Bit<Distance>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory16Bit<Dot>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Length, deFloat16>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Distance, deFloat16>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Dot, deFloat16>()));
 	funcs->addFactory(createSimpleFuncCaseFactory<Cross16Bit>());
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory16Bit<Normalize>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory16Bit<FaceForward>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory16Bit<Reflect>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory16Bit<Refract>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Normalize, deFloat16>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<FaceForward, deFloat16>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Reflect, deFloat16>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new TemplateFuncCaseFactory<Refract, deFloat16>()));
 
-	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory16Bit<OuterProduct>()));
-	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory16Bit<Transpose>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<OuterProduct, deFloat16>()));
+	funcs->addFactory(SharedPtr<const CaseFactory>(new MatrixFuncCaseFactory<Transpose, deFloat16>()));
 	funcs->addFactory(SharedPtr<const CaseFactory>(new SquareMatrixFuncCaseFactory<Determinant16bit>()));
 	funcs->addFactory(SharedPtr<const CaseFactory>(new SquareMatrixFuncCaseFactory<Inverse16bit>()));
 
@@ -6606,7 +6549,7 @@ TestCaseGroup* createFuncGroup (TestContext& ctx, const CaseFactory& factory, in
 										 tcu::MAYBE,	// subnormals
 										 tcu::YES,		// infinities
 										 tcu::MAYBE);	// NaN
-	const FloatFormat       mediump		(-13, 13, 9, false, tcu::MAYBE);
+	const FloatFormat       mediump		(-14, 13, 10, false, tcu::MAYBE);
 
 	for (int precNdx = glu::PRECISION_MEDIUMP; precNdx < glu::PRECISION_LAST; ++precNdx)
 	{

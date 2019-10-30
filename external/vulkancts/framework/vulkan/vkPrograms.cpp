@@ -21,9 +21,7 @@
  * \brief Program utilities.
  *//*--------------------------------------------------------------------*/
 
-#if defined(DEQP_HAVE_SPIRV_TOOLS)
 #include "spirv-tools/optimizer.hpp"
-#endif
 
 #include "qpInfo.h"
 
@@ -49,7 +47,7 @@ using std::string;
 using std::vector;
 using std::map;
 
-#if defined(DE_DEBUG) && defined(DEQP_HAVE_SPIRV_TOOLS)
+#if defined(DE_DEBUG)
 #	define VALIDATE_BINARIES	true
 #else
 #	define VALIDATE_BINARIES	false
@@ -100,8 +98,6 @@ bool isSaneSpirVBinary (const ProgramBinary& binary)
 	return true;
 }
 
-#if defined(DEQP_HAVE_SPIRV_TOOLS)
-
 void optimizeCompiledBinary (vector<deUint32>& binary, int optimizationRecipe, const SpirvVersion spirvVersion)
 {
 	spv_target_env targetEnv = SPV_ENV_VULKAN_1_0;
@@ -113,6 +109,7 @@ void optimizeCompiledBinary (vector<deUint32>& binary, int optimizationRecipe, c
 		case SPIRV_VERSION_1_1:
 		case SPIRV_VERSION_1_2:
 		case SPIRV_VERSION_1_3: targetEnv = SPV_ENV_VULKAN_1_1;	break;
+		case SPIRV_VERSION_1_4: targetEnv = SPV_ENV_VULKAN_1_1_SPIRV_1_4;	break;
 		default:
 			TCU_THROW(InternalError, "Unexpected SPIR-V version requested");
 	}
@@ -149,11 +146,7 @@ ProgramBinary* createProgramBinaryFromSpirV (const vector<deUint32>& binary)
 		TCU_THROW(InternalError, "SPIR-V endianness translation not supported");
 }
 
-#endif // defined(DEQP_HAVE_SPIRV_TOOLS)
-
 } // anonymous
-
-#if defined(DEQP_HAVE_SPIRV_TOOLS)
 
 void validateCompiledBinary(const vector<deUint32>& binary, glu::ShaderProgramInfo* buildInfo, const SpirvValidatorOptions& options)
 {
@@ -655,24 +648,6 @@ ProgramBinary* assembleProgram (const SpirVAsmSource& program, SpirVProgramInfo*
 	return res;
 }
 
-#else // !DEQP_HAVE_SPIRV_TOOLS
-
-ProgramBinary* buildProgram (const GlslSource&, glu::ShaderProgramInfo*, const tcu::CommandLine&)
-{
-	TCU_THROW(NotSupportedError, "GLSL to SPIR-V compilation not supported (DEQP_HAVE_GLSLANG not defined)");
-}
-
-ProgramBinary* buildProgram (const HlslSource&, glu::ShaderProgramInfo*, const tcu::CommandLine&)
-{
-	TCU_THROW(NotSupportedError, "HLSL to SPIR-V compilation not supported (DEQP_HAVE_GLSLANG not defined)");
-}
-
-ProgramBinary* assembleProgram (const SpirVAsmSource&, SpirVProgramInfo*, const tcu::CommandLine&)
-{
-	TCU_THROW(NotSupportedError, "SPIR-V assembly not supported (DEQP_HAVE_SPIRV_TOOLS not defined)");
-}
-#endif
-
 void disassembleProgram (const ProgramBinary& program, std::ostream* dst)
 {
 	if (program.getFormat() == PROGRAM_FORMAT_SPIRV)
@@ -752,7 +727,13 @@ VkShaderStageFlagBits getVkShaderStage (glu::ShaderType shaderType)
 		VK_SHADER_STAGE_GEOMETRY_BIT,
 		VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
 		VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
-		VK_SHADER_STAGE_COMPUTE_BIT
+		VK_SHADER_STAGE_COMPUTE_BIT,
+		VK_SHADER_STAGE_RAYGEN_BIT_NV,
+		VK_SHADER_STAGE_ANY_HIT_BIT_NV,
+		VK_SHADER_STAGE_CLOSEST_HIT_BIT_NV,
+		VK_SHADER_STAGE_MISS_BIT_NV,
+		VK_SHADER_STAGE_INTERSECTION_BIT_NV,
+		VK_SHADER_STAGE_CALLABLE_BIT_NV,
 	};
 
 	return de::getSizedArrayElement<glu::SHADERTYPE_LAST>(s_shaderStages, shaderType);
@@ -764,8 +745,8 @@ vk::SpirvVersion getBaselineSpirvVersion (const deUint32 /* vulkanVersion */)
 	return vk::SPIRV_VERSION_1_0;
 }
 
-// Max supported versions for each vulkan version
-vk::SpirvVersion getMaxSpirvVersionForAsm (const deUint32 vulkanVersion)
+// Max supported versions for each Vulkan version, without requiring a Vulkan extension.
+vk::SpirvVersion getMaxSpirvVersionForVulkan (const deUint32 vulkanVersion)
 {
 	vk::SpirvVersion	result			= vk::SPIRV_VERSION_LAST;
 
@@ -778,26 +759,21 @@ vk::SpirvVersion getMaxSpirvVersionForAsm (const deUint32 vulkanVersion)
 	DE_ASSERT(result < vk::SPIRV_VERSION_LAST);
 
 	return result;
+}
+
+vk::SpirvVersion getMaxSpirvVersionForAsm (const deUint32 vulkanVersion)
+{
+	return getMaxSpirvVersionForVulkan(vulkanVersion);
 }
 
 vk::SpirvVersion getMaxSpirvVersionForGlsl (const deUint32 vulkanVersion)
 {
-	vk::SpirvVersion	result			= vk::SPIRV_VERSION_LAST;
-
-	deUint32 vulkanVersionMajorMinor = VK_MAKE_VERSION(VK_VERSION_MAJOR(vulkanVersion), VK_VERSION_MINOR(vulkanVersion), 0);
-	if (vulkanVersionMajorMinor == VK_API_VERSION_1_0)
-		result = vk::SPIRV_VERSION_1_0;
-	else if (vulkanVersionMajorMinor >= VK_API_VERSION_1_1)
-		result = vk::SPIRV_VERSION_1_3;
-
-	DE_ASSERT(result < vk::SPIRV_VERSION_LAST);
-
-	return result;
+	return getMaxSpirvVersionForVulkan(vulkanVersion);
 }
 
 SpirvVersion extractSpirvVersion (const ProgramBinary& binary)
 {
-	DE_STATIC_ASSERT(SPIRV_VERSION_1_3 + 1 == SPIRV_VERSION_LAST);
+	DE_STATIC_ASSERT(SPIRV_VERSION_1_4 + 1 == SPIRV_VERSION_LAST);
 
 	if (binary.getFormat() != PROGRAM_FORMAT_SPIRV)
 		TCU_THROW(InternalError, "Binary is not in SPIR-V format");
@@ -809,6 +785,7 @@ SpirvVersion extractSpirvVersion (const ProgramBinary& binary)
 	const deUint32				spirvBinaryVersion11	= 0x00010100;
 	const deUint32				spirvBinaryVersion12	= 0x00010200;
 	const deUint32				spirvBinaryVersion13	= 0x00010300;
+	const deUint32				spirvBinaryVersion14	= 0x00010400;
 	const SpirvBinaryHeader*	header					= reinterpret_cast<const SpirvBinaryHeader*>(binary.getBinary());
 	const deUint32				spirvVersion			= isNativeSpirVBinaryEndianness()
 														? header->version
@@ -821,6 +798,7 @@ SpirvVersion extractSpirvVersion (const ProgramBinary& binary)
 		case spirvBinaryVersion11:	result = SPIRV_VERSION_1_1; break; //!< SPIR-V 1.1
 		case spirvBinaryVersion12:	result = SPIRV_VERSION_1_2; break; //!< SPIR-V 1.2
 		case spirvBinaryVersion13:	result = SPIRV_VERSION_1_3; break; //!< SPIR-V 1.3
+		case spirvBinaryVersion14:	result = SPIRV_VERSION_1_4; break; //!< SPIR-V 1.4
 		default:					TCU_THROW(InternalError, "Unknown SPIR-V version detected in binary");
 	}
 
@@ -829,7 +807,7 @@ SpirvVersion extractSpirvVersion (const ProgramBinary& binary)
 
 std::string getSpirvVersionName (const SpirvVersion spirvVersion)
 {
-	DE_STATIC_ASSERT(SPIRV_VERSION_1_3 + 1 == SPIRV_VERSION_LAST);
+	DE_STATIC_ASSERT(SPIRV_VERSION_1_4 + 1 == SPIRV_VERSION_LAST);
 	DE_ASSERT(spirvVersion < SPIRV_VERSION_LAST);
 
 	std::string result;
@@ -840,6 +818,7 @@ std::string getSpirvVersionName (const SpirvVersion spirvVersion)
 		case SPIRV_VERSION_1_1: result = "1.1"; break; //!< SPIR-V 1.1
 		case SPIRV_VERSION_1_2: result = "1.2"; break; //!< SPIR-V 1.2
 		case SPIRV_VERSION_1_3: result = "1.3"; break; //!< SPIR-V 1.3
+		case SPIRV_VERSION_1_4: result = "1.4"; break; //!< SPIR-V 1.4
 		default:				result = "Unknown";
 	}
 

@@ -491,7 +491,7 @@ tcu::TestStatus SpvAsmComputeShaderInstance::iterate (void)
 		if (!isFloatControlsFeaturesSupported(m_context, m_shaderSpec.requestedVulkanFeatures.floatControlsProperties))
 			TCU_THROW(NotSupportedError, "Requested Float Controls features not supported");
 
-        if (m_shaderSpec.usesPhysStorageBuffer && !m_context.getBufferDeviceAddressFeatures().bufferDeviceAddress)
+		if (m_shaderSpec.usesPhysStorageBuffer && !m_context.getBufferDeviceAddressFeatures().bufferDeviceAddress)
 			TCU_THROW(NotSupportedError, "Request physical storage buffer feature not supported");
 	}
 
@@ -875,16 +875,38 @@ tcu::TestStatus SpvAsmComputeShaderInstance::iterate (void)
 
 			if (deMemCmp(&expectedBytes.front(), outputAllocs[outputNdx]->getHostPtr(), expectedBytes.size()))
 			{
+				const size_t	errorsMax	= 16u;
 				const deUint8*	ptrHost		= static_cast<deUint8*>(outputAllocs[outputNdx]->getHostPtr());
 				const deUint8*	ptrExpected	= static_cast<deUint8*>(&expectedBytes.front());
-				unsigned int	ndx			= 0u;
+				size_t			errors		= 0u;
+				size_t			ndx			= 0u;
+
 				for (; ndx < expectedBytes.size(); ++ndx)
 				{
 					if (ptrHost[ndx] != ptrExpected[ndx])
 						break;
 				}
-				m_context.getTestContext().getLog() << tcu::TestLog::Message << "OutputBuffer: " << outputNdx
-													<< " Got " << (deUint8)ptrHost[ndx] <<" expected " << (deUint8)ptrExpected[ndx] << " at byte" << ndx << tcu::TestLog::EndMessage;
+
+				for (; ndx < expectedBytes.size(); ++ndx)
+				{
+					if (ptrHost[ndx] != ptrExpected[ndx])
+					{
+						m_context.getTestContext().getLog() << tcu::TestLog::Message
+															<< "OutputBuffer:" << outputNdx
+															<< " got:" << ((deUint32)ptrHost[ndx])
+															<< " expected:" << ((deUint32)ptrExpected[ndx])
+															<< " at byte " << ndx << tcu::TestLog::EndMessage;
+						errors++;
+
+						if (errors >= errorsMax)
+						{
+							m_context.getTestContext().getLog() << tcu::TestLog::Message << "Maximum error count reached (" << errors << "). Stop output."
+																<< tcu::TestLog::EndMessage;
+							break;
+						}
+					}
+				}
+
 				return tcu::TestStatus(m_shaderSpec.failResult, m_shaderSpec.failMessage);
 			}
 		}

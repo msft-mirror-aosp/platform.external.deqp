@@ -265,17 +265,17 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 		functions.push_back("vkCmdDrawIndirectCountKHR");
 		functions.push_back("vkCmdDrawIndexedIndirectCountKHR");
 	}
-	else if (extName == "VK_KHR_pipeline_executable_properties")
-	{
-		functions.push_back("vkGetPipelineExecutablePropertiesKHR");
-		functions.push_back("vkGetPipelineExecutableStatisticsKHR");
-		functions.push_back("vkGetPipelineExecutableInternalRepresentationsKHR");
-	}
 	else if (extName == "VK_KHR_timeline_semaphore")
 	{
 		functions.push_back("vkGetSemaphoreCounterValueKHR");
 		functions.push_back("vkWaitSemaphoresKHR");
 		functions.push_back("vkSignalSemaphoreKHR");
+	}
+	else if (extName == "VK_KHR_pipeline_executable_properties")
+	{
+		functions.push_back("vkGetPipelineExecutablePropertiesKHR");
+		functions.push_back("vkGetPipelineExecutableStatisticsKHR");
+		functions.push_back("vkGetPipelineExecutableInternalRepresentationsKHR");
 	}
 	else if (extName == "VK_EXT_debug_marker")
 	{
@@ -421,6 +421,18 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 		functions.push_back("vkCmdSetCheckpointNV");
 		functions.push_back("vkGetQueueCheckpointDataNV");
 	}
+	else if (extName == "VK_INTEL_performance_query")
+	{
+		functions.push_back("vkInitializePerformanceApiINTEL");
+		functions.push_back("vkUninitializePerformanceApiINTEL");
+		functions.push_back("vkCmdSetPerformanceMarkerINTEL");
+		functions.push_back("vkCmdSetPerformanceStreamMarkerINTEL");
+		functions.push_back("vkCmdSetPerformanceOverrideINTEL");
+		functions.push_back("vkAcquirePerformanceConfigurationINTEL");
+		functions.push_back("vkReleasePerformanceConfigurationINTEL");
+		functions.push_back("vkQueueSetPerformanceConfigurationINTEL");
+		functions.push_back("vkGetPerformanceParameterINTEL");
+	}
 	else if (extName == "VK_AMD_display_native_hdr")
 	{
 		functions.push_back("vkSetLocalDimmingAMD");
@@ -428,6 +440,10 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 	else if (extName == "VK_EXT_buffer_device_address")
 	{
 		functions.push_back("vkGetBufferDeviceAddressEXT");
+	}
+	else if (extName == "VK_EXT_line_rasterization")
+	{
+		functions.push_back("vkCmdSetLineStippleEXT");
 	}
 	else if (extName == "VK_EXT_host_query_reset")
 	{
@@ -519,8 +535,8 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 	"VK_KHR_bind_memory2",
 	"VK_KHR_maintenance3",
 	"VK_KHR_draw_indirect_count",
-	"VK_KHR_pipeline_executable_properties",
 	"VK_KHR_timeline_semaphore",
+	"VK_KHR_pipeline_executable_properties",
 	"VK_EXT_debug_marker",
 	"VK_EXT_transform_feedback",
 	"VK_NVX_image_view_handle",
@@ -544,8 +560,10 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 	"VK_NV_mesh_shader",
 	"VK_NV_scissor_exclusive",
 	"VK_NV_device_diagnostic_checkpoints",
+	"VK_INTEL_performance_query",
 	"VK_AMD_display_native_hdr",
 	"VK_EXT_buffer_device_address",
+	"VK_EXT_line_rasterization",
 	"VK_EXT_host_query_reset",
 	"VK_ANDROID_external_memory_android_hardware_buffer",
 	"VK_KHR_external_memory_win32",

@@ -1944,6 +1944,9 @@ VkImageCreateInfo GraphicsAttachmentsTestInstance::makeCreateImageInfo (const Vk
 		TCU_THROW(NotSupportedError, "Format storage feature not supported");
 	if ((usageFlags & VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT) && !(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT))
 		TCU_THROW(NotSupportedError, "Format color attachment feature not supported");
+	if ((usageFlags & VK_IMAGE_USAGE_INPUT_ATTACHMENT_BIT) && !(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT) &&
+		!(properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT))
+		TCU_THROW(NotSupportedError, "Format color/depth/stencil attachment feature not supported for input attachment usage");
 
 	const VkImageCreateInfo createImageInfo =
 	{
@@ -2519,6 +2522,7 @@ public:
 														 const TestParameters&		parameters);
 	void					initPrograms				(SourceCollections&			programCollection) const;
 	TestInstance*			createInstance				(Context&					context) const;
+	virtual void			checkSupport				(Context&					context) const;
 protected:
 	const TestParameters	m_parameters;
 };
@@ -2840,28 +2844,19 @@ void TexelViewCompatibleCase::initPrograms (vk::SourceCollections&	programCollec
 	}
 }
 
-TestInstance* TexelViewCompatibleCase::createInstance (Context& context) const
+void TexelViewCompatibleCase::checkSupport (Context& context) const
 {
 	const VkPhysicalDevice			physicalDevice			= context.getPhysicalDevice();
 	const InstanceInterface&		vk						= context.getInstanceInterface();
 
-	if (!m_parameters.useMipmaps)
-	{
-		DE_ASSERT(getNumLayers(m_parameters.imageType, m_parameters.size)     == 1u);
-	}
-
-	DE_ASSERT(getLayerSize(m_parameters.imageType, m_parameters.size).x() >  0u);
-	DE_ASSERT(getLayerSize(m_parameters.imageType, m_parameters.size).y() >  0u);
-
-	if (!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance2"))
-		TCU_THROW(NotSupportedError, "Extension VK_KHR_maintenance2 not supported");
+	context.requireDeviceFunctionality("VK_KHR_maintenance2");
 
 	{
 		VkImageFormatProperties imageFormatProperties;
 
-		if (VK_ERROR_FORMAT_NOT_SUPPORTED == vk.getPhysicalDeviceImageFormatProperties(physicalDevice, m_parameters.formatUncompressed,
-												mapImageType(m_parameters.imageType), VK_IMAGE_TILING_OPTIMAL,
-												m_parameters.uncompressedImageUsage, 0u, &imageFormatProperties))
+		if (vk.getPhysicalDeviceImageFormatProperties(physicalDevice, m_parameters.formatUncompressed,
+													  mapImageType(m_parameters.imageType), VK_IMAGE_TILING_OPTIMAL,
+													  m_parameters.uncompressedImageUsage, 0u, &imageFormatProperties) == VK_ERROR_FORMAT_NOT_SUPPORTED)
 			TCU_THROW(NotSupportedError, "Operation not supported with this image format");
 
 		if (VK_ERROR_FORMAT_NOT_SUPPORTED == vk.getPhysicalDeviceImageFormatProperties(physicalDevice, m_parameters.formatCompressed,
@@ -2873,7 +2868,7 @@ TestInstance* TexelViewCompatibleCase::createInstance (Context& context) const
 	}
 
 	{
-		const VkPhysicalDeviceFeatures	physicalDeviceFeatures	= getPhysicalDeviceFeatures (vk, physicalDevice);
+		const VkPhysicalDeviceFeatures	physicalDeviceFeatures	= getPhysicalDeviceFeatures(vk, physicalDevice);
 
 		if (deInRange32(m_parameters.formatCompressed, VK_FORMAT_BC1_RGB_UNORM_BLOCK, VK_FORMAT_BC7_SRGB_BLOCK) &&
 			!physicalDeviceFeatures.textureCompressionBC)
@@ -2892,6 +2887,15 @@ TestInstance* TexelViewCompatibleCase::createInstance (Context& context) const
 			!physicalDeviceFeatures.shaderStorageImageExtendedFormats)
 			TCU_THROW(NotSupportedError, "Storage view format requires shaderStorageImageExtended");
 	}
+}
+
+TestInstance* TexelViewCompatibleCase::createInstance (Context& context) const
+{
+	if (!m_parameters.useMipmaps)
+		DE_ASSERT(getNumLayers(m_parameters.imageType, m_parameters.size) == 1u);
+
+	DE_ASSERT(getLayerSize(m_parameters.imageType, m_parameters.size).x() > 0u);
+	DE_ASSERT(getLayerSize(m_parameters.imageType, m_parameters.size).y() > 0u);
 
 	switch (m_parameters.shader)
 	{

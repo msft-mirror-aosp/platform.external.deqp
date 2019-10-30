@@ -22,6 +22,7 @@
  *//*--------------------------------------------------------------------*/
 
 #include "vktTestCase.hpp"
+#include "vktCustomInstancesDevices.hpp"
 
 #include "vkRef.hpp"
 #include "vkRefUtil.hpp"
@@ -55,37 +56,6 @@ using namespace vk;
 namespace
 {
 
-vector<string> getValidationLayers (const vector<VkLayerProperties>& supportedLayers)
-{
-	static const char*	s_magicLayer		= "VK_LAYER_LUNARG_standard_validation";
-	static const char*	s_defaultLayers[]	=
-	{
-		"VK_LAYER_GOOGLE_threading",
-		"VK_LAYER_LUNARG_parameter_validation",
-		"VK_LAYER_LUNARG_device_limits",
-		"VK_LAYER_LUNARG_object_tracker",
-		"VK_LAYER_LUNARG_image",
-		"VK_LAYER_LUNARG_core_validation",
-		"VK_LAYER_LUNARG_swapchain",
-		"VK_LAYER_GOOGLE_unique_objects"
-	};
-
-	vector<string>		enabledLayers;
-
-	if (isLayerSupported(supportedLayers, RequiredLayer(s_magicLayer)))
-		enabledLayers.push_back(s_magicLayer);
-	else
-	{
-		for (int ndx = 0; ndx < DE_LENGTH_OF_ARRAY(s_defaultLayers); ++ndx)
-		{
-			if (isLayerSupported(supportedLayers, RequiredLayer(s_defaultLayers[ndx])))
-				enabledLayers.push_back(s_defaultLayers[ndx]);
-		}
-	}
-
-	return enabledLayers;
-}
-
 vector<string> filterExtensions (const vector<VkExtensionProperties>& extensions)
 {
 	vector<string>	enabledExtensions;
@@ -96,6 +66,7 @@ vector<string> filterExtensions (const vector<VkExtensionProperties>& extensions
 		"VK_KHX_",
 		"VK_NV_cooperative_matrix",
 		"VK_NV_shading_rate_image",
+		"VK_NV_ray_tracing"
 	};
 
 	for (size_t extNdx = 0; extNdx < extensions.size(); extNdx++)
@@ -185,7 +156,7 @@ std::pair<deUint32, deUint32> determineDeviceVersions(const PlatformInterface& v
 Move<VkInstance> createInstance (const PlatformInterface& vkp, deUint32 apiVersion, const vector<string>& enabledExtensions, const tcu::CommandLine& cmdLine)
 {
 	const bool								isValidationEnabled	= cmdLine.isValidationEnabled();
-	vector<string>							enabledLayers;
+	vector<const char*>						enabledLayers;
 
 	// \note Extensions in core are not explicitly enabled even though
 	//		 they are in the extension list advertised to tests.
@@ -203,7 +174,7 @@ Move<VkInstance> createInstance (const PlatformInterface& vkp, deUint32 apiVersi
 			TCU_THROW(NotSupportedError, "No validation layers found");
 	}
 
-	return createDefaultInstance(vkp, apiVersion, enabledLayers, nonCoreExtensions);
+	return createDefaultInstance(vkp, apiVersion, vector<string>(begin(enabledLayers), end(enabledLayers)), nonCoreExtensions);
 }
 
 static deUint32 findQueueFamilyIndexWithCaps (const InstanceInterface& vkInstance, VkPhysicalDevice physicalDevice, VkQueueFlags requiredCaps)
@@ -232,8 +203,7 @@ Move<VkDevice> createDefaultDevice (const PlatformInterface&			vkp,
 {
 	VkDeviceQueueCreateInfo		queueInfo[2];
 	VkDeviceCreateInfo			deviceInfo;
-	vector<string>				enabledLayers;
-	vector<const char*>			layerPtrs;
+	vector<const char*>			enabledLayers;
 	vector<const char*>			extensionPtrs;
 	const float					queuePriority	= 1.0f;
 	const deUint32				numQueues = (enabledFeatures.features.sparseBinding && (queueIndex != sparseQueueIndex)) ? 2 : 1;
@@ -247,11 +217,6 @@ Move<VkDevice> createDefaultDevice (const PlatformInterface&			vkp,
 		if (enabledLayers.empty())
 			TCU_THROW(NotSupportedError, "No validation layers found");
 	}
-
-	layerPtrs.resize(enabledLayers.size());
-
-	for (size_t ndx = 0; ndx < enabledLayers.size(); ++ndx)
-		layerPtrs[ndx] = enabledLayers[ndx].c_str();
 
 	// \note Extensions in core are not explicitly enabled even though
 	//		 they are in the extension list advertised to tests.
@@ -288,24 +253,14 @@ Move<VkDevice> createDefaultDevice (const PlatformInterface&			vkp,
 	deviceInfo.pQueueCreateInfos			= queueInfo;
 	deviceInfo.enabledExtensionCount		= (deUint32)extensionPtrs.size();
 	deviceInfo.ppEnabledExtensionNames		= (extensionPtrs.empty() ? DE_NULL : &extensionPtrs[0]);
-	deviceInfo.enabledLayerCount			= (deUint32)layerPtrs.size();
-	deviceInfo.ppEnabledLayerNames			= (layerPtrs.empty() ? DE_NULL : &layerPtrs[0]);
+	deviceInfo.enabledLayerCount			= (deUint32)enabledLayers.size();
+	deviceInfo.ppEnabledLayerNames			= (enabledLayers.empty() ? DE_NULL : enabledLayers.data());
 	deviceInfo.pEnabledFeatures				= enabledFeatures.pNext ? DE_NULL : &enabledFeatures.features;
 
 	return createDevice(vkp, instance, vki, physicalDevice, &deviceInfo);
 };
 
 } // anonymous
-
-vector<string> getValidationLayers (const PlatformInterface& vkp)
-{
-	return getValidationLayers(enumerateInstanceLayerProperties(vkp));
-}
-
-vector<string> getValidationLayers (const InstanceInterface& vki, VkPhysicalDevice physicalDevice)
-{
-	return getValidationLayers(enumerateDeviceLayerProperties(vki, physicalDevice));
-}
 
 class DefaultDevice
 {
@@ -433,11 +388,12 @@ vk::Allocator* createAllocator (DefaultDevice* device)
 Context::Context (tcu::TestContext&				testCtx,
 				  const vk::PlatformInterface&	platformInterface,
 				  vk::BinaryCollection&			progCollection)
-	: m_testCtx				(testCtx)
-	, m_platformInterface	(platformInterface)
-	, m_progCollection		(progCollection)
-	, m_device				(new DefaultDevice(m_platformInterface, testCtx.getCommandLine()))
-	, m_allocator			(createAllocator(m_device.get()))
+	: m_testCtx					(testCtx)
+	, m_platformInterface		(platformInterface)
+	, m_progCollection			(progCollection)
+	, m_device					(new DefaultDevice(m_platformInterface, testCtx.getCommandLine()))
+	, m_allocator				(createAllocator(m_device.get()))
+	, m_resultSetOnValidation	(false)
 {
 }
 
@@ -454,6 +410,25 @@ vk::VkPhysicalDevice					Context::getPhysicalDevice					(void) const { return m_
 deUint32								Context::getDeviceVersion					(void) const { return m_device->getDeviceVersion();						}
 const vk::VkPhysicalDeviceFeatures&		Context::getDeviceFeatures					(void) const { return m_device->getDeviceFeatures();					}
 const vk::VkPhysicalDeviceFeatures2&	Context::getDeviceFeatures2					(void) const { return m_device->getDeviceFeatures2();					}
+
+bool Context::isDeviceFunctionalitySupported (const std::string& extension) const
+{
+	// check if extension was promoted to core
+	if (isCoreDeviceExtension(getUsedApiVersion(), extension))
+		return true;
+
+	// check if extension is on the lits of extensions for current device
+	const auto& extensions = getDeviceExtensions();
+	return de::contains(extensions.begin(), extensions.end(), extension);
+}
+
+bool Context::isInstanceFunctionalitySupported(const std::string& extension) const
+{
+	// NOTE: current implementation uses isInstanceExtensionSupported but
+	// this will change when some instance extensions will be promoted to the
+	// core; don't use isInstanceExtensionSupported directly, use this method instead
+	return isInstanceExtensionSupported(getUsedApiVersion(), getInstanceExtensions(), extension);
+}
 
 #include "vkDeviceFeaturesForContextDefs.inl"
 
@@ -474,17 +449,17 @@ bool									Context::contextSupports					(const ApiVersion version) const
 bool									Context::contextSupports					(const deUint32 requiredApiVersionBits) const
 																								{ return m_device->getUsedApiVersion() >= requiredApiVersionBits; }
 
-bool Context::requireDeviceExtension (const std::string& required)
+bool Context::requireDeviceFunctionality (const std::string& required)
 {
-	if (!isDeviceExtensionSupported(getUsedApiVersion(), getDeviceExtensions(), required))
+	if (!isDeviceFunctionalitySupported(required))
 		TCU_THROW(NotSupportedError, required + " is not supported");
 
 	return true;
 }
 
-bool Context::requireInstanceExtension (const std::string& required)
+bool Context::requireInstanceFunctionality (const std::string& required)
 {
-	if (!isInstanceExtensionSupported(getUsedApiVersion(), getInstanceExtensions(), required))
+	if (!isInstanceFunctionalitySupported(required))
 		TCU_THROW(NotSupportedError, required + " is not supported");
 
 	return true;
@@ -591,6 +566,44 @@ void TestCase::checkSupport (Context&) const
 
 void TestCase::delayedInit (void)
 {
+}
+
+void collectAndReportDebugMessages(vk::DebugReportRecorder &debugReportRecorder, Context& context)
+{
+	// \note We are not logging INFORMATION and DEBUG messages
+	static const vk::VkDebugReportFlagsEXT			errorFlags		= vk::VK_DEBUG_REPORT_ERROR_BIT_EXT;
+	static const vk::VkDebugReportFlagsEXT			logFlags		= errorFlags
+																	| vk::VK_DEBUG_REPORT_WARNING_BIT_EXT
+																	| vk::VK_DEBUG_REPORT_PERFORMANCE_WARNING_BIT_EXT;
+
+	typedef vk::DebugReportRecorder::MessageList	DebugMessages;
+
+	const DebugMessages&	messages	= debugReportRecorder.getMessages();
+	tcu::TestLog&			log			= context.getTestContext().getLog();
+
+	if (messages.begin() != messages.end())
+	{
+		const tcu::ScopedLogSection	section		(log, "DebugMessages", "Debug Messages");
+		int							numErrors	= 0;
+
+		for (DebugMessages::const_iterator curMsg = messages.begin(); curMsg != messages.end(); ++curMsg)
+		{
+			if ((curMsg->flags & logFlags) != 0)
+				log << tcu::TestLog::Message << *curMsg << tcu::TestLog::EndMessage;
+
+			if ((curMsg->flags & errorFlags) != 0)
+				numErrors += 1;
+		}
+
+		debugReportRecorder.clearMessages();
+
+		if (numErrors > 0)
+		{
+			string errorMsg = de::toString(numErrors) + " API usage errors found";
+			context.resultSetOnValidation(true);
+			context.getTestContext().setTestResult(QP_TEST_RESULT_INTERNAL_ERROR, errorMsg.c_str());
+		}
+	}
 }
 
 } // vkt

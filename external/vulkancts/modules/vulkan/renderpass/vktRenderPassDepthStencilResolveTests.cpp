@@ -217,7 +217,7 @@ DepthStencilResolveTest::~DepthStencilResolveTest (void)
 
 bool DepthStencilResolveTest::isFeaturesSupported()
 {
-	m_context.requireDeviceExtension("VK_KHR_depth_stencil_resolve");
+	m_context.requireDeviceFunctionality("VK_KHR_depth_stencil_resolve");
 	if (m_config.imageLayers > 1)
 		m_context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_GEOMETRY_SHADER);
 
@@ -800,6 +800,9 @@ void DepthStencilResolveTest::submit (void)
 
 bool DepthStencilResolveTest::verifyDepth (void)
 {
+	// Invalidate allocation before attempting to read buffer memory.
+	invalidateAlloc(m_context.getDeviceInterface(), m_context.getDevice(), *m_bufferMemory);
+
 	deUint32			layerSize	= m_config.width * m_config.height;
 	deUint32			valuesCount	= layerSize * m_config.viewLayers;
 	deUint8*			pixelPtr	= static_cast<deUint8*>(m_bufferMemory->getHostPtr());
@@ -884,6 +887,9 @@ bool DepthStencilResolveTest::verifyDepth (void)
 
 bool DepthStencilResolveTest::verifyStencil (void)
 {
+	// Invalidate allocation before attempting to read buffer memory.
+	invalidateAlloc(m_context.getDeviceInterface(), m_context.getDevice(), *m_bufferMemory);
+
 	deUint32			layerSize	= m_config.width * m_config.height;
 	deUint32			valuesCount	= layerSize * m_config.viewLayers;
 	deUint8*			pixelPtr	= static_cast<deUint8*>(m_bufferMemory->getHostPtr());

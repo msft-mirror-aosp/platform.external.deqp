@@ -166,7 +166,7 @@ bool isVariablePointersFeaturesSupported (const Context& context, ExtensionVaria
 
 bool isFloat16Int8FeaturesSupported (const Context& context, ExtensionFloat16Int8Features toCheck)
 {
-	const VkPhysicalDeviceFloat16Int8FeaturesKHR& extensionFeatures = context.getFloat16Int8Features();
+	const VkPhysicalDeviceFloat16Int8FeaturesKHR& extensionFeatures = context.getShaderFloat16Int8Features();
 
 	if ((toCheck & EXTFLOAT16INT8FEATURES_FLOAT16) != 0 && extensionFeatures.shaderFloat16 == VK_FALSE)
 		return false;
@@ -179,19 +179,30 @@ bool isFloat16Int8FeaturesSupported (const Context& context, ExtensionFloat16Int
 
 bool isFloatControlsFeaturesSupported (const Context& context, const ExtensionFloatControlsFeatures& toCheck)
 {
-	ExtensionFloatControlsFeatures refControls;
-	deMemset(&refControls, 0, sizeof(ExtensionFloatControlsFeatures));
-
-	// compare with all flags set to false to verify if any float control features are actualy requested by the test
-	if (deMemCmp(&toCheck, &refControls, sizeof(ExtensionFloatControlsFeatures)) == 0)
+	// if all flags are set to false then no float control features are actualy requested by the test
+	if ((toCheck.shaderSignedZeroInfNanPreserveFloat16 ||
+		 toCheck.shaderSignedZeroInfNanPreserveFloat32 ||
+		 toCheck.shaderSignedZeroInfNanPreserveFloat64 ||
+		 toCheck.shaderDenormPreserveFloat16 ||
+		 toCheck.shaderDenormPreserveFloat32 ||
+		 toCheck.shaderDenormPreserveFloat64 ||
+		 toCheck.shaderDenormFlushToZeroFloat16 ||
+		 toCheck.shaderDenormFlushToZeroFloat32 ||
+		 toCheck.shaderDenormFlushToZeroFloat64 ||
+		 toCheck.shaderRoundingModeRTEFloat16 ||
+		 toCheck.shaderRoundingModeRTEFloat32 ||
+		 toCheck.shaderRoundingModeRTEFloat64 ||
+		 toCheck.shaderRoundingModeRTZFloat16 ||
+		 toCheck.shaderRoundingModeRTZFloat32 ||
+		 toCheck.shaderRoundingModeRTZFloat64) == false)
 		return true;
 
 	// return false when float control features are requested and proper extension is not supported
-	const std::vector<std::string>& deviceExtensions = context.getDeviceExtensions();
-	if (!isDeviceExtensionSupported(context.getUsedApiVersion(), deviceExtensions, "VK_KHR_shader_float_controls"))
+	if (!context.isDeviceFunctionalitySupported("VK_KHR_shader_float_controls"))
 		return false;
 
 	// perform query to get supported float control properties
+	ExtensionFloatControlsFeatures refControls;
 	{
 		refControls.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FLOAT_CONTROLS_PROPERTIES_KHR;
 		refControls.pNext = DE_NULL;
@@ -206,8 +217,23 @@ bool isFloatControlsFeaturesSupported (const Context& context, const ExtensionFl
 		instanceInterface.getPhysicalDeviceProperties2(physicalDevice, &deviceProperties);
 	}
 
+	using FCIndependence = VkShaderFloatControlsIndependenceKHR;
+	FCIndependence fcInd32		= VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_32_BIT_ONLY_KHR;
+	FCIndependence fcIndAll		= VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_ALL_KHR;
+	FCIndependence fcIndNone	= VK_SHADER_FLOAT_CONTROLS_INDEPENDENCE_NONE_KHR;
+
+	bool requiredDenormBehaviorNotSupported =
+		((toCheck.denormBehaviorIndependence == fcIndAll) && (refControls.denormBehaviorIndependence != fcIndAll)) ||
+		((toCheck.denormBehaviorIndependence == fcInd32)  && (refControls.denormBehaviorIndependence == fcIndNone));
+
+	bool requiredRoundingModeNotSupported =
+		((toCheck.roundingModeIndependence == fcIndAll) && (refControls.roundingModeIndependence != fcIndAll)) ||
+		((toCheck.roundingModeIndependence == fcInd32)  && (refControls.roundingModeIndependence == fcIndNone));
+
 	// check if flags needed by the test are not supported by the device
 	bool requiredFeaturesNotSupported =
+		requiredDenormBehaviorNotSupported ||
+		requiredRoundingModeNotSupported ||
 		(toCheck.shaderDenormFlushToZeroFloat16			&& !refControls.shaderDenormFlushToZeroFloat16) ||
 		(toCheck.shaderDenormPreserveFloat16			&& !refControls.shaderDenormPreserveFloat16) ||
 		(toCheck.shaderRoundingModeRTEFloat16			&& !refControls.shaderRoundingModeRTEFloat16) ||
@@ -238,6 +264,7 @@ deUint32 getMinRequiredVulkanVersion (const SpirvVersion version)
 	case SPIRV_VERSION_1_1:
 	case SPIRV_VERSION_1_2:
 	case SPIRV_VERSION_1_3:
+	case SPIRV_VERSION_1_4:
 		return VK_API_VERSION_1_1;
 	default:
 		DE_ASSERT(0);

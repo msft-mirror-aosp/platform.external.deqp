@@ -23,6 +23,7 @@
 
 #include "vktYCbCrFormatTests.hpp"
 #include "vktTestCaseUtil.hpp"
+#include "vktCustomInstancesDevices.hpp"
 #include "vktTestGroupUtil.hpp"
 #include "vktShaderExecutor.hpp"
 #include "vktYCbCrUtil.hpp"
@@ -294,7 +295,7 @@ void checkSupport (Context& context, const TestParameters params)
 
 	if (params.useArrayLayers)
 	{
-		if (!isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_ycbcr_image_arrays"))
+		if (!context.isDeviceFunctionalitySupported("VK_EXT_ycbcr_image_arrays"))
 			TCU_THROW(NotSupportedError, "VK_EXT_ycbcr_image_arrays is not supported");
 
 		VkImageFormatProperties properties = getPhysicalDeviceImageFormatProperties(context.getInstanceInterface(), context.getPhysicalDevice(),
@@ -427,9 +428,8 @@ tcu::TestStatus testFormat (Context& context, TestParameters params)
 		},
 	};
 	VkResult				propsResult;
-	const PlatformInterface&		vkp			= context.getPlatformInterface();
-	const Unique<VkInstance>		instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver			vki			(vkp, *instance);
+	const CustomInstance			instance	(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&			vki			(instance.getDriver());
 
 	// Verify that a yuv image consumes at least one descriptor
 	propsResult = vki.getPhysicalDeviceImageFormatProperties2(context.getPhysicalDevice(), &imageFormatInfo, &extProperties);

@@ -25,6 +25,7 @@
 
 #include "vktTestCaseUtil.hpp"
 #include "vktTestGroupUtil.hpp"
+#include "vktCustomInstancesDevices.hpp"
 
 #include "vkPlatform.hpp"
 #include "vkStrUtil.hpp"
@@ -619,10 +620,9 @@ tcu::TestStatus enumeratePhysicalDeviceGroups (Context& context)
 {
 	TestLog&											log				= context.getTestContext().getLog();
 	tcu::ResultCollector								results			(log);
-	const PlatformInterface&							vkp				= context.getPlatformInterface();
-	const Unique<VkInstance>							instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_device_group_creation"));
-	const InstanceDriver								vki				(vkp, *instance);
-	const vector<VkPhysicalDeviceGroupProperties>		devicegroups	= enumeratePhysicalDeviceGroups(vki, *instance);
+	const CustomInstance								instance		(createCustomInstanceWithExtension(context, "VK_KHR_device_group_creation"));
+	const InstanceDriver&								vki				(instance.getDriver());
+	const vector<VkPhysicalDeviceGroupProperties>		devicegroups	= enumeratePhysicalDeviceGroups(vki, instance);
 
 	log << TestLog::Integer("NumDevices", "Number of device groups", "", QP_KEY_TAG_NONE, deInt64(devicegroups.size()));
 
@@ -706,34 +706,50 @@ void checkDeviceExtensions (tcu::ResultCollector& results, const vector<string>&
 	checkDuplicateExtensions(results, extensions);
 }
 
-void checkInstanceExtensionDependencies(tcu::ResultCollector& results,
-										int dependencyLength,
-										const std::pair<const char*, const char*>* dependencies,
-										const vector<VkExtensionProperties>& extensionProperties)
+void checkInstanceExtensionDependencies(tcu::ResultCollector&											results,
+										int																dependencyLength,
+										const std::tuple<deUint32, deUint32, const char*, const char*>*	dependencies,
+										deUint32														versionMajor,
+										deUint32														versionMinor,
+										const vector<VkExtensionProperties>&							extensionProperties)
 {
 	for (int ndx = 0; ndx < dependencyLength; ndx++)
 	{
-		if (isExtensionSupported(extensionProperties, RequiredExtension(dependencies[ndx].first)) &&
-			!isExtensionSupported(extensionProperties, RequiredExtension(dependencies[ndx].second)))
+		deUint32 currentVersionMajor, currentVersionMinor;
+		const char* extensionFirst;
+		const char* extensionSecond;
+		std::tie(currentVersionMajor, currentVersionMinor, extensionFirst, extensionSecond) = dependencies[ndx];
+		if (currentVersionMajor != versionMajor || currentVersionMinor != versionMinor)
+			continue;
+		if (isExtensionSupported(extensionProperties, RequiredExtension(extensionFirst)) &&
+			!isExtensionSupported(extensionProperties, RequiredExtension(extensionSecond)))
 		{
-			results.fail("Extension " + string(dependencies[ndx].first) + " is missing dependency: " + string(dependencies[ndx].second));
+			results.fail("Extension " + string(extensionFirst) + " is missing dependency: " + string(extensionSecond));
 		}
 	}
 }
 
-void checkDeviceExtensionDependencies(tcu::ResultCollector& results,
-									  int dependencyLength,
-									  const std::pair<const char*, const char*>* dependencies,
-									  const vector<VkExtensionProperties>& instanceExtensionProperties,
-									  const vector<VkExtensionProperties>& deviceExtensionProperties)
+void checkDeviceExtensionDependencies(tcu::ResultCollector&												results,
+									  int																dependencyLength,
+									  const std::tuple<deUint32, deUint32, const char*, const char*>*	dependencies,
+									  deUint32															versionMajor,
+									  deUint32															versionMinor,
+									  const vector<VkExtensionProperties>&								instanceExtensionProperties,
+									  const vector<VkExtensionProperties>&								deviceExtensionProperties)
 {
 	for (int ndx = 0; ndx < dependencyLength; ndx++)
 	{
-		if (isExtensionSupported(deviceExtensionProperties, RequiredExtension(dependencies[ndx].first)) &&
-			!isExtensionSupported(deviceExtensionProperties, RequiredExtension(dependencies[ndx].second)) &&
-			!isExtensionSupported(instanceExtensionProperties, RequiredExtension(dependencies[ndx].second)))
+		deUint32 currentVersionMajor, currentVersionMinor;
+		const char* extensionFirst;
+		const char* extensionSecond;
+		std::tie(currentVersionMajor, currentVersionMinor, extensionFirst, extensionSecond) = dependencies[ndx];
+		if (currentVersionMajor != versionMajor || currentVersionMinor != versionMinor)
+			continue;
+		if (isExtensionSupported(deviceExtensionProperties, RequiredExtension(extensionFirst)) &&
+			!isExtensionSupported(deviceExtensionProperties, RequiredExtension(extensionSecond)) &&
+			!isExtensionSupported(instanceExtensionProperties, RequiredExtension(extensionSecond)))
 		{
-			results.fail("Extension " + string(dependencies[ndx].first) + " is missing dependency: " + string(dependencies[ndx].second));
+			results.fail("Extension " + string(extensionFirst) + " is missing dependency: " + string(extensionSecond));
 		}
 	}
 }
@@ -778,17 +794,20 @@ tcu::TestStatus enumerateInstanceExtensions (Context& context)
 		checkInstanceExtensions(results, extensionNames);
 		CheckEnumerateInstanceExtensionPropertiesIncompleteResult()(context, results, properties.size());
 
-		if (context.contextSupports(vk::ApiVersion(1, 1, 0)))
+		for (const auto& version : releasedApiVersions)
 		{
-			checkInstanceExtensionDependencies(results,
-											   DE_LENGTH_OF_ARRAY(instanceExtensionDependencies_1_1),
-											   instanceExtensionDependencies_1_1, properties);
-		}
-		else if (context.contextSupports(vk::ApiVersion(1, 0, 0)))
-		{
-			checkInstanceExtensionDependencies(results,
-											   DE_LENGTH_OF_ARRAY(instanceExtensionDependencies_1_0),
-											   instanceExtensionDependencies_1_0, properties);
+			deUint32 versionMajor, versionMinor;
+			std::tie(std::ignore, versionMajor, versionMinor) = version;
+			if (context.contextSupports(vk::ApiVersion(versionMajor, versionMinor, 0)))
+			{
+				checkInstanceExtensionDependencies(results,
+					DE_LENGTH_OF_ARRAY(instanceExtensionDependencies),
+					instanceExtensionDependencies,
+					versionMajor,
+					versionMinor,
+					properties);
+				break;
+			}
 		}
 	}
 
@@ -899,21 +918,21 @@ tcu::TestStatus enumerateDeviceExtensions (Context& context)
 		checkDeviceExtensions(results, deviceExtensionNames);
 		CheckEnumerateDeviceExtensionPropertiesIncompleteResult()(context, results, deviceExtensionProperties.size());
 
-		if (context.contextSupports(vk::ApiVersion(1, 1, 0)))
+		for (const auto& version : releasedApiVersions)
 		{
-			checkDeviceExtensionDependencies(results,
-											 DE_LENGTH_OF_ARRAY(deviceExtensionDependencies_1_1),
-											 deviceExtensionDependencies_1_1,
-											 instanceExtensionProperties,
-											 deviceExtensionProperties);
-		}
-		else if (context.contextSupports(vk::ApiVersion(1, 0, 0)))
-		{
-			checkDeviceExtensionDependencies(results,
-											 DE_LENGTH_OF_ARRAY(deviceExtensionDependencies_1_0),
-											 deviceExtensionDependencies_1_0,
-											 instanceExtensionProperties,
-											 deviceExtensionProperties);
+			deUint32 versionMajor, versionMinor;
+			std::tie(std::ignore, versionMajor, versionMinor) = version;
+			if (context.contextSupports(vk::ApiVersion(versionMajor, versionMinor, 0)))
+			{
+				checkDeviceExtensionDependencies(results,
+					DE_LENGTH_OF_ARRAY(instanceExtensionDependencies),
+					instanceExtensionDependencies,
+					versionMajor,
+					versionMinor,
+					instanceExtensionProperties,
+					deviceExtensionProperties);
+				break;
+			}
 		}
 	}
 
@@ -1367,11 +1386,11 @@ tcu::TestStatus deviceGroupPeerMemoryFeatures (Context& context)
 {
 	TestLog&							log						= context.getTestContext().getLog();
 	const PlatformInterface&			vkp						= context.getPlatformInterface();
-	const Unique<VkInstance>			instance				(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_device_group_creation"));
-	const InstanceDriver				vki						(vkp, *instance);
+	const CustomInstance				instance				(createCustomInstanceWithExtension(context, "VK_KHR_device_group_creation"));
+	const InstanceDriver&				vki						(instance.getDriver());
 	const tcu::CommandLine&				cmdLine					= context.getTestContext().getCommandLine();
 	const deUint32						devGroupIdx				= cmdLine.getVKDeviceGroupId() - 1;
-	const deUint32						deviceIdx				= vk::chooseDeviceIndex(context.getInstanceInterface(), *instance, cmdLine);
+	const deUint32						deviceIdx				= vk::chooseDeviceIndex(context.getInstanceInterface(), instance, cmdLine);
 	const float							queuePriority			= 1.0f;
 	VkPhysicalDeviceMemoryProperties	memProps;
 	VkPeerMemoryFeatureFlags*			peerMemFeatures;
@@ -1379,7 +1398,7 @@ tcu::TestStatus deviceGroupPeerMemoryFeatures (Context& context)
 	deUint32							numPhysicalDevices		= 0;
 	deUint32							queueFamilyIndex		= 0;
 
-	const vector<VkPhysicalDeviceGroupProperties>		deviceGroupProps = enumeratePhysicalDeviceGroups(vki, *instance);
+	const vector<VkPhysicalDeviceGroupProperties>		deviceGroupProps = enumeratePhysicalDeviceGroups(vki, instance);
 	std::vector<const char*>							deviceExtensions;
 	deviceExtensions.push_back("VK_KHR_device_group");
 
@@ -1415,6 +1434,7 @@ tcu::TestStatus deviceGroupPeerMemoryFeatures (Context& context)
 		deviceGroupProps[devGroupIdx].physicalDeviceCount,	//physicalDeviceCount
 		deviceGroupProps[devGroupIdx].physicalDevices		//physicalDevices
 	};
+
 	const VkDeviceCreateInfo								deviceCreateInfo =
 	{
 		VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,							//sType;
@@ -1429,8 +1449,8 @@ tcu::TestStatus deviceGroupPeerMemoryFeatures (Context& context)
 		DE_NULL,														//pEnabledFeatures;
 	};
 
-	Move<VkDevice>		deviceGroup = createDevice(vkp, *instance, vki, deviceGroupProps[devGroupIdx].physicalDevices[deviceIdx], &deviceCreateInfo);
-	const DeviceDriver	vk	(vkp, *instance, *deviceGroup);
+	Move<VkDevice>		deviceGroup = createCustomDevice(context.getTestContext().getCommandLine().isValidationEnabled(), vkp, instance, vki, deviceGroupProps[devGroupIdx].physicalDevices[deviceIdx], &deviceCreateInfo);
+	const DeviceDriver	vk	(vkp, instance, *deviceGroup);
 	context.getInstanceInterface().getPhysicalDeviceMemoryProperties(deviceGroupProps[devGroupIdx].physicalDevices[deviceIdx], &memProps);
 
 	peerMemFeatures = reinterpret_cast<VkPeerMemoryFeatureFlags*>(buffer);
@@ -1481,7 +1501,7 @@ tcu::TestStatus deviceMemoryBudgetProperties (Context& context)
 	TestLog&							log			= context.getTestContext().getLog();
 	deUint8								buffer[sizeof(VkPhysicalDeviceMemoryBudgetPropertiesEXT) + GUARD_SIZE];
 
-	if (!vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_EXT_memory_budget"))
+	if (!context.isDeviceFunctionalitySupported("VK_EXT_memory_budget"))
 		TCU_THROW(NotSupportedError, "VK_EXT_memory_budget is not supported");
 
 	VkPhysicalDeviceMemoryBudgetPropertiesEXT *budgetProps = reinterpret_cast<VkPhysicalDeviceMemoryBudgetPropertiesEXT *>(buffer);
@@ -1905,7 +1925,7 @@ void checkYcbcrApiSupport (Context& context)
 
 	if (!vk::isCoreDeviceExtension(context.getUsedApiVersion(), "VK_KHR_sampler_ycbcr_conversion"))
 	{
-		if (!vk::isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_sampler_ycbcr_conversion"))
+		if (!context.isDeviceFunctionalitySupported("VK_KHR_sampler_ycbcr_conversion"))
 			TCU_THROW(NotSupportedError, "VK_KHR_sampler_ycbcr_conversion is not supported");
 
 		// Hard dependency for ycbcr
@@ -2486,7 +2506,7 @@ tcu::TestStatus imageFormatProperties (Context& context, const VkFormat format, 
 	const VkPhysicalDeviceFeatures&	deviceFeatures		= context.getDeviceFeatures();
 	const VkPhysicalDeviceLimits&	deviceLimits		= context.getDeviceProperties().limits;
 	const VkFormatProperties		formatProperties	= getPhysicalDeviceFormatProperties(context.getInstanceInterface(), context.getPhysicalDevice(), format);
-	const bool						hasKhrMaintenance1	= isDeviceExtensionSupported(context.getUsedApiVersion(), context.getDeviceExtensions(), "VK_KHR_maintenance1");
+	const bool						hasKhrMaintenance1	= context.isDeviceFunctionalitySupported("VK_KHR_maintenance1");
 
 	const VkFormatFeatureFlags		supportedFeatures	= tiling == VK_IMAGE_TILING_LINEAR ? formatProperties.linearTilingFeatures : formatProperties.optimalTilingFeatures;
 	const VkImageUsageFlags			usageFlagSet		= getValidImageUsageFlags(supportedFeatures, hasKhrMaintenance1);
@@ -2650,10 +2670,9 @@ bool checkExtension (vector<VkExtensionProperties>& properties, const char* exte
 
 tcu::TestStatus deviceFeatures2 (Context& context)
 {
-	const PlatformInterface&	vkp				= context.getPlatformInterface();
 	const VkPhysicalDevice		physicalDevice	= context.getPhysicalDevice();
-	const Unique<VkInstance>	instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver		vki				(vkp, *instance);
+	const CustomInstance		instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&		vki				(instance.getDriver());
 	TestLog&					log				= context.getTestContext().getLog();
 	VkPhysicalDeviceFeatures	coreFeatures;
 	VkPhysicalDeviceFeatures2	extFeatures;
@@ -2832,10 +2851,9 @@ tcu::TestStatus deviceFeatures2 (Context& context)
 
 tcu::TestStatus deviceProperties2 (Context& context)
 {
-	const PlatformInterface&		vkp				= context.getPlatformInterface();
 	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
-	const Unique<VkInstance>		instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver			vki				(vkp, *instance);
+	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&			vki				(instance.getDriver());
 	TestLog&						log				= context.getTestContext().getLog();
 	VkPhysicalDeviceProperties		coreProperties;
 	VkPhysicalDeviceProperties2		extProperties;
@@ -3140,10 +3158,9 @@ string toString (const VkFormatProperties2& value)
 
 tcu::TestStatus deviceFormatProperties2 (Context& context)
 {
-	const PlatformInterface&		vkp				= context.getPlatformInterface();
 	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
-	const Unique<VkInstance>		instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver			vki				(vkp, *instance);
+	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&			vki				(instance.getDriver());
 	TestLog&						log				= context.getTestContext().getLog();
 
 	for (int formatNdx = 0; formatNdx < VK_CORE_FORMAT_LAST; ++formatNdx)
@@ -3175,10 +3192,9 @@ tcu::TestStatus deviceFormatProperties2 (Context& context)
 
 tcu::TestStatus deviceQueueFamilyProperties2 (Context& context)
 {
-	const PlatformInterface&		vkp						= context.getPlatformInterface();
 	const VkPhysicalDevice			physicalDevice			= context.getPhysicalDevice();
-	const Unique<VkInstance>		instance				(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver			vki						(vkp, *instance);
+	const CustomInstance			instance				(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&			vki						(instance.getDriver());
 	TestLog&						log						= context.getTestContext().getLog();
 	deUint32						numCoreQueueFamilies	= ~0u;
 	deUint32						numExtQueueFamilies		= ~0u;
@@ -3227,10 +3243,9 @@ tcu::TestStatus deviceQueueFamilyProperties2 (Context& context)
 
 tcu::TestStatus deviceMemoryProperties2 (Context& context)
 {
-	const PlatformInterface&			vkp				= context.getPlatformInterface();
 	const VkPhysicalDevice				physicalDevice	= context.getPhysicalDevice();
-	const Unique<VkInstance>			instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver				vki				(vkp, *instance);
+	const CustomInstance				instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&				vki				(instance.getDriver());
 	TestLog&							log				= context.getTestContext().getLog();
 	VkPhysicalDeviceMemoryProperties	coreProperties;
 	VkPhysicalDeviceMemoryProperties2	extProperties;
@@ -3263,10 +3278,9 @@ tcu::TestStatus imageFormatProperties2 (Context& context, const VkFormat format,
 
 	TestLog&						log				= context.getTestContext().getLog();
 
-	const PlatformInterface&		vkp				= context.getPlatformInterface();
 	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
-	const Unique<VkInstance>		instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver			vki				(vkp, *instance);
+	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&			vki				(instance.getDriver());
 
 	const VkImageCreateFlags		ycbcrFlags		= isYCbCrFormat(format) ? (VkImageCreateFlags)VK_IMAGE_CREATE_DISJOINT_BIT_KHR : (VkImageCreateFlags)0u;
 	const VkImageUsageFlags			allUsageFlags	= VK_IMAGE_USAGE_TRANSFER_SRC_BIT
@@ -3337,10 +3351,9 @@ tcu::TestStatus sparseImageFormatProperties2 (Context& context, const VkFormat f
 {
 	TestLog&						log				= context.getTestContext().getLog();
 
-	const PlatformInterface&		vkp				= context.getPlatformInterface();
 	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
-	const Unique<VkInstance>		instance		(createInstanceWithExtension(vkp, context.getUsedApiVersion(), "VK_KHR_get_physical_device_properties2"));
-	const InstanceDriver			vki				(vkp, *instance);
+	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&			vki				(instance.getDriver());
 
 	const VkImageUsageFlags			allUsageFlags	= VK_IMAGE_USAGE_TRANSFER_SRC_BIT
 													| VK_IMAGE_USAGE_TRANSFER_DST_BIT
@@ -3594,31 +3607,31 @@ tcu::TestStatus testMandatoryExtensions (Context& context)
 
 	// Instance extensions
 	{
-		static const char*					mandatoryExtensions[]	=
+		static const string					mandatoryExtensions[]	=
 		{
 			"VK_KHR_get_physical_device_properties2",
 		};
 		const vector<VkExtensionProperties>	extensions				= enumerateInstanceExtensionProperties(context.getPlatformInterface(), DE_NULL);
 
-		for (int ndx = 0; ndx < DE_LENGTH_OF_ARRAY(mandatoryExtensions); ++ndx)
+		for (const auto ext : mandatoryExtensions)
 		{
-			if (!isInstanceExtensionSupported(context.getUsedApiVersion(), extensions, RequiredExtension(mandatoryExtensions[ndx])))
-				results.fail(string(mandatoryExtensions[ndx]) + " is not supported");
+			if (!context.isInstanceFunctionalitySupported(ext))
+				results.fail(ext + " is not supported");
 		}
 	}
 
 	// Device extensions
 	{
-		static const char*					mandatoryExtensions[]	=
+		static const string					mandatoryExtensions[]	=
 		{
 			"VK_KHR_maintenance1",
 		};
 		const vector<VkExtensionProperties>	extensions				= enumerateDeviceExtensionProperties(context.getInstanceInterface(), context.getPhysicalDevice(), DE_NULL);
 
-		for (int ndx = 0; ndx < DE_LENGTH_OF_ARRAY(mandatoryExtensions); ++ndx)
+		for (const auto ext : mandatoryExtensions)
 		{
-			if (!isDeviceExtensionSupported(context.getUsedApiVersion(), extensions, RequiredExtension(mandatoryExtensions[ndx])))
-				results.fail(string(mandatoryExtensions[ndx]) + " is not supported");
+			if (!context.isDeviceFunctionalitySupported(ext))
+				results.fail(ext + " is not supported");
 		}
 	}
 
@@ -3632,41 +3645,6 @@ tcu::TestStatus testMandatoryExtensions (Context& context)
 tcu::TestCaseGroup* createFeatureInfoTests (tcu::TestContext& testCtx)
 {
 	de::MovePtr<tcu::TestCaseGroup>	infoTests	(new tcu::TestCaseGroup(testCtx, "info", "Platform Information Tests"));
-
-	{
-		de::MovePtr<tcu::TestCaseGroup> instanceInfoTests	(new tcu::TestCaseGroup(testCtx, "instance", "Instance Information Tests"));
-
-		addFunctionCase(instanceInfoTests.get(), "physical_devices",		"Physical devices",			enumeratePhysicalDevices);
-		addFunctionCase(instanceInfoTests.get(), "physical_device_groups",	"Physical devices Groups",	enumeratePhysicalDeviceGroups);
-		addFunctionCase(instanceInfoTests.get(), "layers",					"Layers",					enumerateInstanceLayers);
-		addFunctionCase(instanceInfoTests.get(), "extensions",				"Extensions",				enumerateInstanceExtensions);
-
-		infoTests->addChild(instanceInfoTests.release());
-	}
-
-	{
-		de::MovePtr<tcu::TestCaseGroup> deviceInfoTests	(new tcu::TestCaseGroup(testCtx, "device", "Device Information Tests"));
-
-		addFunctionCase(deviceInfoTests.get(), "features",					"Device Features",			deviceFeatures);
-		addFunctionCase(deviceInfoTests.get(), "properties",				"Device Properties",		deviceProperties);
-		addFunctionCase(deviceInfoTests.get(), "queue_family_properties",	"Queue family properties",	deviceQueueFamilyProperties);
-		addFunctionCase(deviceInfoTests.get(), "memory_properties",			"Memory properties",		deviceMemoryProperties);
-		addFunctionCase(deviceInfoTests.get(), "layers",					"Layers",					enumerateDeviceLayers);
-		addFunctionCase(deviceInfoTests.get(), "extensions",				"Extensions",				enumerateDeviceExtensions);
-		addFunctionCase(deviceInfoTests.get(), "no_khx_extensions",			"KHX extensions",			testNoKhxExtensions);
-		addFunctionCase(deviceInfoTests.get(), "memory_budget",				"Memory budget",			deviceMemoryBudgetProperties);
-		addFunctionCase(deviceInfoTests.get(), "mandatory_features",		"Mandatory features",		deviceMandatoryFeatures);
-
-		infoTests->addChild(deviceInfoTests.release());
-	}
-
-	{
-		de::MovePtr<tcu::TestCaseGroup> deviceGroupInfoTests(new tcu::TestCaseGroup(testCtx, "device_group", "Device Group Information Tests"));
-
-		addFunctionCase(deviceGroupInfoTests.get(), "peer_memory_features",	"Device Group peer memory features",				deviceGroupPeerMemoryFeatures);
-
-		infoTests->addChild(deviceGroupInfoTests.release());
-	}
 
 	infoTests->addChild(createTestGroup(testCtx, "format_properties",		"VkGetPhysicalDeviceFormatProperties() Tests",		createFormatTests));
 	infoTests->addChild(createTestGroup(testCtx, "image_format_properties",	"VkGetPhysicalDeviceImageFormatProperties() Tests",	createImageFormatTests,	imageFormatProperties));
@@ -3697,6 +3675,32 @@ tcu::TestCaseGroup* createFeatureInfoTests (tcu::TestContext& testCtx)
 	}
 
 	return infoTests.release();
+}
+
+void createFeatureInfoInstanceTests(tcu::TestCaseGroup* testGroup)
+{
+	addFunctionCase(testGroup, "physical_devices",					"Physical devices",						enumeratePhysicalDevices);
+	addFunctionCase(testGroup, "physical_device_groups",			"Physical devices Groups",				enumeratePhysicalDeviceGroups);
+	addFunctionCase(testGroup, "instance_layers",					"Layers",								enumerateInstanceLayers);
+	addFunctionCase(testGroup, "instance_extensions",				"Extensions",							enumerateInstanceExtensions);
+}
+
+void createFeatureInfoDeviceTests(tcu::TestCaseGroup* testGroup)
+{
+	addFunctionCase(testGroup, "device_features",					"Device Features",						deviceFeatures);
+	addFunctionCase(testGroup, "device_properties",					"Device Properties",					deviceProperties);
+	addFunctionCase(testGroup, "device_queue_family_properties",	"Queue family properties",				deviceQueueFamilyProperties);
+	addFunctionCase(testGroup, "device_memory_properties",			"Memory properties",					deviceMemoryProperties);
+	addFunctionCase(testGroup, "device_layers",						"Layers",								enumerateDeviceLayers);
+	addFunctionCase(testGroup, "device_extensions",					"Extensions",							enumerateDeviceExtensions);
+	addFunctionCase(testGroup, "device_no_khx_extensions",			"KHX extensions",						testNoKhxExtensions);
+	addFunctionCase(testGroup, "device_memory_budget",				"Memory budget",						deviceMemoryBudgetProperties);
+	addFunctionCase(testGroup, "device_mandatory_features",			"Mandatory features",					deviceMandatoryFeatures);
+}
+
+void createFeatureInfoDeviceGroupTests(tcu::TestCaseGroup* testGroup)
+{
+	addFunctionCase(testGroup, "device_group_peer_memory_features",	"Device Group peer memory features",	deviceGroupPeerMemoryFeatures);
 }
 
 } // api

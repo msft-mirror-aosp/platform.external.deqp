@@ -4178,7 +4178,7 @@ class AdvancedAllStagesOneImage : public ShaderImageLoadStoreBase
 		const char* const glsl_vs =
 			NL "layout(location = 0) in vec4 i_position;" NL
 			   "layout(r32ui, binding = 3) coherent uniform uimage2D g_image;" NL "void main() {" NL
-			   "  gl_Position = i_position;" NL "  imageAtomicAdd(g_image, ivec2(0, gl_VertexID), 100u);" NL "}";
+			   "  gl_Position = i_position;" NL "  imageAtomicExchange(g_image, ivec2(0, gl_VertexID), 100u);" NL "}";
 		const char* const glsl_fs =
 			NL "#define KSIZE 64" NL "layout(r32ui, binding = 3) coherent uniform uimage2D g_image;" NL
 			   "void main() {" NL "  imageAtomicAdd(g_image, ivec2(0, int(gl_FragCoord.x) & 0x03), 0x1u);" NL "}";
@@ -4383,6 +4383,8 @@ class AdvancedSSOSimple : public ShaderImageLoadStoreBase
 		if (!IsVSFSAvailable(0, 2))
 			return NOT_SUPPORTED;
 		const int kSize = 4;
+		const int textureWidth = 16;
+		const int textureHeight = 16;
 
 		if (pipeline)
 		{
@@ -4394,7 +4396,7 @@ class AdvancedSSOSimple : public ShaderImageLoadStoreBase
 		glBindTexture(GL_TEXTURE_2D_ARRAY, m_texture);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-		glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA32F, getWindowWidth(), getWindowHeight(), 8);
+		glTexStorage3D(GL_TEXTURE_2D_ARRAY, 1, GL_RGBA32F, textureWidth, textureHeight, 8);
 
 		glBindImageTexture(0, m_texture, 0, GL_FALSE, 6, GL_READ_WRITE, GL_RGBA32F);
 		glBindImageTexture(1, m_texture, 0, GL_FALSE, 4, GL_READ_WRITE, GL_RGBA32F);
@@ -4425,8 +4427,8 @@ class AdvancedSSOSimple : public ShaderImageLoadStoreBase
 			   "  data[idx][3] = (imageLoad(g_image[3], ivec2(gl_GlobalInvocationID))).z;" NL "}";
 		c_program = CreateComputeProgram(glsl_cs);
 		glUseProgram(c_program);
-		int wsx   = (getWindowWidth() / kSize) * kSize;
-		int wsy   = (getWindowHeight() / kSize) * kSize;
+		int wsx   = (textureWidth / kSize) * kSize;
+		int wsy   = (textureHeight / kSize) * kSize;
 		int minor = wsx > wsy ? wsy : wsx;
 
 		std::vector<vec4> data_b(wsx * wsy + 1);

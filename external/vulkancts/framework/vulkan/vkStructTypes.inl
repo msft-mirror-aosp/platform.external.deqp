@@ -1972,7 +1972,7 @@ struct VkPhysicalDevicePushDescriptorPropertiesKHR
 	deUint32		maxPushDescriptors;
 };
 
-struct VkPhysicalDeviceFloat16Int8FeaturesKHR
+struct VkPhysicalDeviceShaderFloat16Int8FeaturesKHR
 {
 	VkStructureType	sType;
 	void*			pNext;
@@ -2210,6 +2210,13 @@ struct VkImageFormatListCreateInfoKHR
 	const VkFormat*	pViewFormats;
 };
 
+struct VkPhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		shaderSubgroupExtendedTypes;
+};
+
 struct VkPhysicalDevice8BitStorageFeaturesKHR
 {
 	VkStructureType	sType;
@@ -2225,6 +2232,14 @@ struct VkPhysicalDeviceShaderAtomicInt64FeaturesKHR
 	void*			pNext;
 	VkBool32		shaderBufferInt64Atomics;
 	VkBool32		shaderSharedInt64Atomics;
+};
+
+struct VkPhysicalDeviceShaderClockFeaturesKHR
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		shaderSubgroupClock;
+	VkBool32		shaderDeviceClock;
 };
 
 struct VkConformanceVersionKHR
@@ -2247,25 +2262,25 @@ struct VkPhysicalDeviceDriverPropertiesKHR
 
 struct VkPhysicalDeviceFloatControlsPropertiesKHR
 {
-	VkStructureType	sType;
-	void*			pNext;
-	VkBool32		separateDenormSettings;
-	VkBool32		separateRoundingModeSettings;
-	VkBool32		shaderSignedZeroInfNanPreserveFloat16;
-	VkBool32		shaderSignedZeroInfNanPreserveFloat32;
-	VkBool32		shaderSignedZeroInfNanPreserveFloat64;
-	VkBool32		shaderDenormPreserveFloat16;
-	VkBool32		shaderDenormPreserveFloat32;
-	VkBool32		shaderDenormPreserveFloat64;
-	VkBool32		shaderDenormFlushToZeroFloat16;
-	VkBool32		shaderDenormFlushToZeroFloat32;
-	VkBool32		shaderDenormFlushToZeroFloat64;
-	VkBool32		shaderRoundingModeRTEFloat16;
-	VkBool32		shaderRoundingModeRTEFloat32;
-	VkBool32		shaderRoundingModeRTEFloat64;
-	VkBool32		shaderRoundingModeRTZFloat16;
-	VkBool32		shaderRoundingModeRTZFloat32;
-	VkBool32		shaderRoundingModeRTZFloat64;
+	VkStructureType							sType;
+	void*									pNext;
+	VkShaderFloatControlsIndependenceKHR	denormBehaviorIndependence;
+	VkShaderFloatControlsIndependenceKHR	roundingModeIndependence;
+	VkBool32								shaderSignedZeroInfNanPreserveFloat16;
+	VkBool32								shaderSignedZeroInfNanPreserveFloat32;
+	VkBool32								shaderSignedZeroInfNanPreserveFloat64;
+	VkBool32								shaderDenormPreserveFloat16;
+	VkBool32								shaderDenormPreserveFloat32;
+	VkBool32								shaderDenormPreserveFloat64;
+	VkBool32								shaderDenormFlushToZeroFloat16;
+	VkBool32								shaderDenormFlushToZeroFloat32;
+	VkBool32								shaderDenormFlushToZeroFloat64;
+	VkBool32								shaderRoundingModeRTEFloat16;
+	VkBool32								shaderRoundingModeRTEFloat32;
+	VkBool32								shaderRoundingModeRTEFloat64;
+	VkBool32								shaderRoundingModeRTZFloat16;
+	VkBool32								shaderRoundingModeRTZFloat32;
+	VkBool32								shaderRoundingModeRTZFloat64;
 };
 
 struct VkSubpassDescriptionDepthStencilResolveKHR
@@ -2285,6 +2300,56 @@ struct VkPhysicalDeviceDepthStencilResolvePropertiesKHR
 	VkResolveModeFlagsKHR	supportedStencilResolveModes;
 	VkBool32				independentResolveNone;
 	VkBool32				independentResolve;
+};
+
+struct VkPhysicalDeviceTimelineSemaphoreFeaturesKHR
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		timelineSemaphore;
+};
+
+struct VkPhysicalDeviceTimelineSemaphorePropertiesKHR
+{
+	VkStructureType	sType;
+	void*			pNext;
+	deUint64		maxTimelineSemaphoreValueDifference;
+};
+
+struct VkSemaphoreTypeCreateInfoKHR
+{
+	VkStructureType		sType;
+	const void*			pNext;
+	VkSemaphoreTypeKHR	semaphoreType;
+	deUint64			initialValue;
+};
+
+struct VkTimelineSemaphoreSubmitInfoKHR
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	deUint32		waitSemaphoreValueCount;
+	const deUint64*	pWaitSemaphoreValues;
+	deUint32		signalSemaphoreValueCount;
+	const deUint64*	pSignalSemaphoreValues;
+};
+
+struct VkSemaphoreWaitInfoKHR
+{
+	VkStructureType			sType;
+	const void*				pNext;
+	VkSemaphoreWaitFlagsKHR	flags;
+	deUint32				semaphoreCount;
+	const VkSemaphore*		pSemaphores;
+	const deUint64*			pValues;
+};
+
+struct VkSemaphoreSignalInfoKHR
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	VkSemaphore		semaphore;
+	deUint64		value;
 };
 
 struct VkPhysicalDeviceVulkanMemoryModelFeaturesKHR
@@ -2369,56 +2434,6 @@ struct VkPipelineExecutableInternalRepresentationKHR
 	VkBool32		isText;
 	deUintptr		dataSize;
 	void*			pData;
-};
-
-struct VkPhysicalDeviceTimelineSemaphoreFeaturesKHR
-{
-	VkStructureType	sType;
-	void*			pNext;
-	VkBool32		timelineSemaphore;
-};
-
-struct VkPhysicalDeviceTimelineSemaphorePropertiesKHR
-{
-	VkStructureType	sType;
-	void*			pNext;
-	deUint64		maxTimelineSemaphoreValueDifference;
-};
-
-struct VkSemaphoreTypeCreateInfoKHR
-{
-	VkStructureType		sType;
-	const void*			pNext;
-	VkSemaphoreTypeKHR	semaphoreType;
-	deUint64			initialValue;
-};
-
-struct VkTimelineSemaphoreSubmitInfoKHR
-{
-	VkStructureType	sType;
-	const void*		pNext;
-	deUint32		waitSemaphoreValueCount;
-	const deUint64*	pWaitSemaphoreValues;
-	deUint32		signalSemaphoreValueCount;
-	const deUint64*	pSignalSemaphoreValues;
-};
-
-struct VkSemaphoreWaitInfoKHR
-{
-	VkStructureType			sType;
-	const void*				pNext;
-	VkSemaphoreWaitFlagsKHR	flags;
-	deUint32				semaphoreCount;
-	const VkSemaphore*		pSemaphores;
-	const deUint64*			pValues;
-};
-
-struct VkSemaphoreSignalInfoKHR
-{
-	VkStructureType	sType;
-	const void*		pNext;
-	VkSemaphore		semaphore;
-	deUint64		value;
 };
 
 struct VkDebugReportCallbackCreateInfoEXT
@@ -2590,6 +2605,13 @@ struct VkValidationFlagsEXT
 	const void*					pNext;
 	deUint32					disabledValidationCheckCount;
 	const VkValidationCheckEXT*	pDisabledValidationChecks;
+};
+
+struct VkPhysicalDeviceTextureCompressionASTCHDRFeaturesEXT
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	VkBool32		textureCompressionASTC_HDR;
 };
 
 struct VkImageViewASTCDecodeModeEXT
@@ -3161,12 +3183,19 @@ struct VkPipelineCoverageModulationStateCreateInfoNV
 	const float*									pCoverageModulationTable;
 };
 
-struct VkPhysicalDeviceShaderClockFeaturesKHR
+struct VkPhysicalDeviceShaderSMBuiltinsPropertiesNV
 {
 	VkStructureType	sType;
 	void*			pNext;
-	VkBool32		shaderSubgroupClock;
-	VkBool32		shaderDeviceClock;
+	deUint32		shaderSMCount;
+	deUint32		shaderWarpsPerSM;
+};
+
+struct VkPhysicalDeviceShaderSMBuiltinsFeaturesNV
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		shaderSMBuiltins;
 };
 
 struct VkDrmFormatModifierPropertiesEXT
@@ -3554,6 +3583,13 @@ struct VkPhysicalDeviceExternalMemoryHostPropertiesEXT
 	VkDeviceSize	minImportedHostPointerAlignment;
 };
 
+struct VkPipelineCompilerControlCreateInfoAMD
+{
+	VkStructureType						sType;
+	const void*							pNext;
+	VkPipelineCompilerControlFlagsAMD	compilerControlFlags;
+};
+
 struct VkCalibratedTimestampInfoEXT
 {
 	VkStructureType	sType;
@@ -3717,11 +3753,70 @@ struct VkCheckpointDataNV
 	void*					pCheckpointMarker;
 };
 
-struct VkPhysicalDeviceShaderIntegerFunctions2INTEL
+struct VkPhysicalDeviceShaderIntegerFunctions2FeaturesINTEL
 {
 	VkStructureType	sType;
 	void*			pNext;
 	VkBool32		shaderIntegerFunctions2;
+};
+
+union VkPerformanceValueDataINTEL
+{
+	deUint32	value32;
+	deUint64	value64;
+	float		valueFloat;
+	VkBool32	valueBool;
+	const char*	valueString;
+};
+
+struct VkPerformanceValueINTEL
+{
+	VkPerformanceValueTypeINTEL	type;
+	VkPerformanceValueDataINTEL	data;
+};
+
+struct VkInitializePerformanceApiInfoINTEL
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	void*			pUserData;
+};
+
+struct VkQueryPoolCreateInfoINTEL
+{
+	VkStructureType					sType;
+	const void*						pNext;
+	VkQueryPoolSamplingModeINTEL	performanceCountersSampling;
+};
+
+struct VkPerformanceMarkerInfoINTEL
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	deUint64		marker;
+};
+
+struct VkPerformanceStreamMarkerInfoINTEL
+{
+	VkStructureType	sType;
+	const void*		pNext;
+	deUint32		marker;
+};
+
+struct VkPerformanceOverrideInfoINTEL
+{
+	VkStructureType					sType;
+	const void*						pNext;
+	VkPerformanceOverrideTypeINTEL	type;
+	VkBool32						enable;
+	deUint64						parameter;
+};
+
+struct VkPerformanceConfigurationAcquireInfoINTEL
+{
+	VkStructureType						sType;
+	const void*							pNext;
+	VkPerformanceConfigurationTypeINTEL	type;
 };
 
 struct VkPhysicalDevicePCIBusInfoPropertiesEXT
@@ -3778,6 +3873,46 @@ struct VkPhysicalDeviceScalarBlockLayoutFeaturesEXT
 	VkStructureType	sType;
 	void*			pNext;
 	VkBool32		scalarBlockLayout;
+};
+
+struct VkPhysicalDeviceSubgroupSizeControlFeaturesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		subgroupSizeControl;
+	VkBool32		computeFullSubgroups;
+};
+
+struct VkPhysicalDeviceSubgroupSizeControlPropertiesEXT
+{
+	VkStructureType		sType;
+	void*				pNext;
+	deUint32			minSubgroupSize;
+	deUint32			maxSubgroupSize;
+	deUint32			maxComputeWorkgroupSubgroups;
+	VkShaderStageFlags	requiredSubgroupSizeStages;
+};
+
+struct VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	deUint32		requiredSubgroupSize;
+};
+
+struct VkPhysicalDeviceShaderCoreProperties2AMD
+{
+	VkStructureType					sType;
+	void*							pNext;
+	VkShaderCorePropertiesFlagsAMD	shaderCoreFeatures;
+	deUint32						activeComputeUnitCount;
+};
+
+struct VkPhysicalDeviceCoherentMemoryFeaturesAMD
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		deviceCoherentMemory;
 };
 
 struct VkPhysicalDeviceMemoryBudgetPropertiesEXT
@@ -3926,6 +4061,35 @@ struct VkHeadlessSurfaceCreateInfoEXT
 	VkHeadlessSurfaceCreateFlagsEXT	flags;
 };
 
+struct VkPhysicalDeviceLineRasterizationFeaturesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		rectangularLines;
+	VkBool32		bresenhamLines;
+	VkBool32		smoothLines;
+	VkBool32		stippledRectangularLines;
+	VkBool32		stippledBresenhamLines;
+	VkBool32		stippledSmoothLines;
+};
+
+struct VkPhysicalDeviceLineRasterizationPropertiesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	deUint32		lineSubPixelPrecisionBits;
+};
+
+struct VkPipelineRasterizationLineStateCreateInfoEXT
+{
+	VkStructureType				sType;
+	const void*					pNext;
+	VkLineRasterizationModeEXT	lineRasterizationMode;
+	VkBool32					stippledLineEnable;
+	deUint32					lineStippleFactor;
+	deUint16					lineStipplePattern;
+};
+
 struct VkPhysicalDeviceHostQueryResetFeaturesEXT
 {
 	VkStructureType	sType;
@@ -3945,6 +4109,23 @@ struct VkPhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT
 	VkStructureType	sType;
 	void*			pNext;
 	VkBool32		shaderDemoteToHelperInvocation;
+};
+
+struct VkPhysicalDeviceTexelBufferAlignmentFeaturesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		texelBufferAlignment;
+};
+
+struct VkPhysicalDeviceTexelBufferAlignmentPropertiesEXT
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkDeviceSize	storageTexelBufferOffsetAlignmentBytes;
+	VkBool32		storageTexelBufferOffsetSingleTexelAlignment;
+	VkDeviceSize	uniformTexelBufferOffsetAlignmentBytes;
+	VkBool32		uniformTexelBufferOffsetSingleTexelAlignment;
 };
 
 struct VkAndroidSurfaceCreateInfoKHR
@@ -4381,6 +4562,8 @@ typedef VkPhysicalDeviceMaintenance3Properties VkPhysicalDeviceMaintenance3Prope
 typedef VkDescriptorSetLayoutSupport VkDescriptorSetLayoutSupportKHR;
 
 typedef VkPhysicalDeviceShaderDrawParametersFeatures VkPhysicalDeviceShaderDrawParameterFeatures;
+
+typedef VkPhysicalDeviceShaderFloat16Int8FeaturesKHR VkPhysicalDeviceFloat16Int8FeaturesKHR;
 
 typedef VkPhysicalDeviceBufferDeviceAddressFeaturesEXT VkPhysicalDeviceBufferAddressFeaturesEXT;
 
