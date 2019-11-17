@@ -1,15 +1,23 @@
 # EGL Tests to exclude when Testing ANGLE.
 
-# anglebug.com/3059
-dEQP-EGL.functional.sharing.gles2.multithread.*
-
 # anglebug.com/3058
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.reset_status.vertex
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.reset_status.fragment
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.reset_status.vertex_and_fragment
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.reset_status.compute
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.sync_status.vertex
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.sync_status.fragment
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.sync_status.vertex_and_fragment
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.sync_status.compute
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.query_status.vertex
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.query_status.fragment
 dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.query_status.vertex_and_fragment
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.query_status.compute
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.shared_context_status.vertex
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.shared_context_status.fragment
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.shared_context_status.vertex_and_fragment
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.shared_context_status.compute
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.recover_from_reset.vertex
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.recover_from_reset.fragment
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.recover_from_reset.vertex_and_fragment
+dEQP-EGL.functional.robustness.reset_context.shaders.infinite_loop.recover_from_reset.compute
