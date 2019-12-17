@@ -44,6 +44,7 @@ import com.android.tradefed.testtype.ITestCollector;
 import com.android.tradefed.testtype.ITestFilterReceiver;
 import com.android.tradefed.testtype.NativeCodeCoverageListener;
 import com.android.tradefed.util.AbiUtils;
+import com.android.tradefed.util.FileUtil;
 import com.android.tradefed.util.IRunUtil;
 import com.android.tradefed.util.RunInterruptedException;
 import com.android.tradefed.util.RunUtil;
@@ -1955,7 +1956,13 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             if (reader == null) {
                 File testlist = new File(mBuildHelper.getTestsDir(), mCaselistFile);
                 if (!testlist.isFile()) {
-                    throw new FileNotFoundException();
+                    // Finding file in sub directory if no matching file in the first layer of
+                    // testdir.
+                    testlist = FileUtil.findFile(mBuildHelper.getTestsDir(), mCaselistFile);
+                    if (testlist == null || !testlist.isFile()) {
+                        throw new FileNotFoundException("Cannot find deqp test list file: "
+                            + mCaselistFile);
+                    }
                 }
                 reader = new FileReader(testlist);
             }
