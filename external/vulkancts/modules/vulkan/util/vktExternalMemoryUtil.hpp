@@ -26,6 +26,9 @@
 #include "vkPlatform.hpp"
 #include "vkRefUtil.hpp"
 
+#include "deMemory.h"
+#include "deInt32.h"
+
 namespace vkt
 {
 namespace ExternalMemoryUtil
@@ -53,8 +56,9 @@ public:
 	NativeHandle&						operator=					(vk::pt::AndroidHardwareBufferPtr buffer);
 
 	void								setWin32Handle				(Win32HandleType type, vk::pt::Win32Handle handle);
-
 	vk::pt::Win32Handle					getWin32Handle				(void) const;
+	void								setHostPtr					(void* hostPtr);
+	void*								getHostPtr					(void) const;
 	int									getFd						(void) const;
 	vk::pt::AndroidHardwareBufferPtr	getAndroidHardwareBuffer	(void) const;
 	void								disown						(void);
@@ -65,6 +69,7 @@ private:
 	Win32HandleType						m_win32HandleType;
 	vk::pt::Win32Handle					m_win32Handle;
 	vk::pt::AndroidHardwareBufferPtr	m_androidHardwareBuffer;
+	void*								m_hostPtr;
 
 	// Disabled
 	NativeHandle&						operator=					(const NativeHandle&);
@@ -166,6 +171,26 @@ enum Transference
 	TRANSFERENCE_REFERENCE
 };
 
+struct ExternalHostMemory
+{
+	ExternalHostMemory(vk::VkDeviceSize aSize, vk::VkDeviceSize aAlignment)
+		: size(deAlignSize(static_cast<size_t>(aSize), static_cast<size_t>(aAlignment)))
+	{
+		data = deAlignedMalloc(this->size, static_cast<size_t>(aAlignment));
+	}
+
+	~ExternalHostMemory()
+	{
+		if (data != DE_NULL)
+		{
+			deAlignedFree(data);
+		}
+	}
+
+	size_t	size;
+	void*	data;
+};
+
 bool							isSupportedPermanence				(vk::VkExternalSemaphoreHandleTypeFlagBits	type,
 																	 Permanence									permanence);
 Transference					getHandelTypeTransferences			(vk::VkExternalSemaphoreHandleTypeFlagBits	type);
@@ -191,7 +216,7 @@ vk::Move<vk::VkSemaphore>		createExportableSemaphore			(const vk::DeviceInterfac
 
 vk::Move<vk::VkSemaphore>		createExportableSemaphoreType		(const vk::DeviceInterface&					vkd,
 																	 vk::VkDevice								device,
-																	 vk::VkSemaphoreTypeKHR						semaphoreType,
+																	 vk::VkSemaphoreType						semaphoreType,
 																	 vk::VkExternalSemaphoreHandleTypeFlagBits	externalType);
 
 int								getSemaphoreFd						(const vk::DeviceInterface&					vkd,
@@ -324,6 +349,9 @@ vk::Move<vk::VkImage>			createExternalImage					(const vk::DeviceInterface&					
 																	 vk::VkImageUsageFlags						usageFlags,
 																	 deUint32									mipLevels = 1u,
 																	 deUint32									arrayLayers = 1u);
+
+vk::VkPhysicalDeviceExternalMemoryHostPropertiesEXT getPhysicalDeviceExternalMemoryHostProperties(const vk::InstanceInterface&	vki,
+																								  vk::VkPhysicalDevice			physicalDevice);
 
 } // ExternalMemoryUtil
 } // vkt

@@ -140,6 +140,11 @@ platform requires a different path, it can be specified with:
 
 	--deqp-log-filename=<path>
 
+By default, the CTS will expect to find its test resource files in the current
+working directory. This can be overridden with:
+
+	--deqp-archive-dir=<path>
+
 By default, the shader cache will be written into the path "shadercache.bin". If the
 platform requires a different path, it can be specified with:
 
@@ -248,7 +253,7 @@ if `vk::Platform::describePlatform()` is implemented.
 If the submission package covers multiple products, you can list them by appending
 additional `PRODUCT:` lines to the conformance statement. For example:
 
-	CONFORM_VERSION:         vulkan-cts-1.1.6.0
+	CONFORM_VERSION:         vulkan-cts-1.2.1.0
 	PRODUCT:                 Product A
 	PRODUCT:                 Product B
 	...
