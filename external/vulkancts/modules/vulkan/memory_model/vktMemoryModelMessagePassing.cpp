@@ -23,6 +23,7 @@
  *//*--------------------------------------------------------------------*/
 
 #include "vktMemoryModelTests.hpp"
+#include "vktMemoryModelPadding.hpp"
 
 #include "vkBufferWithMemory.hpp"
 #include "vkImageWithMemory.hpp"
@@ -210,6 +211,25 @@ void MemoryModelTestCase::checkSupport(Context& context) const
 			!(subgroupProperties.supportedOperations & VK_SUBGROUP_FEATURE_SHUFFLE_BIT))
 		{
 			TCU_THROW(NotSupportedError, "Subgroup features not supported");
+		}
+
+		VkShaderStageFlags stage= VK_SHADER_STAGE_COMPUTE_BIT;
+		if (m_data.stage == STAGE_VERTEX)
+		{
+			stage = VK_SHADER_STAGE_VERTEX_BIT;
+		}
+		else if (m_data.stage == STAGE_COMPUTE)
+		{
+			stage = VK_SHADER_STAGE_COMPUTE_BIT;
+		}
+		else if (m_data.stage == STAGE_FRAGMENT)
+		{
+			stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+		}
+
+		if((subgroupProperties.supportedStages & stage)==0)
+		{
+			TCU_THROW(NotSupportedError, "Device does not support subgroup operations for this stage");
 		}
 	}
 	if (m_data.dataType == DATA_TYPE_UINT64)
@@ -986,7 +1006,7 @@ tcu::TestStatus MemoryModelTestInstance::iterate (void)
 			local = m_data.payloadMemLocal;
 			if (m_data.payloadSC == SC_PHYSBUFFER)
 			{
-				usageFlags |= vk::VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR;
+				usageFlags |= vk::VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 				if (m_context.isDeviceFunctionalitySupported("VK_KHR_buffer_device_address"))
 					memoryDeviceAddress = true;
 			}
@@ -997,7 +1017,7 @@ tcu::TestStatus MemoryModelTestInstance::iterate (void)
 			local = m_data.guardMemLocal;
 			if (m_data.guardSC == SC_PHYSBUFFER)
 			{
-				usageFlags |= vk::VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT_KHR;
+				usageFlags |= vk::VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 				if (m_context.isDeviceFunctionalitySupported("VK_KHR_buffer_device_address"))
 					memoryDeviceAddress = true;
 			}
@@ -1433,9 +1453,9 @@ tcu::TestStatus MemoryModelTestInstance::iterate (void)
 	Move<VkCommandPool>				cmdPool					= createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_context.getUniversalQueueFamilyIndex());
 	Move<VkCommandBuffer>			cmdBuffer				= allocateCommandBuffer(vk, device, *cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
-	VkBufferDeviceAddressInfoKHR addrInfo =
+	VkBufferDeviceAddressInfo addrInfo =
 		{
-			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO_KHR,// VkStructureType	sType;
+			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,	// VkStructureType	sType;
 			DE_NULL,										// const void*		 pNext;
 			0,												// VkBuffer			buffer
 		};
@@ -1508,7 +1528,7 @@ tcu::TestStatus MemoryModelTestInstance::iterate (void)
 			addrInfo.buffer = **buffers[0];
 			VkDeviceAddress addr;
 			if (useKHR)
-				addr = vk.getBufferDeviceAddressKHR(device, &addrInfo);
+				addr = vk.getBufferDeviceAddress(device, &addrInfo);
 			else
 				addr = vk.getBufferDeviceAddressEXT(device, &addrInfo);
 			vk.cmdPushConstants(*cmdBuffer, *pipelineLayout, allShaderStages,
@@ -1520,7 +1540,7 @@ tcu::TestStatus MemoryModelTestInstance::iterate (void)
 			addrInfo.buffer = **buffers[1];
 			VkDeviceAddress addr;
 			if (useKHR)
-				addr = vk.getBufferDeviceAddressKHR(device, &addrInfo);
+				addr = vk.getBufferDeviceAddress(device, &addrInfo);
 			else
 				addr = vk.getBufferDeviceAddressEXT(device, &addrInfo);
 			vk.cmdPushConstants(*cmdBuffer, *pipelineLayout, allShaderStages,
@@ -1917,6 +1937,9 @@ tcu::TestCaseGroup*	createTests (tcu::TestContext& testCtx)
 		transGroup->addChild(cohGroup.release());
 	}
 	group->addChild(transGroup.release());
+
+	// Padding tests.
+	group->addChild(createPaddingTests(testCtx));
 
 	return group.release();
 }

@@ -54,10 +54,6 @@ namespace ycbcr
 namespace
 {
 
-// \todo [2017-05-24 pyry] Extend:
-// * VK_IMAGE_TILING_LINEAR
-// * Other shader types
-
 using namespace vk;
 using namespace shaderexecutor;
 
@@ -69,9 +65,6 @@ using de::MovePtr;
 using de::UniquePtr;
 using std::vector;
 using std::string;
-
-typedef de::SharedPtr<Allocation>				AllocationSp;
-typedef de::SharedPtr<vk::Unique<VkBuffer> >	VkBufferSp;
 
 Move<VkImage> createTestImage (const DeviceInterface&	vkd,
 							   VkDevice					device,
