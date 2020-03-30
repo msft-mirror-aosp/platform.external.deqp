@@ -79,6 +79,7 @@ android_test {
     test_suites: [
         "cts",
         "vts",
+        "vts10",
     ],
 
     srcs: ["android/package/src/**/*.java"],
