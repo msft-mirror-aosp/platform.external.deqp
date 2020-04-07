@@ -1413,10 +1413,12 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         checkInterrupted(); // throws if interrupted
 
         final String testCases = generateTestCaseTrie(batch.tests);
-
-        mDevice.executeShellCommand("rm " + APP_DIR + CASE_LIST_FILE_NAME);
+        final String testCaseFilename = APP_DIR + CASE_LIST_FILE_NAME;
+        mDevice.executeShellCommand("rm " + testCaseFilename);
         mDevice.executeShellCommand("rm " + APP_DIR + LOG_FILE_NAME);
-        mDevice.pushString(testCases + "\n", APP_DIR + CASE_LIST_FILE_NAME);
+        if (!mDevice.pushString(testCases + "\n", testCaseFilename)) {
+        	throw new RuntimeException("Failed to write test cases to " + testCaseFilename);
+		}
 
         final String instrumentationName =
                 "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
