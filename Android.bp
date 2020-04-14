@@ -18,6 +18,8 @@ cc_library_shared {
         "-google-runtime-operator",
     ],
 
+    header_libs: ["jni_headers"],
+
     include_dirs: [
         "external/deqp-deps/SPIRV-Headers/include",
     ],
