@@ -71,6 +71,7 @@ cc_library_shared {
         "-Wno-implicit-int-conversion",
         "-Wno-missing-field-initializers",
         "-Wno-switch",
+        "-Wno-unused-parameter",
         "-Wno-unused-variable",
         "-fexceptions",
     ],
