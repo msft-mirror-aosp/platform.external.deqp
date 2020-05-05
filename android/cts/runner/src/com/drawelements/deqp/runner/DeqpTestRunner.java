@@ -1426,8 +1426,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         mDevice.executeShellCommand("rm " + testCaseFilename);
         mDevice.executeShellCommand("rm " + APP_DIR + LOG_FILE_NAME);
         if (!mDevice.pushString(testCases + "\n", testCaseFilename)) {
-        	throw new RuntimeException("Failed to write test cases to " + testCaseFilename);
-		}
+            throw new RuntimeException("Failed to write test cases to " + testCaseFilename);
+        }
 
         final String instrumentationName =
                 "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
