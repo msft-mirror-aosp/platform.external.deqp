@@ -359,6 +359,7 @@ const char* getStructureTypeName (VkStructureType value)
 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES_KHR:				return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_MEMORY_MODEL_FEATURES_KHR";
 		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT:				return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT";
 		case VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR:								return "VK_STRUCTURE_TYPE_SURFACE_PROTECTED_CAPABILITIES_KHR";
+		case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR:		return "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR";
 		default:																				return DE_NULL;
 	}
 }
@@ -6630,6 +6631,16 @@ std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceScalarBlockLayo
 	s << "\tsType = " << value.sType << '\n';
 	s << "\tpNext = " << value.pNext << '\n';
 	s << "\tscalarBlockLayout = " << value.scalarBlockLayout << '\n';
+	s << '}';
+	return s;
+}
+
+std::ostream& operator<< (std::ostream& s, const VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR& value)
+{
+	s << "VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR = {\n";
+	s << "\tsType = " << value.sType << '\n';
+	s << "\tpNext = " << value.pNext << '\n';
+	s << "\tuniformBufferStandardLayout = " << value.uniformBufferStandardLayout << '\n';
 	s << '}';
 	return s;
 }

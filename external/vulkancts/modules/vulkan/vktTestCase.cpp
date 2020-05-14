@@ -327,6 +327,7 @@ public:
 	VkPhysicalDeviceConditionalRenderingFeaturesEXT		conditionalRenderingFeatures;
 	VkPhysicalDeviceScalarBlockLayoutFeaturesEXT		scalarBlockLayoutFeatures;
 	VkPhysicalDeviceFloat16Int8FeaturesKHR				float16Int8Features;
+	VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR	uniformBufferStandardLayoutFeatures;
 
 	DeviceFeatures (const InstanceInterface&	vki,
 					const deUint32				apiVersion,
@@ -349,6 +350,7 @@ public:
 		deMemset(&shaderAtomicInt64Features, 0, sizeof(shaderAtomicInt64Features));
 		deMemset(&conditionalRenderingFeatures, 0, sizeof(conditionalRenderingFeatures));
 		deMemset(&scalarBlockLayoutFeatures, 0, sizeof(scalarBlockLayoutFeatures));
+		deMemset(&uniformBufferStandardLayoutFeatures, 0, sizeof(uniformBufferStandardLayoutFeatures));
 
 		coreFeatures.sType						= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
 		samplerYCbCrConversionFeatures.sType	= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SAMPLER_YCBCR_CONVERSION_FEATURES;
@@ -365,6 +367,7 @@ public:
 		shaderAtomicInt64Features.sType			= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_ATOMIC_INT64_FEATURES_KHR;
 		conditionalRenderingFeatures.sType		= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_CONDITIONAL_RENDERING_FEATURES_EXT;
 		scalarBlockLayoutFeatures.sType			= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT;
+		uniformBufferStandardLayoutFeatures.sType	= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR;
 
 		vector<VkExtensionProperties> deviceExtensionProperties =
 			enumerateDeviceExtensionProperties(vki, physicalDevice, DE_NULL);
@@ -443,6 +446,11 @@ public:
 				*nextPtr	= &scalarBlockLayoutFeatures;
 				nextPtr		= &scalarBlockLayoutFeatures.pNext;
 			}
+			if (de::contains(deviceExtensions.begin(), deviceExtensions.end(), "VK_KHR_uniform_buffer_standard_layout"))
+			{
+				*nextPtr	= &uniformBufferStandardLayoutFeatures;
+				nextPtr		= &uniformBufferStandardLayoutFeatures.pNext;
+			}
 
 			vki.getPhysicalDeviceFeatures2(physicalDevice, &coreFeatures);
 		}
@@ -480,6 +488,7 @@ public:
 	const VkPhysicalDeviceShaderAtomicInt64FeaturesKHR&		getShaderAtomicInt64Features		(void) const	{ return m_deviceFeatures.shaderAtomicInt64Features;	}
 	const VkPhysicalDeviceConditionalRenderingFeaturesEXT&	getConditionalRenderingFeatures		(void) const	{ return m_deviceFeatures.conditionalRenderingFeatures;	}
 	const VkPhysicalDeviceScalarBlockLayoutFeaturesEXT&		getScalarBlockLayoutFeatures		(void) const	{ return m_deviceFeatures.scalarBlockLayoutFeatures;	}
+	const VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR&				getUniformBufferStandardLayoutFeatures				(void) const	{ return m_deviceFeatures.uniformBufferStandardLayoutFeatures;	}
 	const VkPhysicalDeviceFloat16Int8FeaturesKHR&			getFloat16Int8Features				(void) const	{ return m_deviceFeatures.float16Int8Features;				}
 	VkDevice												getDevice							(void) const	{ return *m_device;											}
 	const DeviceInterface&									getDeviceInterface					(void) const	{ return m_deviceInterface;									}
@@ -650,6 +659,8 @@ const vk::VkPhysicalDeviceConditionalRenderingFeaturesEXT&
 										Context::getConditionalRenderingFeatures(void) const { return m_device->getConditionalRenderingFeatures();	}
 const vk::VkPhysicalDeviceScalarBlockLayoutFeaturesEXT&
 										Context::getScalarBlockLayoutFeatures	(void) const { return m_device->getScalarBlockLayoutFeatures();	}
+const vk::VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR&
+										Context::getUniformBufferStandardLayoutFeatures			(void) const { return m_device->getUniformBufferStandardLayoutFeatures();	}
 const vk::VkPhysicalDeviceFloat16Int8FeaturesKHR&
 										Context::getFloat16Int8Features			(void) const { return m_device->getFloat16Int8Features();		}
 const vk::VkPhysicalDeviceProperties&	Context::getDeviceProperties			(void) const { return m_device->getDeviceProperties();			}

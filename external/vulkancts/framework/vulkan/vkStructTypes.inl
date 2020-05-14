@@ -3239,65 +3239,9 @@ struct VkPhysicalDeviceScalarBlockLayoutFeaturesEXT
 	VkBool32		scalarBlockLayout;
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+struct VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR
+{
+	VkStructureType	sType;
+	void*			pNext;
+	VkBool32		uniformBufferStandardLayout;
+};

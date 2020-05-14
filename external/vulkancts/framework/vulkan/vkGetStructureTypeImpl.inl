@@ -1256,3 +1256,7 @@ template<> VkStructureType getStructureType<VkPhysicalDeviceScalarBlockLayoutFea
 	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES_EXT;
 }
 
+template<> VkStructureType getStructureType<VkPhysicalDeviceUniformBufferStandardLayoutFeaturesKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_UNIFORM_BUFFER_STANDARD_LAYOUT_FEATURES_KHR;
+}
