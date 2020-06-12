@@ -174,3 +174,7 @@ dEQP-GLES3.functional.shaders.builtin_functions.precision.reflect.highp_fragment
 
 # b/73070970
 dEQP-GLES3.functional.shaders.declarations.unspecified_precision.*
+
+# Khronos bug 13916, internal bugs 20558284, 143459817
+dEQP-GLES3.functional.flush_finish.*
+
