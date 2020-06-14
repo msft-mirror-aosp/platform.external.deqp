@@ -1655,12 +1655,12 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      *
      * Precondition: the package must be a Vulkan package.
      */
-    private boolean claimedVuklanDeqpLevelIsRecentEnough()
+    private boolean claimedVulkanDeqpLevelIsRecentEnough()
         throws CapabilityQueryFailureException, DeviceNotAvailableException {
 
-        if (!isVulkanPackage()) {
+        if (!isVulkanPackage() || !isSupportedVulkan()) {
             throw new AssertionError("Claims about Vulkan dEQP support should only be checked for "
-                + "Vulkan packages");
+                + "Vulkan packages, and when Vulkan is supported");
         }
         final Map<String, Optional<Integer>> features = getDeviceFeatures(mDevice);
         for (String feature : features.keySet()) {
@@ -1678,8 +1678,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     final int year = Integer.parseInt(matcher.group(1));
                     final int month = Integer.parseInt(matcher.group(2));
                     final int day = Integer.parseInt(matcher.group(3));
-                    CLog.d("Case list date is %s-%s-%s", String.format("04d", year),
-                        String.format("02d", month), String.format("02d", day));
+                    CLog.d("Case list date is %04d-%02d-%02d", year, month, day);
                     // As per the documentation for FEATURE_VULKAN_DEQP_LEVEL in
                     // android.content.pm.PackageManager, a year is encoded as an integer by
                     // devoting bits 31-16 to year, 15-8 to month and 7-0 to day
@@ -1693,8 +1692,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                 }
             }
         }
-        throw new IllegalStateException("Device supports Vulkan, so must have feature "
-            + FEATURE_VULKAN_DEQP_LEVEL);
+        // The device supports Vulkan but does not specify a minimum supported Vulkan dEQP
+        // level.  We conservatively assume that the device should be expected to pass all
+        // Vulkan dEQP tests.
+        return true;
     }
 
     /**
@@ -2172,13 +2173,13 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             final boolean isSupportedApi = (isOpenGlEsPackage() && isSupportedGles())
                                             || (isVulkanPackage() && isSupportedVulkan())
                                             || (!isOpenGlEsPackage() && !isVulkanPackage());
-            final boolean deviceClaimsToSupportTests = !isVulkanPackage()
-                || claimedVuklanDeqpLevelIsRecentEnough();
-            if (!isSupportedApi || !deviceClaimsToSupportTests || mCollectTestsOnly) {
+            if (mCollectTestsOnly
+                || !isSupportedApi
+                || (isVulkanPackage() && !claimedVulkanDeqpLevelIsRecentEnough())) {
                 // Pass all tests trivially if:
-                // - the OpenGL ES or Vulkan is not supported, or
-                // - the device's feature flags do not claim to pass the tests, or
-                // - we are collecting the names of the tests only
+                // - we are collecting the names of the tests only, or
+                // - the relevant API is not supported, or
+                // - the device's feature flags do not claim to pass the tests
                 fakePassTests(listener);
             } else if (!mRemainingTests.isEmpty()) {
                 mInstanceListerner.setSink(listener);
