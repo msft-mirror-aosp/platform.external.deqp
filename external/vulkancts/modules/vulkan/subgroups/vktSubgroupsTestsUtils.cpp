@@ -1052,6 +1052,7 @@ void vkt::subgroups::initStdFrameBufferPrograms(	SourceCollections&				programCo
 			<< testSrc
 			<< "  out_color[gl_InvocationID] = float(tempRes);\n"
 			<< "  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
+			<< (gsPointSize ? " gl_out[gl_InvocationID].gl_PointSize = gl_in[gl_InvocationID].gl_PointSize;\n" : "")
 			<< "}\n";
 
 		programCollection.glslSources.add("tesc")
@@ -1077,6 +1078,7 @@ void vkt::subgroups::initStdFrameBufferPrograms(	SourceCollections&				programCo
 			<< testSrc
 			<< "  out_color = float(tempRes);\n"
 			<< "  gl_Position = mix(gl_in[0].gl_Position, gl_in[1].gl_Position, gl_TessCoord.x);\n"
+			<< (gsPointSize ? "  gl_PointSize = gl_in[0].gl_PointSize;\n" : "")
 			<< "}\n";
 
 		subgroups::setTesCtrlShaderFrameBuffer(programCollection);
@@ -1092,6 +1094,7 @@ void vkt::subgroups::initStdPrograms(	vk::SourceCollections&			programCollection
 										const vk::ShaderBuildOptions&	buildOptions,
 										vk::VkShaderStageFlags			shaderStage,
 										vk::VkFormat					format,
+										bool							gsPointSize,
 										std::string						extHeader,
 										std::string						testSrc,
 										std::string						helperStr)
@@ -1178,6 +1181,7 @@ void vkt::subgroups::initStdPrograms(	vk::SourceCollections&			programCollection
 			"    gl_TessLevelOuter[1] = 1.0f;\n"
 			"  }\n"
 			"  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
+			+ (gsPointSize ? " gl_out[gl_InvocationID].gl_PointSize = gl_in[gl_InvocationID].gl_PointSize;\n" : "") +
 			"}\n";
 
 		const string tese =
@@ -1201,6 +1205,7 @@ void vkt::subgroups::initStdPrograms(	vk::SourceCollections&			programCollection
 			"  result[gl_PrimitiveID * 2 + uint(gl_TessCoord.x + 0.5)] = tempRes;\n"
 			"  float pixelSize = 2.0f/1024.0f;\n"
 			"  gl_Position = gl_in[0].gl_Position + gl_TessCoord.x * pixelSize / 2.0f;\n"
+			+ (gsPointSize ? "  gl_PointSize = gl_in[0].gl_PointSize;\n" : "") +
 			"}\n";
 
 		const string geometry =
@@ -1224,6 +1229,7 @@ void vkt::subgroups::initStdPrograms(	vk::SourceCollections&			programCollection
 			+ testSrc +
 			"  result[gl_PrimitiveIDIn] = tempRes;\n"
 			"  gl_Position = gl_in[0].gl_Position;\n"
+			+ (gsPointSize ? "  gl_PointSize = gl_in[0].gl_PointSize;\n" : "") +
 			"  EmitVertex();\n"
 			"  EndPrimitive();\n"
 			"}\n";
@@ -3480,11 +3486,13 @@ tcu::TestStatus vkt::subgroups::makeComputeTest(
 							VK_PIPELINE_CREATE_ALLOW_DERIVATIVES_BIT, (VkPipeline) DE_NULL,
 							localSizesToTest[0][0], localSizesToTest[0][1], localSizesToTest[0][2]);
 	context.getTestContext().touchWatchdog();
+
 	for (deUint32 index = 1; index < (localSizesToTestCount - 1); index++)
 	{
 		const deUint32 nextX = localSizesToTest[index][0];
 		const deUint32 nextY = localSizesToTest[index][1];
 		const deUint32 nextZ = localSizesToTest[index][2];
+
 		context.getTestContext().touchWatchdog();
 		pipelines[index] =
 			makeComputePipeline(context, *pipelineLayout, *shaderModule,
