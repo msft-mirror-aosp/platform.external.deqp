@@ -57,8 +57,6 @@ public:
 	Platform&				getPlatform			(void)			{ return m_platform;	}
 	void					setTestResult		(qpTestResult result, const char* description);
 	void					touchWatchdog		(void);
-	void					touchWatchdogAndDisableIntervalTimeLimit	(void);
-	void					touchWatchdogAndEnableIntervalTimeLimit		(void);
 	const CommandLine&		getCommandLine		(void) const	{ return m_cmdLine;		}
 
 	// API for test framework
