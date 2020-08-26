@@ -697,9 +697,26 @@ void AtomicOperationCase::createShaderSpec (void)
 	specializations["N"] = de::toString((int)NUM_ELEMENTS);
 	specializations["COMPARE_ARG"] = m_atomicOp == ATOMIC_OP_COMP_SWAP ? "buf.compareValues[idx], " : "";
 
-	const tcu::StringTemplate nonVertexShaderTemplateSrc(
-		"int idx = atomicAdd(buf.index, 1);\n"
-		"buf.outputValues[idx] = ${ATOMICOP}(buf.inoutValues[idx % (${N}/2)], ${COMPARE_ARG}buf.inputValues[idx]);\n");
+	// Shader body for the non-vertex case.
+	std::ostringstream nonVertexShaderTemplateStream;
+
+	if (m_shaderType == glu::SHADERTYPE_FRAGMENT)
+	{
+		nonVertexShaderTemplateStream
+			<< "if (!gl_HelperInvocation) {\n"
+			<< "    int idx = atomicAdd(buf.index, 1);\n"
+			<< "    buf.outputValues[idx] = ${ATOMICOP}(buf.inoutValues[idx % (${N}/2)], ${COMPARE_ARG}buf.inputValues[idx]);\n"
+			<< "}\n" ;
+	}
+	else
+	{
+		nonVertexShaderTemplateStream
+			<< "int idx = atomicAdd(buf.index, 1);\n"
+			<< "buf.outputValues[idx] = ${ATOMICOP}(buf.inoutValues[idx % (${N}/2)], ${COMPARE_ARG}buf.inputValues[idx]);\n";
+	}
+
+	const auto					nonVertexShaderTemplateStreamStr	= nonVertexShaderTemplateStream.str();
+	const tcu::StringTemplate	nonVertexShaderTemplateSrc			(nonVertexShaderTemplateStreamStr);
 
 	const tcu::StringTemplate vertexShaderTemplateSrc(
 		"int idx = gl_VertexIndex;\n"
