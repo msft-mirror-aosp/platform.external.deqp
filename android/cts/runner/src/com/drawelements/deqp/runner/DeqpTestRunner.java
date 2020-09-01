@@ -42,7 +42,6 @@ import com.android.tradefed.testtype.IRuntimeHintProvider;
 import com.android.tradefed.testtype.IShardableTest;
 import com.android.tradefed.testtype.ITestCollector;
 import com.android.tradefed.testtype.ITestFilterReceiver;
-import com.android.tradefed.testtype.NativeCodeCoverageListener;
 import com.android.tradefed.util.AbiUtils;
 import com.android.tradefed.util.FileUtil;
 import com.android.tradefed.util.IRunUtil;
@@ -2159,8 +2158,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             loadTests();
         }
 
-        listener = addNativeCoverageListenerIfEnabled(mDevice, listener);
-
         mRemainingTests = new LinkedList<>(mTestInstances.keySet());
         long startTime = System.currentTimeMillis();
         listener.testRunStarted(getId(), mRemainingTests.size());
@@ -2270,8 +2267,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         mCollectTestsOnly = collectTests;
     }
 
-    public void setNativeCoverage(boolean coverage) { mCoverage = coverage; }
-
     private static void copyOptions(DeqpTestRunner destination, DeqpTestRunner source) {
         destination.mDeqpPackage = source.mDeqpPackage;
         destination.mConfigName = source.mConfigName;
@@ -2360,20 +2355,5 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         // Tests normally take something like ~100ms. Some take a
         // second. Let's guess 200ms per test.
         return 200 * mTestInstances.size();
-    }
-
-    /**
-     * Adds a {@link NativeCodeCoverageListener} to the chain if code coverage is enabled.
-     *
-     * @param device the device to pull coverage results from
-     * @param listener the original listener
-     * @return a chained listener if code coverage is enabled, otherwise the original listener
-     */
-    ITestInvocationListener addNativeCoverageListenerIfEnabled(
-            ITestDevice device, ITestInvocationListener listener) {
-        if (mCoverage) {
-            return new NativeCodeCoverageListener(device, listener);
-        }
-        return listener;
     }
 }
