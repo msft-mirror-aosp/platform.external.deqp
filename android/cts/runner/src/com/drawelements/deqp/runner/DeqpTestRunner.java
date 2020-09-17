@@ -64,8 +64,10 @@ import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -88,6 +90,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     public static final String FEATURE_LANDSCAPE = "android.hardware.screen.landscape";
     public static final String FEATURE_PORTRAIT = "android.hardware.screen.portrait";
     public static final String FEATURE_VULKAN_LEVEL = "android.hardware.vulkan.level";
+    public static final String FEATURE_VULKAN_DEQP_LEVEL = "android.software.vulkan.deqp.level";
 
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS = 10 * 60 * 1000; // 10min
@@ -157,6 +160,12 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                         + " be a coverage build or else this will fail.")
     private boolean mCoverage = false;
 
+    @Option(
+            name = "disable-watchdog",
+            description =
+                    "Disable the native testrunner's per-test watchdog.")
+    private boolean mDisableWatchdog = false;
+
     private Collection<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
     private final TestInstanceResultListener mInstanceListerner = new TestInstanceResultListener();
@@ -165,7 +174,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private CompatibilityBuildHelper mBuildHelper;
     private boolean mLogData = false;
     private ITestDevice mDevice;
-    private Set<String> mDeviceFeatures;
+    private Map<String, Optional<Integer>> mDeviceFeatures;
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
     private IRunUtil mRunUtil = RunUtil.getDefault();
     // When set will override the mCaselistFile for testing purposes.
@@ -1291,14 +1300,14 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             throws DeviceNotAvailableException, CapabilityQueryFailureException {
         // orientation support
         if (!BatchRunConfiguration.ROTATION_UNSPECIFIED.equals(runConfig.getRotation())) {
-            final Set<String> features = getDeviceFeatures(mDevice);
+            final Map<String, Optional<Integer>> features = getDeviceFeatures(mDevice);
 
             if (isPortraitClassRotation(runConfig.getRotation()) &&
-                    !features.contains(FEATURE_PORTRAIT)) {
+                    !features.containsKey(FEATURE_PORTRAIT)) {
                 return false;
             }
             if (isLandscapeClassRotation(runConfig.getRotation()) &&
-                    !features.contains(FEATURE_LANDSCAPE)) {
+                    !features.containsKey(FEATURE_LANDSCAPE)) {
                 return false;
             }
         }
@@ -1416,8 +1425,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         mDevice.executeShellCommand("rm " + testCaseFilename);
         mDevice.executeShellCommand("rm " + APP_DIR + LOG_FILE_NAME);
         if (!mDevice.pushString(testCases + "\n", testCaseFilename)) {
-        	throw new RuntimeException("Failed to write test cases to " + testCaseFilename);
-		}
+            throw new RuntimeException("Failed to write test cases to " + testCaseFilename);
+        }
 
         final String instrumentationName =
                 "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
@@ -1433,7 +1442,9 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             deqpCmdLine.append(" --deqp-log-images=disable");
         }
 
-        deqpCmdLine.append(" --deqp-watchdog=enable");
+        if (!mDisableWatchdog) {
+            deqpCmdLine.append(" --deqp-watchdog=enable");
+        }
 
         final String command = String.format(
                 "am instrument %s -w -e deqpLogFileName \"%s\" -e deqpCmdLine \"%s\""
@@ -1616,7 +1627,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             listener.testEnded(test, emptyMap);
         }
         // Log only once all the skipped tests
-        CLog.d("Opengl ES version not supported. Skipping tests '%s'", mRemainingTests);
+        CLog.d("Skipping tests '%s', either because they are not supported by the device or "
+            + "because tests are simply being collected", mRemainingTests);
         mRemainingTests.clear();
     }
 
@@ -1625,15 +1637,64 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private boolean isSupportedVulkan ()
             throws DeviceNotAvailableException, CapabilityQueryFailureException {
-        final Set<String> features = getDeviceFeatures(mDevice);
+        final Map<String, Optional<Integer>> features = getDeviceFeatures(mDevice);
 
-        for (String feature : features) {
+        for (String feature : features.keySet()) {
             if (feature.startsWith(FEATURE_VULKAN_LEVEL)) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Check whether the device's claimed Vulkan dEQP level is high enough that it should pass the
+     * tests in the caselist.
+     *
+     * Precondition: the package must be a Vulkan package.
+     */
+    private boolean claimedVulkanDeqpLevelIsRecentEnough()
+        throws CapabilityQueryFailureException, DeviceNotAvailableException {
+
+        if (!isVulkanPackage() || !isSupportedVulkan()) {
+            throw new AssertionError("Claims about Vulkan dEQP support should only be checked for "
+                + "Vulkan packages, and when Vulkan is supported");
+        }
+        final Map<String, Optional<Integer>> features = getDeviceFeatures(mDevice);
+        for (String feature : features.keySet()) {
+            if (feature.startsWith(FEATURE_VULKAN_DEQP_LEVEL)) {
+                final Optional<Integer> claimedVulkanDeqpLevel = features.get(feature);
+                if (!claimedVulkanDeqpLevel.isPresent()) {
+                    throw new IllegalStateException("Feature " + FEATURE_VULKAN_DEQP_LEVEL
+                        + " has no associated version");
+                }
+                // A Vulkan case list filename has the form 'vk-master-YYYY-MM-DD.txt'
+                final Pattern caseListFilenamePattern = Pattern
+                    .compile("vk-master-(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)\\.txt");
+                final Matcher matcher = caseListFilenamePattern.matcher(mCaselistFile);
+                if (matcher.find()) {
+                    final int year = Integer.parseInt(matcher.group(1));
+                    final int month = Integer.parseInt(matcher.group(2));
+                    final int day = Integer.parseInt(matcher.group(3));
+                    CLog.d("Case list date is %04d-%02d-%02d", year, month, day);
+                    // As per the documentation for FEATURE_VULKAN_DEQP_LEVEL in
+                    // android.content.pm.PackageManager, a year is encoded as an integer by
+                    // devoting bits 31-16 to year, 15-8 to month and 7-0 to day
+                    final int minimumLevel = (year << 16) + (month << 8) + day;
+                    CLog.d("Minimum level required to run this case list is %d", minimumLevel);
+                    CLog.d("Claimed level for this device is %d", claimedVulkanDeqpLevel.get());
+                    return claimedVulkanDeqpLevel.get() >= minimumLevel;
+                } else {
+                    throw new IllegalStateException("Case list filename " + mCaselistFile
+                        + " is malformed");
+                }
+            }
+        }
+        // The device supports Vulkan but does not specify a minimum supported Vulkan dEQP
+        // level.  We conservatively assume that the device should be expected to pass all
+        // Vulkan dEQP tests.
+        return true;
     }
 
     /**
@@ -1717,9 +1778,9 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     }
 
     /**
-     * Return feature set supported by the device
+     * Return feature set supported by the device, mapping integer-valued features to their values
      */
-    private Set<String> getDeviceFeatures(ITestDevice device)
+    private Map<String, Optional<Integer>> getDeviceFeatures(ITestDevice device)
             throws DeviceNotAvailableException, CapabilityQueryFailureException {
         if (mDeviceFeatures == null) {
             mDeviceFeatures = queryDeviceFeatures(device);
@@ -1730,7 +1791,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     /**
      * Query feature set supported by the device
      */
-    private static Set<String> queryDeviceFeatures(ITestDevice device)
+    private static Map<String, Optional<Integer>> queryDeviceFeatures(ITestDevice device)
             throws DeviceNotAvailableException, CapabilityQueryFailureException {
         // NOTE: Almost identical code in BaseDevicePolicyTest#hasDeviceFeatures
         // TODO: Move this logic to ITestDevice.
@@ -1738,15 +1799,30 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         String commandOutput = device.executeShellCommand(command);
 
         // Extract the id of the new user.
-        HashSet<String> availableFeatures = new HashSet<>();
+        Map<String, Optional<Integer>> availableFeatures = new HashMap<>();
         for (String feature: commandOutput.split("\\s+")) {
-            // Each line in the output of the command has the format "feature:{FEATURE_VALUE}".
-            String[] tokens = feature.split(":");
+            // Each line in the output of the command has the format "feature:{FEATURE_NAME}",
+            // optionally followed by "={FEATURE_VERSION}".
+            String[] tokens = feature.split(":|=");
             if (tokens.length < 2 || !"feature".equals(tokens[0])) {
-                CLog.e("Failed parse features. Unexpect format on line \"%s\"", tokens[0]);
+                CLog.e("Failed parse features. Unexpect format on line \"%s\"", feature);
                 throw new CapabilityQueryFailureException();
             }
-            availableFeatures.add(tokens[1]);
+            final String featureName = tokens[1];
+            Optional<Integer> featureValue = Optional.empty();
+            if (tokens.length > 2) {
+                try {
+                    // Integer.decode, rather than Integer.parseInt, is used here since some
+                    // feature versions may be presented in decimal and others in hexadecimal.
+                    featureValue = Optional.of(Integer.decode(tokens[2]));
+                } catch (NumberFormatException numberFormatException) {
+                    CLog.e("Failed parse features. Feature value \"%s\" was not an integer on "
+                        + "line \"%s\"", tokens[2], feature);
+                    throw new CapabilityQueryFailureException();
+                }
+
+            }
+            availableFeatures.put(featureName, featureValue);
         }
         return availableFeatures;
     }
@@ -2094,10 +2170,13 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             final boolean isSupportedApi = (isOpenGlEsPackage() && isSupportedGles())
                                             || (isVulkanPackage() && isSupportedVulkan())
                                             || (!isOpenGlEsPackage() && !isVulkanPackage());
-
-            if (!isSupportedApi || mCollectTestsOnly) {
-                // Pass all tests if OpenGL ES version is not supported or we are collecting
-                // the names of the tests only
+            if (mCollectTestsOnly
+                || !isSupportedApi
+                || (isVulkanPackage() && !claimedVulkanDeqpLevelIsRecentEnough())) {
+                // Pass all tests trivially if:
+                // - we are collecting the names of the tests only, or
+                // - the relevant API is not supported, or
+                // - the device's feature flags do not claim to pass the tests
                 fakePassTests(listener);
             } else if (!mRemainingTests.isEmpty()) {
                 mInstanceListerner.setSink(listener);
@@ -2204,6 +2283,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         destination.mCollectTestsOnly = source.mCollectTestsOnly;
         destination.mAngle = source.mAngle;
         destination.mCoverage = source.mCoverage;
+        destination.mDisableWatchdog = source.mDisableWatchdog;
     }
 
     /**
