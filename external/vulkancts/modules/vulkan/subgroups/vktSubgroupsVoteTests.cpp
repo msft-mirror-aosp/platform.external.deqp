@@ -116,6 +116,8 @@ struct CaseDefinition
 	VkShaderStageFlags	shaderStage;
 	VkFormat			format;
 	de::SharedPtr<bool>	geometryPointSizeSupported;
+	deBool              requires8BitUniformBuffer;
+	deBool              requires16BitUniformBuffer;
 };
 
 bool fmtIsBoolean(VkFormat format)
@@ -268,6 +270,7 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 			<< source
 			<< "  out_color[gl_InvocationID] = float(result);"
 			<< "  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
+			<< (*caseDef.geometryPointSizeSupported ? "  gl_out[gl_InvocationID].gl_PointSize = gl_in[gl_InvocationID].gl_PointSize;\n" : "")
 			<< "}\n";
 
 		programCollection.glslSources.add("tesc")
@@ -295,6 +298,7 @@ void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefiniti
 			<< source
 			<< "  out_color = float(result);\n"
 			<< "  gl_Position = mix(gl_in[0].gl_Position, gl_in[1].gl_Position, gl_TessCoord.x);\n"
+			<< (*caseDef.geometryPointSizeSupported ? "  gl_PointSize = gl_in[0].gl_PointSize;\n" : "")
 			<< "}\n";
 
 		subgroups::setTesCtrlShaderFrameBuffer(programCollection);
@@ -488,6 +492,7 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"    gl_TessLevelOuter[1] = 1.0f;\n"
 				"  }\n"
 				"  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
+				+ (*caseDef.geometryPointSizeSupported ? "  gl_out[gl_InvocationID].gl_PointSize = gl_in[gl_InvocationID].gl_PointSize;\n" : "") +
 				"}\n";
 
 			programCollection.glslSources.add("tesc")
@@ -517,6 +522,7 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				"  res[offset] = result;\n"
 				"  float pixelSize = 2.0f/1024.0f;\n"
 				"  gl_Position = gl_in[0].gl_Position + gl_TessCoord.x * pixelSize / 2.0f;\n"
+				+ (*caseDef.geometryPointSizeSupported ? "  gl_PointSize = gl_in[0].gl_PointSize;\n" : "") +
 				"}\n";
 
 			programCollection.glslSources.add("tese")
@@ -546,6 +552,7 @@ void initPrograms(SourceCollections& programCollection, CaseDefinition caseDef)
 				+ source +
 				"  res[offset] = result;\n"
 				"  gl_Position = gl_in[0].gl_Position;\n"
+				+ (*caseDef.geometryPointSizeSupported ? "  gl_PointSize = gl_in[0].gl_PointSize;\n" : "") +
 				"  EmitVertex();\n"
 				"  EndPrimitive();\n"
 				"}\n";
@@ -611,6 +618,22 @@ void supportedCheck (Context& context, CaseDefinition caseDef)
 
 	if (!subgroups::isFormatSupportedForDevice(context, caseDef.format))
 		TCU_THROW(NotSupportedError, "Device does not support the specified format in subgroup operations");
+
+	if (caseDef.requires16BitUniformBuffer)
+	{
+		if (!subgroups::is16BitUBOStorageSupported(context))
+		{
+			TCU_THROW(NotSupportedError, "Device does not support the specified format in subgroup operations");
+		}
+	}
+
+	if (caseDef.requires8BitUniformBuffer)
+	{
+		if (!subgroups::is8BitUBOStorageSupported(context))
+		{
+			TCU_THROW(NotSupportedError, "Device does not support the specified format in subgroup operations");
+		}
+	}
 
 	if (caseDef.opType > OPTYPE_LAST_NON_ARB)
 	{
@@ -790,7 +813,7 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 			const std::string op = de::toLower(getOpTypeName(opTypeIndex));
 
 			{
-				const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_COMPUTE_BIT, format, de::SharedPtr<bool>(new bool)};
+				const CaseDefinition caseDef = { opTypeIndex, VK_SHADER_STAGE_COMPUTE_BIT, format, de::SharedPtr<bool>(new bool),deBool(false),deBool(false) };
 				if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 				{
 					addFunctionCaseWithPrograms(computeGroup.get(),
@@ -806,7 +829,7 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 			}
 
 			{
-				const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_ALL_GRAPHICS, format, de::SharedPtr<bool>(new bool)};
+				const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_ALL_GRAPHICS, format, de::SharedPtr<bool>(new bool),deBool(false),deBool(false) };
 				if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 				{
 					addFunctionCaseWithPrograms(graphicGroup.get(),
@@ -823,7 +846,7 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 
 			for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(stages); ++stageIndex)
 			{
-				const CaseDefinition caseDef = {opTypeIndex, stages[stageIndex], format, de::SharedPtr<bool>(new bool)};
+				const CaseDefinition caseDef = {opTypeIndex, stages[stageIndex], format, de::SharedPtr<bool>(new bool),deBool(false),deBool(false) };
 				if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 				{
 					addFunctionCaseWithPrograms(framebufferGroup.get(),
@@ -841,8 +864,9 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 												supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
 				}
 			}
-
-			const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_FRAGMENT_BIT, format, de::SharedPtr<bool>(new bool)};
+			bool needs8BitUBOStorage = isFormat8bitTy(format);
+			bool needs16BitUBOStorage = isFormat16BitTy(format);
+			const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_FRAGMENT_BIT, format, de::SharedPtr<bool>(new bool),deBool(needs8BitUBOStorage),deBool(needs16BitUBOStorage) };
 			if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 			{
 				addFunctionCaseWithPrograms(fragHelperGroup.get(),
