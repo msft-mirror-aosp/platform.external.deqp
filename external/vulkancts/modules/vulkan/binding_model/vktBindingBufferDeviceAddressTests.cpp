@@ -963,6 +963,8 @@ tcu::TestStatus BufferAddressTestInstance::iterate (void)
 	Move<VkFramebuffer> framebuffer;
 	de::MovePtr<BufferWithMemory> sbtBuffer;
 
+	m_context.getTestContext().touchWatchdogAndDisableIntervalTimeLimit();
+
 	if (m_data.stage == STAGE_COMPUTE)
 	{
 		const Unique<VkShaderModule>	shader(createShaderModule(vk, device, m_context.getBinaryCollection().get("test"), 0));
@@ -1215,6 +1217,8 @@ tcu::TestStatus BufferAddressTestInstance::iterate (void)
 
 		pipeline = createGraphicsPipeline(vk, device, DE_NULL, &graphicsPipelineCreateInfo);
 	}
+
+	m_context.getTestContext().touchWatchdogAndEnableIntervalTimeLimit();
 
 	const VkImageMemoryBarrier imageBarrier =
 	{
