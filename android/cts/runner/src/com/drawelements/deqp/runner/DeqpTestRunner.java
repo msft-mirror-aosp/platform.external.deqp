@@ -2097,8 +2097,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         try {
             // Get the system into a known state.
             // Clear ANGLE Global.Settings values
-            mDevice.executeShellCommand("settings put global angle_gl_driver_selection_pkgs \"\"");
-            mDevice.executeShellCommand("settings put global angle_gl_driver_selection_values \"\"");
+            mDevice.executeShellCommand("settings delete global angle_gl_driver_selection_pkgs");
+            mDevice.executeShellCommand("settings delete global angle_gl_driver_selection_values");
 
             // ANGLE
             if (mAngle.equals(ANGLE_VULKAN)) {
@@ -2134,12 +2134,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private void teardownTestEnvironment() throws DeviceNotAvailableException {
         // ANGLE
         try {
-            if (!mAngle.equals(ANGLE_NONE)) {
-                CLog.i("Cleaning up ANGLE");
-                // Stop forcing dEQP to use ANGLE
-                mDevice.executeShellCommand("settings put global angle_gl_driver_selection_pkgs \"\"");
-                mDevice.executeShellCommand("settings put global angle_gl_driver_selection_values \"\"");
-            }
+            CLog.i("Cleaning up ANGLE");
+            // Stop forcing dEQP to use ANGLE
+            mDevice.executeShellCommand("settings delete global angle_gl_driver_selection_pkgs");
+            mDevice.executeShellCommand("settings delete global angle_gl_driver_selection_values");
         } catch (DeviceNotAvailableException ex) {
             // chain forward
             CLog.e("Failed to clean up ANGLE correctly.");
