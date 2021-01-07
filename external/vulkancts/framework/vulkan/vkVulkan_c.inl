@@ -563,6 +563,17 @@ typedef enum VkStructureType {
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DEMOTE_TO_HELPER_INVOCATION_FEATURES_EXT = 1000276000,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_FEATURES_EXT = 1000281000,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_TEXEL_BUFFER_ALIGNMENT_PROPERTIES_EXT = 1000281001,
+    VK_STRUCTURE_TYPE_COPY_BUFFER_INFO_2_KHR = 1000337000,
+    VK_STRUCTURE_TYPE_COPY_IMAGE_INFO_2_KHR = 1000337001,
+    VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2_KHR = 1000337002,
+    VK_STRUCTURE_TYPE_COPY_IMAGE_TO_BUFFER_INFO_2_KHR = 1000337003,
+    VK_STRUCTURE_TYPE_BLIT_IMAGE_INFO_2_KHR = 1000337004,
+    VK_STRUCTURE_TYPE_RESOLVE_IMAGE_INFO_2_KHR = 1000337005,
+    VK_STRUCTURE_TYPE_BUFFER_COPY_2_KHR = 1000337006,
+    VK_STRUCTURE_TYPE_IMAGE_COPY_2_KHR = 1000337007,
+    VK_STRUCTURE_TYPE_IMAGE_BLIT_2_KHR = 1000337008,
+    VK_STRUCTURE_TYPE_BUFFER_IMAGE_COPY_2_KHR = 1000337009,
+    VK_STRUCTURE_TYPE_IMAGE_RESOLVE_2_KHR = 1000337010,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTER_FEATURES = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VARIABLE_POINTERS_FEATURES,
     VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETER_FEATURES = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_DRAW_PARAMETERS_FEATURES,
     VK_STRUCTURE_TYPE_DEBUG_REPORT_CREATE_INFO_EXT = VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
@@ -7387,6 +7398,154 @@ VKAPI_ATTR VkResult VKAPI_CALL vkGetPipelineExecutableInternalRepresentationsKHR
     const VkPipelineExecutableInfoKHR*          pExecutableInfo,
     deUint32*                                   pInternalRepresentationCount,
     VkPipelineExecutableInternalRepresentationKHR* pInternalRepresentations);
+#endif
+
+
+#define VK_KHR_copy_commands2 1
+#define VK_KHR_COPY_COMMANDS_2_SPEC_VERSION 1
+#define VK_KHR_COPY_COMMANDS_2_EXTENSION_NAME "VK_KHR_copy_commands2"
+typedef struct VkBufferCopy2KHR {
+    VkStructureType    sType;
+    const void*        pNext;
+    VkDeviceSize       srcOffset;
+    VkDeviceSize       dstOffset;
+    VkDeviceSize       size;
+} VkBufferCopy2KHR;
+
+typedef struct VkCopyBufferInfo2KHR {
+    VkStructureType            sType;
+    const void*                pNext;
+    VkBuffer                   srcBuffer;
+    VkBuffer                   dstBuffer;
+    deUint32                   regionCount;
+    const VkBufferCopy2KHR*    pRegions;
+} VkCopyBufferInfo2KHR;
+
+typedef struct VkImageCopy2KHR {
+    VkStructureType             sType;
+    const void*                 pNext;
+    VkImageSubresourceLayers    srcSubresource;
+    VkOffset3D                  srcOffset;
+    VkImageSubresourceLayers    dstSubresource;
+    VkOffset3D                  dstOffset;
+    VkExtent3D                  extent;
+} VkImageCopy2KHR;
+
+typedef struct VkCopyImageInfo2KHR {
+    VkStructureType           sType;
+    const void*               pNext;
+    VkImage                   srcImage;
+    VkImageLayout             srcImageLayout;
+    VkImage                   dstImage;
+    VkImageLayout             dstImageLayout;
+    deUint32                  regionCount;
+    const VkImageCopy2KHR*    pRegions;
+} VkCopyImageInfo2KHR;
+
+typedef struct VkBufferImageCopy2KHR {
+    VkStructureType             sType;
+    const void*                 pNext;
+    VkDeviceSize                bufferOffset;
+    deUint32                    bufferRowLength;
+    deUint32                    bufferImageHeight;
+    VkImageSubresourceLayers    imageSubresource;
+    VkOffset3D                  imageOffset;
+    VkExtent3D                  imageExtent;
+} VkBufferImageCopy2KHR;
+
+typedef struct VkCopyBufferToImageInfo2KHR {
+    VkStructureType                 sType;
+    const void*                     pNext;
+    VkBuffer                        srcBuffer;
+    VkImage                         dstImage;
+    VkImageLayout                   dstImageLayout;
+    deUint32                        regionCount;
+    const VkBufferImageCopy2KHR*    pRegions;
+} VkCopyBufferToImageInfo2KHR;
+
+typedef struct VkCopyImageToBufferInfo2KHR {
+    VkStructureType                 sType;
+    const void*                     pNext;
+    VkImage                         srcImage;
+    VkImageLayout                   srcImageLayout;
+    VkBuffer                        dstBuffer;
+    deUint32                        regionCount;
+    const VkBufferImageCopy2KHR*    pRegions;
+} VkCopyImageToBufferInfo2KHR;
+
+typedef struct VkImageBlit2KHR {
+    VkStructureType             sType;
+    const void*                 pNext;
+    VkImageSubresourceLayers    srcSubresource;
+    VkOffset3D                  srcOffsets[2];
+    VkImageSubresourceLayers    dstSubresource;
+    VkOffset3D                  dstOffsets[2];
+} VkImageBlit2KHR;
+
+typedef struct VkBlitImageInfo2KHR {
+    VkStructureType           sType;
+    const void*               pNext;
+    VkImage                   srcImage;
+    VkImageLayout             srcImageLayout;
+    VkImage                   dstImage;
+    VkImageLayout             dstImageLayout;
+    deUint32                  regionCount;
+    const VkImageBlit2KHR*    pRegions;
+    VkFilter                  filter;
+} VkBlitImageInfo2KHR;
+
+typedef struct VkImageResolve2KHR {
+    VkStructureType             sType;
+    const void*                 pNext;
+    VkImageSubresourceLayers    srcSubresource;
+    VkOffset3D                  srcOffset;
+    VkImageSubresourceLayers    dstSubresource;
+    VkOffset3D                  dstOffset;
+    VkExtent3D                  extent;
+} VkImageResolve2KHR;
+
+typedef struct VkResolveImageInfo2KHR {
+    VkStructureType              sType;
+    const void*                  pNext;
+    VkImage                      srcImage;
+    VkImageLayout                srcImageLayout;
+    VkImage                      dstImage;
+    VkImageLayout                dstImageLayout;
+    deUint32                     regionCount;
+    const VkImageResolve2KHR*    pRegions;
+} VkResolveImageInfo2KHR;
+
+typedef void (VKAPI_PTR *PFN_vkCmdCopyBuffer2KHR)(VkCommandBuffer commandBuffer, const VkCopyBufferInfo2KHR* pCopyBufferInfo);
+typedef void (VKAPI_PTR *PFN_vkCmdCopyImage2KHR)(VkCommandBuffer commandBuffer, const VkCopyImageInfo2KHR* pCopyImageInfo);
+typedef void (VKAPI_PTR *PFN_vkCmdCopyBufferToImage2KHR)(VkCommandBuffer commandBuffer, const VkCopyBufferToImageInfo2KHR* pCopyBufferToImageInfo);
+typedef void (VKAPI_PTR *PFN_vkCmdCopyImageToBuffer2KHR)(VkCommandBuffer commandBuffer, const VkCopyImageToBufferInfo2KHR* pCopyImageToBufferInfo);
+typedef void (VKAPI_PTR *PFN_vkCmdBlitImage2KHR)(VkCommandBuffer commandBuffer, const VkBlitImageInfo2KHR* pBlitImageInfo);
+typedef void (VKAPI_PTR *PFN_vkCmdResolveImage2KHR)(VkCommandBuffer commandBuffer, const VkResolveImageInfo2KHR* pResolveImageInfo);
+
+#ifndef VK_NO_PROTOTYPES
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyBuffer2KHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkCopyBufferInfo2KHR*                 pCopyBufferInfo);
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyImage2KHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkCopyImageInfo2KHR*                  pCopyImageInfo);
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyBufferToImage2KHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkCopyBufferToImageInfo2KHR*          pCopyBufferToImageInfo);
+
+VKAPI_ATTR void VKAPI_CALL vkCmdCopyImageToBuffer2KHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkCopyImageToBufferInfo2KHR*          pCopyImageToBufferInfo);
+
+VKAPI_ATTR void VKAPI_CALL vkCmdBlitImage2KHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkBlitImageInfo2KHR*                  pBlitImageInfo);
+
+VKAPI_ATTR void VKAPI_CALL vkCmdResolveImage2KHR(
+    VkCommandBuffer                             commandBuffer,
+    const VkResolveImageInfo2KHR*               pResolveImageInfo);
 #endif
 
 
