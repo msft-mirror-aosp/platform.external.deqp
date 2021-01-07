@@ -229,9 +229,14 @@ public class DeqpTestRunnerTest extends TestCase {
         if (majorVersion > requiredMajorVersion
                 || (majorVersion == requiredMajorVersion && minorVersion >= requiredMinorVersion)) {
 
-            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+            // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
                 andReturn("").once();
-            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+                andReturn("").once();
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+                andReturn("").once();
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
                 andReturn("").once();
 
             expectRenderConfigQuery(mockDevice, requiredMajorVersion,
@@ -378,9 +383,14 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         mockListener.testStarted(EasyMock.eq(testId));
@@ -540,9 +550,14 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         for (int i = 0; i < testPaths.length; i++) {
@@ -625,9 +640,14 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), expectedTests.size());
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         IDevice mockIDevice = EasyMock.createMock(IDevice.class);
@@ -879,9 +899,14 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         for (int i = 0; i < testPaths.length; i++) {
@@ -940,9 +965,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
@@ -987,9 +1012,9 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
         mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
@@ -1093,9 +1118,14 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         mockListener.testStarted(EasyMock.eq(testId));
@@ -1307,9 +1337,14 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         mockListener.testStarted(EasyMock.eq(testId));
@@ -1671,9 +1706,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
         mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>anyObject());
         EasyMock.expectLastCall().once();
@@ -1717,9 +1752,14 @@ public class DeqpTestRunnerTest extends TestCase {
             mockListener.testRunStarted(getTestId(shard), shardTests.size());
             EasyMock.expectLastCall().once();
 
-            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+            // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
                 andReturn("").once();
-            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+                andReturn("").once();
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+                andReturn("").once();
+            EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
                 andReturn("").once();
 
             expectRenderConfigQuery(mockDevice, 3, 0);
@@ -1873,9 +1913,9 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), 1);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         mockListener.testStarted(EasyMock.eq(testId));
@@ -2034,9 +2074,14 @@ public class DeqpTestRunnerTest extends TestCase {
         mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
         EasyMock.expectLastCall().once();
 
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_pkgs \"\""))).
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
             andReturn("").once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings put global angle_gl_driver_selection_values \"\""))).
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs"))).
+            andReturn("").once();
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq("settings delete global angle_gl_driver_selection_values"))).
             andReturn("").once();
 
         for (int i = 0; i < testPaths.length; i++) {
