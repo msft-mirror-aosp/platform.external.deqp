@@ -34,7 +34,6 @@ import com.android.tradefed.testtype.Abi;
 import com.android.tradefed.testtype.IAbi;
 import com.android.tradefed.testtype.IRemoteTest;
 import com.android.tradefed.testtype.IRuntimeHintProvider;
-import com.android.tradefed.testtype.NativeCodeCoverageListener;
 import com.android.tradefed.util.AbiUtils;
 import com.android.tradefed.util.FileUtil;
 import com.android.tradefed.util.IRunUtil;
@@ -2322,41 +2321,5 @@ public class DeqpTestRunnerTest extends TestCase {
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, allTests, mTestsDir);
         deqpTest.addIncludeFilter("dEQP-GLES3.pick_me.yes");
         testFiltering(deqpTest, expectedTrie, activeTests);
-    }
-
-    public void testCoverageDisabled_noCoverageListener() throws Exception {
-        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
-
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-
-        Collection<TestDescription> tests = new ArrayList<>();
-        tests.add(testId);
-
-        DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
-        deqpTest.setNativeCoverage(false);
-
-        ITestInvocationListener listener =
-            deqpTest.addNativeCoverageListenerIfEnabled(mockDevice, mockListener);
-        assertSame(listener, mockListener);
-    }
-
-    public void testCoverageEnabled_newCoverageListener() throws Exception {
-        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
-
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-
-        Collection<TestDescription> tests = new ArrayList<>();
-        tests.add(testId);
-
-        DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
-        deqpTest.setNativeCoverage(true);
-
-        ITestInvocationListener listener =
-            deqpTest.addNativeCoverageListenerIfEnabled(mockDevice, mockListener);
-        assertTrue(listener instanceof NativeCodeCoverageListener);
     }
 }
