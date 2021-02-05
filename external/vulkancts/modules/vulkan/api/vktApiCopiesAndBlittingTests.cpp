@@ -3381,14 +3381,6 @@ public:
 
 		if (m_params.filter == VK_FILTER_LINEAR && !(srcFormatFeatures & VK_FORMAT_FEATURE_SAMPLED_IMAGE_FILTER_LINEAR_BIT))
 			TCU_THROW(NotSupportedError, "Source format feature sampled image filter linear not supported");
-		
-		if (m_params.extensionUse == EXTENSION_USE_COPY_COMMANDS2)
-		{
-			if (!context.isDeviceFunctionalitySupported("VK_KHR_copy_commands2"))
-			{
-				TCU_THROW(NotSupportedError, "VK_KHR_copy_commands2 is not supported");
-			}
-		}
 	}
 
 private:
