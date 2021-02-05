@@ -297,15 +297,6 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 		functions.push_back("vkGetPipelineExecutableStatisticsKHR");
 		functions.push_back("vkGetPipelineExecutableInternalRepresentationsKHR");
 	}
-	else if (extName == "VK_KHR_copy_commands2")
-	{
-		functions.push_back("vkCmdCopyBuffer2KHR");
-		functions.push_back("vkCmdCopyImage2KHR");
-		functions.push_back("vkCmdCopyBufferToImage2KHR");
-		functions.push_back("vkCmdCopyImageToBuffer2KHR");
-		functions.push_back("vkCmdBlitImage2KHR");
-		functions.push_back("vkCmdResolveImage2KHR");
-	}
 	else if (extName == "VK_EXT_debug_marker")
 	{
 		functions.push_back("vkDebugMarkerSetObjectTagEXT");
@@ -569,7 +560,6 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 	"VK_KHR_timeline_semaphore",
 	"VK_KHR_buffer_device_address",
 	"VK_KHR_pipeline_executable_properties",
-	"VK_KHR_copy_commands2",
 	"VK_EXT_debug_marker",
 	"VK_EXT_transform_feedback",
 	"VK_NVX_image_view_handle",
