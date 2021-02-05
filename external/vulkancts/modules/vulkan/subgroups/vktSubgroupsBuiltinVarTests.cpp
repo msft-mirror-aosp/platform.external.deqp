@@ -1608,6 +1608,19 @@ void supportedCheck (Context& context, CaseDefinition caseDef)
 
 		if (subgroupSizeControlFeatures.computeFullSubgroups == DE_FALSE)
 			TCU_THROW(NotSupportedError, "Device does not support full subgroups in compute shaders");
+
+		VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroupSizeControlProperties;
+		subgroupSizeControlProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES_EXT;
+		subgroupSizeControlProperties.pNext = DE_NULL;
+
+		VkPhysicalDeviceProperties2 properties;
+		properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		properties.pNext = &subgroupSizeControlProperties;
+
+		context.getInstanceInterface().getPhysicalDeviceProperties2(context.getPhysicalDevice(), &properties);
+
+		if ((subgroupSizeControlProperties.requiredSubgroupSizeStages & caseDef.shaderStage) != caseDef.shaderStage)
+			TCU_THROW(NotSupportedError, "Required subgroup size is not supported for shader stage");
 	}
 
 	*caseDef.geometryPointSizeSupported = subgroups::isTessellationAndGeometryPointSizeSupported(context);
@@ -1929,6 +1942,10 @@ tcu::TestCaseGroup* createSubgroupsBuiltinVarTests(tcu::TestContext& testCtx)
 			addFunctionCaseWithPrograms(computeGroup.get(),
 						varLower + "_" + getShaderStageName(caseDef.shaderStage), "",
 						supportedCheck, initPrograms, test, caseDef);
+			caseDef.requiredSubgroupSize = DE_TRUE;
+			addFunctionCaseWithPrograms(computeGroup.get(),
+						varLower + "_" + getShaderStageName(caseDef.shaderStage) + "_requiredsubgroupsize", "",
+						supportedCheck, initPrograms, test, caseDef);
 		}
 
 		for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(stages); ++stageIndex)
@@ -1947,6 +1964,9 @@ tcu::TestCaseGroup* createSubgroupsBuiltinVarTests(tcu::TestContext& testCtx)
 		CaseDefinition caseDef = {"gl_" + var, VK_SHADER_STAGE_COMPUTE_BIT, de::SharedPtr<bool>(new bool), DE_FALSE};
 
 		addFunctionCaseWithPrograms(computeGroup.get(), de::toLower(var), "",
+									supportedCheck, initPrograms, test, caseDef);
+		caseDef.requiredSubgroupSize = DE_TRUE;
+		addFunctionCaseWithPrograms(computeGroup.get(), de::toLower(var) + "_requiredsubgroupsize", "",
 									supportedCheck, initPrograms, test, caseDef);
 	}
 

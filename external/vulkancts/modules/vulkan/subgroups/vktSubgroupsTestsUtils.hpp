@@ -156,6 +156,7 @@ const std::vector<vk::VkFormat> getAllFormats ();
 bool isFormatSigned (vk::VkFormat format);
 bool isFormatUnsigned (vk::VkFormat format);
 bool isFormatFloat (vk::VkFormat format);
+bool isFormatBool (vk::VkFormat format);
 bool isFormat8bitTy(vk::VkFormat format);
 bool isFormat16BitTy(vk::VkFormat format);
 

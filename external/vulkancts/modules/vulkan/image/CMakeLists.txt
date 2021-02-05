@@ -9,8 +9,12 @@ set(DEQP_VK_IMAGE_SRCS
 	vktImageAstcDecodeModeTests.hpp
 	vktImageAtomicOperationTests.cpp
 	vktImageAtomicOperationTests.hpp
+	vktImageAtomicSpirvShaders.cpp
+	vktImageAtomicSpirvShaders.hpp
 	vktImageLoadStoreTests.cpp
 	vktImageLoadStoreTests.hpp
+	vktImageMismatchedFormatsTests.cpp
+	vktImageMismatchedFormatsTests.hpp
 	vktImageMutableTests.cpp
 	vktImageMutableTests.hpp
 	vktImageQualifiersTests.cpp
@@ -29,6 +33,8 @@ set(DEQP_VK_IMAGE_SRCS
 	vktImageTranscodingSupportTests.hpp
 	vktImageMisalignedCubeTests.cpp
 	vktImageMisalignedCubeTests.hpp
+	vktImageSubresourceLayoutTests.cpp
+	vktImageSubresourceLayoutTests.hpp
 	)
 
 set(DEQP_VK_IMAGE_LIBS

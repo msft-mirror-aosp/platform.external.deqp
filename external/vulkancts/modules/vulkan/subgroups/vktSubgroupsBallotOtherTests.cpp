@@ -151,21 +151,12 @@ std::string getBodySource(CaseDefinition caseDef)
 				<< "  tempResult |= 0 == subgroupBallotInclusiveBitCount(allZeros) ? 0x2 : 0;\n"
 				<< "  tempResult |= 0 < subgroupBallotInclusiveBitCount(subgroupBallot(true)) ? 0x4 : 0;\n"
 				<< "  tempResult |= 0x8;\n"
-				<< "  uvec4 inclusiveUndef = MAKE_HIGH_BALLOT_RESULT(inclusiveOffset);\n"
-				<< "  bool undefTerritory = false;\n"
-				<< "  for (uint i = 0; i <= 128; i++)\n"
+				<< "  for (uint i = 0; i < 128; i++)\n"
 				<< "  {\n"
-				<< "    uvec4 iUndef = MAKE_HIGH_BALLOT_RESULT(i);\n"
-				<< "    if (iUndef == inclusiveUndef)"
-				<< "    {\n"
-				<< "      undefTerritory = true;\n"
-				<< "    }\n"
-				<< "    uint inclusiveBitCount = subgroupBallotInclusiveBitCount(iUndef);\n"
-				<< "    if (undefTerritory && (0 != inclusiveBitCount))\n"
-				<< "    {\n"
-				<< "      tempResult &= ~0x8;\n"
-				<< "    }\n"
-				<< "    else if (!undefTerritory && (0 == inclusiveBitCount))\n"
+				<< "    uint ref = inclusiveOffset - min(inclusiveOffset, i);\n"
+				<< "    uvec4 b = MAKE_HIGH_BALLOT_RESULT(i);\n"
+				<< "    uint inclusiveBitCount = subgroupBallotInclusiveBitCount(b);\n"
+				<< "    if (inclusiveBitCount != ref)\n"
 				<< "    {\n"
 				<< "      tempResult &= ~0x8;\n"
 				<< "    }\n"
@@ -177,21 +168,12 @@ std::string getBodySource(CaseDefinition caseDef)
 				<< "  tempResult |= 0 == subgroupBallotExclusiveBitCount(allZeros) ? 0x2 : 0;\n"
 				<< "  tempResult |= 0x4;\n"
 				<< "  tempResult |= 0x8;\n"
-				<< "  uvec4 exclusiveUndef = MAKE_HIGH_BALLOT_RESULT(exclusiveOffset);\n"
-				<< "  bool undefTerritory = false;\n"
-				<< "  for (uint i = 0; i <= 128; i++)\n"
+				<< "  for (uint i = 0; i < 128; i++)\n"
 				<< "  {\n"
-				<< "    uvec4 iUndef = MAKE_HIGH_BALLOT_RESULT(i);\n"
-				<< "    if (iUndef == exclusiveUndef)"
-				<< "    {\n"
-				<< "      undefTerritory = true;\n"
-				<< "    }\n"
-				<< "    uint exclusiveBitCount = subgroupBallotExclusiveBitCount(iUndef);\n"
-				<< "    if (undefTerritory && (0 != exclusiveBitCount))\n"
-				<< "    {\n"
-				<< "      tempResult &= ~0x4;\n"
-				<< "    }\n"
-				<< "    else if (!undefTerritory && (0 == exclusiveBitCount))\n"
+				<< "    uint ref = exclusiveOffset - min(exclusiveOffset, i);\n"
+				<< "    uvec4 b = MAKE_HIGH_BALLOT_RESULT(i);\n"
+				<< "    uint exclusiveBitCount = subgroupBallotExclusiveBitCount(b);\n"
+				<< "    if (exclusiveBitCount != ref)\n"
 				<< "    {\n"
 				<< "      tempResult &= ~0x8;\n"
 				<< "    }\n"
@@ -509,6 +491,19 @@ void supportedCheck (Context& context, CaseDefinition caseDef)
 
 		if (subgroupSizeControlFeatures.computeFullSubgroups == DE_FALSE)
 			TCU_THROW(NotSupportedError, "Device does not support full subgroups in compute shaders");
+
+		VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroupSizeControlProperties;
+		subgroupSizeControlProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES_EXT;
+		subgroupSizeControlProperties.pNext = DE_NULL;
+
+		VkPhysicalDeviceProperties2 properties;
+		properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		properties.pNext = &subgroupSizeControlProperties;
+
+		context.getInstanceInterface().getPhysicalDeviceProperties2(context.getPhysicalDevice(), &properties);
+
+		if ((subgroupSizeControlProperties.requiredSubgroupSizeStages & caseDef.shaderStage) != caseDef.shaderStage)
+			TCU_THROW(NotSupportedError, "Required subgroup size is not supported for shader stage");
 	}
 
 	*caseDef.geometryPointSizeSupported = subgroups::isTessellationAndGeometryPointSizeSupported(context);
@@ -641,6 +636,8 @@ tcu::TestCaseGroup* createSubgroupsBallotOtherTests(tcu::TestContext& testCtx)
 		{
 			CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_COMPUTE_BIT, de::SharedPtr<bool>(new bool), DE_FALSE};
 			addFunctionCaseWithPrograms(computeGroup.get(), op, "", supportedCheck, initPrograms, test, caseDef);
+			caseDef.requiredSubgroupSize = DE_TRUE;
+			addFunctionCaseWithPrograms(computeGroup.get(), op + "_requiredsubgroupSize", "", supportedCheck, initPrograms, test, caseDef);
 		}
 
 		{

@@ -40,6 +40,9 @@
 #include "vktDrawScissorTests.hpp"
 #include "vktDrawMultipleInterpolationTests.hpp"
 #include "vktDrawDiscardRectanglesTests.hpp"
+#include "vktDrawExplicitVertexParameterTests.hpp"
+#include "vktDrawOutputLocationTests.hpp"
+#include "vktDrawDepthClampTests.hpp"
 
 namespace vkt
 {
@@ -69,6 +72,9 @@ void createChildren (tcu::TestCaseGroup* group)
 	group->addChild(createScissorTests					(testCtx));
 	group->addChild(createMultipleInterpolationTests	(testCtx));
 	group->addChild(createDiscardRectanglesTests		(testCtx));
+	group->addChild(createExplicitVertexParameterTests	(testCtx));
+	group->addChild(createOutputLocationTests	        (testCtx));
+	group->addChild(createDepthClampTests				(testCtx));
 }
 
 } // anonymous

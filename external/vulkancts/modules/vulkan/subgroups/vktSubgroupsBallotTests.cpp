@@ -939,6 +939,19 @@ void supportedCheck (Context& context, CaseDefinition caseDef)
 
 		if (subgroupSizeControlFeatures.computeFullSubgroups == DE_FALSE)
 			TCU_THROW(NotSupportedError, "Device does not support full subgroups in compute shaders");
+
+		VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroupSizeControlProperties;
+		subgroupSizeControlProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES_EXT;
+		subgroupSizeControlProperties.pNext = DE_NULL;
+
+		VkPhysicalDeviceProperties2 properties;
+		properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		properties.pNext = &subgroupSizeControlProperties;
+
+		context.getInstanceInterface().getPhysicalDeviceProperties2(context.getPhysicalDevice(), &properties);
+
+		if ((subgroupSizeControlProperties.requiredSubgroupSizeStages & caseDef.shaderStage) != caseDef.shaderStage)
+			TCU_THROW(NotSupportedError, "Required subgroup size is not supported for shader stage");
 	}
 
 	*caseDef.geometryPointSizeSupported = subgroups::isTessellationAndGeometryPointSizeSupported(context);
@@ -1099,6 +1112,12 @@ tcu::TestCaseGroup* createSubgroupsBallotTests(tcu::TestContext& testCtx)
 		addFunctionCaseWithPrograms(computeGroup.get(), getShaderStageName(caseDef.shaderStage), "", supportedCheck, initPrograms, test, caseDef);
 		caseDef.extShaderSubGroupBallotTests = DE_TRUE;
 		addFunctionCaseWithPrograms(computeGroupEXT.get(), getShaderStageName(caseDef.shaderStage), "", supportedCheck, initPrograms, test, caseDef);
+
+		caseDef.requiredSubgroupSize = DE_TRUE;
+		caseDef.extShaderSubGroupBallotTests = DE_FALSE;
+		addFunctionCaseWithPrograms(computeGroup.get(), getShaderStageName(caseDef.shaderStage) + "_requiredsubgroupsize", "", supportedCheck, initPrograms, test, caseDef);
+		caseDef.extShaderSubGroupBallotTests = DE_TRUE;
+		addFunctionCaseWithPrograms(computeGroupEXT.get(), getShaderStageName(caseDef.shaderStage) + "_requiredsubgroupsize", "", supportedCheck, initPrograms, test, caseDef);
 	}
 
 	{
@@ -1110,7 +1129,7 @@ tcu::TestCaseGroup* createSubgroupsBallotTests(tcu::TestContext& testCtx)
 
 	for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(stages); ++stageIndex)
 	{
-		CaseDefinition caseDef = {stages[stageIndex],de::SharedPtr<bool>(new bool), DE_TRUE, DE_FALSE};
+		CaseDefinition caseDef = {stages[stageIndex],de::SharedPtr<bool>(new bool), DE_FALSE, DE_FALSE};
 		addFunctionCaseWithPrograms(framebufferGroup.get(), getShaderStageName(caseDef.shaderStage), "",
 					supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
 		caseDef.extShaderSubGroupBallotTests = DE_TRUE;

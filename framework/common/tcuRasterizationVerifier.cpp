@@ -28,7 +28,9 @@
 #include "tcuTextureUtil.hpp"
 #include "tcuVectorUtil.hpp"
 #include "tcuFloat.hpp"
+
 #include "deMath.h"
+#include "deStringUtil.hpp"
 
 #include "rrRasterizer.hpp"
 
@@ -38,6 +40,8 @@ namespace tcu
 {
 namespace
 {
+
+bool verifyLineGroupInterpolationWithProjectedWeights (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log);
 
 bool lineLineIntersect (const tcu::Vector<deInt64, 2>& line0Beg, const tcu::Vector<deInt64, 2>& line0End, const tcu::Vector<deInt64, 2>& line1Beg, const tcu::Vector<deInt64, 2>& line1End)
 {
@@ -651,7 +655,11 @@ struct MultisampleLineInterpolator
 };
 
 template <typename Interpolator>
-bool verifyTriangleGroupInterpolationWithInterpolator (const tcu::Surface& surface, const TriangleSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log, const Interpolator& interpolator)
+bool verifyTriangleGroupInterpolationWithInterpolator (const tcu::Surface&							surface,
+													   const TriangleSceneSpec&						scene,
+													   const RasterizationArguments&				args,
+													   VerifyTriangleGroupInterpolationLogStash&	logStash,
+													   const Interpolator&							interpolator)
 {
 	const tcu::RGBA		invalidPixelColor	= tcu::RGBA(255, 0, 0, 255);
 	const bool			multisampled		= (args.numSamples != 0);
@@ -666,21 +674,22 @@ bool verifyTriangleGroupInterpolationWithInterpolator (const tcu::Surface& surfa
 
 	// log format
 
-	log << tcu::TestLog::Message << "Verifying rasterization result. Native format is RGB" << args.redBits << args.greenBits << args.blueBits << tcu::TestLog::EndMessage;
+	logStash.messages.push_back(std::string("Verifying rasterization result. Native format is RGB" + de::toString(args.redBits) + de::toString(args.greenBits) + de::toString(args.blueBits)));
 	if (args.redBits > 8 || args.greenBits > 8 || args.blueBits > 8)
-		log << tcu::TestLog::Message << "Warning! More than 8 bits in a color channel, this may produce false negatives." << tcu::TestLog::EndMessage;
+		logStash.messages.push_back(std::string("Warning! More than 8 bits in a color channel, this may produce false negatives."));
 
-	// subpixel bits in in a valid range?
+	// subpixel bits in a valid range?
 
 	if (subPixelBits < 0)
 	{
-		log << tcu::TestLog::Message << "Invalid subpixel count (" << subPixelBits << "), assuming 0" << tcu::TestLog::EndMessage;
+		logStash.messages.push_back(std::string("Invalid subpixel count (" + de::toString(subPixelBits) + "), assuming 0"));
 		subPixelBits = 0;
 	}
 	else if (subPixelBits > 16)
 	{
 		// At high subpixel bit counts we might overflow. Checking at lower bit count is ok, but is less strict
-		log << tcu::TestLog::Message << "Subpixel count is greater than 16 (" << subPixelBits << "). Checking results using less strict 16 bit requirements. This may produce false positives." << tcu::TestLog::EndMessage;
+		logStash.messages.push_back(std::string("Subpixel count is greater than 16 (" + de::toString(subPixelBits) + ")."
+												" Checking results using less strict 16 bit requirements. This may produce false positives."));
 		subPixelBits = 16;
 	}
 
@@ -763,11 +772,13 @@ bool verifyTriangleGroupInterpolationWithInterpolator (const tcu::Surface& surfa
 				// don't fill the logs with too much data
 				if (errorCount < errorFloodThreshold)
 				{
-					log << tcu::TestLog::Message
-						<< "Found an invalid pixel at (" << x << "," << y << ")\n"
+					std::ostringstream str;
+
+					str << "Found an invalid pixel at (" << x << "," << y << ")\n"
 						<< "\tPixel color:\t\t" << color << "\n"
-						<< "\tExpected background color.\n"
-						<< tcu::TestLog::EndMessage;
+						<< "\tExpected background color.\n";
+
+					logStash.messages.push_back(str.str());
 				}
 
 				++invalidPixels;
@@ -816,8 +827,9 @@ bool verifyTriangleGroupInterpolationWithInterpolator (const tcu::Surface& surfa
 				// don't fill the logs with too much data
 				if (errorCount <= errorFloodThreshold)
 				{
-					log << tcu::TestLog::Message
-						<< "Found an invalid pixel at (" << x << "," << y << ")\n"
+					std::ostringstream str;
+
+					str << "Found an invalid pixel at (" << x << "," << y << ")\n"
 						<< "\tPixel color:\t\t" << color << "\n"
 						<< "\tNative color:\t\t" << pixelNativeColor << "\n"
 						<< "\tAllowed error:\t\t" << tcu::IVec3(thresholdRed, thresholdGreen, thresholdBlue) << "\n"
@@ -826,8 +838,8 @@ bool verifyTriangleGroupInterpolationWithInterpolator (const tcu::Surface& surfa
 						<< "\tReference native float min: " << tcu::clamp(colorMinF - tcu::IVec3(thresholdRed, thresholdGreen, thresholdBlue).cast<float>(), tcu::Vec3(0.0f, 0.0f, 0.0f), formatLimit.cast<float>()) << "\n"
 						<< "\tReference native float max: " << tcu::clamp(colorMaxF + tcu::IVec3(thresholdRed, thresholdGreen, thresholdBlue).cast<float>(), tcu::Vec3(0.0f, 0.0f, 0.0f), formatLimit.cast<float>()) << "\n"
 						<< "\tFmin:\t" << tcu::clamp(valueRangeMin, tcu::Vec3(0.0f, 0.0f, 0.0f), tcu::Vec3(1.0f, 1.0f, 1.0f)) << "\n"
-						<< "\tFmax:\t" << tcu::clamp(valueRangeMax, tcu::Vec3(0.0f, 0.0f, 0.0f), tcu::Vec3(1.0f, 1.0f, 1.0f)) << "\n"
-						<< tcu::TestLog::EndMessage;
+						<< "\tFmax:\t" << tcu::clamp(valueRangeMax, tcu::Vec3(0.0f, 0.0f, 0.0f), tcu::Vec3(1.0f, 1.0f, 1.0f)) << "\n";
+					logStash.messages.push_back(str.str());
 				}
 
 				++invalidPixels;
@@ -838,28 +850,16 @@ bool verifyTriangleGroupInterpolationWithInterpolator (const tcu::Surface& surfa
 
 	// don't just hide failures
 	if (errorCount > errorFloodThreshold)
-		log << tcu::TestLog::Message << "Omitted " << (errorCount-errorFloodThreshold) << " pixel error description(s)." << tcu::TestLog::EndMessage;
+		logStash.messages.push_back(std::string("Omitted " + de::toString(errorCount - errorFloodThreshold) + " pixel error description(s)."));
+
+	logStash.success		= (invalidPixels == 0);
+	logStash.invalidPixels	= invalidPixels;
 
 	// report result
-	if (invalidPixels)
-	{
-		log << tcu::TestLog::Message << invalidPixels << " invalid pixel(s) found." << tcu::TestLog::EndMessage;
-		log << tcu::TestLog::ImageSet("Verification result", "Result of rendering")
-			<< tcu::TestLog::Image("Result", "Result",			surface)
-			<< tcu::TestLog::Image("ErrorMask", "ErrorMask",	errorMask)
-			<< tcu::TestLog::EndImageSet;
+	if (!logStash.success)
+		logStash.errorMask = errorMask;
 
-		return false;
-	}
-	else
-	{
-		log << tcu::TestLog::Message << "No invalid pixels found." << tcu::TestLog::EndMessage;
-		log << tcu::TestLog::ImageSet("Verification result", "Result of rendering")
-			<< tcu::TestLog::Image("Result", "Result", surface)
-			<< tcu::TestLog::EndImageSet;
-
-		return true;
-	}
+	return logStash.success;
 }
 
 
@@ -907,7 +907,14 @@ enum ClipMode
 	CLIPMODE_LAST
 };
 
-bool verifyMultisampleLineGroupRasterization (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log, ClipMode clipMode, VerifyTriangleGroupRasterizationLogStash* logStash = DE_NULL, const bool vulkanLinesTest = false)
+bool verifyMultisampleLineGroupRasterization (const tcu::Surface&						surface,
+											  const LineSceneSpec&						scene,
+											  const RasterizationArguments&				args,
+											  tcu::TestLog&								log,
+											  ClipMode									clipMode,
+											  VerifyTriangleGroupRasterizationLogStash*	logStash,
+											  const bool								vulkanLinesTest,
+											  const bool								strictMode)
 {
 	// Multisampled line == 2 triangles
 
@@ -948,7 +955,9 @@ bool verifyMultisampleLineGroupRasterization (const tcu::Surface& surface, const
 		};
 
 		const tcu::Vec2 lineDir			= tcu::normalize(lineScreenSpace[1] - lineScreenSpace[0]);
-		const tcu::Vec2 lineNormalDir	= tcu::Vec2(lineDir.y(), -lineDir.x());
+		const tcu::Vec2 lineNormalDir	= strictMode ? tcu::Vec2(lineDir.y(), -lineDir.x())
+										: isLineXMajor(lineScreenSpace[0], lineScreenSpace[1]) ? tcu::Vec2(0.0f, 1.0f)
+										: tcu::Vec2(1.0f, 0.0f);
 
 		if (scene.stippleEnable)
 		{
@@ -1060,10 +1069,20 @@ bool verifyMultisampleLineGroupRasterization (const tcu::Surface& surface, const
 		}
 	}
 
+	if (logStash != DE_NULL)
+	{
+		logStash->messages.push_back("Rasterization clipping mode: " + std::string(clipMode == CLIPMODE_USE_CLIPPING_BOX ? "CLIPMODE_USE_CLIPPING_BOX" : "CLIPMODE_NO_CLIPPING") + ".");
+		logStash->messages.push_back("Rasterization line draw strictness mode: " + std::string(strictMode ? "strict" : "non-strict") + ".");
+	}
+
 	return verifyTriangleGroupRasterization(surface, triangleScene, args, log, scene.verificationMode, logStash, vulkanLinesTest);
 }
 
-bool verifyMultisampleLineGroupInterpolation (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log)
+static bool verifyMultisampleLineGroupInterpolationInternal (const tcu::Surface&						surface,
+													  const LineSceneSpec&						scene,
+													  const RasterizationArguments&				args,
+													  VerifyTriangleGroupInterpolationLogStash&	logStash,
+													  const bool								strictMode)
 {
 	// Multisampled line == 2 triangles
 
@@ -1074,11 +1093,15 @@ bool verifyMultisampleLineGroupInterpolation (const tcu::Surface& surface, const
 	triangleScene.triangles.resize(2 * scene.lines.size());
 	for (int lineNdx = 0; lineNdx < (int)scene.lines.size(); ++lineNdx)
 	{
+		// Need the w-coordinates a couple of times
+		const float		wa = scene.lines[lineNdx].positions[0].w();
+		const float		wb = scene.lines[lineNdx].positions[1].w();
+
 		// Transform to screen space, add pixel offsets, convert back to normalized device space, and test as triangles
 		const tcu::Vec2 lineNormalizedDeviceSpace[2] =
 		{
-			tcu::Vec2(scene.lines[lineNdx].positions[0].x() / scene.lines[lineNdx].positions[0].w(), scene.lines[lineNdx].positions[0].y() / scene.lines[lineNdx].positions[0].w()),
-			tcu::Vec2(scene.lines[lineNdx].positions[1].x() / scene.lines[lineNdx].positions[1].w(), scene.lines[lineNdx].positions[1].y() / scene.lines[lineNdx].positions[1].w()),
+			tcu::Vec2(scene.lines[lineNdx].positions[0].x() / wa, scene.lines[lineNdx].positions[0].y() / wa),
+			tcu::Vec2(scene.lines[lineNdx].positions[1].x() / wb, scene.lines[lineNdx].positions[1].y() / wb),
 		};
 		const tcu::Vec2 lineScreenSpace[2] =
 		{
@@ -1087,7 +1110,9 @@ bool verifyMultisampleLineGroupInterpolation (const tcu::Surface& surface, const
 		};
 
 		const tcu::Vec2 lineDir			= tcu::normalize(lineScreenSpace[1] - lineScreenSpace[0]);
-		const tcu::Vec2 lineNormalDir	= tcu::Vec2(lineDir.y(), -lineDir.x());
+		const tcu::Vec2 lineNormalDir	= strictMode ? tcu::Vec2(lineDir.y(), -lineDir.x())
+										: isLineXMajor(lineScreenSpace[0], lineScreenSpace[1]) ? tcu::Vec2(0.0f, 1.0f)
+										: tcu::Vec2(1.0f, 0.0f);
 
 		const tcu::Vec2 lineQuadScreenSpace[4] =
 		{
@@ -1104,9 +1129,18 @@ bool verifyMultisampleLineGroupInterpolation (const tcu::Surface& surface, const
 			lineQuadScreenSpace[3] / viewportSize * 2.0f - tcu::Vec2(1.0f, 1.0f),
 		};
 
-		triangleScene.triangles[lineNdx*2 + 0].positions[0] = tcu::Vec4(lineQuadNormalizedDeviceSpace[0].x(), lineQuadNormalizedDeviceSpace[0].y(), 0.0f, 1.0f);
-		triangleScene.triangles[lineNdx*2 + 0].positions[1] = tcu::Vec4(lineQuadNormalizedDeviceSpace[1].x(), lineQuadNormalizedDeviceSpace[1].y(), 0.0f, 1.0f);
-		triangleScene.triangles[lineNdx*2 + 0].positions[2] = tcu::Vec4(lineQuadNormalizedDeviceSpace[2].x(), lineQuadNormalizedDeviceSpace[2].y(), 0.0f, 1.0f);
+		// Re-construct un-projected geometry using the quantised positions
+		const tcu::Vec4 lineQuadUnprojected[4] =
+		{
+			tcu::Vec4(lineQuadNormalizedDeviceSpace[0].x() * wa, lineQuadNormalizedDeviceSpace[0].y() * wa, 0.0f, wa),
+			tcu::Vec4(lineQuadNormalizedDeviceSpace[1].x() * wa, lineQuadNormalizedDeviceSpace[1].y() * wa, 0.0f, wa),
+			tcu::Vec4(lineQuadNormalizedDeviceSpace[2].x() * wb, lineQuadNormalizedDeviceSpace[2].y() * wb, 0.0f, wb),
+			tcu::Vec4(lineQuadNormalizedDeviceSpace[3].x() * wb, lineQuadNormalizedDeviceSpace[3].y() * wb, 0.0f, wb),
+		};
+
+		triangleScene.triangles[lineNdx*2 + 0].positions[0] = lineQuadUnprojected[0];
+		triangleScene.triangles[lineNdx*2 + 0].positions[1] = lineQuadUnprojected[1];
+		triangleScene.triangles[lineNdx*2 + 0].positions[2] = lineQuadUnprojected[2];
 
 		triangleScene.triangles[lineNdx*2 + 0].sharedEdge[0] = false;
 		triangleScene.triangles[lineNdx*2 + 0].sharedEdge[1] = false;
@@ -1116,9 +1150,9 @@ bool verifyMultisampleLineGroupInterpolation (const tcu::Surface& surface, const
 		triangleScene.triangles[lineNdx*2 + 0].colors[1] = scene.lines[lineNdx].colors[0];
 		triangleScene.triangles[lineNdx*2 + 0].colors[2] = scene.lines[lineNdx].colors[1];
 
-		triangleScene.triangles[lineNdx*2 + 1].positions[0] = tcu::Vec4(lineQuadNormalizedDeviceSpace[0].x(), lineQuadNormalizedDeviceSpace[0].y(), 0.0f, 1.0f);
-		triangleScene.triangles[lineNdx*2 + 1].positions[1] = tcu::Vec4(lineQuadNormalizedDeviceSpace[2].x(), lineQuadNormalizedDeviceSpace[2].y(), 0.0f, 1.0f);
-		triangleScene.triangles[lineNdx*2 + 1].positions[2] = tcu::Vec4(lineQuadNormalizedDeviceSpace[3].x(), lineQuadNormalizedDeviceSpace[3].y(), 0.0f, 1.0f);
+		triangleScene.triangles[lineNdx*2 + 1].positions[0] = lineQuadUnprojected[0];
+		triangleScene.triangles[lineNdx*2 + 1].positions[1] = lineQuadUnprojected[2];
+		triangleScene.triangles[lineNdx*2 + 1].positions[2] = lineQuadUnprojected[3];
 
 		triangleScene.triangles[lineNdx*2 + 1].sharedEdge[0] = true;
 		triangleScene.triangles[lineNdx*2 + 1].sharedEdge[1] = false;
@@ -1129,7 +1163,117 @@ bool verifyMultisampleLineGroupInterpolation (const tcu::Surface& surface, const
 		triangleScene.triangles[lineNdx*2 + 1].colors[2] = scene.lines[lineNdx].colors[1];
 	}
 
-	return verifyTriangleGroupInterpolationWithInterpolator(surface, triangleScene, args, log, MultisampleLineInterpolator(scene));
+	if (strictMode)
+	{
+		// Strict mode interpolation should be purely in the direction of the line-segment
+		logStash.messages.push_back("Verify using line interpolator");
+		return verifyTriangleGroupInterpolationWithInterpolator(surface, triangleScene, args, logStash, MultisampleLineInterpolator(scene));
+	}
+	else
+	{
+		// For non-strict lines some allowance needs to be inplace for a few different styles of implementation.
+		//
+		// Some implementations duplicate the attributes at the endpoints to the corners of the triangle
+		// deconstruted parallelogram. Gradients along the line will be seen to travel in the major axis,
+		// with values effectively duplicated in the minor axis direction. In other cases, implementations
+		// will use the original parameters of the line to calculate attribute interpolation so it will
+		// follow the direction of the line-segment.
+		logStash.messages.push_back("Verify using triangle interpolator");
+		if (!verifyTriangleGroupInterpolationWithInterpolator(surface, triangleScene, args, logStash, TriangleInterpolator(triangleScene)))
+		{
+			logStash.messages.push_back("Verify using line interpolator");
+			return verifyTriangleGroupInterpolationWithInterpolator(surface, triangleScene, args, logStash, MultisampleLineInterpolator(scene));
+		}
+		return true;
+	}
+}
+
+static void logTriangleGroupnterpolationStash (const tcu::Surface& surface, tcu::TestLog& log, VerifyTriangleGroupInterpolationLogStash& logStash)
+{
+	// Output results
+	log << tcu::TestLog::Message << "Verifying rasterization result." << tcu::TestLog::EndMessage;
+
+	for (size_t msgNdx = 0; msgNdx < logStash.messages.size(); ++msgNdx)
+		log << tcu::TestLog::Message << logStash.messages[msgNdx] << tcu::TestLog::EndMessage;
+
+	// report result
+	if (!logStash.success)
+	{
+		log << tcu::TestLog::Message << logStash.invalidPixels << " invalid pixel(s) found." << tcu::TestLog::EndMessage;
+		log << tcu::TestLog::ImageSet("Verification result", "Result of rendering")
+			<< tcu::TestLog::Image("Result", "Result",			surface)
+			<< tcu::TestLog::Image("ErrorMask", "ErrorMask",	logStash.errorMask)
+			<< tcu::TestLog::EndImageSet;
+	}
+	else
+	{
+		log << tcu::TestLog::Message << "No invalid pixels found." << tcu::TestLog::EndMessage;
+		log << tcu::TestLog::ImageSet("Verification result", "Result of rendering")
+			<< tcu::TestLog::Image("Result", "Result", surface)
+			<< tcu::TestLog::EndImageSet;
+	}
+}
+
+static bool verifyMultisampleLineGroupInterpolation (const tcu::Surface&			surface,
+													 const LineSceneSpec&			scene,
+													 const RasterizationArguments&	args,
+													 tcu::TestLog&					log,
+													 const bool						strictMode = true,
+													 const bool						allowBresenhamForNonStrictLines = false)
+{
+	bool										result					= false;
+	VerifyTriangleGroupInterpolationLogStash	nonStrictModeLogStash;
+	VerifyTriangleGroupInterpolationLogStash	strictModeLogStash;
+
+	nonStrictModeLogStash.messages.push_back("Non-strict line draw mode.");
+	strictModeLogStash.messages.push_back("Strict mode line draw mode.");
+
+	if (strictMode)
+	{
+		result = verifyMultisampleLineGroupInterpolationInternal(surface,scene, args, strictModeLogStash, strictMode);
+
+		logTriangleGroupnterpolationStash(surface, log, strictModeLogStash);
+	}
+	else
+	{
+		if (verifyMultisampleLineGroupInterpolationInternal(surface,scene, args, nonStrictModeLogStash, false))
+		{
+			logTriangleGroupnterpolationStash(surface, log, nonStrictModeLogStash);
+
+			result	= true;
+		}
+		else if (verifyMultisampleLineGroupInterpolationInternal(surface,scene, args, strictModeLogStash, true))
+		{
+			logTriangleGroupnterpolationStash(surface, log, strictModeLogStash);
+
+			result	= true;
+		}
+		else
+		{
+			logTriangleGroupnterpolationStash(surface, log, nonStrictModeLogStash);
+			logTriangleGroupnterpolationStash(surface, log, strictModeLogStash);
+		}
+
+		// In the non-strict line case, bresenham is also permissable, though not specified. This is due
+		// to a change in how lines are specified in Vulkan versus GLES; in GLES bresenham lines using the
+		// diamond-exit rule were the preferred way to draw single pixel non-antialiased lines, and not all
+		// GLES implementations are able to disable this behaviour.
+		if (result == false)
+		{
+			log << tcu::TestLog::Message << "Checking line rasterisation using verifySinglesampleNarrowLineGroupInterpolation for nonStrict lines" << tcu::TestLog::EndMessage;
+			if (args.numSamples <= 1 &&
+				allowBresenhamForNonStrictLines &&
+				verifyLineGroupInterpolationWithProjectedWeights(surface, scene, args, log))
+			{
+				log << tcu::TestLog::Message << "verifySinglesampleNarrowLineGroupInterpolation for nonStrict lines Passed" << tcu::TestLog::EndMessage;
+
+				result	= true;
+			}
+		}
+
+	}
+
+	return result;
 }
 
 bool verifyMultisamplePointGroupRasterization (const tcu::Surface& surface, const PointSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log)
@@ -2346,10 +2490,13 @@ CoverageType calculateTriangleCoverage (const tcu::Vec4& p0, const tcu::Vec4& p1
 	}
 }
 
-static void verifyTriangleGroupRasterizationLog (const tcu::Surface& surface, tcu::TestLog& log, VerifyTriangleGroupRasterizationLogStash& logStash)
+static void logTriangleGroupRasterizationStash (const tcu::Surface& surface, tcu::TestLog& log, VerifyTriangleGroupRasterizationLogStash& logStash)
 {
 	// Output results
 	log << tcu::TestLog::Message << "Verifying rasterization result." << tcu::TestLog::EndMessage;
+
+	for (size_t msgNdx = 0; msgNdx < logStash.messages.size(); ++msgNdx)
+		log << tcu::TestLog::Message << logStash.messages[msgNdx] << tcu::TestLog::EndMessage;
 
 	if (!logStash.result)
 	{
@@ -2393,7 +2540,7 @@ bool verifyTriangleGroupRasterization (const tcu::Surface& surface, const Triang
 	tcu::Surface		errorMask					(surface.getWidth(), surface.getHeight());
 	bool				result						= false;
 
-	// subpixel bits in in a valid range?
+	// subpixel bits in a valid range?
 
 	if (subPixelBits < 0)
 	{
@@ -2477,6 +2624,10 @@ bool verifyTriangleGroupRasterization (const tcu::Surface& surface, const Triang
 
 	tcu::clear(errorMask.getAccess(), tcu::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
 
+	// Use these to sanity check there is something drawn when a test expects something else than an empty picture.
+	bool referenceEmpty	= true;
+	bool resultEmpty	= true;
+
 	for (int y = 0; y < surface.getHeight(); ++y)
 	for (int x = 0; x < surface.getWidth(); ++x)
 	{
@@ -2484,6 +2635,9 @@ bool verifyTriangleGroupRasterization (const tcu::Surface& surface, const Triang
 		const bool			imageNoCoverage		= compareColors(color, backGroundColor, args.redBits, args.greenBits, args.blueBits);
 		const bool			imageFullCoverage	= compareColors(color, triangleColor, args.redBits, args.greenBits, args.blueBits);
 		CoverageType		referenceCoverage	= (CoverageType)coverageMap.getAccess().getPixelUint(x, y).x();
+
+		if (!imageNoCoverage)
+			resultEmpty = false;
 
 		switch (referenceCoverage)
 		{
@@ -2498,6 +2652,7 @@ bool verifyTriangleGroupRasterization (const tcu::Surface& surface, const Triang
 
 			case COVERAGE_PARTIAL:
 				{
+					referenceEmpty = false;
 					bool foundFragment = false;
 					if (vulkanLinesTest == true)
 					{
@@ -2524,6 +2679,7 @@ bool verifyTriangleGroupRasterization (const tcu::Surface& surface, const Triang
 				break;
 
 			case COVERAGE_FULL:
+				referenceEmpty = false;
 				if (!imageFullCoverage)
 				{
 					// no coverage where there should be
@@ -2544,7 +2700,8 @@ bool verifyTriangleGroupRasterization (const tcu::Surface& surface, const Triang
 	if (((mode == VERIFICATIONMODE_STRICT) && (missingPixels + unexpectedPixels > 0)) ||
 		((mode == VERIFICATIONMODE_WEAK)   && (missingPixels + unexpectedPixels > weakVerificationThreshold)) ||
 		((mode == VERIFICATIONMODE_WEAKER) && (missingPixels + unexpectedPixels > weakerVerificationThreshold)) ||
-		((mode == VERIFICATIONMODE_SMOOTH) && (missingPixels > weakVerificationThreshold)))
+		((mode == VERIFICATIONMODE_SMOOTH) && (missingPixels > weakVerificationThreshold)) ||
+		referenceEmpty != resultEmpty)
 	{
 		result = false;
 	}
@@ -2564,7 +2721,7 @@ bool verifyTriangleGroupRasterization (const tcu::Surface& surface, const Triang
 
 		if (logStash == DE_NULL)
 		{
-			verifyTriangleGroupRasterizationLog(surface, log, *tempLogStash);
+			logTriangleGroupRasterizationStash(surface, log, *tempLogStash);
 			delete tempLogStash;
 		}
 	}
@@ -2577,43 +2734,63 @@ bool verifyLineGroupRasterization (const tcu::Surface& surface, const LineSceneS
 	const bool multisampled = args.numSamples != 0;
 
 	if (multisampled)
-		return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_NO_CLIPPING, DE_NULL);
+		return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_NO_CLIPPING, DE_NULL, false, true);
 	else
 		return verifySinglesampleLineGroupRasterization(surface, scene, args, log);
 }
 
 bool verifyClippedTriangulatedLineGroupRasterization (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log)
 {
-	return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_USE_CLIPPING_BOX, DE_NULL);
+	return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_USE_CLIPPING_BOX, DE_NULL, false, true);
 }
 
-bool verifyRelaxedLineGroupRasterization (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log, const bool vulkanLinesTest)
+bool verifyRelaxedLineGroupRasterization (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log, const bool vulkanLinesTest, const bool strict)
 {
-	VerifyTriangleGroupRasterizationLogStash noClippingLogStash;
 	VerifyTriangleGroupRasterizationLogStash useClippingLogStash;
+	VerifyTriangleGroupRasterizationLogStash noClippingLogStash;
+	VerifyTriangleGroupRasterizationLogStash useClippingForcedStrictLogStash;
+	VerifyTriangleGroupRasterizationLogStash noClippingForcedStrictLogStash;
 
-	if (verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_USE_CLIPPING_BOX, &useClippingLogStash, vulkanLinesTest))
+	if (verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_USE_CLIPPING_BOX, &useClippingLogStash, vulkanLinesTest, strict))
 	{
-		log << tcu::TestLog::Message << "Relaxed rasterization succeeded with CLIPMODE_USE_CLIPPING_BOX, details follow." << tcu::TestLog::EndMessage;
-
-		verifyTriangleGroupRasterizationLog(surface, log, useClippingLogStash);
+		logTriangleGroupRasterizationStash(surface, log, useClippingLogStash);
 
 		return true;
 	}
-	else if (verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_NO_CLIPPING, &noClippingLogStash, vulkanLinesTest))
+	else if (verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_NO_CLIPPING, &noClippingLogStash, vulkanLinesTest, strict))
 	{
-		log << tcu::TestLog::Message << "Relaxed rasterization succeeded with CLIPMODE_NO_CLIPPING, details follow." << tcu::TestLog::EndMessage;
+		logTriangleGroupRasterizationStash(surface, log, noClippingLogStash);
 
-		verifyTriangleGroupRasterizationLog(surface, log, noClippingLogStash);
+		return true;
+	}
+	else if (strict == false && verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_USE_CLIPPING_BOX, &useClippingForcedStrictLogStash, vulkanLinesTest, true))
+	{
+		logTriangleGroupRasterizationStash(surface, log, useClippingForcedStrictLogStash);
 
+		return true;
+	}
+	else if (strict == false && verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_NO_CLIPPING, &noClippingForcedStrictLogStash, vulkanLinesTest, true))
+	{
+		logTriangleGroupRasterizationStash(surface, log, noClippingForcedStrictLogStash);
+
+		return true;
+	}
+	else if (strict == false && args.numSamples == 0 && verifyLineGroupRasterization(surface, scene, args, log))
+	{
 		return true;
 	}
 	else
 	{
 		log << tcu::TestLog::Message << "Relaxed rasterization failed, details follow." << tcu::TestLog::EndMessage;
 
-		verifyTriangleGroupRasterizationLog(surface, log, useClippingLogStash);
-		verifyTriangleGroupRasterizationLog(surface, log, noClippingLogStash);
+		logTriangleGroupRasterizationStash(surface, log, useClippingLogStash);
+		logTriangleGroupRasterizationStash(surface, log, noClippingLogStash);
+
+		if (strict == false)
+		{
+			logTriangleGroupRasterizationStash(surface, log, useClippingForcedStrictLogStash);
+			logTriangleGroupRasterizationStash(surface, log, noClippingForcedStrictLogStash);
+		}
 
 		return false;
 	}
@@ -2627,7 +2804,12 @@ bool verifyPointGroupRasterization (const tcu::Surface& surface, const PointScen
 
 bool verifyTriangleGroupInterpolation (const tcu::Surface& surface, const TriangleSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log)
 {
-	return verifyTriangleGroupInterpolationWithInterpolator(surface, scene, args, log, TriangleInterpolator(scene));
+	VerifyTriangleGroupInterpolationLogStash	logStash;
+	const bool									result		= verifyTriangleGroupInterpolationWithInterpolator(surface, scene, args, logStash, TriangleInterpolator(scene));
+
+	logTriangleGroupnterpolationStash(surface, log, logStash);
+
+	return result;
 }
 
 LineInterpolationMethod verifyLineGroupInterpolation (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log)
@@ -2665,9 +2847,9 @@ LineInterpolationMethod verifyLineGroupInterpolation (const tcu::Surface& surfac
 	}
 }
 
-bool verifyTriangulatedLineGroupInterpolation (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log)
+bool verifyTriangulatedLineGroupInterpolation (const tcu::Surface& surface, const LineSceneSpec& scene, const RasterizationArguments& args, tcu::TestLog& log, const bool strictMode, const bool allowBresenhamForNonStrictLines)
 {
-	return verifyMultisampleLineGroupInterpolation(surface, scene, args, log);
+	return verifyMultisampleLineGroupInterpolation(surface, scene, args, log, strictMode, allowBresenhamForNonStrictLines);
 }
 
 } // tcu
