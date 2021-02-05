@@ -98,6 +98,16 @@ void ImageSparseBindingCase::checkSupport (Context& context) const
 
 	if (!isImageSizeSupported(context.getInstanceInterface(), context.getPhysicalDevice(), m_imageType, m_imageSize))
 		TCU_THROW(NotSupportedError, "Image size not supported for device");
+
+	if (formatIsR64(m_format))
+	{
+		context.requireDeviceFunctionality("VK_EXT_shader_image_atomic_int64");
+
+		if (context.getShaderImageAtomicInt64FeaturesEXT().sparseImageInt64Atomics == VK_FALSE)
+		{
+			TCU_THROW(NotSupportedError, "sparseImageInt64Atomics is not supported for device");
+		}
+	}
 }
 
 class ImageSparseBindingInstance : public SparseResourcesBaseInstance
@@ -181,9 +191,6 @@ tcu::TestStatus ImageSparseBindingInstance::iterate (void)
 			imageSparseInfo.flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 		}
 
-		if (!checkSparseSupportForImageFormat(instance, physicalDevice, imageSparseInfo))
-			TCU_THROW(NotSupportedError, "The image format does not support sparse operations");
-
 		{
 			VkImageFormatProperties imageFormatProperties;
 			if (instance.getPhysicalDeviceImageFormatProperties(physicalDevice,
@@ -194,7 +201,7 @@ tcu::TestStatus ImageSparseBindingInstance::iterate (void)
 				imageSparseInfo.flags,
 				&imageFormatProperties) == VK_ERROR_FORMAT_NOT_SUPPORTED)
 			{
-				TCU_THROW(NotSupportedError, "Image format does not support sparse operations");
+				TCU_THROW(NotSupportedError, "Image format does not support sparse binding operations");
 			}
 
 			imageSparseInfo.mipLevels = getMipmapCount(m_format, formatDescription, imageFormatProperties, imageSparseInfo.extent);

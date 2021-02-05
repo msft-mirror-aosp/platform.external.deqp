@@ -663,6 +663,19 @@ void supportedCheck (Context& context, CaseDefinition caseDef)
 
 		if (subgroupSizeControlFeatures.computeFullSubgroups == DE_FALSE)
 			TCU_THROW(NotSupportedError, "Device does not support full subgroups in compute shaders");
+
+		VkPhysicalDeviceSubgroupSizeControlPropertiesEXT subgroupSizeControlProperties;
+		subgroupSizeControlProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_SIZE_CONTROL_PROPERTIES_EXT;
+		subgroupSizeControlProperties.pNext = DE_NULL;
+
+		VkPhysicalDeviceProperties2 properties;
+		properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+		properties.pNext = &subgroupSizeControlProperties;
+
+		context.getInstanceInterface().getPhysicalDeviceProperties2(context.getPhysicalDevice(), &properties);
+
+		if ((subgroupSizeControlProperties.requiredSubgroupSizeStages & caseDef.shaderStage) != caseDef.shaderStage)
+			TCU_THROW(NotSupportedError, "Required subgroup size is not supported for shader stage");
 	}
 
 	*caseDef.geometryPointSizeSupported = subgroups::isTessellationAndGeometryPointSizeSupported(context);
@@ -865,11 +878,15 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 			const std::string op = de::toLower(getOpTypeName(opTypeIndex));
 
 			{
-				CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_COMPUTE_BIT, format, de::SharedPtr<bool>(new bool), deBool(false), deBool(false), DE_FALSE};
+				CaseDefinition caseDef = { opTypeIndex, VK_SHADER_STAGE_COMPUTE_BIT, format, de::SharedPtr<bool>(new bool), DE_FALSE, deBool(false),deBool(false) };
 				if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 				{
 					addFunctionCaseWithPrograms(computeGroup.get(),
 												op + "_" + subgroups::getFormatNameForGLSL(format),
+												"", supportedCheck, initPrograms, test, caseDef);
+					caseDef.requiredSubgroupSize = DE_TRUE;
+					addFunctionCaseWithPrograms(computeGroup.get(),
+												op + "_" + subgroups::getFormatNameForGLSL(format) + "_requiredsubgroupsize",
 												"", supportedCheck, initPrograms, test, caseDef);
 				}
 				else
@@ -877,11 +894,15 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 					addFunctionCaseWithPrograms(computeGroupARB.get(),
 												op + "_" + subgroups::getFormatNameForGLSL(format),
 												"", supportedCheck, initPrograms, test, caseDef);
+					caseDef.requiredSubgroupSize = DE_TRUE;
+					addFunctionCaseWithPrograms(computeGroupARB.get(),
+												op + "_" + subgroups::getFormatNameForGLSL(format) + "_requiredsubgroupsize",
+												"", supportedCheck, initPrograms, test, caseDef);
 				}
 			}
 
 			{
-				const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_ALL_GRAPHICS, format, de::SharedPtr<bool>(new bool), deBool(false), deBool(false), DE_FALSE};
+				const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_ALL_GRAPHICS, format, de::SharedPtr<bool>(new bool), DE_FALSE, deBool(false),deBool(false) };
 				if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 				{
 					addFunctionCaseWithPrograms(graphicGroup.get(),
@@ -898,7 +919,7 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 
 			for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(stages); ++stageIndex)
 			{
-				const CaseDefinition caseDef = {opTypeIndex, stages[stageIndex], format, de::SharedPtr<bool>(new bool), deBool(false), deBool(false), DE_FALSE};
+				const CaseDefinition caseDef = {opTypeIndex, stages[stageIndex], format, de::SharedPtr<bool>(new bool), DE_FALSE, deBool(false),deBool(false) };
 				if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 				{
 					addFunctionCaseWithPrograms(framebufferGroup.get(),
@@ -916,9 +937,10 @@ tcu::TestCaseGroup* createSubgroupsVoteTests(tcu::TestContext& testCtx)
 												supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
 				}
 			}
+
 			bool needs8BitUBOStorage = isFormat8bitTy(format);
 			bool needs16BitUBOStorage = isFormat16BitTy(format);
-			const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_FRAGMENT_BIT, format, de::SharedPtr<bool>(new bool),deBool(needs8BitUBOStorage), deBool(needs16BitUBOStorage), DE_FALSE };
+			const CaseDefinition caseDef = {opTypeIndex, VK_SHADER_STAGE_FRAGMENT_BIT, format, de::SharedPtr<bool>(new bool), DE_FALSE, deBool(needs8BitUBOStorage),deBool(needs16BitUBOStorage) };
 			if (opTypeIndex < OPTYPE_LAST_NON_ARB)
 			{
 				addFunctionCaseWithPrograms(fragHelperGroup.get(),

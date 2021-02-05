@@ -115,6 +115,13 @@ Move<VkPipelineLayout> makePipelineLayout (const DeviceInterface&		vk,
 										   const deUint32				setLayoutCount,
 										   const VkDescriptorSetLayout*	descriptorSetLayout);
 
+Move<VkPipelineLayout> makePipelineLayout (const DeviceInterface&		vk,
+										   const VkDevice				device,
+										   const deUint32				setLayoutCount,
+										   const VkDescriptorSetLayout*	descriptorSetLayout,
+										   const deUint32               pushConstantRangeCount,
+										   const VkPushConstantRange*   pPushConstantRanges);
+
 Move<VkFramebuffer> makeFramebuffer (const DeviceInterface&	vk,
 									 const VkDevice			device,
 									 const VkRenderPass		renderPass,
@@ -127,7 +134,7 @@ Move<VkFramebuffer> makeFramebuffer (const DeviceInterface&	vk,
 									 const VkDevice			device,
 									 const VkRenderPass		renderPass,
 									 const deUint32			attachmentCount,
-									 const VkImageView*		colorAttachments,
+									 const VkImageView*		attachmentsArray,
 									 const deUint32			width,
 									 const deUint32			height,
 									 const deUint32			layers = 1u);
