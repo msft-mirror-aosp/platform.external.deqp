@@ -1038,7 +1038,7 @@ void CommonDescriptorInstance::copyBuffersToImages					(IterateCommonVariables&	
 	DE_ASSERT(variables.descriptorsImages.size() == infoCount);
 	const VkPipelineStageFlagBits dstStageMask = (m_testParams.stageFlags & VK_SHADER_STAGE_COMPUTE_BIT)
 		? VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT
-		: VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+		: VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	for (deUint32 infoIdx = 0; infoIdx < infoCount; ++infoIdx)
 	{
 		ut::recordCopyBufferToImage(
@@ -1376,6 +1376,7 @@ tcu::TestStatus	CommonDescriptorInstance::iterate					(void)
 			vk::endRenderPass		(m_vki, *v.commandBuffer);
 
 			iterateCommandEnd(v, programResult, referenceResult);
+			programResult->invalidate();
 		}
 
 	return ( iterateVerifyResults(v, programResult, referenceResult) ? tcu::TestStatus::pass : tcu::TestStatus::fail)("");
@@ -1677,13 +1678,13 @@ std::string CommonDescriptorInstance::getColorAccess				(VkDescriptorType							
 		break;
 	case VK_DESCRIPTOR_TYPE_SAMPLER:
 		text = usesMipMaps
-			? "textureLod(sampler2D(tex[0], data[nonuniformEXT(${INDEX})]), normalpos, 1)"
-			: "texture(   sampler2D(tex[0], data[nonuniformEXT(${INDEX})]), normalpos   )";
+			? "textureLod(nonuniformEXT(sampler2D(tex[0], data[${INDEX}])), normalpos, 1)"
+			: "texture(   nonuniformEXT(sampler2D(tex[0], data[${INDEX}])), normalpos   )";
 		break;
 	case VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE:
 		text = usesMipMaps
-			? "textureLod( sampler2D(data[nonuniformEXT(${INDEX})], samp[0]), vec2(0,0), textureQueryLevels(sampler2D(data[nonuniformEXT(${INDEX})], samp[0]))-1)"
-			: "texture(    sampler2D(data[nonuniformEXT(${INDEX})], samp[0]), vec2(0,0)   )";
+			? "textureLod( nonuniformEXT(sampler2D(data[${INDEX}], samp[0])), vec2(0,0), textureQueryLevels(nonuniformEXT(sampler2D(data[${INDEX}], samp[0])))-1)"
+			: "texture(    nonuniformEXT(sampler2D(data[${INDEX}], samp[0])), vec2(0,0)   )";
 		break;
 	case VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER:
 		text = usesMipMaps
@@ -2290,6 +2291,7 @@ tcu::TestStatus	DynamicBuffersInstance::iterate						(void)
 	vk::endRenderPass	(m_vki, *v.commandBuffer);
 
 			iterateCommandEnd(v, programResult, referenceResult);
+			programResult->invalidate();
 		}
 
 	return (iterateVerifyResults(v, programResult, referenceResult) ? tcu::TestStatus::pass : tcu::TestStatus::fail)("");
