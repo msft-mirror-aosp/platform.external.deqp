@@ -154,13 +154,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private String mAngle = "none";
 
     @Option(
-            name = "native-coverage",
-            description =
-                    "Collect code coverage for this test run. Note that the build under test must"
-                        + " be a coverage build or else this will fail.")
-    private boolean mCoverage = false;
-
-    @Option(
             name = "disable-watchdog",
             description =
                     "Disable the native testrunner's per-test watchdog.")
@@ -2280,7 +2273,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         destination.mLogData = source.mLogData;
         destination.mCollectTestsOnly = source.mCollectTestsOnly;
         destination.mAngle = source.mAngle;
-        destination.mCoverage = source.mCoverage;
         destination.mDisableWatchdog = source.mDisableWatchdog;
     }
 

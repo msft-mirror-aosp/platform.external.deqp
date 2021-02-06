@@ -509,7 +509,12 @@ public:
 		const DeviceInterface&	vk	= m_context.getDeviceInterface();
 
 		if (m_bufferOp == BUFFER_OP_FILL)
+		{
 			vk.cmdFillBuffer(cmdBuffer, m_resource.getBuffer().handle, m_resource.getBuffer().offset, m_resource.getBuffer().size, m_fillValue);
+
+			const VkBufferMemoryBarrier	barrier = makeBufferMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT, m_resource.getBuffer().handle, 0u, m_resource.getBuffer().size);
+			vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0u, DE_NULL, 1u, &barrier, 0u, DE_NULL);
+		}
 		else if (m_bufferOp == BUFFER_OP_UPDATE)
 			vk.cmdUpdateBuffer(cmdBuffer, m_resource.getBuffer().handle, m_resource.getBuffer().offset, m_resource.getBuffer().size, reinterpret_cast<deUint32*>(&m_data[0]));
 		else
@@ -3733,6 +3738,23 @@ public:
 	void recordCommands (const VkCommandBuffer cmdBuffer)
 	{
 		const DeviceInterface&		vk						= m_context.getDeviceInterface();
+		if ((m_resource.getImage().subresourceRange.aspectMask & (VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT)) != 0)
+		{
+			const VkImageMemoryBarrier imageBarrier =
+			{
+				VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,				// sType
+				DE_NULL,											// pNext
+				0u,													// srcAccessMask
+				VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,		// dstAccessMask
+				VK_IMAGE_LAYOUT_UNDEFINED,							// oldLayout
+				VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,	// newLayout
+				VK_QUEUE_FAMILY_IGNORED,							// srcQueueFamilyIndex
+				VK_QUEUE_FAMILY_IGNORED,							// dstQueueFamilyIndex
+				m_resource.getImage().handle,						// image
+				m_resource.getImage().subresourceRange				// subresourceRange
+			};
+			vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, 0u, 0u, DE_NULL, 0u, DE_NULL, 1u, &imageBarrier);
+		}
 		beginRenderPass(vk, cmdBuffer, *m_renderPass, *m_frameBuffer, makeRect2D(0 ,0, m_resource.getImage().extent.width, m_resource.getImage().extent.height), m_clearValue);
 
 		const VkClearAttachment	clearAttachment	=

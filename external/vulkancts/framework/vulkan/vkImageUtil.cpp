@@ -1653,6 +1653,31 @@ PlanarFormatDescription getCorePlanarFormatDescription (VkFormat format)
 			return desc;
 		}
 
+
+		case VK_FORMAT_R64_SINT:
+		{
+			const PlanarFormatDescription	desc =
+			{
+				1, // planes
+				chanR,
+				1,1,
+				{
+				//		Size	WDiv	HDiv	planeCompatibleFormat
+					{	8,		1,		1,		VK_FORMAT_R64_SINT },
+					{	0,		0,		0,		VK_FORMAT_UNDEFINED },
+					{	0,		0,		0,		VK_FORMAT_UNDEFINED },
+				},
+				{
+					//		Plane	Type	Offs	Size	Stride
+						{	0,		sint,	0,		64,		8 },	// R
+						{	0,		0,		0,		0,		0 },	// G
+						{	0,		0,		0,		0,		0 },	// B
+						{	0,		0,		0,		0,		0 }		// A
+					}
+			};
+			return desc;
+		}
+
 		case VK_FORMAT_R8G8_SINT:
 		{
 			const PlanarFormatDescription	desc	=
@@ -1865,6 +1890,30 @@ PlanarFormatDescription getCorePlanarFormatDescription (VkFormat format)
 					{	0,		0,		0,		0,		0 },	// B
 					{	0,		0,		0,		0,		0 }		// A
 				}
+			};
+			return desc;
+		}
+
+		case VK_FORMAT_R64_UINT:
+		{
+			const PlanarFormatDescription	desc =
+			{
+				1, // planes
+				chanR,
+				1,1,
+				{
+				//		Size	WDiv	HDiv	planeCompatibleFormat
+					{	8,		1,		1,		VK_FORMAT_R64_UINT },
+					{	0,		0,		0,		VK_FORMAT_UNDEFINED },
+					{	0,		0,		0,		VK_FORMAT_UNDEFINED },
+				},
+				{
+					//		Plane	Type	Offs	Size	Stride
+						{	0,		uint,	0,		64,		8 },	// R
+						{	0,		0,		0,		0,		0 },	// G
+						{	0,		0,		0,		0,		0 },	// B
+						{	0,		0,		0,		0,		0 }		// A
+					}
 			};
 			return desc;
 		}
@@ -2353,28 +2402,24 @@ bool isChromaSubsampled (VkFormat format)
 		case VK_FORMAT_G8_B8R8_2PLANE_420_UNORM_KHR:
 		case VK_FORMAT_G8_B8_R8_3PLANE_422_UNORM_KHR:
 		case VK_FORMAT_G8_B8R8_2PLANE_422_UNORM_KHR:
-		case VK_FORMAT_G8_B8_R8_3PLANE_444_UNORM_KHR:
 		case VK_FORMAT_G10X6B10X6G10X6R10X6_422_UNORM_4PACK16_KHR:
 		case VK_FORMAT_B10X6G10X6R10X6G10X6_422_UNORM_4PACK16_KHR:
 		case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_420_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_420_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_422_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G10X6_B10X6R10X6_2PLANE_422_UNORM_3PACK16_KHR:
-		case VK_FORMAT_G10X6_B10X6_R10X6_3PLANE_444_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G12X4B12X4G12X4R12X4_422_UNORM_4PACK16_KHR:
 		case VK_FORMAT_B12X4G12X4R12X4G12X4_422_UNORM_4PACK16_KHR:
 		case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_420_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_420_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_422_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G12X4_B12X4R12X4_2PLANE_422_UNORM_3PACK16_KHR:
-		case VK_FORMAT_G12X4_B12X4_R12X4_3PLANE_444_UNORM_3PACK16_KHR:
 		case VK_FORMAT_G16B16G16R16_422_UNORM_KHR:
 		case VK_FORMAT_B16G16R16G16_422_UNORM_KHR:
 		case VK_FORMAT_G16_B16_R16_3PLANE_420_UNORM_KHR:
 		case VK_FORMAT_G16_B16R16_2PLANE_420_UNORM_KHR:
 		case VK_FORMAT_G16_B16_R16_3PLANE_422_UNORM_KHR:
 		case VK_FORMAT_G16_B16R16_2PLANE_422_UNORM_KHR:
-		case VK_FORMAT_G16_B16_R16_3PLANE_444_UNORM_KHR:
 			return true;
 
 		default:
@@ -2526,6 +2571,8 @@ VkFormat mapTextureFormat (const tcu::TextureFormat& format)
 
 		case FMT_CASE(R, UNSIGNED_INT32):					return VK_FORMAT_R32_UINT;
 		case FMT_CASE(R, SIGNED_INT32):						return VK_FORMAT_R32_SINT;
+		case FMT_CASE(R, UNSIGNED_INT64):					return VK_FORMAT_R64_UINT;
+		case FMT_CASE(R, SIGNED_INT64):						return VK_FORMAT_R64_SINT;
 		case FMT_CASE(R, FLOAT):							return VK_FORMAT_R32_SFLOAT;
 
 		case FMT_CASE(RG, UNSIGNED_INT32):					return VK_FORMAT_R32G32_UINT;
@@ -2786,7 +2833,13 @@ tcu::TextureFormat mapVkFormat (VkFormat format)
 		case VK_FORMAT_R32G32B32A32_SFLOAT:		return TextureFormat(TextureFormat::RGBA,	TextureFormat::FLOAT);
 
 		case VK_FORMAT_R64_UINT:				return TextureFormat(TextureFormat::R,		TextureFormat::UNSIGNED_INT64);
+		case VK_FORMAT_R64G64_UINT:				return TextureFormat(TextureFormat::RG,		TextureFormat::UNSIGNED_INT64);
+		case VK_FORMAT_R64G64B64_UINT:			return TextureFormat(TextureFormat::RGB,	TextureFormat::UNSIGNED_INT64);
+		case VK_FORMAT_R64G64B64A64_UINT:		return TextureFormat(TextureFormat::RGBA,	TextureFormat::UNSIGNED_INT64);
 		case VK_FORMAT_R64_SINT:				return TextureFormat(TextureFormat::R,		TextureFormat::SIGNED_INT64);
+		case VK_FORMAT_R64G64_SINT:				return TextureFormat(TextureFormat::RG,		TextureFormat::SIGNED_INT64);
+		case VK_FORMAT_R64G64B64_SINT:			return TextureFormat(TextureFormat::RGB,	TextureFormat::SIGNED_INT64);
+		case VK_FORMAT_R64G64B64A64_SINT:		return TextureFormat(TextureFormat::RGBA,	TextureFormat::SIGNED_INT64);
 		case VK_FORMAT_R64_SFLOAT:				return TextureFormat(TextureFormat::R,		TextureFormat::FLOAT64);
 		case VK_FORMAT_R64G64_SFLOAT:			return TextureFormat(TextureFormat::RG,		TextureFormat::FLOAT64);
 		case VK_FORMAT_R64G64B64_SFLOAT:		return TextureFormat(TextureFormat::RGB,	TextureFormat::FLOAT64);
@@ -3054,6 +3107,15 @@ tcu::TextureFormat getChannelAccessFormat (tcu::TextureChannelClass	type,
 			TextureFormat::FLOAT,				// float
 		};
 
+		static const TextureFormat::ChannelType	s_size64[tcu::TEXTURECHANNELCLASS_LAST] =
+		{
+			TextureFormat::CHANNELTYPE_LAST,	// snorm
+			TextureFormat::CHANNELTYPE_LAST,	// unorm
+			TextureFormat::SIGNED_INT64,		// sint
+			TextureFormat::UNSIGNED_INT64,		// uint
+			TextureFormat::FLOAT64,				// float
+		};
+
 		TextureFormat::ChannelType	chnType		= TextureFormat::CHANNELTYPE_LAST;
 
 		if (sizeBits == 8)
@@ -3062,6 +3124,8 @@ tcu::TextureFormat getChannelAccessFormat (tcu::TextureChannelClass	type,
 			chnType = s_size16[type];
 		else if (sizeBits == 32)
 			chnType = s_size32[type];
+		else if (sizeBits == 64)
+			chnType = s_size64[type];
 
 		if (chnType != TextureFormat::CHANNELTYPE_LAST)
 			return TextureFormat(TextureFormat::R, chnType);
@@ -3310,15 +3374,18 @@ deUint32 getFormatComponentWidth (const VkFormat format, const deUint32 componen
 			case tcu::TextureFormat::SNORM_INT32:
 			case tcu::TextureFormat::UNSIGNED_INT32:
 			case tcu::TextureFormat::SIGNED_INT32:
+			case tcu::TextureFormat::FLOAT:
 				return 32;
 
 			case tcu::TextureFormat::FLOAT64:
-			return 64;
+			case tcu::TextureFormat::UNSIGNED_INT64:
+			case tcu::TextureFormat::SIGNED_INT64:
+				return 64;
 
 			// Packed formats
 			case tcu::TextureFormat::UNORM_SHORT_4444:
 			case tcu::TextureFormat::UNSIGNED_SHORT_4444:
-			return 4;
+				return 4;
 
 			case tcu::TextureFormat::UNORM_SHORT_565:
 			case tcu::TextureFormat::UNSIGNED_SHORT_565:
@@ -3392,16 +3459,19 @@ deUint32 getBlockHeight (const VkFormat compressedFormat)
 
 VkFilter mapFilterMode (tcu::Sampler::FilterMode filterMode)
 {
-	DE_STATIC_ASSERT(tcu::Sampler::FILTERMODE_LAST == 6);
+	DE_STATIC_ASSERT(tcu::Sampler::FILTERMODE_LAST == 9);
 
 	switch (filterMode)
 	{
 		case tcu::Sampler::NEAREST:					return VK_FILTER_NEAREST;
 		case tcu::Sampler::LINEAR:					return VK_FILTER_LINEAR;
+		case tcu::Sampler::CUBIC:					return VK_FILTER_CUBIC_EXT;
 		case tcu::Sampler::NEAREST_MIPMAP_NEAREST:	return VK_FILTER_NEAREST;
 		case tcu::Sampler::NEAREST_MIPMAP_LINEAR:	return VK_FILTER_NEAREST;
 		case tcu::Sampler::LINEAR_MIPMAP_NEAREST:	return VK_FILTER_LINEAR;
 		case tcu::Sampler::LINEAR_MIPMAP_LINEAR:	return VK_FILTER_LINEAR;
+		case tcu::Sampler::CUBIC_MIPMAP_NEAREST:	return VK_FILTER_CUBIC_EXT;
+		case tcu::Sampler::CUBIC_MIPMAP_LINEAR:		return VK_FILTER_CUBIC_EXT;
 		default:
 			DE_FATAL("Illegal filter mode");
 			return (VkFilter)0;
@@ -3410,7 +3480,7 @@ VkFilter mapFilterMode (tcu::Sampler::FilterMode filterMode)
 
 VkSamplerMipmapMode mapMipmapMode (tcu::Sampler::FilterMode filterMode)
 {
-	DE_STATIC_ASSERT(tcu::Sampler::FILTERMODE_LAST == 6);
+	DE_STATIC_ASSERT(tcu::Sampler::FILTERMODE_LAST == 9);
 
 	// \note VkSamplerCreateInfo doesn't have a flag for disabling mipmapping. Instead
 	//		 minLod = 0 and maxLod = 0.25 should be used to match OpenGL NEAREST and LINEAR
@@ -3420,10 +3490,13 @@ VkSamplerMipmapMode mapMipmapMode (tcu::Sampler::FilterMode filterMode)
 	{
 		case tcu::Sampler::NEAREST:					return VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		case tcu::Sampler::LINEAR:					return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		case tcu::Sampler::CUBIC:					return VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		case tcu::Sampler::NEAREST_MIPMAP_NEAREST:	return VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		case tcu::Sampler::NEAREST_MIPMAP_LINEAR:	return VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		case tcu::Sampler::LINEAR_MIPMAP_NEAREST:	return VK_SAMPLER_MIPMAP_MODE_NEAREST;
 		case tcu::Sampler::LINEAR_MIPMAP_LINEAR:	return VK_SAMPLER_MIPMAP_MODE_LINEAR;
+		case tcu::Sampler::CUBIC_MIPMAP_NEAREST:	return VK_SAMPLER_MIPMAP_MODE_NEAREST;
+		case tcu::Sampler::CUBIC_MIPMAP_LINEAR:		return VK_SAMPLER_MIPMAP_MODE_LINEAR;
 		default:
 			DE_FATAL("Illegal filter mode");
 			return (VkSamplerMipmapMode)0;
@@ -3473,6 +3546,7 @@ static VkBorderColor mapBorderColor (tcu::TextureChannelClass channelClass, cons
 		if (uColor		== tcu::UVec4(0, 0, 0, 0)) return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
 		else if (uColor	== tcu::UVec4(0, 0, 0, 1)) return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 		else if (uColor == tcu::UVec4(1, 1, 1, 1)) return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+		else									   return VK_BORDER_COLOR_INT_CUSTOM_EXT;
 	}
 	else if (channelClass == tcu::TEXTURECHANNELCLASS_SIGNED_INTEGER)
 	{
@@ -3481,6 +3555,7 @@ static VkBorderColor mapBorderColor (tcu::TextureChannelClass channelClass, cons
 		if (sColor		== tcu::IVec4(0, 0, 0, 0)) return VK_BORDER_COLOR_INT_TRANSPARENT_BLACK;
 		else if (sColor	== tcu::IVec4(0, 0, 0, 1)) return VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 		else if (sColor == tcu::IVec4(1, 1, 1, 1)) return VK_BORDER_COLOR_INT_OPAQUE_WHITE;
+		else									   return	VK_BORDER_COLOR_INT_CUSTOM_EXT;
 	}
 	else
 	{
@@ -3489,18 +3564,19 @@ static VkBorderColor mapBorderColor (tcu::TextureChannelClass channelClass, cons
 		if (fColor		== tcu::Vec4(0.0f, 0.0f, 0.0f, 0.0f)) return VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
 		else if (fColor == tcu::Vec4(0.0f, 0.0f, 0.0f, 1.0f)) return VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
 		else if (fColor == tcu::Vec4(1.0f, 1.0f, 1.0f, 1.0f)) return VK_BORDER_COLOR_FLOAT_OPAQUE_WHITE;
+		else												  return VK_BORDER_COLOR_FLOAT_CUSTOM_EXT;
 	}
 
 	DE_FATAL("Unsupported border color");
-	return VK_BORDER_COLOR_LAST;
+	return VK_BORDER_COLOR_MAX_ENUM;
 }
 
 VkSamplerCreateInfo mapSampler (const tcu::Sampler& sampler, const tcu::TextureFormat& format, float minLod, float maxLod, bool unnormal)
 {
-	const bool					compareEnabled	= (sampler.compare != tcu::Sampler::COMPAREMODE_NONE);
-	const VkCompareOp			compareOp		= (compareEnabled) ? (mapCompareMode(sampler.compare)) : (VK_COMPARE_OP_ALWAYS);
-	const VkBorderColor			borderColor		= mapBorderColor(getTextureChannelClass(format.type), sampler.borderColor);
-	const bool					isMipmapEnabled	= (sampler.minFilter != tcu::Sampler::NEAREST && sampler.minFilter != tcu::Sampler::LINEAR);
+	const bool			compareEnabled	= (sampler.compare != tcu::Sampler::COMPAREMODE_NONE);
+	const VkCompareOp	compareOp		= (compareEnabled) ? (mapCompareMode(sampler.compare)) : (VK_COMPARE_OP_ALWAYS);
+	const VkBorderColor	borderColor		= mapBorderColor(getTextureChannelClass(format.type), sampler.borderColor);
+	const bool			isMipmapEnabled = (sampler.minFilter != tcu::Sampler::NEAREST && sampler.minFilter != tcu::Sampler::LINEAR && sampler.minFilter != tcu::Sampler::CUBIC);
 
 	const VkSamplerCreateInfo	createInfo		=
 	{
@@ -3527,12 +3603,31 @@ VkSamplerCreateInfo mapSampler (const tcu::Sampler& sampler, const tcu::TextureF
 	return createInfo;
 }
 
+rr::GenericVec4 mapVkColor (const VkClearColorValue& color)
+{
+	rr::GenericVec4 value;
+
+	static_assert(sizeof(rr::GenericVec4) == sizeof(VkClearColorValue), "GenericVec4 and VkClearColorValue size mismatch");
+	deMemcpy(&value, &color, sizeof(rr::GenericVec4));
+	return value;
+}
+
+VkClearColorValue mapVkColor(const rr::GenericVec4& color)
+{
+	VkClearColorValue value;
+
+	static_assert(sizeof(rr::GenericVec4) == sizeof(VkClearColorValue), "GenericVec4 and VkClearColorValue size mismatch");
+	deMemcpy(&value, &color, sizeof(VkClearColorValue));
+	return value;
+}
+
 tcu::Sampler mapVkSampler (const VkSamplerCreateInfo& samplerCreateInfo)
 {
 	// \note minLod & maxLod are not supported by tcu::Sampler. LOD must be clamped
 	//       before passing it to tcu::Texture*::sample*()
 
 	tcu::Sampler::ReductionMode reductionMode = tcu::Sampler::WEIGHTED_AVERAGE;
+	rr::GenericVec4 borderColorValue;
 
 	void const *pNext = samplerCreateInfo.pNext;
 	while (pNext != DE_NULL)
@@ -3550,6 +3645,13 @@ tcu::Sampler mapVkSampler (const VkSamplerCreateInfo& samplerCreateInfo)
 			case VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO:
 				pNext = reinterpret_cast<const VkSamplerYcbcrConversionInfo*>(pNext)->pNext;
 				break;
+			case VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT:
+			{
+				const VkSamplerCustomBorderColorCreateInfoEXT customBorderColorCreateInfo = *reinterpret_cast<const VkSamplerCustomBorderColorCreateInfoEXT*>(pNext);
+				borderColorValue = mapVkColor(customBorderColorCreateInfo.customBorderColor);
+				pNext = reinterpret_cast<const VkSamplerCustomBorderColorCreateInfoEXT*>(pNext)->pNext;
+				break;
+			}
 			default:
 				TCU_FAIL("Unrecognized sType in chained sampler create info");
 		}
@@ -3594,6 +3696,10 @@ tcu::Sampler mapVkSampler (const VkSamplerCreateInfo& samplerCreateInfo)
 			break;
 		case VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK:
 			sampler.borderColor = tcu::Vec4(0.0f, 0.0f, 0.0f, 0.0f);
+			break;
+		case VK_BORDER_COLOR_FLOAT_CUSTOM_EXT:
+		case VK_BORDER_COLOR_INT_CUSTOM_EXT:
+			sampler.borderColor = borderColorValue;
 			break;
 
 		default:
@@ -3679,6 +3785,15 @@ tcu::Sampler::FilterMode mapVkMinTexFilter (VkFilter filter, VkSamplerMipmapMode
 					break;
 			}
 			break;
+		case VK_FILTER_CUBIC_EXT:
+			switch (mipMode)
+			{
+			case VK_SAMPLER_MIPMAP_MODE_LINEAR:		return tcu::Sampler::CUBIC_MIPMAP_LINEAR;
+			case VK_SAMPLER_MIPMAP_MODE_NEAREST:	return tcu::Sampler::CUBIC_MIPMAP_NEAREST;
+			default:
+				break;
+			}
+			break;
 
 		default:
 			break;
@@ -3694,6 +3809,7 @@ tcu::Sampler::FilterMode mapVkMagTexFilter (VkFilter filter)
 	{
 		case VK_FILTER_LINEAR:		return tcu::Sampler::LINEAR;
 		case VK_FILTER_NEAREST:		return tcu::Sampler::NEAREST;
+		case VK_FILTER_CUBIC_EXT:	return tcu::Sampler::CUBIC;
 		default:
 			break;
 	}
@@ -3702,7 +3818,7 @@ tcu::Sampler::FilterMode mapVkMagTexFilter (VkFilter filter)
 	return tcu::Sampler::FILTERMODE_LAST;
 }
 
-//! Get a format the matches the layout in buffer memory used for a
+//! Get a format that matches the layout in buffer memory used for a
 //! buffer<->image copy on a depth/stencil format.
 tcu::TextureFormat getDepthCopyFormat (VkFormat combinedFormat)
 {
@@ -3727,7 +3843,7 @@ tcu::TextureFormat getDepthCopyFormat (VkFormat combinedFormat)
 	}
 }
 
-//! Get a format the matches the layout in buffer memory used for a
+//! Get a format that matches the layout in buffer memory used for a
 //! buffer<->image copy on a depth/stencil format.
 tcu::TextureFormat getStencilCopyFormat (VkFormat combinedFormat)
 {
@@ -4632,7 +4748,14 @@ void allocateAndBindSparseImage (const DeviceInterface&						vk,
 		TCU_THROW(NotSupportedError, "Required memory size for sparse resource exceeds device limits.");
 
 	const VkSparseImageMemoryRequirements		aspectRequirements	= sparseImageMemoryRequirements[aspectIndex];
-	const VkExtent3D							imageGranularity	= aspectRequirements.formatProperties.imageGranularity;
+	VkExtent3D									blockSize			= aspectRequirements.formatProperties.imageGranularity;
+
+	if (isCompressedFormat(imageCreateInfo.format))
+	{
+		// 28.4.3 block dimensions of block-compressed format
+		blockSize.width *= getBlockWidth(imageCreateInfo.format);
+		blockSize.height *= getBlockHeight(imageCreateInfo.format);
+	}
 
 	std::vector<VkSparseImageMemoryBind>		imageResidencyMemoryBinds;
 	std::vector<VkSparseMemoryBind>				imageMipTailMemoryBinds;
@@ -4642,10 +4765,10 @@ void allocateAndBindSparseImage (const DeviceInterface&						vk,
 		for (deUint32 mipLevelNdx = 0; mipLevelNdx < aspectRequirements.imageMipTailFirstLod; ++mipLevelNdx)
 		{
 			const VkExtent3D	mipExtent		= mipLevelExtents(imageCreateInfo.extent, mipLevelNdx);
-			const tcu::UVec3	numSparseBinds	= alignedDivide(mipExtent, imageGranularity);
-			const tcu::UVec3	lastBlockExtent	= tcu::UVec3(mipExtent.width  % imageGranularity.width  ? mipExtent.width  % imageGranularity.width  : imageGranularity.width,
-															 mipExtent.height % imageGranularity.height ? mipExtent.height % imageGranularity.height : imageGranularity.height,
-															 mipExtent.depth  % imageGranularity.depth  ? mipExtent.depth  % imageGranularity.depth  : imageGranularity.depth );
+			const tcu::UVec3	numSparseBinds	= alignedDivide(mipExtent, blockSize);
+			const tcu::UVec3	lastBlockExtent	= tcu::UVec3(mipExtent.width  % blockSize.width  ? mipExtent.width  % blockSize.width  : blockSize.width,
+															 mipExtent.height % blockSize.height ? mipExtent.height % blockSize.height : blockSize.height,
+															 mipExtent.depth  % blockSize.depth  ? mipExtent.depth  % blockSize.depth  : blockSize.depth );
 
 			for (deUint32 z = 0; z < numSparseBinds.z(); ++z)
 			for (deUint32 y = 0; y < numSparseBinds.y(); ++y)
@@ -4663,14 +4786,14 @@ void allocateAndBindSparseImage (const DeviceInterface&						vk,
 				allocations.push_back(allocation);
 
 				VkOffset3D offset;
-				offset.x = x*imageGranularity.width;
-				offset.y = y*imageGranularity.height;
-				offset.z = z*imageGranularity.depth;
+				offset.x = x*blockSize.width;
+				offset.y = y*blockSize.height;
+				offset.z = z*blockSize.depth;
 
 				VkExtent3D extent;
-				extent.width	= (x == numSparseBinds.x() - 1) ? lastBlockExtent.x() : imageGranularity.width;
-				extent.height	= (y == numSparseBinds.y() - 1) ? lastBlockExtent.y() : imageGranularity.height;
-				extent.depth	= (z == numSparseBinds.z() - 1) ? lastBlockExtent.z() : imageGranularity.depth;
+				extent.width	= (x == numSparseBinds.x() - 1) ? lastBlockExtent.x() : blockSize.width;
+				extent.height	= (y == numSparseBinds.y() - 1) ? lastBlockExtent.y() : blockSize.height;
+				extent.depth	= (z == numSparseBinds.z() - 1) ? lastBlockExtent.z() : blockSize.depth;
 
 				const VkSparseImageMemoryBind imageMemoryBind =
 				{
