@@ -15,9 +15,6 @@
  */
 package com.drawelements.deqp.runner;
 
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
-
 import com.android.compatibility.common.tradefed.build.CompatibilityBuildHelper;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.IShellOutputReceiver;
