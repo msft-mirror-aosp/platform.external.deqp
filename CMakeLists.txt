@@ -210,6 +210,7 @@ include_directories(
 	framework/randomshaders
 	framework/egl
 	framework/egl/wrapper
+	framework/xexml
 	external/vulkancts/framework/vulkan
 	)
 
