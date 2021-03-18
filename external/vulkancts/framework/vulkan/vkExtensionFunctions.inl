@@ -290,6 +290,18 @@ void getInstanceExtensionFunctions (deUint32 apiVersion, ::std::string extName, 
 	{
 		return;
 	}
+	if (extName == "VK_KHR_synchronization2")
+	{
+		return;
+	}
+	if (extName == "VK_KHR_zero_initialize_workgroup_memory")
+	{
+		return;
+	}
+	if (extName == "VK_KHR_workgroup_memory_explicit_layout")
+	{
+		return;
+	}
 	if (extName == "VK_KHR_copy_commands2")
 	{
 		return;
@@ -817,6 +829,10 @@ void getInstanceExtensionFunctions (deUint32 apiVersion, ::std::string extName, 
 	{
 		return;
 	}
+	if (extName == "VK_QCOM_rotated_copy_commands")
+	{
+		return;
+	}
 	if (extName == "VK_EXT_image_robustness")
 	{
 		return;
@@ -1269,6 +1285,24 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 	{
 		return;
 	}
+	if (extName == "VK_KHR_synchronization2")
+	{
+		functions.push_back("vkCmdSetEvent2KHR");
+		functions.push_back("vkCmdResetEvent2KHR");
+		functions.push_back("vkCmdWaitEvents2KHR");
+		functions.push_back("vkCmdPipelineBarrier2KHR");
+		functions.push_back("vkCmdWriteTimestamp2KHR");
+		functions.push_back("vkQueueSubmit2KHR");
+		return;
+	}
+	if (extName == "VK_KHR_zero_initialize_workgroup_memory")
+	{
+		return;
+	}
+	if (extName == "VK_KHR_workgroup_memory_explicit_layout")
+	{
+		return;
+	}
 	if (extName == "VK_KHR_copy_commands2")
 	{
 		functions.push_back("vkCmdCopyBuffer2KHR");
@@ -1593,7 +1627,6 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 		functions.push_back("vkCmdCopyAccelerationStructureNV");
 		functions.push_back("vkCmdTraceRaysNV");
 		functions.push_back("vkCreateRayTracingPipelinesNV");
-		functions.push_back("vkGetRayTracingShaderGroupHandlesKHR");
 		functions.push_back("vkGetRayTracingShaderGroupHandlesNV");
 		functions.push_back("vkGetAccelerationStructureHandleNV");
 		functions.push_back("vkCmdWriteAccelerationStructuresPropertiesNV");
@@ -1889,6 +1922,10 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 	{
 		return;
 	}
+	if (extName == "VK_QCOM_rotated_copy_commands")
+	{
+		return;
+	}
 	if (extName == "VK_EXT_image_robustness")
 	{
 		return;
@@ -2102,6 +2139,7 @@ void getDeviceExtensionFunctions (deUint32 apiVersion, ::std::string extName, ::
 	"VK_KHR_buffer_device_address",
 	"VK_KHR_deferred_host_operations",
 	"VK_KHR_pipeline_executable_properties",
+	"VK_KHR_synchronization2",
 	"VK_KHR_copy_commands2",
 	"VK_EXT_debug_marker",
 	"VK_EXT_transform_feedback",
