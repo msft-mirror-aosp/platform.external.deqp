@@ -43,7 +43,7 @@ class Project:
 		self.copyright	= copyright
 
 class Configuration:
-	def __init__ (self, name, filters, glconfig = None, rotation = None, surfacetype = None, required = False, runtime = None):
+	def __init__ (self, name, filters, glconfig = None, rotation = None, surfacetype = None, required = False, runtime = None, runByDefault = True):
 		self.name				= name
 		self.glconfig			= glconfig
 		self.rotation			= rotation
@@ -51,6 +51,7 @@ class Configuration:
 		self.required			= required
 		self.filters			= filters
 		self.expectedRuntime	= runtime
+		self.runByDefault		= runByDefault
 
 class Package:
 	def __init__ (self, module, configurations):
@@ -323,6 +324,8 @@ def genAndroidTestXml (mustpass):
 
 	for package in mustpass.packages:
 		for config in package.configurations:
+			if not config.runByDefault:
+				continue
 			testElement = ElementTree.SubElement(configElement, "test")
 			testElement.set("class", RUNNER_CLASS)
 			addOptionElement(testElement, "deqp-package", package.module.name)
