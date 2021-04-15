@@ -1,10 +1,7 @@
 
-include_directories(
-	..
-	../amber
-	)
-
 set(DEQP_VK_PIPELINE_SRCS
+	vktPipelineBindPointTests.cpp
+	vktPipelineBindPointTests.hpp
 	vktPipelineBlendTests.cpp
 	vktPipelineBlendTests.hpp
 	vktPipelineClearUtil.cpp
@@ -22,6 +19,8 @@ set(DEQP_VK_PIPELINE_SRCS
 	vktPipelineImageSamplingInstance.hpp
 	vktPipelineImageTests.cpp
 	vktPipelineImageTests.hpp
+	vktPipelineLogicOpTests.cpp
+	vktPipelineLogicOpTests.hpp
 	vktPipelinePushConstantTests.cpp
 	vktPipelinePushConstantTests.hpp
 	vktPipelinePushDescriptorTests.cpp
@@ -81,8 +80,8 @@ set(DEQP_VK_PIPELINE_SRCS
 	vktPipelineVertexInputTests.hpp
 	vktPipelineTimestampTests.cpp
 	vktPipelineTimestampTests.hpp
-	vktPipelineVertexOnlyTests.cpp
-	vktPipelineVertexOnlyTests.hpp
+	vktPipelineMiscTests.cpp
+	vktPipelineMiscTests.hpp
 	vktPipelineVertexUtil.cpp
 	vktPipelineVertexUtil.hpp
 	vktPipelineCacheTests.cpp
@@ -101,6 +100,10 @@ set(DEQP_VK_PIPELINE_SRCS
 	vktPipelineBlendOperationAdvancedTests.hpp
 	vktPipelineExtendedDynamicStateTests.cpp
 	vktPipelineExtendedDynamicStateTests.hpp
+	vktPipelineCreationCacheControlTests.cpp
+	vktPipelineCreationCacheControlTests.hpp
+	vktPipelineNoPositionTests.cpp
+	vktPipelineNoPositionTests.hpp
 	)
 
 set(DEQP_VK_PIPELINE_LIBS
@@ -111,8 +114,13 @@ set(DEQP_VK_PIPELINE_LIBS
 	)
 
 PCH(DEQP_VK_PIPELINE_SRCS ../pch.cpp)
-include_directories("../../../../amber/src/include")
-include_directories("../amber")
 
 add_library(deqp-vk-pipeline STATIC ${DEQP_VK_PIPELINE_SRCS})
 target_link_libraries(deqp-vk-pipeline ${DEQP_VK_PIPELINE_LIBS})
+target_include_directories(deqp-vk-pipeline
+	PRIVATE
+		..
+		../../../../amber/src/include
+		../amber
+		../util
+)

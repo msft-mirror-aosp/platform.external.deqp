@@ -108,6 +108,7 @@ enum class TestType
 	NO_DUPLICATE_ANY_HIT,
 	REPORT_INTERSECTION_RESULT,
 	RAY_PAYLOAD_IN,
+	RECURSIVE_TRACES_0,
 	RECURSIVE_TRACES_1,
 	RECURSIVE_TRACES_2,
 	RECURSIVE_TRACES_3,
@@ -161,6 +162,12 @@ enum class TestType
 	SHADER_RECORD_BLOCK_STD430_4,
 	SHADER_RECORD_BLOCK_STD430_5,
 	SHADER_RECORD_BLOCK_STD430_6,
+	IGNORE_ANY_HIT_STATICALLY,
+	IGNORE_ANY_HIT_DYNAMICALLY,
+	TERMINATE_ANY_HIT_STATICALLY,
+	TERMINATE_ANY_HIT_DYNAMICALLY,
+	TERMINATE_INTERSECTION_STATICALLY,
+	TERMINATE_INTERSECTION_DYNAMICALLY,
 
 	COUNT
 };
@@ -947,6 +954,72 @@ private:
 	tcu::Vec3		m_gridStartXYZ;
 };
 
+/* Provides an AS holding a single {(0, 0, 0), (-1, 1, 0), {1, 1, 0} tri. */
+class TriASProvider : public ASProviderBase
+{
+public:
+	TriASProvider()
+	{
+		/* Stub*/
+	}
+
+	std::unique_ptr<TopLevelAccelerationStructure> createTLAS(	Context&							context,
+																const AccelerationStructureLayout&	/* asLayout */,
+																VkCommandBuffer						cmdBuffer,
+																const VkGeometryFlagsKHR&			bottomLevelGeometryFlags,
+																const ASPropertyProvider*			optASPropertyProviderPtr,
+																IGridASFeedback*					/* optASFeedbackPtr */) const final
+	{
+		Allocator&										allocator		= context.getDefaultAllocator		();
+		const DeviceInterface&							deviceInterface	= context.getDeviceInterface		();
+		const VkDevice									deviceVk		= context.getDevice					();
+		std::unique_ptr<TopLevelAccelerationStructure>	resultPtr;
+		de::MovePtr<TopLevelAccelerationStructure>		tlPtr			= makeTopLevelAccelerationStructure ();
+
+		{
+
+			const auto	cullMask				= (optASPropertyProviderPtr != nullptr)		? optASPropertyProviderPtr->getCullMask(0, 0)
+																							: static_cast<deUint8>(0xFF);
+			const auto	instanceCustomIndex		= (optASPropertyProviderPtr != nullptr)		? optASPropertyProviderPtr->getInstanceCustomIndex(0, 0)
+																							: 0;
+
+			tlPtr->setInstanceCount(1);
+
+			{
+				de::MovePtr<BottomLevelAccelerationStructure>	blPtr		= makeBottomLevelAccelerationStructure();
+				const std::vector<tcu::Vec3>					vertexVec	= {tcu::Vec3(0, 0, 0), tcu::Vec3(-1, 1, 0), tcu::Vec3(1, 1, 0) };
+
+				blPtr->setGeometryCount	(1u);
+				blPtr->addGeometry		(vertexVec,
+										 true, /* triangles */
+										 bottomLevelGeometryFlags);
+
+				blPtr->createAndBuild(	deviceInterface,
+										deviceVk,
+										cmdBuffer,
+										allocator);
+
+				tlPtr->addInstance(	de::SharedPtr<BottomLevelAccelerationStructure>(blPtr.release() ),
+									identityMatrix3x4,
+									instanceCustomIndex,
+									cullMask);
+			}
+		}
+
+		tlPtr->createAndBuild(	deviceInterface,
+								deviceVk,
+								cmdBuffer,
+								allocator);
+
+		resultPtr = decltype(resultPtr)(tlPtr.release() );
+		return resultPtr;
+	}
+
+	deUint32 getNPrimitives() const final
+	{
+		return 1;
+	}
+};
 
 /* Test logic providers ==> */
 class TestBase
@@ -1021,6 +1094,11 @@ public:
 		return makePipelineLayout(	deviceInterface,
 									deviceVk,
 									descriptorSetLayout);
+	}
+
+	virtual std::vector<deUint8> getResultBufferStartData() const
+	{
+		return std::vector<deUint8>();
 	}
 
 	virtual const void* getShaderRecordData(const ShaderGroups& /* shaderGroup */) const
@@ -4071,7 +4149,7 @@ public:
 				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_SCALAR_OFFSET_3)	||
 				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_SCALAR_OFFSET_4)	||
 				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_SCALAR_OFFSET_5)	||
-				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_STD430_OFFSET_6)	||
+				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_SCALAR_OFFSET_6)	||
 				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_STD430_OFFSET_1)	||
 				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_STD430_OFFSET_2)	||
 				(testType == TestType::SHADER_RECORD_BLOCK_EXPLICIT_STD430_OFFSET_3)	||
@@ -6027,7 +6105,6 @@ public:
 
 	deUint32 getResultBufferSize() const final
 	{
-		DE_ASSERT(m_depthToUse	!= 0);
 		DE_ASSERT(m_depthToUse  <  30); //< due to how nItemsExpectedPerRay is stored.
 		DE_ASSERT(m_nRaysToTest	!= 0);
 
@@ -6067,8 +6144,6 @@ public:
 	bool init(	vkt::Context&			/* context    */,
 				RayTracingProperties*	/* rtPropsPtr */) final
 	{
-		DE_ASSERT(m_depthToUse != 0);
-
 		m_specializationEntry.constantID	= 1;
 		m_specializationEntry.offset		= 0;
 		m_specializationEntry.size			= sizeof(deUint32);
@@ -6350,6 +6425,8 @@ public:
 		}
 
 		{
+			const std::string rayPayloadDefinition = ((m_depthToUse == 0u) ? "" : rayPayloadDefinitionVec.at(0));
+
 			std::stringstream css;
 
 			css <<
@@ -6360,7 +6437,7 @@ public:
 				"layout(set = 0, binding = 1) uniform accelerationStructureEXT accelerationStructure;\n"
 				"\n"
 				+	de::toString(resultBufferDefinition)
-				+	rayPayloadDefinitionVec.at(0)			+
+				+	rayPayloadDefinition +
 				"void main()\n"
 				"{\n"
 				"    uint  nInvocation  = gl_LaunchIDEXT.z * gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x;\n"
@@ -6387,12 +6464,14 @@ public:
 				"        resultItems[nItem].shaderStage      = 3;\n"
 				"    }\n"
 				"\n"
-				"    currentDepth      = 0;\n"
-				"    currentNOriginRay = nInvocation;\n"
-				"    currentResultItem = nItem;\n"
-				"\n"
-				"    traceRayEXT(accelerationStructure, rayFlags, cullMask, 0, 0, 0, origin, tmin, directionHit,  tmax, 0);\n"
-				"    traceRayEXT(accelerationStructure, rayFlags, cullMask, 0, 0, 0, origin, tmin, directionMiss, tmax, 0);\n"
+				+ ((m_depthToUse == 0u) ? "" :
+					"    currentDepth      = 0;\n"
+					"    currentNOriginRay = nInvocation;\n"
+					"    currentResultItem = nItem;\n"
+					"\n"
+					"    traceRayEXT(accelerationStructure, rayFlags, cullMask, 0, 0, 0, origin, tmin, directionHit,  tmax, 0);\n"
+					"    traceRayEXT(accelerationStructure, rayFlags, cullMask, 0, 0, 0, origin, tmin, directionMiss, tmax, 0);\n"
+				) +
 				"}\n";
 
 			programCollection.glslSources.add("rgen") << glu::RaygenSource(css.str() ) << buildOptions;
@@ -6500,7 +6579,7 @@ public:
 				}
 			}
 
-			if (resultItemPtr->depth >= m_depthToUse)
+			if (resultItemPtr->depth >= m_depthToUse && m_depthToUse > 0u)
 			{
 				DE_ASSERT(resultItemPtr->depth < m_depthToUse);
 
@@ -6605,14 +6684,14 @@ public:
 						if (	currentResultItemPtr->stage == VK_SHADER_STAGE_RAYGEN_BIT_KHR ||
 								currentNLevel				!= m_depthToUse - 1)
 						{
-							if (currentResultItemPtr->childCHitNodePtr == nullptr)
+							if (currentResultItemPtr->childCHitNodePtr == nullptr && m_depthToUse > 0u)
 							{
 								DE_ASSERT(currentResultItemPtr->childCHitNodePtr != nullptr);
 
 								goto end;
 							}
 
-							if (currentResultItemPtr->childMissNodePtr == nullptr)
+							if (currentResultItemPtr->childMissNodePtr == nullptr && m_depthToUse > 0u)
 							{
 								DE_ASSERT(currentResultItemPtr->childMissNodePtr != nullptr);
 
@@ -7296,6 +7375,492 @@ private:
 	VkSpecializationMapEntry	m_specializationInfoMapEntry;
 };
 
+class TerminationTest : public TestBase
+{
+public:
+	enum class Mode
+	{
+		IGNORE_ANY_HIT_STATICALLY,
+		IGNORE_ANY_HIT_DYNAMICALLY,
+		TERMINATE_ANY_HIT_STATICALLY,
+		TERMINATE_ANY_HIT_DYNAMICALLY,
+		TERMINATE_INTERSECTION_STATICALLY,
+		TERMINATE_INTERSECTION_DYNAMICALLY,
+
+		UNKNOWN
+	};
+
+	static Mode getModeFromTestType(const TestType& testType)
+	{
+		Mode result = Mode::UNKNOWN;
+
+		switch (testType)
+		{
+			case TestType::IGNORE_ANY_HIT_DYNAMICALLY:			result = Mode::IGNORE_ANY_HIT_DYNAMICALLY;			break;
+			case TestType::IGNORE_ANY_HIT_STATICALLY:			result = Mode::IGNORE_ANY_HIT_STATICALLY;			break;
+			case TestType::TERMINATE_ANY_HIT_DYNAMICALLY:		result = Mode::TERMINATE_ANY_HIT_DYNAMICALLY;		break;
+			case TestType::TERMINATE_ANY_HIT_STATICALLY:		result = Mode::TERMINATE_ANY_HIT_STATICALLY;		break;
+			case TestType::TERMINATE_INTERSECTION_DYNAMICALLY:	result = Mode::TERMINATE_INTERSECTION_DYNAMICALLY;	break;
+			case TestType::TERMINATE_INTERSECTION_STATICALLY:	result = Mode::TERMINATE_INTERSECTION_STATICALLY;	break;
+
+			default:
+			{
+				DE_ASSERT(false && "This should never happen");
+			}
+		}
+
+		return result;
+	}
+
+	TerminationTest(const Mode& mode)
+		:m_mode(mode)
+	{
+		/* Stub */
+	}
+
+	~TerminationTest()
+	{
+		/* Stub */
+	}
+
+	std::vector<std::string> getCHitShaderCollectionShaderNames() const final
+	{
+		return {};
+	}
+
+	tcu::UVec3 getDispatchSize() const final
+	{
+		return tcu::UVec3(1, 1, 1);
+	}
+
+	std::vector<deUint8> getResultBufferStartData() const final
+	{
+		auto resultU8Vec		= std::vector<deUint8>			(getResultBufferSize	() );
+		auto resultU32DataPtr	= reinterpret_cast<deUint32*>	(resultU8Vec.data		() );
+
+		memset(	resultU8Vec.data(),
+				0,
+				resultU8Vec.size() );
+
+		if (m_mode == Mode::IGNORE_ANY_HIT_DYNAMICALLY		||
+			m_mode == Mode::TERMINATE_ANY_HIT_DYNAMICALLY)
+		{
+			resultU32DataPtr[2] = 1;
+		}
+		else
+		if (m_mode == Mode::TERMINATE_INTERSECTION_DYNAMICALLY)
+		{
+			resultU32DataPtr[3] = 1;
+		}
+
+		return resultU8Vec;
+	}
+
+	deUint32 getResultBufferSize() const final
+	{
+		const deUint32 nExtraUints	= (	m_mode == Mode::IGNORE_ANY_HIT_DYNAMICALLY			||
+										m_mode == Mode::TERMINATE_ANY_HIT_DYNAMICALLY		||
+										m_mode == Mode::TERMINATE_INTERSECTION_DYNAMICALLY) ?	1
+																							:	0;
+		const deUint32 nResultUints	= (	m_mode == Mode::TERMINATE_INTERSECTION_DYNAMICALLY	||
+										m_mode == Mode::TERMINATE_INTERSECTION_STATICALLY)	?	3
+																							:	2;
+
+		return static_cast<deUint32>(sizeof(deUint32) ) * (nExtraUints + nResultUints);
+	}
+
+	std::vector<TopLevelAccelerationStructure*>	getTLASPtrVecToBind() const	final
+	{
+		return {m_tlPtr.get() };
+	}
+
+	void resetTLAS() final
+	{
+		m_tlPtr.reset();
+	}
+
+	void initAS(vkt::Context&			context,
+				RayTracingProperties*	/* rtPropertiesPtr */,
+				VkCommandBuffer			commandBuffer) final
+	{
+		if (m_mode == Mode::TERMINATE_INTERSECTION_DYNAMICALLY ||
+			m_mode == Mode::TERMINATE_INTERSECTION_STATICALLY)
+		{
+			const tcu::Vec3		gridCellSizeXYZ			= tcu::Vec3	( 2,  1,  1);
+			const tcu::Vec3		gridInterCellDeltaXYZ	= tcu::Vec3	( 3,  3,  3);
+			const tcu::UVec3	gridSizeXYZ				= tcu::UVec3( 1,  1,  1);
+			const tcu::Vec3		gridStartXYZ			= tcu::Vec3	(-1, -1, -1);
+
+			m_asProviderPtr.reset(
+				new GridASProvider(	gridStartXYZ,
+									gridCellSizeXYZ,
+									gridSizeXYZ,
+									gridInterCellDeltaXYZ,
+									GeometryType::AABB)
+			);
+		}
+		else
+		{
+			m_asProviderPtr.reset(
+				new TriASProvider()
+			);
+		}
+
+		m_tlPtr  = m_asProviderPtr->createTLAS(	context,
+												AccelerationStructureLayout::ONE_TL_ONE_BL_ONE_GEOMETRY,
+												commandBuffer,
+												VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR,
+												nullptr,	/* optASPropertyProviderPtr */
+												nullptr);	/* optASFedbackPtr          */
+	}
+
+	void initPrograms(SourceCollections& programCollection) const final
+	{
+		const vk::ShaderBuildOptions	buildOptions(	programCollection.usedVulkanVersion,
+														vk::SPIRV_VERSION_1_4,
+														0u,		/* flags        */
+														true);	/* allowSpirv14 */
+
+		const std::string resultBufferSizeString = de::toString(getResultBufferSize() / sizeof(deUint32) );
+
+		{
+			std::string aHitShader;
+
+			switch (m_mode)
+			{
+				case Mode::IGNORE_ANY_HIT_DYNAMICALLY:
+				{
+					aHitShader =
+						"#version 460 core\n"
+						"\n"
+						"#extension GL_EXT_ray_tracing : require\n"
+						"\n"
+						"hitAttributeEXT vec3 dummyAttribute;\n"
+						"\n"
+						"layout(location = 0) rayPayloadInEXT      dummy { vec3 dummyVec;};\n"
+						"layout(set      = 0, binding = 0, std430) buffer result\n"
+						"{\n"
+						"    uint resultData[" + resultBufferSizeString + "];\n"
+						"};\n"
+						"\n"
+						"void ignoreIntersectionWrapper()\n"
+						"{\n"
+						"    ignoreIntersectionEXT;\n"
+						"}\n"
+						"\n"
+						"void main()\n"
+						"{\n"
+						"\n"
+						"    if (resultData[2] == 1)\n"
+						"    {\n"
+						"        ignoreIntersectionWrapper();\n"
+						"    }\n"
+						"\n"
+						"    resultData[0] = 1;\n"
+						"}\n";
+
+					break;
+				}
+
+				case Mode::IGNORE_ANY_HIT_STATICALLY:
+				{
+					aHitShader =
+						"#version 460 core\n"
+						"\n"
+						"#extension GL_EXT_ray_tracing : require\n"
+						"\n"
+						"hitAttributeEXT vec3 dummyAttribute;\n"
+						"\n"
+						"layout(location = 0) rayPayloadInEXT      dummy { vec3 dummyVec;};\n"
+						"layout(set      = 0, binding = 0, std430) buffer result\n"
+						"{\n"
+						"    uint resultData[" + resultBufferSizeString + "];\n"
+						"};\n"
+						"\n"
+						"void ignoreIntersectionWrapper()\n"
+						"{\n"
+						"    ignoreIntersectionEXT;\n"
+						"}\n"
+						"\n"
+						"void main()\n"
+						"{\n"
+						"    ignoreIntersectionWrapper();\n"
+						"\n"
+						"    resultData[0] = 1;\n"
+						"}\n";
+
+					break;
+				}
+
+				case Mode::TERMINATE_ANY_HIT_DYNAMICALLY:
+				{
+					aHitShader =
+						"#version 460 core\n"
+						"\n"
+						"#extension GL_EXT_ray_tracing : require\n"
+						"\n"
+						"hitAttributeEXT vec3 dummyAttribute;\n"
+						"\n"
+						"layout(location = 0) rayPayloadInEXT      dummy { vec3 dummyVec;};\n"
+						"layout(set      = 0, binding = 0, std430) buffer result\n"
+						"{\n"
+						"    uint resultData[" + resultBufferSizeString + "];\n"
+						"};\n"
+						"\n"
+						"void terminateRayWrapper()\n"
+						"{\n"
+						"    terminateRayEXT;\n"
+						"}\n"
+						"\n"
+						"void main()\n"
+						"{\n"
+						"    if (resultData[2] == 1)\n"
+						"    {\n"
+						"        terminateRayWrapper();\n"
+						"    }\n"
+						"\n"
+						"    resultData[0] = 1;\n"
+						"}\n";
+
+					break;
+				}
+
+				case Mode::TERMINATE_ANY_HIT_STATICALLY:
+				case Mode::TERMINATE_INTERSECTION_STATICALLY:
+				{
+					aHitShader =
+						"#version 460 core\n"
+						"\n"
+						"#extension GL_EXT_ray_tracing : require\n"
+						"\n"
+						"hitAttributeEXT vec3 dummyAttribute;\n"
+						"\n"
+						"layout(location = 0) rayPayloadInEXT      dummy { vec3 dummyVec;};\n"
+						"layout(set      = 0, binding = 0, std430) buffer result\n"
+						"{\n"
+						"    uint resultData[" + resultBufferSizeString + "];\n"
+						"};\n"
+						"\n"
+						"void terminateRayWrapper()\n"
+						"{\n"
+						"    terminateRayEXT;\n"
+						"}\n"
+						"\n"
+						"void main()\n"
+						"{\n"
+						"    terminateRayWrapper();\n"
+						"\n"
+						"    resultData[0] = 1;\n"
+						"}\n";
+
+					break;
+				}
+
+				case Mode::TERMINATE_INTERSECTION_DYNAMICALLY:
+				{
+					aHitShader =
+						"#version 460 core\n"
+						"\n"
+						"#extension GL_EXT_ray_tracing : require\n"
+						"\n"
+						"hitAttributeEXT vec3 dummyAttribute;\n"
+						"\n"
+						"layout(location = 0) rayPayloadInEXT      dummy { vec3 dummyVec;};\n"
+						"layout(set      = 0, binding = 0, std430) buffer result\n"
+						"{\n"
+						"    uint resultData[" + resultBufferSizeString + "];\n"
+						"};\n"
+						"\n"
+						"void terminateRayWrapper()\n"
+						"{\n"
+						"    terminateRayEXT;\n"
+						"}\n"
+						"\n"
+						"void main()\n"
+						"{\n"
+						"    if (resultData[3] == 1)\n"
+						"    {\n"
+						"        terminateRayWrapper();\n"
+						"    }\n"
+						"\n"
+						"    resultData[0] = 1;\n"
+						"}\n";
+
+					break;
+				}
+
+				default:
+				{
+					DE_ASSERT(false);
+				}
+			}
+
+			programCollection.glslSources.add("ahit") << glu::AnyHitSource(aHitShader) << buildOptions;
+		}
+
+		if (m_mode == Mode::TERMINATE_INTERSECTION_DYNAMICALLY ||
+		    m_mode == Mode::TERMINATE_INTERSECTION_STATICALLY)
+		{
+			std::stringstream css;
+
+			css <<
+				"#version 460 core\n"
+				"\n"
+				"#extension GL_EXT_ray_tracing : require\n"
+				"\n"
+				"hitAttributeEXT vec3 hitAttribute;\n"
+				"\n"
+				"layout(set = 0, binding = 0, std430) buffer result\n"
+				"{\n"
+				"    uint resultData[4];\n"
+				"};\n"
+				"\n"
+				"void generateIntersection()\n"
+				"{\n"
+				"    reportIntersectionEXT(0.95f, 0);\n"
+				"}\n"
+				"\n"
+				"void main()\n"
+				"{\n";
+
+			if (m_mode == Mode::TERMINATE_INTERSECTION_DYNAMICALLY)
+			{
+				css <<	"    if (resultData[3] == 1)\n"
+						"    {\n";
+			}
+
+			css <<	"    generateIntersection();\n";
+
+			if (m_mode == Mode::TERMINATE_INTERSECTION_DYNAMICALLY)
+			{
+				css <<	"    }\n";
+			}
+
+			css <<
+				"\n"
+				"    resultData[2] = 1;\n"
+				"}\n";
+
+			programCollection.glslSources.add("intersection") << glu::IntersectionSource(css.str() ) << buildOptions;
+		}
+
+		{
+			std::stringstream css;
+
+			css <<
+				"#version 460 core\n"
+				"\n"
+				"#extension GL_EXT_ray_tracing : require\n"
+				"\n"
+				"layout(location = 0) rayPayloadInEXT      vec3   dummy;\n"
+				"layout(set      = 0, binding = 0, std430) buffer result\n"
+				"{\n"
+				"    uint resultData[2];\n"
+				"};\n"
+				"\n"
+				"void main()\n"
+				"{\n"
+				"    resultData[1] = 1;\n"
+				"}\n";
+
+			programCollection.glslSources.add("miss") << glu::MissSource(css.str() ) << buildOptions;
+		}
+
+		{
+			std::stringstream css;
+
+			css <<
+				"#version 460 core\n"
+				"\n"
+				"#extension GL_EXT_ray_tracing : require\n"
+				"\n"
+				"layout(location = 0)              rayPayloadEXT vec3                     dummy;\n"
+				"layout(set      = 0, binding = 1) uniform       accelerationStructureEXT topLevelAS;\n"
+				"\n"
+				"void main()\n"
+				"{\n"
+				"    uint  nInvocation = gl_LaunchIDEXT.z * gl_LaunchSizeEXT.x * gl_LaunchSizeEXT.y + gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x;\n"
+				"    uint  rayFlags    = 0;\n"
+				"    uint  cullMask    = 0xFF;\n"
+				"    float tmin        = 0.001;\n"
+				"    float tmax        = 9.0;\n"
+				"    vec3  origin      = vec3(-1,  -1,  -1);\n"
+				"    vec3  target      = vec3(0.5, 0.5,  0);\n"
+				"    vec3  direct      = normalize(target - origin);\n"
+				"\n"
+				"    traceRayEXT(topLevelAS, rayFlags, cullMask, 0, 0, 0, origin, tmin, direct, tmax, 0);\n"
+				"}\n";
+
+			programCollection.glslSources.add("rgen") << glu::RaygenSource(css.str() ) << buildOptions;
+		}
+	}
+
+	bool verifyResultBuffer (const void* resultDataPtr) const final
+	{
+		const deUint32* resultU32DataPtr	= reinterpret_cast<const deUint32*>(resultDataPtr);
+		bool			result				= false;
+
+		switch (m_mode)
+		{
+			case Mode::IGNORE_ANY_HIT_DYNAMICALLY:
+			case Mode::IGNORE_ANY_HIT_STATICALLY:
+			{
+				if (resultU32DataPtr[0] != 0 ||
+					resultU32DataPtr[1] != 1)
+				{
+					goto end;
+				}
+
+				result = true;
+
+				break;
+			}
+
+			case Mode::TERMINATE_ANY_HIT_DYNAMICALLY:
+			case Mode::TERMINATE_ANY_HIT_STATICALLY:
+			{
+				if (resultU32DataPtr[0] != 0 ||
+					resultU32DataPtr[1] != 0)
+				{
+					goto end;
+				}
+
+				result = true;
+
+				break;
+			}
+
+			case Mode::TERMINATE_INTERSECTION_DYNAMICALLY:
+			case Mode::TERMINATE_INTERSECTION_STATICALLY:
+			{
+				if (resultU32DataPtr[0] != 0 ||
+					resultU32DataPtr[1] != 0 ||
+					resultU32DataPtr[2] != 0)
+				{
+					goto end;
+				}
+
+				result = true;
+
+				break;
+			}
+
+			default:
+			{
+				TCU_FAIL("This should never be reached");
+			}
+		}
+
+end:
+		return result;
+	}
+
+private:
+	std::unique_ptr<ASProviderBase>					m_asProviderPtr;
+	const Mode										m_mode;
+	std::unique_ptr<TopLevelAccelerationStructure>	m_tlPtr;
+};
+
 /* Generic misc test instance */
 class RayTracingMiscTestInstance : public TestInstance
 {
@@ -7572,10 +8137,13 @@ de::MovePtr<BufferWithMemory> RayTracingMiscTestInstance::runTest(void)
 			}
 		}
 
-		missShaderStackSize = deviceInterface.getRayTracingShaderGroupStackSizeKHR(	deviceVk,
-																					*pipelineVkPtr,
-																					static_cast<deUint32>(ShaderGroups::MISS_GROUP),
-																					VK_SHADER_GROUP_SHADER_GENERAL_KHR);
+		if (nMissGroups > 0u)
+		{
+			missShaderStackSize = deviceInterface.getRayTracingShaderGroupStackSizeKHR(	deviceVk,
+																						*pipelineVkPtr,
+																						static_cast<deUint32>(ShaderGroups::MISS_GROUP),
+																						VK_SHADER_GROUP_SHADER_GENERAL_KHR);
+		}
 
 		for (deUint32 nCallableShader = 0; nCallableShader < static_cast<deUint32>(callableShaderCollectionNames.size() ); ++nCallableShader)
 		{
@@ -7627,43 +8195,52 @@ de::MovePtr<BufferWithMemory> RayTracingMiscTestInstance::runTest(void)
 																								0u,																								/* opaqueCaptureAddress        */
 																								0u);																							/* shaderBindingTableOffset    */
 
-	const void*	missShaderBindingGroupShaderRecordDataPtr	= m_testPtr->getShaderRecordData(					ShaderGroups::MISS_GROUP);
-	const auto	missShaderBindingTablePtr					= rayTracingPipelinePtr->createShaderBindingTable(	deviceInterface,
-																												deviceVk,
-																												*pipelineVkPtr,
-																												allocator,
-																												m_rayTracingPropsPtr->getShaderGroupHandleSize		(),
-																												m_rayTracingPropsPtr->getShaderGroupBaseAlignment	(),
-																												missGroupIndex,
-																												nMissGroups,																					/* groupCount                  */
-																												0u,																								/* additionalBufferCreateFlags */
-																												0u,																								/* additionalBufferUsageFlags  */
-																												MemoryRequirement::Any,
-																												0u,																								/* opaqueCaptureAddress       */
-																												0u,																								/* shaderBindingTableOffset   */
-																												m_testPtr->getShaderRecordSize(ShaderGroups::MISS_GROUP),
-																												&missShaderBindingGroupShaderRecordDataPtr);
+	auto missShaderBindingTablePtr = de::MovePtr<BufferWithMemory>();
+	if (nMissGroups > 0u)
+	{
+		const void*	missShaderBindingGroupShaderRecordDataPtr	= m_testPtr->getShaderRecordData(					ShaderGroups::MISS_GROUP);
+		missShaderBindingTablePtr								= rayTracingPipelinePtr->createShaderBindingTable(	deviceInterface,
+																													deviceVk,
+																													*pipelineVkPtr,
+																													allocator,
+																													m_rayTracingPropsPtr->getShaderGroupHandleSize		(),
+																													m_rayTracingPropsPtr->getShaderGroupBaseAlignment	(),
+																													missGroupIndex,
+																													nMissGroups,																					/* groupCount                  */
+																													0u,																								/* additionalBufferCreateFlags */
+																													0u,																								/* additionalBufferUsageFlags  */
+																													MemoryRequirement::Any,
+																													0u,																								/* opaqueCaptureAddress       */
+																													0u,																								/* shaderBindingTableOffset   */
+																													m_testPtr->getShaderRecordSize(ShaderGroups::MISS_GROUP),
+																													&missShaderBindingGroupShaderRecordDataPtr);
+	}
 
-	const void*	hitShaderBindingGroupShaderRecordDataPtr	= m_testPtr->getShaderRecordData(					ShaderGroups::HIT_GROUP);
-	const auto	hitShaderBindingTablePtr					= rayTracingPipelinePtr->createShaderBindingTable(	deviceInterface,
-																												deviceVk,
-																												*pipelineVkPtr,
-																												allocator,
-																												m_rayTracingPropsPtr->getShaderGroupHandleSize		(),
-																												m_rayTracingPropsPtr->getShaderGroupBaseAlignment	(),
-																												hitGroupIndex,
-																												nHitGroups,																						/* groupCount                  */
-																												0u,																								/* additionalBufferCreateFlags */
-																												0u,																								/* additionalBufferUsageFlags  */
-																												MemoryRequirement::Any,
-																												0u,																								/* opaqueCaptureAddress       */
-																												0u,																								/* shaderBindingTableOffset   */
-																												m_testPtr->getShaderRecordSize(ShaderGroups::HIT_GROUP),
-																												&hitShaderBindingGroupShaderRecordDataPtr);
+	auto hitShaderBindingTablePtr = de::MovePtr<BufferWithMemory>();
+	if (nHitGroups > 0u)
+	{
+		const void*	hitShaderBindingGroupShaderRecordDataPtr	= m_testPtr->getShaderRecordData(					ShaderGroups::HIT_GROUP);
+		hitShaderBindingTablePtr								= rayTracingPipelinePtr->createShaderBindingTable(	deviceInterface,
+																													deviceVk,
+																													*pipelineVkPtr,
+																													allocator,
+																													m_rayTracingPropsPtr->getShaderGroupHandleSize		(),
+																													m_rayTracingPropsPtr->getShaderGroupBaseAlignment	(),
+																													hitGroupIndex,
+																													nHitGroups,																						/* groupCount                  */
+																													0u,																								/* additionalBufferCreateFlags */
+																													0u,																								/* additionalBufferUsageFlags  */
+																													MemoryRequirement::Any,
+																													0u,																								/* opaqueCaptureAddress       */
+																													0u,																								/* shaderBindingTableOffset   */
+																													m_testPtr->getShaderRecordSize(ShaderGroups::HIT_GROUP),
+																													&hitShaderBindingGroupShaderRecordDataPtr);
+	}
 
 	{
-		const auto resultBufferCreateInfo	= makeBufferCreateInfo(	resultBufferSize,
-																	VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+		const auto resultBufferCreateInfo	= makeBufferCreateInfo					(	resultBufferSize,
+																						VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+		const auto resultBufferDataVec		= m_testPtr->getResultBufferStartData	();
 
 		resultBufferPtr	= de::MovePtr<BufferWithMemory>(
 			new BufferWithMemory(	deviceInterface,
@@ -7671,6 +8248,22 @@ de::MovePtr<BufferWithMemory> RayTracingMiscTestInstance::runTest(void)
 									allocator,
 									resultBufferCreateInfo,
 									MemoryRequirement::HostVisible));
+
+		if (resultBufferDataVec.size() > 0)
+		{
+			DE_ASSERT(static_cast<deUint32>(resultBufferDataVec.size() ) == resultBufferSize);
+
+			memcpy(	resultBufferPtr->getAllocation().getHostPtr(),
+					resultBufferDataVec.data(),
+					resultBufferDataVec.size() );
+
+			flushMappedMemoryRange(	deviceInterface,
+									deviceVk,
+									resultBufferPtr->getAllocation().getMemory(),
+									resultBufferPtr->getAllocation().getOffset(),
+									resultBufferSize);
+		}
+
 	}
 
 	beginCommandBuffer(	deviceInterface,
@@ -7689,24 +8282,27 @@ de::MovePtr<BufferWithMemory> RayTracingMiscTestInstance::runTest(void)
 			tlasVkVec.push_back(*currentTLASPtr->getPtr() );
 		}
 
-		deviceInterface.cmdFillBuffer(	*cmdBufferPtr,
-										**resultBufferPtr,
-										0,					/* dstOffset */
-										VK_WHOLE_SIZE,
-										0);					/* data */
-
+		if (m_testPtr->getResultBufferStartData().size() == 0)
 		{
-			const auto postFillBarrier = makeBufferMemoryBarrier(	VK_ACCESS_TRANSFER_WRITE_BIT,	/* srcAccessMask */
-																	VK_ACCESS_SHADER_WRITE_BIT,		/* dstAccessMask */
-																	**resultBufferPtr,
-																	0, /* offset */
-																	VK_WHOLE_SIZE);
+			deviceInterface.cmdFillBuffer(	*cmdBufferPtr,
+											**resultBufferPtr,
+											0,					/* dstOffset */
+											VK_WHOLE_SIZE,
+											0);					/* data */
 
-			cmdPipelineBufferMemoryBarrier(	deviceInterface,
-											*cmdBufferPtr,
-											VK_PIPELINE_STAGE_TRANSFER_BIT,					/* srcStageMask */
-											VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,	/* dstStageMask */
-											&postFillBarrier);
+			{
+				const auto postFillBarrier = makeBufferMemoryBarrier(	VK_ACCESS_TRANSFER_WRITE_BIT,	/* srcAccessMask */
+																		VK_ACCESS_SHADER_WRITE_BIT,		/* dstAccessMask */
+																		**resultBufferPtr,
+																		0, /* offset */
+																		VK_WHOLE_SIZE);
+
+				cmdPipelineBufferMemoryBarrier(	deviceInterface,
+												*cmdBufferPtr,
+												VK_PIPELINE_STAGE_TRANSFER_BIT,					/* srcStageMask */
+												VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR,	/* dstStageMask */
+												&postFillBarrier);
+			}
 		}
 
 		{
@@ -7768,18 +8364,24 @@ de::MovePtr<BufferWithMemory> RayTracingMiscTestInstance::runTest(void)
 																														0 /* offset */),
 																								m_rayTracingPropsPtr->getShaderGroupHandleSize(),
 																								m_rayTracingPropsPtr->getShaderGroupHandleSize() );
-			const auto	missShaderBindingTableRegion		= makeStridedDeviceAddressRegionKHR(getBufferDeviceAddress(	deviceInterface,
-																														deviceVk,
-																														missShaderBindingTablePtr->get(),
-																														0 /* offset */),
-																								m_rayTracingPropsPtr->getShaderGroupHandleSize() + m_testPtr->getShaderRecordSize(ShaderGroups::MISS_GROUP),
-																								m_rayTracingPropsPtr->getShaderGroupHandleSize());
-			const auto	hitShaderBindingTableRegion			= makeStridedDeviceAddressRegionKHR(getBufferDeviceAddress(	deviceInterface,
-																														deviceVk,
-																														hitShaderBindingTablePtr->get(),
-																														0 /* offset */),
-																								m_rayTracingPropsPtr->getShaderGroupHandleSize() + m_testPtr->getShaderRecordSize(ShaderGroups::HIT_GROUP),
-																								m_rayTracingPropsPtr->getShaderGroupHandleSize() );
+			const auto	missShaderBindingTableRegion		= ((nMissGroups > 0u)	?	makeStridedDeviceAddressRegionKHR(getBufferDeviceAddress(	deviceInterface,
+																																					deviceVk,
+																																					missShaderBindingTablePtr->get(),
+																																					0 /* offset */),
+																															m_rayTracingPropsPtr->getShaderGroupHandleSize() + m_testPtr->getShaderRecordSize(ShaderGroups::MISS_GROUP),
+																															m_rayTracingPropsPtr->getShaderGroupHandleSize())
+																					:	makeStridedDeviceAddressRegionKHR(DE_NULL,
+																														  0, /* stride */
+																														  0  /* size   */));
+			const auto	hitShaderBindingTableRegion			= ((nHitGroups > 0u)	?	makeStridedDeviceAddressRegionKHR(getBufferDeviceAddress(	deviceInterface,
+																																					deviceVk,
+																																					hitShaderBindingTablePtr->get(),
+																																					0 /* offset */),
+																															m_rayTracingPropsPtr->getShaderGroupHandleSize() + m_testPtr->getShaderRecordSize(ShaderGroups::HIT_GROUP),
+																															m_rayTracingPropsPtr->getShaderGroupHandleSize() )
+																					:	makeStridedDeviceAddressRegionKHR(DE_NULL,
+																														  0, /* stride */
+																														  0  /* size   */));
 
 			const auto	callableShaderBindingTableRegion	=	(callableShaderCollectionNames.size() > 0)	? makeStridedDeviceAddressRegionKHR(getBufferDeviceAddress(	deviceInterface,
 																																										deviceVk,
@@ -8048,6 +8650,7 @@ void RayTracingTestCase::initPrograms(SourceCollections& programCollection)	cons
 			break;
 		}
 
+		case TestType::RECURSIVE_TRACES_0:
 		case TestType::RECURSIVE_TRACES_1:
 		case TestType::RECURSIVE_TRACES_2:
 		case TestType::RECURSIVE_TRACES_3:
@@ -8078,7 +8681,9 @@ void RayTracingTestCase::initPrograms(SourceCollections& programCollection)	cons
 		case TestType::RECURSIVE_TRACES_28:
 		case TestType::RECURSIVE_TRACES_29:
 		{
-			const auto nLevels = static_cast<deUint32>(m_data.type) - static_cast<deUint32>(TestType::RECURSIVE_TRACES_1) + 1;
+			const auto nLevels	= ((m_data.type == TestType::RECURSIVE_TRACES_0)
+								? 0u
+								: (static_cast<deUint32>(m_data.type) - static_cast<deUint32>(TestType::RECURSIVE_TRACES_1) + 1));
 
 			m_testPtr.reset(
 				new RecursiveTracesTest(m_data.geometryType, m_data.asLayout, nLevels)
@@ -8139,6 +8744,22 @@ void RayTracingTestCase::initPrograms(SourceCollections& programCollection)	cons
 			m_testPtr.reset(
 				new ShaderRecordBlockTest(	m_data.type,
 											ShaderRecordBlockTest::getVarsToTest(m_data.type) )
+			);
+
+			m_testPtr->initPrograms(programCollection);
+
+			break;
+		}
+
+		case TestType::IGNORE_ANY_HIT_DYNAMICALLY:
+		case TestType::IGNORE_ANY_HIT_STATICALLY:
+		case TestType::TERMINATE_ANY_HIT_DYNAMICALLY:
+		case TestType::TERMINATE_ANY_HIT_STATICALLY:
+		case TestType::TERMINATE_INTERSECTION_DYNAMICALLY:
+		case TestType::TERMINATE_INTERSECTION_STATICALLY:
+		{
+			m_testPtr.reset(
+				new TerminationTest(TerminationTest::getModeFromTestType(m_data.type) )
 			);
 
 			m_testPtr->initPrograms(programCollection);
@@ -8247,6 +8868,7 @@ TestInstance* RayTracingTestCase::createInstance (Context& context) const
 			break;
 		}
 
+		case TestType::RECURSIVE_TRACES_0:
 		case TestType::RECURSIVE_TRACES_1:
 		case TestType::RECURSIVE_TRACES_2:
 		case TestType::RECURSIVE_TRACES_3:
@@ -8277,7 +8899,9 @@ TestInstance* RayTracingTestCase::createInstance (Context& context) const
 		case TestType::RECURSIVE_TRACES_28:
 		case TestType::RECURSIVE_TRACES_29:
 		{
-			const auto nLevels = static_cast<deUint32>(m_data.type) - static_cast<deUint32>(TestType::RECURSIVE_TRACES_1) + 1;
+			const auto nLevels	= ((m_data.type == TestType::RECURSIVE_TRACES_0)
+								? 0u
+								: (static_cast<deUint32>(m_data.type) - static_cast<deUint32>(TestType::RECURSIVE_TRACES_1) + 1));
 
 			if (m_testPtr == nullptr)
 			{
@@ -8343,6 +8967,23 @@ TestInstance* RayTracingTestCase::createInstance (Context& context) const
 				m_testPtr.reset(
 					new ShaderRecordBlockTest(	m_data.type,
 												ShaderRecordBlockTest::getVarsToTest(m_data.type))
+				);
+			}
+
+			break;
+		}
+
+		case TestType::IGNORE_ANY_HIT_DYNAMICALLY:
+		case TestType::IGNORE_ANY_HIT_STATICALLY:
+		case TestType::TERMINATE_ANY_HIT_DYNAMICALLY:
+		case TestType::TERMINATE_ANY_HIT_STATICALLY:
+		case TestType::TERMINATE_INTERSECTION_DYNAMICALLY:
+		case TestType::TERMINATE_INTERSECTION_STATICALLY:
+		{
+			if (m_testPtr == nullptr)
+			{
+				m_testPtr.reset(
+					new TerminationTest(TerminationTest::getModeFromTestType(m_data.type) )
 				);
 			}
 
@@ -8631,6 +9272,16 @@ tcu::TestCaseGroup*	createMiscTests (tcu::TestContext& testCtx)
 	{
 		const std::string newTestCaseName = "recursiveTraces_" + de::toString(getSuffixForGeometryType(currentGeometryType) ) + "_";
 
+		// 0 recursion levels.
+		{
+			auto newTestCasePtr = new RayTracingTestCase(	testCtx,
+															(newTestCaseName + "0").data(),
+															"Verifies that relevant shader stages can correctly read large ray payloads provided by raygen shader stage.",
+															CaseDef{TestType::RECURSIVE_TRACES_0, currentGeometryType, AccelerationStructureLayout::ONE_TL_ONE_BL_ONE_GEOMETRY});
+
+			miscGroupPtr->addChild(newTestCasePtr);
+		}
+
 		// TODO: for (deUint32 nLevels = 1; nLevels <= 29; ++nLevels)
 		for (deUint32 nLevels = 1; nLevels <= 15; ++nLevels)
 		{
@@ -8641,6 +9292,40 @@ tcu::TestCaseGroup*	createMiscTests (tcu::TestContext& testCtx)
 
 			miscGroupPtr->addChild(newTestCasePtr);
 		}
+	}
+
+	{
+		auto newTestCase1Ptr = new RayTracingTestCase(	testCtx,
+														"OpIgnoreIntersectionKHR_AnyHitStatically",
+														"Verifies that OpIgnoreIntersectionKHR works as per spec (static invocations).",
+														CaseDef{static_cast<TestType>(static_cast<deUint32>(TestType::IGNORE_ANY_HIT_STATICALLY) ), GeometryType::TRIANGLES, AccelerationStructureLayout::COUNT});
+		auto newTestCase2Ptr = new RayTracingTestCase(	testCtx,
+														"OpIgnoreIntersectionKHR_AnyHitDynamically",
+														"Verifies that OpIgnoreIntersectionKHR works as per spec (dynamic invocations).",
+														CaseDef{static_cast<TestType>(static_cast<deUint32>(TestType::IGNORE_ANY_HIT_DYNAMICALLY) ), GeometryType::TRIANGLES, AccelerationStructureLayout::COUNT});
+		auto newTestCase3Ptr = new RayTracingTestCase(	testCtx,
+														"OpTerminateRayKHR_AnyHitStatically",
+														"Verifies that OpTerminateRayKHR works as per spec (static invocations).",
+														CaseDef{static_cast<TestType>(static_cast<deUint32>(TestType::TERMINATE_ANY_HIT_STATICALLY) ), GeometryType::TRIANGLES, AccelerationStructureLayout::COUNT});
+		auto newTestCase4Ptr = new RayTracingTestCase(	testCtx,
+														"OpTerminateRayKHR_AnyHitDynamically",
+														"Verifies that OpTerminateRayKHR works as per spec (dynamic invocations).",
+														CaseDef{static_cast<TestType>(static_cast<deUint32>(TestType::TERMINATE_ANY_HIT_DYNAMICALLY) ), GeometryType::TRIANGLES, AccelerationStructureLayout::COUNT});
+		auto newTestCase5Ptr = new RayTracingTestCase(	testCtx,
+														"OpTerminateRayKHR_IntersectionStatically",
+														"Verifies that OpTerminateRayKHR works as per spec (static invocations).",
+														CaseDef{static_cast<TestType>(static_cast<deUint32>(TestType::TERMINATE_INTERSECTION_STATICALLY) ), GeometryType::AABB, AccelerationStructureLayout::COUNT});
+		auto newTestCase6Ptr = new RayTracingTestCase(	testCtx,
+														"OpTerminateRayKHR_IntersectionDynamically",
+														"Verifies that OpTerminateRayKHR works as per spec (dynamic invocations).",
+														CaseDef{static_cast<TestType>(static_cast<deUint32>(TestType::TERMINATE_INTERSECTION_DYNAMICALLY) ), GeometryType::AABB, AccelerationStructureLayout::COUNT});
+
+		miscGroupPtr->addChild(newTestCase1Ptr);
+		miscGroupPtr->addChild(newTestCase2Ptr);
+		miscGroupPtr->addChild(newTestCase3Ptr);
+		miscGroupPtr->addChild(newTestCase4Ptr);
+		miscGroupPtr->addChild(newTestCase5Ptr);
+		miscGroupPtr->addChild(newTestCase6Ptr);
 	}
 
 	return miscGroupPtr.release();

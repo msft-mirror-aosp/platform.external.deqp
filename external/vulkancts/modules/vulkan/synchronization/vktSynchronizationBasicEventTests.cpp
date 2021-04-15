@@ -47,7 +47,7 @@ struct TestConfig
 	VkEventCreateFlags		flags;
 };
 
-tcu::TestStatus hostResetSetEventCase (Context& context)
+tcu::TestStatus hostResetSetEventCase (Context& context, TestConfig config)
 {
 	const DeviceInterface&		vk			= context.getDeviceInterface();
 	const VkDevice				device		= context.getDevice();
@@ -59,6 +59,8 @@ tcu::TestStatus hostResetSetEventCase (Context& context)
 											};
 	VkEvent						event;
 	Move<VkEvent>				ptrEvent;
+
+	DE_UNREF(config);
 
 	if (VK_SUCCESS != vk.createEvent(device, &eventInfo, DE_NULL, &event))
 		return tcu::TestStatus::fail("Couldn't create event");
@@ -344,6 +346,9 @@ void checkSupport(Context& context, TestConfig config)
 {
 	if (config.type == SynchronizationType::SYNCHRONIZATION2)
 		context.requireDeviceFunctionality("VK_KHR_synchronization2");
+
+	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") && !context.getPortabilitySubsetFeatures().events)
+		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: Events are not supported by this implementation");
 }
 
 } // anonymous
@@ -358,7 +363,7 @@ tcu::TestCaseGroup* createBasicEventTests (tcu::TestContext& testCtx)
 
 	de::MovePtr<tcu::TestCaseGroup> basicTests (new tcu::TestCaseGroup(testCtx, "event", "Basic event tests"));
 
-	addFunctionCase(basicTests.get(), "host_set_reset", "Basic event tests set and reset on host", hostResetSetEventCase);
+	addFunctionCase(basicTests.get(), "host_set_reset", "Basic event tests set and reset on host", checkSupport, hostResetSetEventCase, config);
 	addFunctionCase(basicTests.get(), "device_set_reset", "Basic event tests set and reset on device", checkSupport, deviceResetSetEventCase, config);
 	addFunctionCase(basicTests.get(), "single_submit_multi_command_buffer", "Wait and set event single submission on device", checkSupport, singleSubmissionCase, config);
 	addFunctionCase(basicTests.get(), "multi_submit_multi_command_buffer", "Wait and set event mutli submission on device", checkSupport, multiSubmissionCase, config);
