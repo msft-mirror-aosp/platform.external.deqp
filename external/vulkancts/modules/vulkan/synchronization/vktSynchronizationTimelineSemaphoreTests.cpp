@@ -29,6 +29,7 @@
 #include "vktTestCaseUtil.hpp"
 #include "vktSynchronizationUtil.hpp"
 #include "vktExternalMemoryUtil.hpp"
+#include "vktCustomInstancesDevices.hpp"
 #include "vkBarrierUtil.hpp"
 
 #include "vkDefs.hpp"
@@ -41,6 +42,7 @@
 #include "vkBufferWithMemory.hpp"
 
 #include "tcuTestLog.hpp"
+#include "tcuCommandLine.hpp"
 
 #include "deClock.h"
 #include "deRandom.hpp"
@@ -632,6 +634,7 @@ tcu::TestStatus initialValueCase (Context& context, SynchronizationType type)
 
 	const DeviceInterface&							vk							= context.getDeviceInterface();
 	const VkDevice&									device						= context.getDevice();
+	const VkQueue									queue						= context.getUniversalQueue();
 	const deUint64									maxTimelineValueDifference	= getMaxTimelineSemaphoreValueDifference(context.getInstanceInterface(), context.getPhysicalDevice());
 	de::Random										rng							(1234);
 	const deUint64									nonZeroValue				= 1 + rng.getUint64() % (maxTimelineValueDifference - 1);
@@ -655,6 +658,26 @@ tcu::TestStatus initialValueCase (Context& context, SynchronizationType type)
 	result = vk.waitSemaphores(device, &waitInfo, 0ull);
 	if (result != VK_SUCCESS)
 		return tcu::TestStatus::fail("Wait zero initial value failed");
+
+	{
+		VkSemaphoreSubmitInfoKHR	waitSemaphoreSubmitInfo		= makeCommonSemaphoreSubmitInfo(*semaphoreDefaultValue, initialValue, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT_KHR);
+		SynchronizationWrapperPtr	synchronizationWrapper		= getSynchronizationWrapper(type, vk, DE_TRUE);
+
+		synchronizationWrapper->addSubmitInfo(
+			1u,										// deUint32								waitSemaphoreInfoCount
+			&waitSemaphoreSubmitInfo,				// const VkSemaphoreSubmitInfoKHR*		pWaitSemaphoreInfos
+			0u,										// deUint32								commandBufferInfoCount
+			DE_NULL,								// const VkCommandBufferSubmitInfoKHR*	pCommandBufferInfos
+			0u,										// deUint32								signalSemaphoreInfoCount
+			DE_NULL,								// const VkSemaphoreSubmitInfoKHR*		pSignalSemaphoreInfos
+			DE_TRUE,
+			DE_FALSE
+		);
+
+		VK_CHECK(synchronizationWrapper->queueSubmit(queue, DE_NULL));
+
+		VK_CHECK(vk.deviceWaitIdle(device));
+	}
 
 	VK_CHECK(vk.getSemaphoreCounterValue(device, *semaphoreDefaultValue, &value));
 	if (value != initialValue)
@@ -1256,7 +1279,7 @@ std::vector<VkDeviceQueueCreateInfo> getQueueCreateInfo(const std::vector<VkQueu
 	return infos;
 }
 
-Move<VkDevice> createDevice(const Context& context, SynchronizationType type)
+Move<VkDevice> createTestDevice(const Context& context, SynchronizationType type)
 {
 	const std::vector<VkQueueFamilyProperties>		queueFamilyProperties		= getPhysicalDeviceQueueFamilyProperties(context.getInstanceInterface(), context.getPhysicalDevice());
 	std::vector<VkDeviceQueueCreateInfo>			queueCreateInfos			= getQueueCreateInfo(queueFamilyProperties);
@@ -1302,8 +1325,10 @@ Move<VkDevice> createDevice(const Context& context, SynchronizationType type)
 		queueCreateInfo.pQueuePriorities = &(*queuePriorities.back().get())[0];
 	}
 
-	return createDevice(context.getPlatformInterface(), context.getInstance(),
-						context.getInstanceInterface(), context.getPhysicalDevice(), &deviceInfo);
+	const auto validation = context.getTestContext().getCommandLine().isValidationEnabled();
+
+	return createCustomDevice(validation, context.getPlatformInterface(), context.getInstance(),
+							  context.getInstanceInterface(), context.getPhysicalDevice(), &deviceInfo);
 }
 
 
@@ -1311,7 +1336,7 @@ Move<VkDevice> createDevice(const Context& context, SynchronizationType type)
 class SingletonDevice
 {
 	SingletonDevice	(const Context& context, SynchronizationType type)
-		: m_logicalDevice	(createDevice(context, type))
+		: m_logicalDevice	(createTestDevice(context, type))
 	{
 	}
 
