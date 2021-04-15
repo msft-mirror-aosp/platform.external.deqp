@@ -25,8 +25,12 @@
 #include "vktRayQueryBuiltinTests.hpp"
 #include "vktRayQueryTraversalControlTests.hpp"
 #include "vktRayQueryAccelerationStructuresTests.hpp"
+#include "vktRayQueryProceduralGeometryTests.hpp"
 #include "vktRayQueryWatertightnessTests.hpp"
 #include "vktRayQueryCullRayFlagsTests.hpp"
+#include "vktRayQueryMiscTests.hpp"
+#include "vktRayQueryDirectionTests.hpp"
+#include "vktRayQueryBarycentricCoordinatesTests.hpp"
 
 #include "deUniquePtr.hpp"
 
@@ -44,9 +48,13 @@ tcu::TestCaseGroup*	createTests (tcu::TestContext& testCtx)
 	group->addChild(createBuiltinTests(testCtx));
 	group->addChild(createTraversalControlTests(testCtx));
 	group->addChild(createAccelerationStructuresTests(testCtx));
+	group->addChild(createProceduralGeometryTests(testCtx));
 	group->addChild(createAdvancedTests(testCtx));
 	group->addChild(createWatertightnessTests(testCtx));
 	group->addChild(createCullRayFlagsTests(testCtx));
+	group->addChild(createMiscTests(testCtx));
+	group->addChild(createDirectionTests(testCtx));
+	group->addChild(createBarycentricCoordinatesTests(testCtx));
 
 	return group.release();
 }

@@ -36,6 +36,7 @@
 
 namespace vk
 {
+
 struct DeferredThreadParams
 {
 	const DeviceInterface&	vk;
@@ -564,6 +565,18 @@ VkDeviceSize SerialStorage::getStorageSize ()
 	return m_storageSize;
 }
 
+deUint64 SerialStorage::getDeserializedSize ()
+{
+	deUint64		result		= 0;
+	const deUint8*	startPtr	= static_cast<deUint8*>(m_buffer->getAllocation().getHostPtr());
+
+	DE_ASSERT(sizeof(result) == DESERIALIZED_SIZE_SIZE);
+
+	deMemcpy(&result, startPtr + DESERIALIZED_SIZE_OFFSET, sizeof(result));
+
+	return result;
+}
+
 BottomLevelAccelerationStructure::~BottomLevelAccelerationStructure ()
 {
 }
@@ -589,7 +602,8 @@ void BottomLevelAccelerationStructure::setGeometryData (const std::vector<tcu::V
 	addGeometry(geometryData, triangles, geometryFlags);
 }
 
-void BottomLevelAccelerationStructure::setDefaultGeometryData (const VkShaderStageFlagBits	testStage)
+void BottomLevelAccelerationStructure::setDefaultGeometryData (const VkShaderStageFlagBits	testStage,
+															   const VkGeometryFlagsKHR		geometryFlags)
 {
 	bool					trianglesData	= false;
 	float					z				= 0.0f;
@@ -627,7 +641,7 @@ void BottomLevelAccelerationStructure::setDefaultGeometryData (const VkShaderSta
 
 	setGeometryCount(1u);
 
-	addGeometry(geometryData, trianglesData);
+	addGeometry(geometryData, trianglesData, geometryFlags);
 }
 
 void BottomLevelAccelerationStructure::setGeometryCount (const size_t geometryCount)
@@ -1367,8 +1381,8 @@ void BottomLevelAccelerationStructure::createAndDeserializeFrom (const DeviceInt
 																 VkDeviceAddress							deviceAddress )
 {
 	DE_ASSERT(storage != NULL);
-	DE_ASSERT(storage->getStorageSize() != 0u);
-	create(vk, device, allocator, storage->getStorageSize(), deviceAddress);
+	DE_ASSERT(storage->getStorageSize() >= SerialStorage::SERIAL_STORAGE_SIZE_MIN);
+	create(vk, device, allocator, storage->getDeserializedSize(), deviceAddress);
 	deserialize(vk, device, cmdBuffer, storage);
 }
 
@@ -1444,8 +1458,8 @@ void TopLevelAccelerationStructure::createAndDeserializeFrom (const DeviceInterf
 															  VkDeviceAddress							deviceAddress)
 {
 	DE_ASSERT(storage != NULL);
-	DE_ASSERT(storage->getStorageSize() != 0u);
-	create(vk, device, allocator, storage->getStorageSize(), deviceAddress);
+	DE_ASSERT(storage->getStorageSize() >= SerialStorage::SERIAL_STORAGE_SIZE_MIN);
+	create(vk, device, allocator, storage->getDeserializedSize(), deviceAddress);
 	deserialize(vk, device, cmdBuffer, storage);
 }
 
