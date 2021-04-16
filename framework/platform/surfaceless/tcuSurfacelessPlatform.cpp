@@ -80,6 +80,14 @@ using std::vector;
 #	define DEQP_OPENGL_LIBRARY_PATH "libGL.so"
 #endif
 
+#if !defined(DEQP_VULKAN_LIBRARY_PATH)
+#	if (DE_OS == DE_OS_ANDROID)
+#		define DEQP_VULKAN_LIBRARY_PATH "libvulkan.so"
+#	else
+#		define DEQP_VULKAN_LIBRARY_PATH "libvulkan.so.1"
+#	endif
+#endif
+
 namespace tcu
 {
 namespace surfaceless
@@ -89,7 +97,7 @@ class VulkanLibrary : public vk::Library
 {
 public:
 	VulkanLibrary (void)
-		: m_library	("libvulkan.so.1")
+		: m_library	(DEQP_VULKAN_LIBRARY_PATH)
 		, m_driver	(m_library)
 	{
 	}
