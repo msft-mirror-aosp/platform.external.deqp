@@ -115,6 +115,10 @@ set(GLCTS_COMMON_SRCS
 	glcLimitTest.inl
 	glcLimitTest.hpp
 	glcWaiver.hpp
+	glcGLSLVectorConstructorTests.cpp
+	glcGLSLVectorConstructorTests.hpp
+	glcFramebufferCompleteness.cpp
+	glcFramebufferCompleteness.hpp
 	)
 
 set(GLCTS_COMMON_LIBS

@@ -282,7 +282,7 @@ void RayTracingTestCase::initPrograms (SourceCollections& programCollection) con
 			"\n"
 			"void main()\n"
 			"{\n"
-			"  uint primitiveCount  = " << m_data.depth << "u;\n"
+			"  uint primitiveCount  = " << m_data.instancesGroupCount << "u;\n"
 			"  uint primitiveOffset = " << 0 << "u;\n"
 			"  uint firstVertex     = " << 0 << "u;\n"
 			"  uint transformOffset = " << 0 << "u;\n"
@@ -632,7 +632,7 @@ VkBuffer	RayTracingBuildIndirectTestInstance::initIndirectBottomAccelerationStru
 {
 	VkBuffer result	= DE_NULL;
 
-	m_indirectAccelerationStructureBottom	= prepareBuffer(sizeof(VkAccelerationStructureBuildRangeInfoKHR), "wr-asb");
+	m_indirectAccelerationStructureBottom	= prepareBuffer(sizeof(VkAccelerationStructureBuildRangeInfoKHR) * m_data.geometriesGroupCount, "wr-asb");
 	result									= **m_indirectAccelerationStructureBottom;
 
 	return result;

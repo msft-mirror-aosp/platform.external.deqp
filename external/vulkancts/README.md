@@ -16,7 +16,7 @@ The following tools must be installed and present in the PATH variable:
 
  * Git (for checking out sources)
  * Python 3.x (for the build related scripts, some other scripts still use Python 2.7.x)
- * CMake 3.0 (3.6 for Android NDK r17+ builds) or newer
+ * CMake 3.10.2 or newer
 
 ### Win32
 
@@ -25,6 +25,9 @@ The following tools must be installed and present in the PATH variable:
 ### Linux
 
  * Standard toolchain (make, gcc/clang)
+ * If you have X11 installed, then the build assumes you also have the `GL/glx.h` header
+   file.
+    * You can get this from the `mesa-common-dev` Ubuntu package.
 
 ### Android
 
@@ -170,6 +173,12 @@ the following command line option may be used:
 
 	--deqp-waiver-file=<path>
 
+Some CTS tests use third-party runners. By default all tests are executed
+regardless of runner type (`any`). To exclude all tests using any of the
+external runners (`none`) or to only include tests using a certain runner:
+
+	--deqp-runner-type=(any|none|amber)
+
 No other command line options are allowed.
 
 ### Win32
@@ -263,7 +272,7 @@ if `vk::Platform::describePlatform()` is implemented.
 If the submission package covers multiple products, you can list them by appending
 additional `PRODUCT:` lines to the conformance statement. For example:
 
-	CONFORM_VERSION:         vulkan-cts-1.2.5.0
+	CONFORM_VERSION:         vulkan-cts-1.2.6.0
 	PRODUCT:                 Product A
 	PRODUCT:                 Product B
 	...
@@ -327,15 +336,8 @@ codes are allowed:
 	CompatibilityWarning
 	Waiver
 
-Submission package can be verified using `external/vulkancts/scripts/verify_submission.py`
-script. The script takes two arguments: path to extracted submission package
-and path to current mustpass list. For example:
-
-	python external/vulkancts/scripts/verify_submission.py VK_11_Khronos_1/ external/vulkancts/mustpass/master/vk-default.txt
-
-Please note that the script reports a warning even for a correctly generated git-log.txt
-If your git-log.txt contains only head commit of the release tag then
-the warning can be ignored.
+Submission package can be verified using `verify_submission.py`
+script located in [VK-GL-CTS-Tools](https://github.com/KhronosGroup/VK-GL-CTS-Tools).
 
 Vulkan platform port
 --------------------
