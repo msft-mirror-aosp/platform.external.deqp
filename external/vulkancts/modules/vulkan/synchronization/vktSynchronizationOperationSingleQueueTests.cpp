@@ -640,6 +640,13 @@ public:
 	{
 		if (m_type == SynchronizationType::SYNCHRONIZATION2)
 			context.requireDeviceFunctionality("VK_KHR_synchronization2");
+
+		if (SYNC_PRIMITIVE_EVENT == m_syncPrimitive &&
+			context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") &&
+			!context.getPortabilitySubsetFeatures().events)
+		{
+			TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: Events are not supported by this implementation");
+		}
 	}
 
 	TestInstance* createInstance (Context& context) const
