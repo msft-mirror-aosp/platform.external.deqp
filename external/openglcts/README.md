@@ -247,7 +247,7 @@ using Cmake.
 
 Requirements:
 - Visual Studio (2015 or newer recommended) or Windows SDK
-- CMake 2.8.x Windows native version (i.e. not Cygwin version)
+- CMake 3.10.2 Windows native version (i.e. not Cygwin version)
 - For GL/ES2/ES3.x tests: OpengGL, OpenGL ES 2 or ES 3.x libraries and headers
 
 To choose the backend build system for CMake, choose one of the following Generator Names for the
@@ -294,7 +294,7 @@ function wcmake () {
 
 Required tools:
 - Standard build utilities (make, gcc, etc.)
-- CMake 2.8.x
+- CMake 3.10.2
 - Necessary API libraries (OpenGL, GLES, EGL depending on configuration)
 
 Building ES2 or ES3.x conformance tests:
@@ -713,7 +713,7 @@ The CTS writes test logs in XML encapsulated in a simple plain-text container
 format. Each tested configuration listed in `cts-run-summary.xml`
 
 To analyse and process the log files, run the following scripts
-- `external/openglcts/scripts/verify_submission.py`: Script that verifies logs based on `cts-run-summary.xml` file.
+- `verify_submission.py` located in [VK-GL-CTS-Tools](https://github.com/KhronosGroup/VK-GL-CTS-Tools): Script that verifies logs based on `cts-run-summary.xml` file.
 - `scripts/log/log_to_csv.py`: This utility converts `.qpa` log into CSV format. This is
 useful for importing results into other systems.
 - `scripts/log/log_to_xml.py`: Converts `.qpa` into well-formed XML document. The document
