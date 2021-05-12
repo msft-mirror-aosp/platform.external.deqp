@@ -68,7 +68,9 @@ vector<string> filterExtensions (const vector<VkExtensionProperties>& extensions
 		"VK_EXT_",
 		"VK_KHX_",
 		"VK_NV_cooperative_matrix",
+		"VK_EXT_extended_dynamic_state2",
 		"VK_NV_ray_tracing",
+        "VK_NV_inherited_viewport_scissor",
 		"VK_AMD_mixed_attachment_samples",
 		"VK_AMD_shader_fragment_mask",
 		"VK_AMD_buffer_marker",
@@ -369,7 +371,7 @@ namespace
 
 deUint32 sanitizeApiVersion(deUint32 v)
 {
-	return VK_MAKE_VERSION( VK_VERSION_MAJOR(v), VK_VERSION_MINOR(v), 0 );
+	return VK_MAKE_VERSION(VK_API_VERSION_MAJOR(v), VK_API_VERSION_MINOR(v), 0 );
 }
 
 de::MovePtr<vk::DebugReportRecorder> createDebugReportRecorder (const vk::PlatformInterface& vkp, const vk::InstanceInterface& vki, vk::VkInstance instance, bool printValidationErrors)
