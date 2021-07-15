@@ -1181,7 +1181,7 @@ bool isPackedType (const vk::VkFormat format)
 {
 	const tcu::TextureFormat	textureFormat	= mapVkFormat(format);
 
-	DE_STATIC_ASSERT(tcu::TextureFormat::CHANNELTYPE_LAST == 40);
+	DE_STATIC_ASSERT(tcu::TextureFormat::CHANNELTYPE_LAST == 42);
 
 	switch (textureFormat.type)
 	{
