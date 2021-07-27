@@ -52,19 +52,6 @@ namespace ExternalMemoryUtil
 {
 namespace
 {
-deUint32 chooseMemoryType (deUint32 bits)
-{
-	DE_ASSERT(bits != 0);
-
-	for (deUint32 memoryTypeIndex = 0; (1u << memoryTypeIndex) <= bits; memoryTypeIndex++)
-	{
-		if ((bits & (1u << memoryTypeIndex)) != 0)
-			return memoryTypeIndex;
-	}
-
-	DE_FATAL("No supported memory types");
-	return -1;
-}
 
 } // anonymous
 
@@ -902,14 +889,58 @@ vk::Move<vk::VkSemaphore> createAndImportSemaphore (const vk::DeviceInterface&		
 	return semaphore;
 }
 
+deUint32 chooseMemoryType(deUint32 bits)
+{
+	if (bits == 0)
+		return 0;
+
+	for (deUint32 memoryTypeIndex = 0; (1u << memoryTypeIndex) <= bits; memoryTypeIndex++)
+	{
+		if ((bits & (1u << memoryTypeIndex)) != 0)
+			return memoryTypeIndex;
+	}
+
+	DE_FATAL("No supported memory types");
+	return -1;
+}
+
+deUint32 chooseHostVisibleMemoryType (deUint32 bits, const vk::VkPhysicalDeviceMemoryProperties properties)
+{
+	DE_ASSERT(bits != 0);
+
+	for (deUint32 memoryTypeIndex = 0; (1u << memoryTypeIndex) <= bits; memoryTypeIndex++)
+	{
+		if (((bits & (1u << memoryTypeIndex)) != 0) &&
+			((properties.memoryTypes[memoryTypeIndex].propertyFlags & vk::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0))
+			return memoryTypeIndex;
+	}
+
+	TCU_THROW(NotSupportedError, "No supported memory type found");
+	return -1;
+}
+
+vk::VkMemoryRequirements getImageMemoryRequirements (const vk::DeviceInterface& vkd,
+													 vk::VkDevice device,
+													 vk::VkImage image,
+													 vk::VkExternalMemoryHandleTypeFlagBits externalType)
+{
+	if (externalType == vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID)
+	{
+		return { 0u, 0u, 0u };
+	}
+	else
+	{
+		return vk::getImageMemoryRequirements(vkd, device, image);
+	}
+}
+
 vk::Move<vk::VkDeviceMemory> allocateExportableMemory (const vk::DeviceInterface&					vkd,
 													   vk::VkDevice									device,
-													   const vk::VkMemoryRequirements&				requirements,
+													   vk::VkDeviceSize								allocationSize,
+													   deUint32										memoryTypeIndex,
 													   vk::VkExternalMemoryHandleTypeFlagBits		externalType,
-													   vk::VkBuffer									buffer,
-													   deUint32&									exportedMemoryTypeIndex)
+													   vk::VkBuffer									buffer)
 {
-	exportedMemoryTypeIndex = chooseMemoryType(requirements.memoryTypeBits);
 	const vk::VkMemoryDedicatedAllocateInfo	dedicatedInfo	=
 	{
 		vk::VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
@@ -928,20 +959,19 @@ vk::Move<vk::VkDeviceMemory> allocateExportableMemory (const vk::DeviceInterface
 	{
 		vk::VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		&exportInfo,
-		requirements.size,
-		exportedMemoryTypeIndex
+		allocationSize,
+		memoryTypeIndex
 	};
 	return vk::allocateMemory(vkd, device, &info);
 }
 
 vk::Move<vk::VkDeviceMemory> allocateExportableMemory (const vk::DeviceInterface&					vkd,
 													   vk::VkDevice									device,
-													   const vk::VkMemoryRequirements&				requirements,
+													   vk::VkDeviceSize								allocationSize,
+													   deUint32										memoryTypeIndex,
 													   vk::VkExternalMemoryHandleTypeFlagBits		externalType,
-													   vk::VkImage									image,
-													   deUint32&									exportedMemoryTypeIndex)
+													   vk::VkImage									image)
 {
-	exportedMemoryTypeIndex = chooseMemoryType(requirements.memoryTypeBits);
 	const vk::VkMemoryDedicatedAllocateInfo	dedicatedInfo	=
 	{
 		vk::VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
@@ -960,57 +990,10 @@ vk::Move<vk::VkDeviceMemory> allocateExportableMemory (const vk::DeviceInterface
 	{
 		vk::VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		&exportInfo,
-		requirements.size,
-		exportedMemoryTypeIndex
+		allocationSize,
+		memoryTypeIndex
 	};
 	return vk::allocateMemory(vkd, device, &info);
-}
-
-vk::Move<vk::VkDeviceMemory> allocateExportableMemory (const vk::InstanceInterface&					vki,
-													   vk::VkPhysicalDevice							physicalDevice,
-													   const vk::DeviceInterface&					vkd,
-													   vk::VkDevice									device,
-													   const vk::VkMemoryRequirements&				requirements,
-													   vk::VkExternalMemoryHandleTypeFlagBits		externalType,
-													   bool											hostVisible,
-													   vk::VkBuffer									buffer,
-													   deUint32&									exportedMemoryTypeIndex)
-{
-	const vk::VkPhysicalDeviceMemoryProperties properties = vk::getPhysicalDeviceMemoryProperties(vki, physicalDevice);
-
-	for (deUint32 memoryTypeIndex = 0; (1u << memoryTypeIndex) <= requirements.memoryTypeBits; memoryTypeIndex++)
-	{
-		if (((requirements.memoryTypeBits & (1u << memoryTypeIndex)) != 0)
-			&& (((properties.memoryTypes[memoryTypeIndex].propertyFlags & vk::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) != 0) == hostVisible))
-		{
-			const vk::VkMemoryDedicatedAllocateInfo	dedicatedInfo	=
-			{
-				vk::VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,
-				DE_NULL,
-
-				(vk::VkImage)0,
-				buffer
-			};
-			const vk::VkExportMemoryAllocateInfo	exportInfo	=
-			{
-				vk::VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO,
-				!!buffer ? &dedicatedInfo : DE_NULL,
-				(vk::VkExternalMemoryHandleTypeFlags)externalType
-			};
-			const vk::VkMemoryAllocateInfo			info		=
-			{
-				vk::VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-				&exportInfo,
-				requirements.size,
-				memoryTypeIndex
-			};
-
-			exportedMemoryTypeIndex = memoryTypeIndex;
-			return vk::allocateMemory(vkd, device, &info);
-		}
-	}
-
-	TCU_THROW(NotSupportedError, "No supported memory type found");
 }
 
 static vk::Move<vk::VkDeviceMemory> importMemory (const vk::DeviceInterface&				vkd,
@@ -1101,6 +1084,16 @@ static vk::Move<vk::VkDeviceMemory> importMemory (const vk::DeviceInterface&				
 		ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, DE_NULL, DE_NULL);
 		DE_ASSERT(ahbApi->ahbFormatIsBlob(ahbFormat) || image != 0);
 
+		vk::VkAndroidHardwareBufferPropertiesANDROID ahbProperties =
+		{
+			vk::VK_STRUCTURE_TYPE_ANDROID_HARDWARE_BUFFER_PROPERTIES_ANDROID,
+			DE_NULL,
+			0u,
+			0u
+		};
+
+		vkd.getAndroidHardwareBufferPropertiesANDROID(device, handle.getAndroidHardwareBuffer(), &ahbProperties);
+
 		vk::VkImportAndroidHardwareBufferInfoANDROID	importInfo =
 		{
 			vk::VK_STRUCTURE_TYPE_IMPORT_ANDROID_HARDWARE_BUFFER_INFO_ANDROID,
@@ -1118,8 +1111,8 @@ static vk::Move<vk::VkDeviceMemory> importMemory (const vk::DeviceInterface&				
 		{
 			vk::VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 			(isDedicated ? (const void*)&dedicatedInfo : (const void*)&importInfo),
-			requirements.size,
-			(memoryTypeIndex == ~0U) ? chooseMemoryType(requirements.memoryTypeBits)  : memoryTypeIndex
+			ahbProperties.allocationSize,
+			(memoryTypeIndex == ~0U) ? chooseMemoryType(ahbProperties.memoryTypeBits)  : memoryTypeIndex
 		};
 		vk::Move<vk::VkDeviceMemory> memory (vk::allocateMemory(vkd, device, &info));
 
@@ -1271,6 +1264,9 @@ vk::Move<vk::VkImage> createExternalImage (const vk::DeviceInterface&					vkd,
 										   deUint32										mipLevels,
 										   deUint32										arrayLayers)
 {
+	if (createFlags & vk::VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT && arrayLayers < 6u)
+		arrayLayers = 6u;
+
 	const vk::VkExternalMemoryImageCreateInfo		externalCreateInfo	=
 	{
 		vk::VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO,
