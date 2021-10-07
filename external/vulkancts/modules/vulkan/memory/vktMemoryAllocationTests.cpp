@@ -120,7 +120,7 @@ T roundUpToNextMultiple (T value, T multiple)
 class BaseAllocateTestInstance : public TestInstance
 {
 public:
-						BaseAllocateTestInstance		(Context& context, bool useDeviceGroups)
+	BaseAllocateTestInstance		(Context& context, bool useDeviceGroups)
 		: TestInstance				(context)
 		, m_useDeviceGroups			(useDeviceGroups)
 		, m_subsetAllocationAllowed	(false)
@@ -130,7 +130,7 @@ public:
 		if (m_useDeviceGroups)
 			createDeviceGroup();
 		else
-			createDevice();
+			createTestDevice();
 
 		m_allocFlagsInfo.sType		= VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO_KHR;
 		m_allocFlagsInfo.pNext		= DE_NULL;
@@ -138,7 +138,7 @@ public:
 		m_allocFlagsInfo.deviceMask	= 0;
 	}
 
-	void						createDevice		(void);
+	void						createTestDevice	(void);
 	void						createDeviceGroup	(void);
 	const vk::DeviceInterface&	getDeviceInterface	(void) { return m_useDeviceGroups ? *m_deviceDriver : m_context.getDeviceInterface(); }
 	vk::VkDevice				getDevice			(void) { return m_logicalDevice.get();}
@@ -156,7 +156,7 @@ private:
 	de::MovePtr<vk::DeviceDriver>	m_deviceDriver;
 };
 
-void BaseAllocateTestInstance::createDevice (void)
+void BaseAllocateTestInstance::createTestDevice (void)
 {
 	VkInstance										instance				(m_context.getInstance());
 	InstanceDriver									instanceDriver			(m_context.getPlatformInterface(), instance);
@@ -321,22 +321,6 @@ tcu::TestStatus AllocateFreeTestInstance::iterate (void)
 		createFlags |= vk::VK_BUFFER_CREATE_PROTECTED_BIT;
 	}
 
-	// Create a minimal buffer first to get the supported memory types
-	VkBufferCreateInfo				bufferParams					=
-	{
-		VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,                       // VkStructureType          sType;
-		DE_NULL,                                                    // const void*              pNext;
-		createFlags,                                                // VkBufferCreateFlags      flags;
-		1u,                                                         // VkDeviceSize             size;
-		usageFlags,                                                 // VkBufferUsageFlags       usage;
-		sharingMode,                                                // VkSharingMode            sharingMode;
-		1u,                                                         // uint32_t                 queueFamilyIndexCount;
-		&queueFamilyIndex,                                          // const uint32_t*          pQueueFamilyIndices;
-	};
-
-	buffer = createBuffer(vkd, device, &bufferParams);
-	vkd.getBufferMemoryRequirements(device, *buffer, &memReqs);
-
 	DE_ASSERT(m_config.memoryAllocationCount <= MAX_ALLOCATION_COUNT);
 
 	if (m_memoryTypeIndex == 0)
@@ -359,15 +343,29 @@ tcu::TestStatus AllocateFreeTestInstance::iterate (void)
 		const VkMemoryType		memoryType				= m_memoryProperties.memoryTypes[m_memoryTypeIndex];
 		const VkMemoryHeap		memoryHeap				= m_memoryProperties.memoryHeaps[memoryType.heapIndex];
 
+		// Create a buffer to get the required size
+		{
+			const VkDeviceSize bufferSize	= m_config.memorySize ? *m_config.memorySize : (VkDeviceSize) (*m_config.memoryPercentage * (float) memoryHeap.size);
+
+			VkBufferCreateInfo bufferParams =
+				{
+					VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,                       // VkStructureType          sType;
+					DE_NULL,                                                    // const void*              pNext;
+					createFlags,                                                // VkBufferCreateFlags      flags;
+					bufferSize,                                                 // VkDeviceSize             size;
+					usageFlags,                                                 // VkBufferUsageFlags       usage;
+					sharingMode,                                                // VkSharingMode            sharingMode;
+					1u,                                                         // uint32_t                 queueFamilyIndexCount;
+					&queueFamilyIndex,                                          // const uint32_t*          pQueueFamilyIndices;
+				};
+
+			buffer = createBuffer(vkd, device, &bufferParams);
+			vkd.getBufferMemoryRequirements(device, *buffer, &memReqs);
+		}
+
 		const VkDeviceSize		allocationSize	= (m_config.memorySize ? memReqs.size : (VkDeviceSize)(*m_config.memoryPercentage * (float)memoryHeap.size));
 		const VkDeviceSize		roundedUpAllocationSize	 = roundUpToNextMultiple(allocationSize, m_memoryLimits.deviceMemoryAllocationGranularity);
 		vector<VkDeviceMemory>	memoryObjects	(m_config.memoryAllocationCount, (VkDeviceMemory)0);
-		deUint32				totalAllocateCount		= m_config.memoryAllocationCount;
-		VkResult				result					= vk::VK_SUCCESS;
-		// Because of the size limitation of protect heap, we ignore the "VK_ERROR_OUT_OF_DEVICE_MEMORY"
-		// when total number of protected memory reaches 80 times.
-		const deUint32			protectHeapLimit		= 80;
-
 
 		log << TestLog::Message << "Memory type index: " << m_memoryTypeIndex << TestLog::EndMessage;
 
@@ -408,7 +406,7 @@ tcu::TestStatus AllocateFreeTestInstance::iterate (void)
 						{
 							for (size_t ndx = 0; ndx < m_config.memoryAllocationCount; ndx++)
 							{
-								VkMemoryAllocateInfo alloc =
+								VkMemoryAllocateInfo	alloc	=
 								{
 									VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,				// sType
 									m_useDeviceGroups ? &m_allocFlagsInfo : DE_NULL,	// pNext
@@ -416,40 +414,43 @@ tcu::TestStatus AllocateFreeTestInstance::iterate (void)
 									m_memoryTypeIndex									// memoryTypeIndex;
 								};
 
-								result = vkd.allocateMemory(device, &alloc, (const VkAllocationCallbacks*)DE_NULL, &memoryObjects[ndx]);
-								if ( VK_ERROR_OUT_OF_DEVICE_MEMORY == result &&
-								    (memoryType.propertyFlags & vk::VK_MEMORY_PROPERTY_PROTECTED_BIT) == vk::VK_MEMORY_PROPERTY_PROTECTED_BIT &&
-								    ndx >= protectHeapLimit)
-								{
-									totalAllocateCount = (deUint32)ndx + 1;
+								VkResult				res		= vkd.allocateMemory(device, &alloc, (const VkAllocationCallbacks*)DE_NULL, &memoryObjects[ndx]);
+
+								// Some implementations might have limitations on protected heap, and these limitations
+								// don't show up in Vulkan queries. Use a hard coded threshold after which out of memory
+								// is allowed.
+								if (res == VK_ERROR_OUT_OF_DEVICE_MEMORY && memoryType.propertyFlags & vk::VK_MEMORY_PROPERTY_PROTECTED_BIT && ndx > 80)
 									break;
-								}
-								else
-								{
-									VK_CHECK(result);
-								}
+
+								VK_CHECK(res);
 
 								TCU_CHECK(!!memoryObjects[ndx]);
 							}
 
 							if (m_config.order == TestConfig::ALLOC_FREE)
 							{
-								for (size_t ndx = 0; ndx < totalAllocateCount; ndx++)
+								for (size_t ndx = 0; ndx < m_config.memoryAllocationCount; ndx++)
 								{
-									const VkDeviceMemory mem = memoryObjects[totalAllocateCount - 1 - ndx];
+									const VkDeviceMemory mem = memoryObjects[memoryObjects.size() - 1 - ndx];
 
-									vkd.freeMemory(device, mem, (const VkAllocationCallbacks*)DE_NULL);
-									memoryObjects[totalAllocateCount - 1 - ndx] = (VkDeviceMemory)0;
+									if (!!mem)
+									{
+										vkd.freeMemory(device, mem, (const VkAllocationCallbacks *) DE_NULL);
+										memoryObjects[memoryObjects.size() - 1 - ndx] = (VkDeviceMemory) 0;
+									}
 								}
 							}
 							else
 							{
-								for (size_t ndx = 0; ndx < totalAllocateCount; ndx++)
+								for (size_t ndx = 0; ndx < m_config.memoryAllocationCount; ndx++)
 								{
 									const VkDeviceMemory mem = memoryObjects[ndx];
 
-									vkd.freeMemory(device, mem, (const VkAllocationCallbacks*)DE_NULL);
-									memoryObjects[ndx] = (VkDeviceMemory)0;
+									if (!!mem)
+									{
+										vkd.freeMemory(device, mem, (const VkAllocationCallbacks *) DE_NULL);
+										memoryObjects[ndx] = (VkDeviceMemory) 0;
+									}
 								}
 							}
 						}
