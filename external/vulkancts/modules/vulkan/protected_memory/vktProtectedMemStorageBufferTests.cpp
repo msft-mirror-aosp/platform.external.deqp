@@ -378,7 +378,7 @@ tcu::TestStatus StorageBufferTestInstance<T>::executeFragmentTest(void)
 	// Set the test input uniform data
 	{
 		deMemcpy(testUniform->getAllocation().getHostPtr(), &m_testInput, testUniformSize);
-		vk::flushMappedMemoryRange(vk, device, testUniform->getAllocation().getMemory(), testUniform->getAllocation().getOffset(), testUniformSize);
+		vk::flushAlloc(vk, device, testUniform->getAllocation());
 	}
 	const deUint32							testBufferSize		= sizeof(ValidationDataStorage<T>);
 	de::MovePtr<vk::BufferWithMemory>		testBuffer			(makeBuffer(ctx,
@@ -565,7 +565,7 @@ tcu::TestStatus StorageBufferTestInstance<T>::executeComputeTest(void)
 	// Set the test input uniform data
 	{
 		deMemcpy(testUniform->getAllocation().getHostPtr(), &m_testInput, testUniformSize);
-		vk::flushMappedMemoryRange(vk, device, testUniform->getAllocation().getMemory(), testUniform->getAllocation().getOffset(), testUniformSize);
+		vk::flushAlloc(vk, device, testUniform->getAllocation());
 	}
 
 	const deUint32							testBufferSize		= sizeof(ValidationDataStorage<T>);
