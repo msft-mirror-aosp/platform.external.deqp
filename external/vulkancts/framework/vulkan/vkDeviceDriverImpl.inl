@@ -857,6 +857,11 @@ void DeviceDriver::cmdSetFragmentShadingRateKHR (VkCommandBuffer commandBuffer, 
 	m_vk.cmdSetFragmentShadingRateKHR(commandBuffer, pFragmentSize, combinerOps);
 }
 
+VkResult DeviceDriver::waitForPresentKHR (VkDevice device, VkSwapchainKHR swapchain, deUint64 presentId, deUint64 timeout) const
+{
+	return m_vk.waitForPresentKHR(device, swapchain, presentId, timeout);
+}
+
 VkResult DeviceDriver::createDeferredOperationKHR (VkDevice device, const VkAllocationCallbacks* pAllocator, VkDeferredOperationKHR* pDeferredOperation) const
 {
 	return m_vk.createDeferredOperationKHR(device, pAllocator, pDeferredOperation);
@@ -1020,6 +1025,31 @@ void DeviceDriver::cmdEndQueryIndexedEXT (VkCommandBuffer commandBuffer, VkQuery
 void DeviceDriver::cmdDrawIndirectByteCountEXT (VkCommandBuffer commandBuffer, deUint32 instanceCount, deUint32 firstInstance, VkBuffer counterBuffer, VkDeviceSize counterBufferOffset, deUint32 counterOffset, deUint32 vertexStride) const
 {
 	m_vk.cmdDrawIndirectByteCountEXT(commandBuffer, instanceCount, firstInstance, counterBuffer, counterBufferOffset, counterOffset, vertexStride);
+}
+
+VkResult DeviceDriver::createCuModuleNVX (VkDevice device, const VkCuModuleCreateInfoNVX* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkCuModuleNVX* pModule) const
+{
+	return m_vk.createCuModuleNVX(device, pCreateInfo, pAllocator, pModule);
+}
+
+VkResult DeviceDriver::createCuFunctionNVX (VkDevice device, const VkCuFunctionCreateInfoNVX* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkCuFunctionNVX* pFunction) const
+{
+	return m_vk.createCuFunctionNVX(device, pCreateInfo, pAllocator, pFunction);
+}
+
+void DeviceDriver::destroyCuModuleNVX (VkDevice device, VkCuModuleNVX module, const VkAllocationCallbacks* pAllocator) const
+{
+	m_vk.destroyCuModuleNVX(device, module, pAllocator);
+}
+
+void DeviceDriver::destroyCuFunctionNVX (VkDevice device, VkCuFunctionNVX function, const VkAllocationCallbacks* pAllocator) const
+{
+	m_vk.destroyCuFunctionNVX(device, function, pAllocator);
+}
+
+void DeviceDriver::cmdCuLaunchKernelNVX (VkCommandBuffer commandBuffer, const VkCuLaunchInfoNVX* pLaunchInfo) const
+{
+	m_vk.cmdCuLaunchKernelNVX(commandBuffer, pLaunchInfo);
 }
 
 uint32_t DeviceDriver::getImageViewHandleNVX (VkDevice device, const VkImageViewHandleInfoNVX* pInfo) const
@@ -1477,6 +1507,26 @@ void DeviceDriver::cmdSetVertexInputEXT (VkCommandBuffer commandBuffer, deUint32
 	m_vk.cmdSetVertexInputEXT(commandBuffer, vertexBindingDescriptionCount, pVertexBindingDescriptions, vertexAttributeDescriptionCount, pVertexAttributeDescriptions);
 }
 
+VkResult DeviceDriver::getDeviceSubpassShadingMaxWorkgroupSizeHUAWEI (VkDevice device, VkRenderPass renderpass, VkExtent2D* pMaxWorkgroupSize) const
+{
+	return m_vk.getDeviceSubpassShadingMaxWorkgroupSizeHUAWEI(device, renderpass, pMaxWorkgroupSize);
+}
+
+void DeviceDriver::cmdSubpassShadingHUAWEI (VkCommandBuffer commandBuffer) const
+{
+	m_vk.cmdSubpassShadingHUAWEI(commandBuffer);
+}
+
+void DeviceDriver::cmdBindInvocationMaskHUAWEI (VkCommandBuffer commandBuffer, VkImageView imageView, VkImageLayout imageLayout) const
+{
+	m_vk.cmdBindInvocationMaskHUAWEI(commandBuffer, imageView, imageLayout);
+}
+
+VkResult DeviceDriver::getMemoryRemoteAddressNV (VkDevice device, const VkMemoryGetRemoteAddressInfoNV* pMemoryGetRemoteAddressInfo, VkRemoteAddressNV* pAddress) const
+{
+	return m_vk.getMemoryRemoteAddressNV(device, pMemoryGetRemoteAddressInfo, pAddress);
+}
+
 void DeviceDriver::cmdSetPatchControlPointsEXT (VkCommandBuffer commandBuffer, deUint32 patchControlPoints) const
 {
 	m_vk.cmdSetPatchControlPointsEXT(commandBuffer, patchControlPoints);
@@ -1505,6 +1555,16 @@ void DeviceDriver::cmdSetPrimitiveRestartEnableEXT (VkCommandBuffer commandBuffe
 void DeviceDriver::cmdSetColorWriteEnableEXT (VkCommandBuffer commandBuffer, deUint32 attachmentCount, const VkBool32* pColorWriteEnables) const
 {
 	m_vk.cmdSetColorWriteEnableEXT(commandBuffer, attachmentCount, pColorWriteEnables);
+}
+
+void DeviceDriver::cmdDrawMultiEXT (VkCommandBuffer commandBuffer, deUint32 drawCount, const VkMultiDrawInfoEXT* pVertexInfo, deUint32 instanceCount, deUint32 firstInstance, deUint32 stride) const
+{
+	m_vk.cmdDrawMultiEXT(commandBuffer, drawCount, pVertexInfo, instanceCount, firstInstance, stride);
+}
+
+void DeviceDriver::cmdDrawMultiIndexedEXT (VkCommandBuffer commandBuffer, deUint32 drawCount, const VkMultiDrawIndexedInfoEXT* pIndexInfo, deUint32 instanceCount, deUint32 firstInstance, deUint32 stride, const deInt32* pVertexOffset) const
+{
+	m_vk.cmdDrawMultiIndexedEXT(commandBuffer, drawCount, pIndexInfo, instanceCount, firstInstance, stride, pVertexOffset);
 }
 
 VkResult DeviceDriver::createAccelerationStructureKHR (VkDevice device, const VkAccelerationStructureCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkAccelerationStructureKHR* pAccelerationStructure) const

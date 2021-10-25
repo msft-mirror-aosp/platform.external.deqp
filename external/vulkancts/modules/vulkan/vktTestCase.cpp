@@ -77,6 +77,7 @@ vector<string> filterExtensions (const vector<VkExtensionProperties>& extensions
 		"VK_AMD_shader_trinary_minmax",
 		"VK_AMD_texture_gather_bias_lod",
 		"VK_ANDROID_external_memory_android_hardware_buffer",
+		"VK_VALVE_mutable_descriptor_type",
 	};
 
 	for (size_t extNdx = 0; extNdx < extensions.size(); extNdx++)
@@ -182,16 +183,16 @@ std::pair<deUint32, deUint32> determineDeviceVersions(const PlatformInterface& v
 }
 
 
-Move<VkInstance> createInstance (const PlatformInterface& vkp, deUint32 apiVersion, const vector<string>& enabledExtensions, const tcu::CommandLine& cmdLine)
+Move<VkInstance> createInstance (const PlatformInterface& vkp, deUint32 apiVersion, const vector<string>& enabledExtensions, DebugReportRecorder* recorder)
 {
-	const bool								isValidationEnabled	= cmdLine.isValidationEnabled();
-	vector<const char*>						enabledLayers;
+	const bool			isValidationEnabled	= (recorder != nullptr);
+	vector<const char*>	enabledLayers;
 
 	// \note Extensions in core are not explicitly enabled even though
 	//		 they are in the extension list advertised to tests.
-	vector<const char*>						coreExtensions;
+	vector<const char*> coreExtensions;
 	getCoreInstanceExtensions(apiVersion, coreExtensions);
-	vector<string>							nonCoreExtensions	(removeExtensions(enabledExtensions, coreExtensions));
+	const auto nonCoreExtensions = removeExtensions(enabledExtensions, coreExtensions);
 
 	if (isValidationEnabled)
 	{
@@ -203,7 +204,7 @@ Move<VkInstance> createInstance (const PlatformInterface& vkp, deUint32 apiVersi
 			TCU_THROW(NotSupportedError, "No validation layers found");
 	}
 
-	return createDefaultInstance(vkp, apiVersion, vector<string>(begin(enabledLayers), end(enabledLayers)), nonCoreExtensions);
+	return createDefaultInstance(vkp, apiVersion, vector<string>(begin(enabledLayers), end(enabledLayers)), nonCoreExtensions, recorder);
 }
 
 static deUint32 findQueueFamilyIndexWithCaps (const InstanceInterface& vkInstance, VkPhysicalDevice physicalDevice, VkQueueFlags requiredCaps)
@@ -318,8 +319,8 @@ public:
 	bool															isDevicePropertyInitialized				(VkStructureType sType) const { return m_deviceProperties.isDevicePropertyInitialized(sType);	}
 	const VkPhysicalDeviceProperties&								getDeviceProperties						(void) const { return m_deviceProperties.getCoreProperties2().properties;	}
 	const VkPhysicalDeviceProperties2&								getDeviceProperties2					(void) const { return m_deviceProperties.getCoreProperties2();				}
-	const VkPhysicalDeviceVulkan11Properties&						getVulkan11Properties					(void) const { return m_deviceProperties.getVulkan11Properties();			}
-	const VkPhysicalDeviceVulkan12Properties&						getVulkan12Properties					(void) const { return m_deviceProperties.getVulkan12Properties();			}
+	const VkPhysicalDeviceVulkan11Properties&						getDeviceVulkan11Properties				(void) const { return m_deviceProperties.getVulkan11Properties();			}
+	const VkPhysicalDeviceVulkan12Properties&						getDeviceVulkan12Properties				(void) const { return m_deviceProperties.getVulkan12Properties();			}
 
 #include "vkDevicePropertiesForDefaultDeviceDefs.inl"
 
@@ -337,6 +338,7 @@ public:
 
 private:
 	using DebugReportRecorderPtr		= de::UniquePtr<vk::DebugReportRecorder>;
+	using DebugReportCallbackPtr		= vk::Move<VkDebugReportCallbackEXT>;
 
 	const deUint32						m_maximumFrameworkVulkanVersion;
 	const deUint32						m_availableInstanceVersion;
@@ -345,10 +347,11 @@ private:
 	const std::pair<deUint32, deUint32> m_deviceVersions;
 	const deUint32						m_usedApiVersion;
 
+	const DebugReportRecorderPtr		m_debugReportRecorder;
 	const vector<string>				m_instanceExtensions;
 	const Unique<VkInstance>			m_instance;
 	const InstanceDriver				m_instanceInterface;
-	const DebugReportRecorderPtr		m_debugReportRecorder;
+	const DebugReportCallbackPtr		m_debugReportCallback;
 
 	const VkPhysicalDevice				m_physicalDevice;
 	const deUint32						m_deviceVersion;
@@ -372,10 +375,10 @@ deUint32 sanitizeApiVersion(deUint32 v)
 	return VK_MAKE_VERSION(VK_API_VERSION_MAJOR(v), VK_API_VERSION_MINOR(v), 0 );
 }
 
-de::MovePtr<vk::DebugReportRecorder> createDebugReportRecorder (const vk::PlatformInterface& vkp, const vk::InstanceInterface& vki, vk::VkInstance instance, bool printValidationErrors)
+de::MovePtr<vk::DebugReportRecorder> createDebugReportRecorder (const vk::PlatformInterface& vkp, bool printValidationErrors)
 {
 	if (isDebugReportSupported(vkp))
-		return de::MovePtr<vk::DebugReportRecorder>(new vk::DebugReportRecorder(vki, instance, printValidationErrors));
+		return de::MovePtr<vk::DebugReportRecorder>(new vk::DebugReportRecorder(printValidationErrors));
 	else
 		TCU_THROW(NotSupportedError, "VK_EXT_debug_report is not supported");
 }
@@ -389,16 +392,16 @@ DefaultDevice::DefaultDevice (const PlatformInterface& vkPlatform, const tcu::Co
 	, m_deviceVersions					(determineDeviceVersions(vkPlatform, m_usedInstanceVersion, cmdLine))
 	, m_usedApiVersion					(sanitizeApiVersion(deMinu32(m_usedInstanceVersion, m_deviceVersions.first)))
 
+	, m_debugReportRecorder				(cmdLine.isValidationEnabled()
+										 ? createDebugReportRecorder(vkPlatform, cmdLine.printValidationErrors())
+										 : de::MovePtr<vk::DebugReportRecorder>())
 	, m_instanceExtensions				(addCoreInstanceExtensions(filterExtensions(enumerateInstanceExtensionProperties(vkPlatform, DE_NULL)), m_usedApiVersion))
-	, m_instance						(createInstance(vkPlatform, m_usedApiVersion, m_instanceExtensions, cmdLine))
+	, m_instance						(createInstance(vkPlatform, m_usedApiVersion, m_instanceExtensions, m_debugReportRecorder.get()))
 
 	, m_instanceInterface				(vkPlatform, *m_instance)
-	, m_debugReportRecorder				(cmdLine.isValidationEnabled()
-										 ? createDebugReportRecorder(vkPlatform,
-																	 m_instanceInterface,
-																	 *m_instance,
-																	 cmdLine.printValidationErrors())
-										 : de::MovePtr<vk::DebugReportRecorder>(DE_NULL))
+	, m_debugReportCallback				(cmdLine.isValidationEnabled()
+										 ? m_debugReportRecorder->createCallback(m_instanceInterface, m_instance.get())
+										 : DebugReportCallbackPtr())
 	, m_physicalDevice					(chooseDevice(m_instanceInterface, *m_instance, cmdLine))
 	, m_deviceVersion					(getPhysicalDeviceProperties(m_instanceInterface, m_physicalDevice).apiVersion)
 
@@ -462,15 +465,17 @@ Context::~Context (void)
 {
 }
 
-deUint32								Context::getMaximumFrameworkVulkanVersion	(void) const { return m_device->getMaximumFrameworkVulkanVersion();		}
-deUint32								Context::getAvailableInstanceVersion		(void) const { return m_device->getAvailableInstanceVersion();	}
-const vector<string>&					Context::getInstanceExtensions				(void) const { return m_device->getInstanceExtensions();		}
-vk::VkInstance							Context::getInstance						(void) const { return m_device->getInstance();					}
-const vk::InstanceInterface&			Context::getInstanceInterface				(void) const { return m_device->getInstanceInterface();			}
-vk::VkPhysicalDevice					Context::getPhysicalDevice					(void) const { return m_device->getPhysicalDevice();			}
-deUint32								Context::getDeviceVersion					(void) const { return m_device->getDeviceVersion();				}
-const vk::VkPhysicalDeviceFeatures&		Context::getDeviceFeatures					(void) const { return m_device->getDeviceFeatures();			}
-const vk::VkPhysicalDeviceFeatures2&	Context::getDeviceFeatures2					(void) const { return m_device->getDeviceFeatures2();			}
+deUint32										Context::getMaximumFrameworkVulkanVersion		(void) const { return m_device->getMaximumFrameworkVulkanVersion();			}
+deUint32										Context::getAvailableInstanceVersion			(void) const { return m_device->getAvailableInstanceVersion();				}
+const vector<string>&							Context::getInstanceExtensions					(void) const { return m_device->getInstanceExtensions();					}
+vk::VkInstance									Context::getInstance							(void) const { return m_device->getInstance();								}
+const vk::InstanceInterface&					Context::getInstanceInterface					(void) const { return m_device->getInstanceInterface();						}
+vk::VkPhysicalDevice							Context::getPhysicalDevice						(void) const { return m_device->getPhysicalDevice();						}
+deUint32										Context::getDeviceVersion						(void) const { return m_device->getDeviceVersion();							}
+const vk::VkPhysicalDeviceFeatures&				Context::getDeviceFeatures						(void) const { return m_device->getDeviceFeatures();						}
+const vk::VkPhysicalDeviceFeatures2&			Context::getDeviceFeatures2						(void) const { return m_device->getDeviceFeatures2();						}
+const vk::VkPhysicalDeviceVulkan11Features&		Context::getDeviceVulkan11Features				(void) const { return m_device->getVulkan11Features();						}
+const vk::VkPhysicalDeviceVulkan12Features&		Context::getDeviceVulkan12Features				(void) const { return m_device->getVulkan12Features();						}
 
 bool Context::isDeviceFunctionalitySupported (const std::string& extension) const
 {
@@ -524,7 +529,7 @@ bool Context::isDeviceFunctionalitySupported (const std::string& extension) cons
 		return true;
 	}
 
-	// check if extension is on the lits of extensions for current device
+	// check if extension is on the list of extensions for current device
 	const auto& extensions = getDeviceExtensions();
 	if (de::contains(extensions.begin(), extensions.end(), extension))
 	{
@@ -555,8 +560,10 @@ bool Context::isInstanceFunctionalitySupported(const std::string& extension) con
 
 #include "vkDeviceFeaturesForContextDefs.inl"
 
-const vk::VkPhysicalDeviceProperties&	Context::getDeviceProperties				(void) const { return m_device->getDeviceProperties();			}
-const vk::VkPhysicalDeviceProperties2&	Context::getDeviceProperties2				(void) const { return m_device->getDeviceProperties2();			}
+const vk::VkPhysicalDeviceProperties&			Context::getDeviceProperties				(void) const { return m_device->getDeviceProperties();			}
+const vk::VkPhysicalDeviceProperties2&			Context::getDeviceProperties2				(void) const { return m_device->getDeviceProperties2();			}
+const vk::VkPhysicalDeviceVulkan11Properties&	Context::getDeviceVulkan11Properties		(void) const { return m_device->getDeviceVulkan11Properties();	}
+const vk::VkPhysicalDeviceVulkan12Properties&	Context::getDeviceVulkan12Properties		(void) const { return m_device->getDeviceVulkan12Properties();	}
 
 #include "vkDevicePropertiesForContextDefs.inl"
 
