@@ -33,6 +33,7 @@
 #include <vector>
 #include <string>
 #include <thread>
+#include <limits>
 
 namespace vk
 {
@@ -559,13 +560,18 @@ VkDeviceOrHostAddressKHR SerialStorage::getAddress (const DeviceInterface&				vk
 		return makeDeviceOrHostAddressKHR(m_buffer->getAllocation().getHostPtr());
 }
 
+VkDeviceOrHostAddressConstKHR SerialStorage::getHostAddressConst()
+{
+	return makeDeviceOrHostAddressConstKHR(m_buffer->getAllocation().getHostPtr());
+}
+
 VkDeviceOrHostAddressConstKHR SerialStorage::getAddressConst (const DeviceInterface&	vk,
 															  const VkDevice			device)
 {
 	if (m_buildType == VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR)
 		return makeDeviceOrHostAddressConstKHR(vk, device, m_buffer->get(), 0);
 	else
-		return makeDeviceOrHostAddressConstKHR(m_buffer->getAllocation().getHostPtr());
+		return getHostAddressConst();
 }
 
 VkDeviceSize SerialStorage::getStorageSize ()
@@ -1510,65 +1516,74 @@ BufferWithMemory* createInstanceBuffer (const DeviceInterface&											vk,
 	}
 }
 
-void updateInstanceBuffer (const DeviceInterface&											vk,
-						   const VkDevice													device,
-						   std::vector<de::SharedPtr<BottomLevelAccelerationStructure> >	bottomLevelInstances,
-						   std::vector<InstanceData>										instanceData,
-						   BufferWithMemory*												instanceBuffer,
-						   VkAccelerationStructureBuildTypeKHR								buildType,
-						   bool																inactiveInstances)
+void updateSingleInstance (const DeviceInterface&					vk,
+						   const VkDevice							device,
+						   const BottomLevelAccelerationStructure&	bottomLevelAccelerationStructure,
+						   const InstanceData&						instanceData,
+						   deUint8*									bufferLocation,
+						   VkAccelerationStructureBuildTypeKHR		buildType,
+						   bool										inactiveInstances)
+{
+	const VkAccelerationStructureKHR accelerationStructureKHR = *bottomLevelAccelerationStructure.getPtr();
+
+	// This part needs to be fixed once a new version of the VkAccelerationStructureInstanceKHR will be added to vkStructTypes.inl
+	VkDeviceAddress accelerationStructureAddress;
+	if (buildType == VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR)
+	{
+		VkAccelerationStructureDeviceAddressInfoKHR asDeviceAddressInfo =
+		{
+			VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,	// VkStructureType				sType;
+			DE_NULL,															// const void*					pNext;
+			accelerationStructureKHR											// VkAccelerationStructureKHR	accelerationStructure;
+		};
+		accelerationStructureAddress = vk.getAccelerationStructureDeviceAddressKHR(device, &asDeviceAddressInfo);
+	}
+
+	deUint64 structureReference;
+	if (inactiveInstances)
+	{
+		// Instances will be marked inactive by making their references VK_NULL_HANDLE or having address zero.
+		structureReference = 0ull;
+	}
+	else
+	{
+		structureReference	= (buildType == VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR)
+							? deUint64(accelerationStructureAddress)
+							: deUint64(accelerationStructureKHR.getInternal());
+	}
+
+	VkAccelerationStructureInstanceKHR	accelerationStructureInstanceKHR = makeVkAccelerationStructureInstanceKHR
+	(
+		instanceData.matrix,									//  VkTransformMatrixKHR		transform;
+		instanceData.instanceCustomIndex,						//  deUint32					instanceCustomIndex:24;
+		instanceData.mask,										//  deUint32					mask:8;
+		instanceData.instanceShaderBindingTableRecordOffset,	//  deUint32					instanceShaderBindingTableRecordOffset:24;
+		instanceData.flags,										//  VkGeometryInstanceFlagsKHR	flags:8;
+		structureReference										//  deUint64					accelerationStructureReference;
+	);
+
+	deMemcpy(bufferLocation, &accelerationStructureInstanceKHR, sizeof(VkAccelerationStructureInstanceKHR));
+}
+
+void updateInstanceBuffer (const DeviceInterface&												vk,
+						   const VkDevice														device,
+						   const std::vector<de::SharedPtr<BottomLevelAccelerationStructure>>&	bottomLevelInstances,
+						   const std::vector<InstanceData>&										instanceData,
+						   const BufferWithMemory*												instanceBuffer,
+						   VkAccelerationStructureBuildTypeKHR									buildType,
+						   bool																	inactiveInstances)
 {
 	DE_ASSERT(bottomLevelInstances.size() != 0);
 	DE_ASSERT(bottomLevelInstances.size() == instanceData.size());
 
-	const Allocation&			instancesAlloc		= instanceBuffer->getAllocation();
-
-	deUint8*					bufferStart			= static_cast<deUint8*>(instancesAlloc.getHostPtr());
-	VkDeviceSize				bufferOffset		= 0;
+	auto&			instancesAlloc		= instanceBuffer->getAllocation();
+	auto			bufferStart			= reinterpret_cast<deUint8*>(instancesAlloc.getHostPtr());
+	VkDeviceSize	bufferOffset		= 0ull;
 
 	for (size_t instanceNdx = 0; instanceNdx < bottomLevelInstances.size(); ++instanceNdx)
 	{
-		const BottomLevelAccelerationStructure&		bottomLevelAccelerationStructure	= *bottomLevelInstances[instanceNdx];
-		const VkAccelerationStructureKHR			accelerationStructureKHR			= *bottomLevelAccelerationStructure.getPtr();
-
-		// This part needs to be fixed once a new version of the VkAccelerationStructureInstanceKHR will be added to vkStructTypes.inl
-		VkDeviceAddress accelerationStructureAddress;
-		if (buildType == VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR)
-		{
-			VkAccelerationStructureDeviceAddressInfoKHR asDeviceAddressInfo =
-			{
-				VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR,	// VkStructureType				sType;
-				DE_NULL,															// const void*					pNext;
-				accelerationStructureKHR											// VkAccelerationStructureKHR	accelerationStructure;
-			};
-			accelerationStructureAddress = vk.getAccelerationStructureDeviceAddressKHR(device, &asDeviceAddressInfo);
-		}
-
-		deUint64 structureReference;
-		if (inactiveInstances)
-		{
-			// Instances will be marked inactive by making their references VK_NULL_HANDLE or having address zero.
-			structureReference = 0ull;
-		}
-		else
-		{
-			structureReference	= (buildType == VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR)
-								? deUint64(accelerationStructureAddress)
-								: deUint64(accelerationStructureKHR.getInternal());
-		}
-
-		VkAccelerationStructureInstanceKHR	accelerationStructureInstanceKHR = makeVkAccelerationStructureInstanceKHR
-		(
-			instanceData[instanceNdx].matrix,													//  VkTransformMatrixKHR		transform;
-			instanceData[instanceNdx].instanceCustomIndex,										//  deUint32					instanceCustomIndex:24;
-			instanceData[instanceNdx].mask,														//  deUint32					mask:8;
-			instanceData[instanceNdx].instanceShaderBindingTableRecordOffset,					//  deUint32					instanceShaderBindingTableRecordOffset:24;
-			instanceData[instanceNdx].flags,													//  VkGeometryInstanceFlagsKHR	flags:8;
-			structureReference																	//  deUint64					accelerationStructureReference;
-		);
-
-		deMemcpy(&bufferStart[bufferOffset], &accelerationStructureInstanceKHR, sizeof(VkAccelerationStructureInstanceKHR));
-
+		const auto& blas = *bottomLevelInstances[instanceNdx];
+		updateSingleInstance(vk, device, blas, instanceData[instanceNdx], bufferStart + bufferOffset, buildType, inactiveInstances);
 		bufferOffset += sizeof(VkAccelerationStructureInstanceKHR);
 	}
 
@@ -1596,6 +1611,7 @@ public:
 	void													setIndirectBuildParameters							(const VkBuffer									indirectBuffer,
 																												 const VkDeviceSize								indirectBufferOffset,
 																												 const deUint32									indirectBufferStride) override;
+	void													setUsePPGeometries									(const bool										usePPGeometries) override;
 	VkBuildAccelerationStructureFlagsKHR					getBuildFlags										() const override;
 
 	void													create												(const DeviceInterface&							vk,
@@ -1622,6 +1638,11 @@ public:
 
 	const VkAccelerationStructureKHR*						getPtr												(void) const override;
 
+	void													updateInstanceMatrix								(const DeviceInterface&							vk,
+																												 const VkDevice									device,
+																												 size_t											instanceIndex,
+																												 const VkTransformMatrixKHR&					matrix) override;
+
 protected:
 	VkAccelerationStructureBuildTypeKHR						m_buildType;
 	VkAccelerationStructureCreateFlagsKHR					m_createFlags;
@@ -1641,6 +1662,7 @@ protected:
 	VkBuffer												m_indirectBuffer;
 	VkDeviceSize											m_indirectBufferOffset;
 	deUint32												m_indirectBufferStride;
+	bool													m_usePPGeometries;
 
 	void													prepareInstances									(const DeviceInterface&							vk,
 																												 const VkDevice									device,
@@ -1677,6 +1699,7 @@ TopLevelAccelerationStructureKHR::TopLevelAccelerationStructureKHR ()
 	, m_indirectBuffer				(DE_NULL)
 	, m_indirectBufferOffset		(0)
 	, m_indirectBufferStride		(0)
+	, m_usePPGeometries				(false)
 {
 }
 
@@ -1726,6 +1749,11 @@ void TopLevelAccelerationStructureKHR::setUseArrayOfPointers (const bool	useArra
 	m_useArrayOfPointers = useArrayOfPointers;
 }
 
+void TopLevelAccelerationStructureKHR::setUsePPGeometries (const bool usePPGeometries)
+{
+	m_usePPGeometries = usePPGeometries;
+}
+
 void TopLevelAccelerationStructureKHR::setIndirectBuildParameters (const VkBuffer		indirectBuffer,
 																   const VkDeviceSize	indirectBufferOffset,
 																   const deUint32		indirectBufferStride)
@@ -1753,6 +1781,7 @@ void TopLevelAccelerationStructureKHR::create (const DeviceInterface&				vk,
 	if (structureSize == 0)
 	{
 		VkAccelerationStructureGeometryKHR		accelerationStructureGeometryKHR;
+		const auto								accelerationStructureGeometryKHRPtr = &accelerationStructureGeometryKHR;
 		std::vector<deUint32>					maxPrimitiveCounts;
 		prepareInstances(vk, device, accelerationStructureGeometryKHR, maxPrimitiveCounts);
 
@@ -1766,8 +1795,8 @@ void TopLevelAccelerationStructureKHR::create (const DeviceInterface&				vk,
 			DE_NULL,																				//  VkAccelerationStructureKHR							srcAccelerationStructure;
 			DE_NULL,																				//  VkAccelerationStructureKHR							dstAccelerationStructure;
 			1u,																						//  deUint32											geometryCount;
-			&accelerationStructureGeometryKHR,														//  const VkAccelerationStructureGeometryKHR*			pGeometries;
-			DE_NULL,																				//  const VkAccelerationStructureGeometryKHR* const*	ppGeometries;
+			(m_usePPGeometries ? nullptr : &accelerationStructureGeometryKHR),						//  const VkAccelerationStructureGeometryKHR*			pGeometries;
+			(m_usePPGeometries ? &accelerationStructureGeometryKHRPtr : nullptr),					//  const VkAccelerationStructureGeometryKHR* const*	ppGeometries;
 			makeDeviceOrHostAddressKHR(DE_NULL)														//  VkDeviceOrHostAddressKHR							scratchData;
 		};
 
@@ -1840,12 +1869,30 @@ void TopLevelAccelerationStructureKHR::create (const DeviceInterface&				vk,
 
 	if (m_useArrayOfPointers)
 	{
-		const VkBufferCreateInfo	bufferCreateInfo = makeBufferCreateInfo(m_bottomLevelInstances.size() * sizeof(VkDeviceOrHostAddressConstKHR), VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
+		const size_t				pointerSize = (m_buildType == VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR) ? sizeof(VkDeviceOrHostAddressConstKHR::deviceAddress) : sizeof(VkDeviceOrHostAddressConstKHR::hostAddress);
+		const VkBufferCreateInfo	bufferCreateInfo = makeBufferCreateInfo(static_cast<VkDeviceSize>(m_bottomLevelInstances.size() * pointerSize), VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
 		m_instanceAddressBuffer = de::MovePtr<BufferWithMemory>(new BufferWithMemory(vk, device, allocator, bufferCreateInfo, MemoryRequirement::HostVisible | MemoryRequirement::Coherent | MemoryRequirement::DeviceAddress));
 	}
 
 	if(!m_bottomLevelInstances.empty())
 		m_instanceBuffer = de::MovePtr<BufferWithMemory>(createInstanceBuffer(vk, device, allocator, m_bottomLevelInstances, m_instanceData));
+}
+
+void TopLevelAccelerationStructureKHR::updateInstanceMatrix (const DeviceInterface& vk, const VkDevice device, size_t instanceIndex, const VkTransformMatrixKHR& matrix)
+{
+	DE_ASSERT(m_buildType == VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR);
+	DE_ASSERT(instanceIndex < m_bottomLevelInstances.size());
+	DE_ASSERT(instanceIndex < m_instanceData.size());
+
+	const auto&		blas			= *m_bottomLevelInstances[instanceIndex];
+	auto&			instanceData	= m_instanceData[instanceIndex];
+	auto&			instancesAlloc	= m_instanceBuffer->getAllocation();
+	auto			bufferStart		= reinterpret_cast<deUint8*>(instancesAlloc.getHostPtr());
+	VkDeviceSize	bufferOffset	= sizeof(VkAccelerationStructureInstanceKHR) * instanceIndex;
+
+	instanceData.matrix = matrix;
+	updateSingleInstance(vk, device, blas, instanceData, bufferStart + bufferOffset, m_buildType, m_inactiveInstances);
+	flushMappedMemoryRange(vk, device, instancesAlloc.getMemory(), instancesAlloc.getOffset(), VK_WHOLE_SIZE);
 }
 
 void TopLevelAccelerationStructureKHR::build (const DeviceInterface&	vk,
@@ -1859,6 +1906,7 @@ void TopLevelAccelerationStructureKHR::build (const DeviceInterface&	vk,
 	updateInstanceBuffer(vk, device, m_bottomLevelInstances, m_instanceData, m_instanceBuffer.get(), m_buildType, m_inactiveInstances);
 
 	VkAccelerationStructureGeometryKHR		accelerationStructureGeometryKHR;
+	const auto								accelerationStructureGeometryKHRPtr = &accelerationStructureGeometryKHR;
 	std::vector<deUint32>					maxPrimitiveCounts;
 	prepareInstances(vk, device, accelerationStructureGeometryKHR, maxPrimitiveCounts);
 
@@ -1876,8 +1924,8 @@ void TopLevelAccelerationStructureKHR::build (const DeviceInterface&	vk,
 		DE_NULL,																				//  VkAccelerationStructureKHR							srcAccelerationStructure;
 		m_accelerationStructureKHR.get(),														//  VkAccelerationStructureKHR							dstAccelerationStructure;
 		1u,																						//  deUint32											geometryCount;
-		&accelerationStructureGeometryKHR,														//  const VkAccelerationStructureGeometryKHR*			pGeometries;
-		DE_NULL,																				//  const VkAccelerationStructureGeometryKHR* const*	ppGeometries;
+		(m_usePPGeometries ? nullptr : &accelerationStructureGeometryKHR),						//  const VkAccelerationStructureGeometryKHR*			pGeometries;
+		(m_usePPGeometries ? &accelerationStructureGeometryKHRPtr : nullptr),					//  const VkAccelerationStructureGeometryKHR* const*	ppGeometries;
 		scratchData																				//  VkDeviceOrHostAddressKHR							scratchData;
 	};
 
@@ -2090,8 +2138,8 @@ void TopLevelAccelerationStructureKHR::prepareInstances (const DeviceInterface&	
 					VkDeviceOrHostAddressConstKHR	currentInstance;
 					currentInstance.deviceAddress	= firstInstance.deviceAddress + instanceNdx * sizeof(VkAccelerationStructureInstanceKHR);
 
-					deMemcpy(&bufferStart[bufferOffset], &currentInstance, sizeof(VkDeviceOrHostAddressConstKHR));
-					bufferOffset += sizeof(VkDeviceOrHostAddressConstKHR);
+					deMemcpy(&bufferStart[bufferOffset], &currentInstance, sizeof(VkDeviceOrHostAddressConstKHR::deviceAddress));
+					bufferOffset += sizeof(VkDeviceOrHostAddressConstKHR::deviceAddress);
 				}
 				flushMappedMemoryRange(vk, device, m_instanceAddressBuffer->getAllocation().getMemory(), m_instanceAddressBuffer->getAllocation().getOffset(), VK_WHOLE_SIZE);
 
@@ -2116,8 +2164,8 @@ void TopLevelAccelerationStructureKHR::prepareInstances (const DeviceInterface&	
 					VkDeviceOrHostAddressConstKHR	currentInstance;
 					currentInstance.hostAddress	= (deUint8*)m_instanceBuffer->getAllocation().getHostPtr() + instanceNdx * sizeof(VkAccelerationStructureInstanceKHR);
 
-					deMemcpy(&bufferStart[bufferOffset], &currentInstance, sizeof(VkDeviceOrHostAddressConstKHR));
-					bufferOffset += sizeof(VkDeviceOrHostAddressConstKHR);
+					deMemcpy(&bufferStart[bufferOffset], &currentInstance, sizeof(VkDeviceOrHostAddressConstKHR::hostAddress));
+					bufferOffset += sizeof(VkDeviceOrHostAddressConstKHR::hostAddress);
 				}
 				instancesData = makeDeviceOrHostAddressConstKHR(m_instanceAddressBuffer->getAllocation().getHostPtr());
 			}
@@ -2222,12 +2270,33 @@ RayTracingPipeline::~RayTracingPipeline ()
 	else															\
 		TCU_THROW(InternalError, "Attempt to reassign shader")
 
-void RayTracingPipeline::addShader (VkShaderStageFlagBits shaderStage, Move<VkShaderModule> shaderModule, deUint32 group, const VkSpecializationInfo* specializationInfo)
+void RayTracingPipeline::addShader (VkShaderStageFlagBits					shaderStage,
+									Move<VkShaderModule>					shaderModule,
+									deUint32								group,
+									const VkSpecializationInfo*				specializationInfo,
+									const VkPipelineShaderStageCreateFlags	pipelineShaderStageCreateFlags,
+									const void*								pipelineShaderStageCreateInfopNext)
 {
-	addShader(shaderStage, makeVkSharedPtr(shaderModule), group, specializationInfo);
+	addShader(shaderStage, makeVkSharedPtr(shaderModule), group, specializationInfo, pipelineShaderStageCreateFlags, pipelineShaderStageCreateInfopNext);
 }
 
-void RayTracingPipeline::addShader (VkShaderStageFlagBits shaderStage, de::SharedPtr<Move<VkShaderModule>> shaderModule, deUint32 group, const VkSpecializationInfo* specializationInfoPtr)
+void RayTracingPipeline::addShader (VkShaderStageFlagBits					shaderStage,
+									de::SharedPtr<Move<VkShaderModule>>		shaderModule,
+									deUint32								group,
+									const VkSpecializationInfo*				specializationInfoPtr,
+									const VkPipelineShaderStageCreateFlags	pipelineShaderStageCreateFlags,
+									const void*								pipelineShaderStageCreateInfopNext)
+{
+	addShader(shaderStage, **shaderModule, group, specializationInfoPtr, pipelineShaderStageCreateFlags, pipelineShaderStageCreateInfopNext);
+	m_shadersModules.push_back(shaderModule);
+}
+
+void RayTracingPipeline::addShader (VkShaderStageFlagBits					shaderStage,
+									VkShaderModule		                    shaderModule,
+									deUint32								group,
+									const VkSpecializationInfo*				specializationInfoPtr,
+									const VkPipelineShaderStageCreateFlags	pipelineShaderStageCreateFlags,
+									const void*								pipelineShaderStageCreateInfopNext)
 {
 	if (group >= m_shadersGroupCreateInfos.size())
 	{
@@ -2294,18 +2363,16 @@ void RayTracingPipeline::addShader (VkShaderStageFlagBits shaderStage, de::Share
 		const VkPipelineShaderStageCreateInfo	shaderCreateInfo	=
 		{
 			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	//  VkStructureType						sType;
-			DE_NULL,												//  const void*							pNext;
-			(VkPipelineShaderStageCreateFlags)0,					//  VkPipelineShaderStageCreateFlags	flags;
+			pipelineShaderStageCreateInfopNext,						//  const void*							pNext;
+			pipelineShaderStageCreateFlags,							//  VkPipelineShaderStageCreateFlags	flags;
 			shaderStage,											//  VkShaderStageFlagBits				stage;
-			**shaderModule,											//  VkShaderModule						module;
+			shaderModule,											//  VkShaderModule						module;
 			"main",													//  const char*							pName;
 			specializationInfoPtr,									//  const VkSpecializationInfo*			pSpecializationInfo;
 		};
 
 		m_shaderCreateInfos.push_back(shaderCreateInfo);
 	}
-
-	m_shadersModules.push_back(shaderModule);
 }
 
 void RayTracingPipeline::addLibrary (de::SharedPtr<de::MovePtr<RayTracingPipeline>> pipelineLibrary)

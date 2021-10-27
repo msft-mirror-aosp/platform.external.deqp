@@ -300,6 +300,8 @@ struct TestParams
 
 	TestParams (void)
 	{
+		allocationKind				= ALLOCATION_KIND_DEDICATED;
+		extensionUse				= EXTENSION_USE_NONE;
 		mipLevels					= 1u;
 		singleCommand				= DE_TRUE;
 		barrierCount				= 1u;
@@ -705,11 +707,17 @@ void CopiesAndBlittingTestInstance::uploadImageAspect (const tcu::ConstPixelBuff
 			imageExtent.depth
 		};
 
+		const bool		isCompressed	= isCompressedFormat(parms.format);
+		const deUint32	blockWidth		= (isCompressed) ? getBlockWidth(parms.format) : 1u;
+		const deUint32	blockHeight		= (isCompressed) ? getBlockHeight(parms.format) : 1u;
+		deUint32 rowLength		= ((copyExtent.width + blockWidth-1) / blockWidth) * blockWidth;
+		deUint32 imageHeight	= ((copyExtent.height + blockHeight-1) / blockHeight) * blockHeight;
+
 		const VkBufferImageCopy	copyRegion	=
 		{
 			0u,												// VkDeviceSize				bufferOffset;
-			copyExtent.width,								// deUint32					bufferRowLength;
-			copyExtent.height,								// deUint32					bufferImageHeight;
+			rowLength,										// deUint32					bufferRowLength;
+			imageHeight,									// deUint32					bufferImageHeight;
 			{
 				getAspectFlags(imageAccess.getFormat()),		// VkImageAspectFlags	aspect;
 				mipLevelNdx,									// deUint32				mipLevel;
@@ -908,12 +916,18 @@ void CopiesAndBlittingTestInstance::readImageAspect (vk::VkImage					image,
 	};
 
 	// Copy image to buffer
+	const bool		isCompressed	= isCompressedFormat(imageParms.format);
+	const deUint32	blockWidth		= (isCompressed) ? getBlockWidth(imageParms.format) : 1u;
+	const deUint32	blockHeight		= (isCompressed) ? getBlockHeight(imageParms.format) : 1u;
+	deUint32 rowLength		= ((imageExtent.width + blockWidth-1) / blockWidth) * blockWidth;
+	deUint32 imageHeight	= ((imageExtent.height + blockHeight-1) / blockHeight) * blockHeight;
+
 	const VkImageAspectFlags	aspect			= getAspectFlags(dst.getFormat());
 	const VkBufferImageCopy		copyRegion		=
 	{
 		0u,								// VkDeviceSize				bufferOffset;
-		imageExtent.width,				// deUint32					bufferRowLength;
-		imageExtent.height,				// deUint32					bufferImageHeight;
+		rowLength,						// deUint32					bufferRowLength;
+		imageHeight,					// deUint32					bufferImageHeight;
 		{
 			aspect,							// VkImageAspectFlags		aspect;
 			mipLevel,						// deUint32					mipLevel;
@@ -1255,31 +1269,6 @@ tcu::TestStatus CopyImageToImage::checkTestResult (tcu::ConstPixelBufferAccess r
 		if (isFloatFormat(result.getFormat()))
 		{
 			if (!tcu::floatThresholdCompare(m_context.getTestContext().getLog(), "Compare", "Result comparison", m_expectedTextureLevel[0]->getAccess(), result, fThreshold, tcu::COMPARE_LOG_RESULT))
-				return tcu::TestStatus::fail("CopiesAndBlitting test");
-		}
-		else if (isSnormFormat(mapTextureFormat(result.getFormat())))
-		{
-			// There may be an ambiguity between two possible binary representations of 1.0.
-			// Get rid of that by expanding the data to floats and re-normalizing again.
-
-			tcu::TextureLevel resultSnorm	(result.getFormat(), result.getWidth(), result.getHeight(), result.getDepth());
-			{
-				tcu::TextureLevel resultFloat	(tcu::TextureFormat(resultSnorm.getFormat().order, tcu::TextureFormat::FLOAT), resultSnorm.getWidth(), resultSnorm.getHeight(), resultSnorm.getDepth());
-
-				tcu::copy(resultFloat.getAccess(), result);
-				tcu::copy(resultSnorm, resultFloat.getAccess());
-			}
-
-			tcu::TextureLevel expectedSnorm	(m_expectedTextureLevel[0]->getFormat(), m_expectedTextureLevel[0]->getWidth(), m_expectedTextureLevel[0]->getHeight(), m_expectedTextureLevel[0]->getDepth());
-
-			{
-				tcu::TextureLevel expectedFloat	(tcu::TextureFormat(expectedSnorm.getFormat().order, tcu::TextureFormat::FLOAT), expectedSnorm.getWidth(), expectedSnorm.getHeight(), expectedSnorm.getDepth());
-
-				tcu::copy(expectedFloat.getAccess(), m_expectedTextureLevel[0]->getAccess());
-				tcu::copy(expectedSnorm, expectedFloat.getAccess());
-			}
-
-			if (!tcu::intThresholdCompare(m_context.getTestContext().getLog(), "Compare", "Result comparison", expectedSnorm.getAccess(), resultSnorm.getAccess(), uThreshold, tcu::COMPARE_LOG_RESULT))
 				return tcu::TestStatus::fail("CopiesAndBlitting test");
 		}
 		else
@@ -5361,6 +5350,120 @@ void ResolveImageToImageTestCase::initPrograms (SourceCollections& programCollec
 	}
 }
 
+struct BufferOffsetParams
+{
+	static constexpr deUint32 kMaxOffset = 8u;
+
+	deUint32 srcOffset;
+	deUint32 dstOffset;
+};
+
+void checkZerosAt(const std::vector<deUint8>& bufferData, deUint32 from, deUint32 count)
+{
+	constexpr deUint8 zero{0};
+	for (deUint32 i = 0; i < count; ++i)
+	{
+		const auto& val = bufferData[from + i];
+		if (val != zero)
+		{
+			std::ostringstream msg;
+			msg << "Unexpected non-zero byte found at position " << (from + i) << ": " << static_cast<int>(val);
+			TCU_FAIL(msg.str());
+		}
+	}
+}
+
+tcu::TestStatus bufferOffsetTest (Context& ctx, BufferOffsetParams params)
+{
+	// Try to copy blocks of sizes 1 to kMaxOffset. Each copy region will use a block of kMaxOffset*2 bytes to take into account srcOffset and dstOffset.
+	constexpr auto kMaxOffset	= BufferOffsetParams::kMaxOffset;
+	constexpr auto kBlockSize	= kMaxOffset * 2u;
+	constexpr auto kBufferSize	= kMaxOffset * kBlockSize;
+
+	DE_ASSERT(params.srcOffset < kMaxOffset);
+	DE_ASSERT(params.dstOffset < kMaxOffset);
+
+	const auto&	vkd		= ctx.getDeviceInterface();
+	const auto	device	= ctx.getDevice();
+	auto&		alloc	= ctx.getDefaultAllocator();
+	const auto	qIndex	= ctx.getUniversalQueueFamilyIndex();
+	const auto	queue	= ctx.getUniversalQueue();
+
+	const auto srcBufferInfo = makeBufferCreateInfo(kBufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT);
+	const auto dstBufferInfo = makeBufferCreateInfo(kBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+
+	BufferWithMemory	srcBuffer	(vkd, device, alloc, srcBufferInfo, MemoryRequirement::HostVisible);
+	BufferWithMemory	dstBuffer	(vkd, device, alloc, dstBufferInfo, MemoryRequirement::HostVisible);
+	auto&				srcAlloc	= srcBuffer.getAllocation();
+	auto&				dstAlloc	= dstBuffer.getAllocation();
+
+	// Zero-out destination buffer.
+	deMemset(dstAlloc.getHostPtr(), 0, kBufferSize);
+	flushAlloc(vkd, device, dstAlloc);
+
+	// Fill source buffer with nonzero bytes.
+	std::vector<deUint8> srcData;
+	srcData.reserve(kBufferSize);
+	for (deUint32 i = 0; i < kBufferSize; ++i)
+		srcData.push_back(static_cast<deUint8>(100u + i));
+	deMemcpy(srcAlloc.getHostPtr(), srcData.data(), de::dataSize(srcData));
+	flushAlloc(vkd, device, srcAlloc);
+
+	// Copy regions.
+	std::vector<VkBufferCopy> copies;
+	copies.reserve(kMaxOffset);
+	for (deUint32 i = 0; i < kMaxOffset; ++i)
+	{
+		const auto blockStart	= kBlockSize * i;
+		const auto copySize		= i + 1u;
+		const auto bufferCopy	= makeBufferCopy(params.srcOffset + blockStart, params.dstOffset + blockStart, copySize);
+		copies.push_back(bufferCopy);
+	}
+
+	const auto cmdPool		= makeCommandPool(vkd, device, qIndex);
+	const auto cmdBufferPtr	= allocateCommandBuffer(vkd, device, cmdPool.get(), VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	const auto cmdBuffer	= cmdBufferPtr.get();
+
+	beginCommandBuffer(vkd, cmdBuffer);
+	vkd.cmdCopyBuffer(cmdBuffer, srcBuffer.get(), dstBuffer.get(), static_cast<deUint32>(copies.size()), copies.data());
+	const auto barrier = makeMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT);
+	vkd.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 1u, &barrier, 0u, nullptr, 0u, nullptr);
+	endCommandBuffer(vkd, cmdBuffer);
+	submitCommandsAndWait(vkd, device, queue, cmdBuffer);
+	invalidateAlloc(vkd, device, dstAlloc);
+
+	// Verify destination buffer data.
+	std::vector<deUint8> dstData(kBufferSize);
+	deMemcpy(dstData.data(), dstAlloc.getHostPtr(), de::dataSize(dstData));
+
+	for (deUint32 blockIdx = 0; blockIdx < kMaxOffset; ++blockIdx)
+	{
+		const auto blockStart	= kBlockSize * blockIdx;
+		const auto copySize		= blockIdx + 1u;
+
+		// Verify no data has been written before dstOffset.
+		checkZerosAt(dstData, blockStart, params.dstOffset);
+
+		// Verify copied block.
+		for (deUint32 i = 0; i < copySize; ++i)
+		{
+			const auto& dstVal = dstData[blockStart + params.dstOffset + i];
+			const auto& srcVal = srcData[blockStart + params.srcOffset + i];
+			if (dstVal != srcVal)
+			{
+				std::ostringstream msg;
+				msg << "Unexpected value found at position " << (blockStart + params.dstOffset + i) << ": expected " << static_cast<int>(srcVal) << " but found " << static_cast<int>(dstVal);
+				TCU_FAIL(msg.str());
+			}
+		}
+
+		// Verify no data has been written after copy block.
+		checkZerosAt(dstData, blockStart + params.dstOffset + copySize, kBlockSize - (params.dstOffset + copySize));
+	}
+
+	return tcu::TestStatus::pass("Pass");
+}
+
 std::string getSampleCountCaseName (VkSampleCountFlagBits sampleFlag)
 {
 	return de::toLower(de::toString(getSampleCountFlagsStr(sampleFlag)).substr(16));
@@ -5506,41 +5609,83 @@ void addImageToImageSimpleTests (tcu::TestCaseGroup* group, AllocationKind alloc
 		group->addChild(new CopyImageToImageTestCase(testCtx, "partial_image", "Partial image", params));
 	}
 
+	static const struct
 	{
-		VkExtent3D	extent					= { 65u, 63u, 1u };
+		std::string		name;
+		vk::VkFormat	format1;
+		vk::VkFormat	format2;
+	} formats [] =
+	{
+		{ "diff_format",	vk::VK_FORMAT_R32_UINT,			vk::VK_FORMAT_R8G8B8A8_UNORM	},
+		{ "same_format",	vk::VK_FORMAT_R8G8B8A8_UNORM,	vk::VK_FORMAT_R8G8B8A8_UNORM	}
+	};
+	static const struct
+	{
+		std::string		name;
+		vk::VkBool32	clear;
+	} clears [] =
+	{
+		{ "clear",		VK_TRUE		},
+		{ "noclear",	VK_FALSE	}
+	};
+	static const struct
+	{
+		std::string		name;
+		VkExtent3D		extent;
+	} extents [] =
+	{
+		{ "npot",	{65u, 63u, 1u}	},
+		{ "pot",	{64u, 64u, 1u}	}
+	};
 
-		TestParams	params;
-		params.src.image.imageType			= VK_IMAGE_TYPE_2D;
-		params.src.image.format				= VK_FORMAT_R32_UINT;
-		params.src.image.extent				= extent;
-		params.src.image.tiling				= VK_IMAGE_TILING_OPTIMAL;
-		params.src.image.operationLayout	= VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-		params.dst.image.imageType			= VK_IMAGE_TYPE_2D;
-		params.dst.image.format				= VK_FORMAT_R8G8B8A8_UNORM;
-		params.dst.image.extent				= extent;
-		params.dst.image.tiling				= VK_IMAGE_TILING_OPTIMAL;
-		params.dst.image.operationLayout	= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-		params.allocationKind				= allocationKind;
-		params.extensionUse					= extensionUse;
-		params.clearDestination				= VK_TRUE;
-
+	for (const auto& format : formats)
+	{
+		for (const auto& clear : clears)
 		{
-			const VkImageCopy	testCopy	=
+			for (const auto& extent : extents)
 			{
-				defaultSourceLayer,	// VkImageSubresourceLayers	srcSubresource;
-				{34, 34, 0},		// VkOffset3D				srcOffset;
-				defaultSourceLayer,	// VkImageSubresourceLayers	dstSubresource;
-				{0, 0, 0},			// VkOffset3D				dstOffset;
-				{31, 29, 1}			// VkExtent3D				extent;
-			};
+				TestParams	params;
+				params.src.image.imageType			= VK_IMAGE_TYPE_2D;
+				params.src.image.format				= format.format1;
+				params.src.image.extent				= extent.extent;
+				params.src.image.tiling				= VK_IMAGE_TILING_OPTIMAL;
+				params.src.image.operationLayout	= VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+				params.dst.image.imageType			= VK_IMAGE_TYPE_2D;
+				params.dst.image.format				= format.format2;
+				params.dst.image.extent				= extent.extent;
+				params.dst.image.tiling				= VK_IMAGE_TILING_OPTIMAL;
+				params.dst.image.operationLayout	= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+				params.allocationKind				= allocationKind;
+				params.extensionUse					= extensionUse;
+				params.clearDestination				= clear.clear;
 
-			CopyRegion			imageCopy;
+				{
+					VkImageCopy	testCopy	=
+					{
+						defaultSourceLayer,	// VkImageSubresourceLayers	srcSubresource;
+						{34, 34, 0},		// VkOffset3D				srcOffset;
+						defaultSourceLayer,	// VkImageSubresourceLayers	dstSubresource;
+						{0, 0, 0},			// VkOffset3D				dstOffset;
+						{31, 29, 1}			// VkExtent3D				extent;
+					};
 
-			imageCopy.imageCopy = testCopy;
-			params.regions.push_back(imageCopy);
+					if (extent.name == "pot")
+					{
+						testCopy.srcOffset	= { 16, 16, 0 };
+						testCopy.extent		= { 32, 32, 1 };
+					}
+
+					CopyRegion	imageCopy;
+					imageCopy.imageCopy = testCopy;
+					params.regions.push_back(imageCopy);
+				}
+
+				// Example test case name: "partial_image_npot_diff_format_clear"
+				const std::string testCaseName = "partial_image_" + extent.name + "_" + format.name + "_" + clear.name;
+
+				group->addChild(new CopyImageToImageTestCase(testCtx, testCaseName, "", params));
+			}
 		}
-
-		group->addChild(new CopyImageToImageTestCase(testCtx, "partial_image_npot_diff_format_clear", "Partial image with npot dimensions, different format, and clearing of the destination image", params));
 	}
 
 	{
@@ -6439,6 +6584,7 @@ void addImageToImageAllFormatsDepthStencilTests (tcu::TestCaseGroup* group, Allo
 
 			const VkImageSubresourceLayers		defaultDepthSourceLayer		= { VK_IMAGE_ASPECT_DEPTH_BIT, 0u, 0u, 1u };
 			const VkImageSubresourceLayers		defaultStencilSourceLayer	= { VK_IMAGE_ASPECT_STENCIL_BIT, 0u, 0u, 1u };
+			const VkImageSubresourceLayers		defaultDSSourceLayer		= { VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT, 0u, 0u, 1u };
 
 			for (deInt32 i = 0; i < defaultSize; i += defaultFourthSize)
 			{
@@ -6487,6 +6633,37 @@ void addImageToImageAllFormatsDepthStencilTests (tcu::TestCaseGroup* group, Allo
 				const std::string testName2		= getFormatCaseName(params.src.image.format) + "_" + getFormatCaseName(params.dst.image.format) + "_separate_layouts";
 				const std::string description2	= "Copy from " + getFormatCaseName(params.src.image.format) + " to " + getFormatCaseName(params.dst.image.format) + " with separate depth/stencil layouts";
 				addTestGroup(subGroup.get(), testName2, description2, addImageToImageAllFormatsDepthStencilFormatsTests, params);
+
+				// DS Image copy
+				{
+					params.separateDepthStencilLayouts	= DE_FALSE;
+					// Clear previous vkImageCopy elements
+					params.regions.clear();
+
+					for (deInt32 i = 0; i < defaultSize; i += defaultFourthSize)
+					{
+						CopyRegion			copyRegion;
+						const VkOffset3D	srcOffset	= {0, 0, 0};
+						const VkOffset3D	dstOffset	= {i, defaultSize - i - defaultFourthSize, 0};
+						const VkExtent3D	extent		= {defaultFourthSize, defaultFourthSize, 1};
+
+						const VkImageCopy				testCopy	=
+						{
+							defaultDSSourceLayer,		// VkImageSubresourceLayers	srcSubresource;
+							srcOffset,					// VkOffset3D				srcOffset;
+							defaultDSSourceLayer,		// VkImageSubresourceLayers	dstSubresource;
+							dstOffset,					// VkOffset3D				dstOffset;
+							extent,						// VkExtent3D				extent;
+						};
+
+						copyRegion.imageCopy	= testCopy;
+						params.regions.push_back(copyRegion);
+					}
+
+					const std::string testName3		= getFormatCaseName(params.src.image.format) + "_" + getFormatCaseName(params.dst.image.format) + "_depth_stencil_aspects";
+					const std::string description3	= "Copy both depth and stencil aspects from " + getFormatCaseName(params.src.image.format) + " to " + getFormatCaseName(params.dst.image.format);
+					addTestGroup(subGroup.get(), testName3, description3, addImageToImageAllFormatsDepthStencilFormatsTests, params);
+				}
 			}
 		}
 
@@ -10544,6 +10721,20 @@ void addResolveImageDiffImageSizeTests (tcu::TestCaseGroup* group, AllocationKin
 	}
 }
 
+void addBufferCopyOffsetTests (tcu::TestCaseGroup* group)
+{
+	de::MovePtr<tcu::TestCaseGroup> subGroup(new tcu::TestCaseGroup(group->getTestContext(), "buffer_to_buffer_with_offset", "Copy from buffer to buffer using different offsets in the source and destination buffers"));
+
+	for (deUint32 srcOffset = 0u; srcOffset < BufferOffsetParams::kMaxOffset; ++srcOffset)
+	for (deUint32 dstOffset = 0u; dstOffset < BufferOffsetParams::kMaxOffset; ++dstOffset)
+	{
+		BufferOffsetParams params{srcOffset, dstOffset};
+		addFunctionCase(subGroup.get(), de::toString(srcOffset) + "_" + de::toString(dstOffset), "", bufferOffsetTest, params);
+	}
+
+	group->addChild(subGroup.release());
+}
+
 void addResolveImageTests (tcu::TestCaseGroup* group, AllocationKind allocationKind, ExtensionUse extensionUse)
 {
 	addTestGroup(group, "whole", "Resolve from image to image (whole)", addResolveImageWholeTests, allocationKind, extensionUse);
@@ -10569,6 +10760,7 @@ void addCopiesAndBlittingTests (tcu::TestCaseGroup* group, AllocationKind alloca
 void addCoreCopiesAndBlittingTests(tcu::TestCaseGroup* group)
 {
 	addCopiesAndBlittingTests(group, ALLOCATION_KIND_SUBALLOCATED, EXTENSION_USE_NONE);
+	addBufferCopyOffsetTests(group);
 }
 
 

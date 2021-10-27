@@ -34,9 +34,17 @@
 #include "tcuVectorType.hpp"
 
 #include <vector>
+#include <limits>
 
 namespace vk
 {
+constexpr VkShaderStageFlags	SHADER_STAGE_ALL_RAY_TRACING	= VK_SHADER_STAGE_RAYGEN_BIT_KHR
+																| VK_SHADER_STAGE_ANY_HIT_BIT_KHR
+																| VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+																| VK_SHADER_STAGE_MISS_BIT_KHR
+																| VK_SHADER_STAGE_INTERSECTION_BIT_KHR
+																| VK_SHADER_STAGE_CALLABLE_BIT_KHR;
+
 const VkTransformMatrixKHR identityMatrix3x4 = { { { 1.0f, 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f, 0.0f } } };
 
 template<typename T>
@@ -475,8 +483,11 @@ public:
 																 const VkAccelerationStructureBuildTypeKHR	buildType,
 																 const VkDeviceSize							storageSize);
 
+	// this method will return host addres if acc was build on cpu and device addres when it was build on gpu
 	VkDeviceOrHostAddressKHR				getAddress			(const DeviceInterface&	vk,
 																 const VkDevice			device);
+	// this method retuns host addres regardles of where acc was build
+	VkDeviceOrHostAddressConstKHR			getHostAddressConst	();
 	VkDeviceOrHostAddressConstKHR			getAddressConst		(const DeviceInterface&	vk,
 																 const VkDevice			device);
 	VkDeviceSize							getStorageSize		();
@@ -624,6 +635,7 @@ public:
 	virtual void													setIndirectBuildParameters			(const VkBuffer										indirectBuffer,
 																										 const VkDeviceSize									indirectBufferOffset,
 																										 const deUint32										indirectBufferStride) = DE_NULL;
+	virtual void													setUsePPGeometries					(const bool											usePPGeometries) = 0;
 	virtual VkBuildAccelerationStructureFlagsKHR					getBuildFlags						() const = DE_NULL;
 	VkDeviceSize													getStructureSize					() const;
 
@@ -673,6 +685,11 @@ public:
 
 	virtual const VkAccelerationStructureKHR*						getPtr								(void) const = DE_NULL;
 
+	virtual void													updateInstanceMatrix				(const DeviceInterface&						vk,
+																										 const VkDevice								device,
+																										 size_t										instanceIndex,
+																										 const VkTransformMatrixKHR&				matrix) = 0;
+
 protected:
 	std::vector<de::SharedPtr<BottomLevelAccelerationStructure> >	m_bottomLevelInstances;
 	std::vector<InstanceData>										m_instanceData;
@@ -682,6 +699,10 @@ protected:
 };
 
 de::MovePtr<TopLevelAccelerationStructure> makeTopLevelAccelerationStructure ();
+
+template<class ASType> de::MovePtr<ASType> makeAccelerationStructure ();
+template<> inline de::MovePtr<BottomLevelAccelerationStructure>	makeAccelerationStructure () { return makeBottomLevelAccelerationStructure(); }
+template<> inline de::MovePtr<TopLevelAccelerationStructure>	makeAccelerationStructure () { return makeTopLevelAccelerationStructure(); }
 
 bool queryAccelerationStructureSize (const DeviceInterface&							vk,
 									 const VkDevice									device,
@@ -702,11 +723,21 @@ public:
 	void														addShader					(VkShaderStageFlagBits									shaderStage,
 																							 Move<VkShaderModule>									shaderModule,
 																							 deUint32												group,
-																							 const VkSpecializationInfo*							specializationInfo = nullptr);
+																							 const VkSpecializationInfo*							specializationInfo = nullptr,
+																							 const VkPipelineShaderStageCreateFlags					pipelineShaderStageCreateFlags = static_cast<VkPipelineShaderStageCreateFlags>(0),
+																							 const void*											pipelineShaderStageCreateInfopNext = nullptr);
 	void														addShader					(VkShaderStageFlagBits									shaderStage,
 																							 de::SharedPtr<Move<VkShaderModule>>					shaderModule,
 																							 deUint32												group,
-																							 const VkSpecializationInfo*							specializationInfoPtr = nullptr);
+																							 const VkSpecializationInfo*							specializationInfoPtr = nullptr,
+																							 const VkPipelineShaderStageCreateFlags					pipelineShaderStageCreateFlags = static_cast<VkPipelineShaderStageCreateFlags>(0),
+																							 const void*											pipelineShaderStageCreateInfopNext = nullptr);
+	void														addShader					(VkShaderStageFlagBits									shaderStage,
+																							 VkShaderModule									        shaderModule,
+																							 deUint32												group,
+																							 const VkSpecializationInfo*							specializationInfo = nullptr,
+																							 const VkPipelineShaderStageCreateFlags					pipelineShaderStageCreateFlags = static_cast<VkPipelineShaderStageCreateFlags>(0),
+																							 const void*											pipelineShaderStageCreateInfopNext = nullptr);
 	void														addLibrary					(de::SharedPtr<de::MovePtr<RayTracingPipeline>>			pipelineLibrary);
 	Move<VkPipeline>											createPipeline				(const DeviceInterface&									vk,
 																							 const VkDevice											device,

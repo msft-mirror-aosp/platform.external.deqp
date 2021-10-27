@@ -38,7 +38,7 @@
 #include "glcShaderMacroTests.hpp"
 #include "glcShaderNegativeTests.hpp"
 #include "glcShaderStructTests.hpp"
-#include "glcShaderSwitchTests.hpp"
+#include "glcTextureCompatibilityTests.hpp"
 #include "glcUniformBlockTests.hpp"
 #include "glcNearestEdgeTests.hpp"
 #include "glcFramebufferCompleteness.hpp"
@@ -178,6 +178,7 @@ void ES32TestPackage::init(void)
 		coreGroup->addChild(new deqp::Functional::TextureShadowLodTest(getContext()));
 		coreGroup->addChild(new glcts::NearestEdgeCases(getContext()));
 		coreGroup->addChild(new glcts::FramebufferCompletenessTests(getContext()));
+		coreGroup->addChild(new glcts::TextureCompatibilityTests(getContext()));
 		addChild(coreGroup);
 	}
 	catch (...)

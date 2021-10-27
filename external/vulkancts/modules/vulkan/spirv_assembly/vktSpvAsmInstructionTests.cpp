@@ -10833,6 +10833,11 @@ void createConvertCases (vector<ConvertCase>& testCases, const string& instructi
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_32,		DATA_TYPE_FLOAT_16,			65504,								true,	0x7BFF,								"max",	false));
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_64,		DATA_TYPE_FLOAT_16,			65504,								true,	0x7BFF,								"max",	false));
 
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_64,		DATA_TYPE_FLOAT_32,			4294967296ll,						true,	0x4f800000,							"4294967296",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_64,		DATA_TYPE_FLOAT_64,			4294967296ll,						true,	0x41f0000000000000,					"4294967296",	false));
+
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_64,		DATA_TYPE_FLOAT_32,			0xffffff0000000000,					true,	0x5f7fffff,							"max",	false));
+
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_16,		DATA_TYPE_FLOAT_32,			1234,								true,	0x449a4000));
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_16,		DATA_TYPE_FLOAT_64,			1234,								true,	0x4093480000000000));
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_UNSIGNED_32,		DATA_TYPE_FLOAT_32,			1234,								true,	0x449a4000));
@@ -10873,14 +10878,16 @@ void createConvertCases (vector<ConvertCase>& testCases, const string& instructi
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_64,		0xE4D2,								true,	-1234,								"m1234",	false));
 
 		// 0xF800 = 1111 1000 0000 0000 = 1 11110 0000000000 = -32768
+		// 0xFBFF = 1111 1011 1111 1111 = 1 11110 1111111111 = -65504
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_16,		0xF800,								true,	-32768,								"min",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_32,		0xF800,								true,	-32768,								"min",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_64,		0xF800,								true,	-32768,								"min",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_32,		0xFBFF,								true,	-65504,								"min",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_64,		0xFBFF,								true,	-65504,								"min",	false));
 
 		// 0x77FF = 0111 0111 1111 1111 = 0 11101 1111111111 = 32752
+		// 0x7BFF = 0111 1011 1111 1111 = 0 11110 1111111111 = 65504
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_16,		0x77FF,								true,	32752,								"max",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_32,		0x77FF,								true,	32752,								"max",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_64,		0x77FF,								true,	32752,								"max",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_32,		0x7BFF,								true,	65504,								"max",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_64,		0x7BFF,								true,	65504,								"max",	false));
 
 		// +0
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_FLOAT_16,			DATA_TYPE_SIGNED_16,		0x0000,								true,	0,									"p0",	false));
@@ -10923,15 +10930,32 @@ void createConvertCases (vector<ConvertCase>& testCases, const string& instructi
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_32,		DATA_TYPE_FLOAT_16,			-1234,								true,	0xE4D2,								"m1234",	false));
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_16,			-1234,								true,	0xE4D2,								"m1234",	false));
 
+		// 0x7800 = 0111 1000 0000 0000 = 0 11110 0000000000 = 32768
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_32,		DATA_TYPE_FLOAT_16,			32768,								true,	0x7800,								"p32768",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_16,			32768,								true,	0x7800,								"p32768",	false));
+
 		// 0xF800 = 1111 1000 0000 0000 = 1 11110 0000000000 = -32768
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_32,		DATA_TYPE_FLOAT_16,			-32768,								true,	0xF800,								"m32768",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_16,			-32768,								true,	0xF800,								"m32768",	false));
+
+		// 0xFBFF = 1111 1000 0000 0000 = 1 11110 1111111111 = -65504
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_16,		DATA_TYPE_FLOAT_16,			-32768,								true,	0xF800,								"min",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_32,		DATA_TYPE_FLOAT_16,			-32768,								true,	0xF800,								"min",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_16,			-32768,								true,	0xF800,								"min",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_32,		DATA_TYPE_FLOAT_16,			-65504,								true,	0xFBFF,								"min",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_16,			-65504,								true,	0xFBFF,								"min",	false));
 
 		// 0x77FF = 0111 0111 1111 1111 = 0 11101 1111111111 = 32752
+		// 0x7BFF = 0111 1011 1111 1111 = 0 11110 1111111111 = 65504
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_16,		DATA_TYPE_FLOAT_16,			32752,								true,	0x77FF,								"max",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_32,		DATA_TYPE_FLOAT_16,			32752,								true,	0x77FF,								"max",	false));
-		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_16,			32752,								true,	0x77FF,								"max",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_32,		DATA_TYPE_FLOAT_16,			65504,								true,	0x7BFF,								"max",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_16,			65504,								true,	0x7BFF,								"max",	false));
+
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_32,			4294967296ll,						true,	0x4f800000,							"p4294967296",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_64,			4294967296ll,						true,	0x41f0000000000000,					"p4294967296",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_32,			-4294967296ll,						true,	0xcf800000,							"m4294967296",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_64,			-4294967296ll,						true,	0xc1f0000000000000,					"m4294967296",	false));
+
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_32,			0x7fffff8000000000,					true,	0x5effffff,							"max",	false));
+		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_64,		DATA_TYPE_FLOAT_32,			-0x7fffff8000000000,				true,	0xdeffffff,							"min",	false));
 
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_16,		DATA_TYPE_FLOAT_32,			-1234,								true,	0xc49a4000));
 		testCases.push_back(ConvertCase(instruction,	DATA_TYPE_SIGNED_16,		DATA_TYPE_FLOAT_64,			-1234,								true,	0xc093480000000000));
@@ -15279,7 +15303,7 @@ struct fp16Atan2 : public fp16PerComponent
 		const double	yd		(y.asDouble());
 		double			result	(0.0);
 
-		if (x.isZero() && y.isZero())
+		if ((x.isZero() && y.isZero())||(x.isInf() && y.isInf()))
 			return false;
 
 		if (getFlavor() == 0)
@@ -15938,6 +15962,9 @@ struct fp16Normalize : public fp16AllComponents
 		flavorNames.push_back("EmulatingFP16");
 		flavorNames.push_back("DoubleCalc");
 
+		permutationsFlavorStart = 0;
+		permutationsFlavorEnd = flavorNames.size();
+
 		// flavorNames will be extended later
 	}
 
@@ -16456,6 +16483,9 @@ struct fp16Dot : public fp16AllComponents
 		flavorNames.push_back("EmulatingFP16");
 		flavorNames.push_back("FloatCalc");
 		flavorNames.push_back("DoubleCalc");
+
+		permutationsFlavorStart = 0;
+		permutationsFlavorEnd = flavorNames.size();
 
 		// flavorNames will be extended later
 	}
@@ -20406,6 +20436,114 @@ tcu::TestCaseGroup* createFunctionParamsGroup (tcu::TestContext& testCtx)
 	return testGroup.release();
 }
 
+tcu::TestCaseGroup* createEarlyFragmentTests(tcu::TestContext& testCtx)
+{
+	de::MovePtr<tcu::TestCaseGroup> earlyFragTests (new tcu::TestCaseGroup(testCtx, "early_fragment", "Early Fragment Tests"));
+
+	static const char dataDir[] = "spirv_assembly/instruction/graphics/early_fragment";
+
+	static const struct Case
+	{
+		const string name;
+		const string desc;
+	}
+	cases[] =
+	{
+		// Overwriting the gl_FragDepth should be ignored, when Early Fragment Test Mode is enabled.
+		{ "depth_less",				"gl_FragDepth > CLEAR_DEPTH. Polygon depth < CLEAR_DEPTH."	},
+		{ "depth_greater",			"gl_FragDepth < CLEAR_DEPTH. Polygon depth > CLEAR_DEPTH."	},
+		{ "depth_less_or_equal",	"gl_FragDepth > CLEAR_DEPTH. Polygon depth == CLEAR_DEPTH."	},
+		{ "depth_greater_or_equal",	"gl_FragDepth < CLEAR_DEPTH. Polygon depth == CLEAR_DEPTH."	},
+		{ "depth_equal",			"gl_FragDepth < CLEAR_DEPTH. Polygon depth == CLEAR_DEPTH."	},
+		{ "depth_not_equal",		"gl_FragDepth == CLEAR_DEPTH. Polygon depth < CLEAR_DEPTH."	}
+	};
+
+	for (const auto& tCase : cases)
+	{
+		cts_amber::AmberTestCase* testCase = cts_amber::createAmberTestCase(testCtx,
+			tCase.name.c_str(),
+			tCase.desc.c_str(),
+			dataDir,
+			tCase.name + ".amber");
+
+		earlyFragTests->addChild(testCase);
+	}
+
+	return earlyFragTests.release();
+}
+
+tcu::TestCaseGroup* createOpExecutionModeTests (tcu::TestContext& testCtx)
+{
+	de::MovePtr<tcu::TestCaseGroup> testGroup (new tcu::TestCaseGroup(testCtx, "execution_mode", "Execution mode tests"));
+
+	static const char dataDir[] = "spirv_assembly/instruction/graphics/execution_mode";
+
+	static const struct Case
+	{
+		const string name;
+		const string desc;
+	} cases[] =
+	{
+		{ "depthless_0",		"FragDepth < Polygon depth: depth test should pass." },
+		{ "depthless_1",		"FragDepth > Polygon depth: violates the promise that FragDepth is less than the implicit depth, but the depth test should pass." },
+		{ "depthless_2",		"FragDepth < Polygon depth: depth test should fail." },
+		{ "depthless_3",		"FragDepth > Polygon depth: violates the promise that FragDepth is less than the implicit depth, the depth test should fail." },
+		{ "depthless_4",		"FragDepth < Polygon depth: depth test should pass." },
+		{ "depthgreater_0",		"FragDepth > Polygon depth: depth test should pass." },
+		{ "depthgreater_1",		"FragDepth < Polygon depth: violates the promise that FragDepth is greater than the implicit depth, but the depth test should pass." },
+		{ "depthgreater_2",		"FragDepth > Polygon depth: depth test should fail." },
+		{ "depthgreater_3",		"FragDepth > Polygon depth: violates the promise that FragDepth is greater than the implicit depth, the depth test should fail." },
+		{ "depthgreater_4",		"FragDepth > Polygon depth: depth test should pass." },
+		{ "depthunchanged_0",	"FragDepth == Polygon depth: depth test should pass." },
+		{ "depthunchanged_1",	"FragDepth == Polygon depth: depth test should fail." },
+		{ "depthunchanged_2",	"FragDepth != Polygon depth: violates the promise that FragDepth is equal to the implicit depth, the depth test should pass." },
+		{ "depthunchanged_3",	"FragDepth != Polygon depth: violates the promise that FragDepth is equal to the implicit depth, the depth test should fail." },
+	};
+
+	for (const auto& case_ : cases)
+	{
+		cts_amber::AmberTestCase *testCase = cts_amber::createAmberTestCase(testCtx,
+																			case_.name.c_str(),
+																			case_.desc.c_str(),
+																			dataDir,
+																			case_.name + ".amber");
+		testGroup->addChild(testCase);
+	}
+
+	return testGroup.release();
+}
+
+tcu::TestCaseGroup* createQueryGroup (tcu::TestContext& testCtx)
+{
+	de::MovePtr<tcu::TestCaseGroup>	testGroup (new tcu::TestCaseGroup(testCtx, "image_query", "image query tests"));
+
+	static const char data_dir[] = "spirv_assembly/instruction/image_query";
+
+	static const struct
+	{
+		const std::string name;
+		const std::string desc;
+	} cases[] =
+	{
+		{ "samples_storage", "Test samples query can be used on storage images" },
+	};
+
+	vector<string> requirements(1, "Features.shaderStorageImageMultisample");
+
+	for (int i = 0; i < DE_LENGTH_OF_ARRAY(cases); ++i)
+	{
+		cts_amber::AmberTestCase *testCase = cts_amber::createAmberTestCase(testCtx,
+																			cases[i].name.c_str(),
+																			cases[i].desc.c_str(),
+																			data_dir,
+																			cases[i].name + ".amber",
+																			requirements);
+		testGroup->addChild(testCase);
+	}
+
+	return testGroup.release();
+}
+
 tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 {
 	const bool testComputePipeline = true;
@@ -20574,11 +20712,14 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	graphicsTests->addChild(createFloat32Tests(testCtx));
 	graphicsTests->addChild(createSpirvIdsAbuseTests(testCtx));
 	graphicsTests->addChild(create64bitCompareGraphicsGroup(testCtx));
+	graphicsTests->addChild(createEarlyFragmentTests(testCtx));
+	graphicsTests->addChild(createOpExecutionModeTests(testCtx));
 
 	instructionTests->addChild(computeTests.release());
 	instructionTests->addChild(graphicsTests.release());
 	instructionTests->addChild(createSpirvVersion1p4Group(testCtx));
 	instructionTests->addChild(createFunctionParamsGroup(testCtx));
+	instructionTests->addChild(createQueryGroup(testCtx));
 	instructionTests->addChild(createTrinaryMinMaxGroup(testCtx));
 	instructionTests->addChild(createTerminateInvocationGroup(testCtx));
 

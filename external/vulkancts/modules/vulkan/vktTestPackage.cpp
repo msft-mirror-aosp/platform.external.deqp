@@ -103,6 +103,7 @@
 #include "vktRayQueryTests.hpp"
 #include "vktPostmortemTests.hpp"
 #include "vktFragmentShadingRateTests.hpp"
+#include "vktReconvergenceTests.hpp"
 
 #include <vector>
 #include <sstream>
@@ -261,10 +262,8 @@ void TestCaseExecutor::init (tcu::TestCase* testCase, const std::string& casePat
 	vk::ShaderBuildOptions		defaultHlslBuildOptions		(usedVulkanVersion, baselineSpirvVersion, 0u);
 	vk::SpirVAsmBuildOptions	defaultSpirvAsmBuildOptions	(usedVulkanVersion, baselineSpirvVersion);
 	vk::SourceCollections		sourceProgs					(usedVulkanVersion, defaultGlslBuildOptions, defaultHlslBuildOptions, defaultSpirvAsmBuildOptions);
-	const bool					doShaderLog					= log.isShaderLoggingEnabled();
 	const tcu::CommandLine&		commandLine					= m_context.getTestContext().getCommandLine();
-
-	DE_UNREF(casePath); // \todo [2015-03-13 pyry] Use this to identify ProgramCollection storage path
+	const bool					doShaderLog					= commandLine.isLogDecompiledSpirvEnabled() && log.isShaderLoggingEnabled();
 
 	if (!vktCase)
 		TCU_THROW(InternalError, "Test node not an instance of vkt::TestCase");
@@ -580,11 +579,13 @@ void TestPackage::init (void)
 	addChild(RayTracing::createTests			(m_testCtx));
 	addChild(RayQuery::createTests				(m_testCtx));
 	addChild(FragmentShadingRate::createTests	(m_testCtx));
+	addChild(Reconvergence::createTests			(m_testCtx, false));
 }
 
 void ExperimentalTestPackage::init (void)
 {
 	addChild(postmortem::createTests			(m_testCtx));
+	addChild(Reconvergence::createTests			(m_testCtx, true));
 }
 
 } // vkt
