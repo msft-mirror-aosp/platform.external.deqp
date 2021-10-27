@@ -124,7 +124,9 @@ public class DeqpTestRunnerTest extends TestCase {
     private static DeqpTestRunner buildGlesTestRunner(int majorVersion,
                                                       int minorVersion,
                                                       Collection<TestDescription> tests,
-                                                      File testsDir) throws ConfigurationException {
+                                                      File testsDir)
+        throws ConfigurationException, IOException {
+
         StringWriter testlist = new StringWriter();
         for (TestDescription test : tests) {
             testlist.write(test.getClassName() + "." + test.getTestName() + "\n");
@@ -141,20 +143,23 @@ public class DeqpTestRunnerTest extends TestCase {
     private static DeqpTestRunner buildGlesTestRunner(int majorVersion,
                                                       int minorVersion,
                                                       String testlist,
-                                                      File testsDir) throws ConfigurationException {
+                                                      File testsDir)
+        throws ConfigurationException, IOException {
+
         DeqpTestRunner runner = new DeqpTestRunner();
         OptionSetter setter = new OptionSetter(runner);
 
         String deqpPackage = "dEQP-GLES" + Integer.toString(majorVersion)
                 + (minorVersion > 0 ? Integer.toString(minorVersion) : "");
 
+        final File caselistsFile = new File(testsDir, "gles3-caselist.txt");
+        FileUtil.writeToFile(testlist, caselistsFile);
+
         setter.setOptionValue("deqp-package", deqpPackage);
         setter.setOptionValue("deqp-gl-config-name", "rgba8888d24s8");
-        setter.setOptionValue("deqp-caselist-file", "dummyfile.txt");
+        setter.setOptionValue("deqp-caselist-file", caselistsFile.getName());
         setter.setOptionValue("deqp-screen-rotation", "unspecified");
         setter.setOptionValue("deqp-surface-type", "window");
-
-        runner.setCaselistReader(new StringReader(testlist));
         runner.setAbi(ABI);
         runner.setBuildHelper(getMockBuildHelper(testsDir));
 

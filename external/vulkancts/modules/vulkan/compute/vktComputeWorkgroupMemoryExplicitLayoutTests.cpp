@@ -507,7 +507,7 @@ void AliasTest::initPrograms(SourceCollections& sourceCollections) const
 
 	sourceCollections.glslSources.add("comp")
 		<< glu::ComputeSource(src.str())
-		<< vk::ShaderBuildOptions(sourceCollections.usedVulkanVersion, vk::SPIRV_VERSION_1_4, buildFlags);
+		<< vk::ShaderBuildOptions(sourceCollections.usedVulkanVersion, vk::SPIRV_VERSION_1_4, buildFlags, true);
 }
 
 std::string makeArray(const std::string& type, const std::vector<deUint64>& values)
@@ -941,7 +941,7 @@ void ZeroTest::initPrograms(SourceCollections& sourceCollections) const
 	sourceCollections.glslSources.add("comp")
 		<< ComputeSource(src.str())
 		<< vk::ShaderBuildOptions(sourceCollections.usedVulkanVersion, vk::SPIRV_VERSION_1_4,
-								  vk::ShaderBuildOptions::Flags(0u));
+								  vk::ShaderBuildOptions::Flags(0u), true);
 }
 
 bool isTestedZeroElementType(glu::DataType dt)
@@ -1169,7 +1169,7 @@ void PaddingTest::initPrograms(SourceCollections& sourceCollections) const
 	sourceCollections.glslSources.add("comp")
 		<< ComputeSource(src.str())
 		<< vk::ShaderBuildOptions(sourceCollections.usedVulkanVersion, vk::SPIRV_VERSION_1_4,
-								  vk::ShaderBuildOptions::Flags(0u));
+								  vk::ShaderBuildOptions::Flags(0u), true);
 }
 
 void AddPaddingTests(tcu::TestCaseGroup* group)
@@ -1301,7 +1301,7 @@ void SizeTest::initPrograms(SourceCollections& sourceCollections) const
 	sourceCollections.glslSources.add("comp")
 		<< ComputeSource(src.str())
 		<< vk::ShaderBuildOptions(sourceCollections.usedVulkanVersion, vk::SPIRV_VERSION_1_4,
-								  vk::ShaderBuildOptions::Flags(0u));
+								  vk::ShaderBuildOptions::Flags(0u), true);
 }
 
 void AddSizeTests(tcu::TestCaseGroup* group)
@@ -1350,6 +1350,15 @@ void AddCopyMemoryTests(tcu::TestCaseGroup* group)
 										{ "VariablePointerFeatures.variablePointers" }));
 }
 
+void AddZeroInitializeExtensionTests(tcu::TestCaseGroup* group)
+{
+	tcu::TestContext& testCtx = group->getTestContext();
+
+	group->addChild(CreateAmberTestCase(testCtx, "block", "", "zero_ext_block.amber"));
+	group->addChild(CreateAmberTestCase(testCtx, "other_block", "", "zero_ext_other_block.amber"));
+	group->addChild(CreateAmberTestCase(testCtx, "block_with_offset", "", "zero_ext_block_with_offset.amber"));
+}
+
 } // anonymous
 
 tcu::TestCaseGroup* createWorkgroupMemoryExplicitLayoutTests(tcu::TestContext& testCtx)
@@ -1375,6 +1384,10 @@ tcu::TestCaseGroup* createWorkgroupMemoryExplicitLayoutTests(tcu::TestContext& t
 	tcu::TestCaseGroup* copy_memory = new tcu::TestCaseGroup(testCtx, "copy_memory", "Test OpCopyMemory with Workgroup memory");
 	AddCopyMemoryTests(copy_memory);
 	tests->addChild(copy_memory);
+
+	tcu::TestCaseGroup* zero_ext = new tcu::TestCaseGroup(testCtx, "zero_ext", "Test interaction with VK_KHR_zero_initialize_workgroup_memory");
+	AddZeroInitializeExtensionTests(zero_ext);
+	tests->addChild(zero_ext);
 
 	return tests.release();
 }

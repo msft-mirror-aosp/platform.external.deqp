@@ -53,7 +53,7 @@
 #if (DE_OS == DE_OS_WIN32)
 #	define WIN32_LEAN_AND_MEAN
 #	include <windows.h>
-#	include <Dxgi1_2.h>
+#	include <dxgi1_2.h>
 #endif
 
 using tcu::TestLog;
@@ -4256,9 +4256,9 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 				context.getTestContext().touchWatchdog();
 			}
 
-			if (properties.imageFormatProperties.maxMipLevels > 1u)
+			if (properties.imageFormatProperties.maxMipLevels >= 7u)
 			{
-				const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, 64u, 64u, tiling, createFlag, usage, properties.imageFormatProperties.maxMipLevels));
+				const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, 64u, 64u, tiling, createFlag, usage, 7u));
 				const vk::VkMemoryRequirements			requirements			(getImageMemoryRequirements(vkd, *device, *image, externalMemoryType));
 				const deUint32							exportedMemoryTypeIndex	(chooseMemoryType(requirements.memoryTypeBits));
 				const vk::Unique<vk::VkDeviceMemory>	memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, externalMemoryType, *image));

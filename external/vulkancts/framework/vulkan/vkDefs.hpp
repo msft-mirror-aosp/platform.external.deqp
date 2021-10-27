@@ -31,7 +31,7 @@
 #	define VKAPI_ATTR
 #endif
 
-#if (DE_OS == DE_OS_WIN32) && ((_MSC_VER >= 800) || defined(_STDCALL_SUPPORTED))
+#if (DE_OS == DE_OS_WIN32) && ((defined(_MSC_VER) && _MSC_VER >= 800) || defined(__MINGW32__) || defined(_STDCALL_SUPPORTED))
 #	define VKAPI_CALL __stdcall
 #else
 #	define VKAPI_CALL
@@ -184,6 +184,8 @@ typedef VKAPI_ATTR void		(VKAPI_CALL* PFN_vkDeviceMemoryReportCallbackEXT)	(cons
 																				 void*												pUserData);
 
 #include "vkStructTypes.inl"
+
+typedef void* VkRemoteAddressNV;
 
 extern "C"
 {

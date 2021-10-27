@@ -425,7 +425,7 @@ Move<VkRenderPass> makeRenderPass (const DeviceInterface&				vk,
 	const bool								hasColor							= colorFormat != VK_FORMAT_UNDEFINED;
 	const bool								hasDepthStencil						= depthStencilFormat != VK_FORMAT_UNDEFINED;
 	const VkImageLayout						initialLayoutColor					= loadOperation == VK_ATTACHMENT_LOAD_OP_LOAD ? VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
-	const VkImageLayout						initialLayoutDepthStencil			= VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	const VkImageLayout						initialLayoutDepthStencil			= loadOperation == VK_ATTACHMENT_LOAD_OP_LOAD ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED;
 
 	const VkAttachmentDescription			colorAttachmentDescription			=
 	{
@@ -583,7 +583,7 @@ VkBufferCreateInfo makeBufferCreateInfo (const VkDeviceSize				size,
 										 const std::vector<deUint32>&	queueFamilyIndices)
 {
 	const deUint32				queueFamilyIndexCount	= static_cast<deUint32>(queueFamilyIndices.size());
-	const deUint32*				pQueueFamilyIndices		= de::dataSafe(queueFamilyIndices);
+	const deUint32*				pQueueFamilyIndices		= de::dataOrNull(queueFamilyIndices);
 	const VkBufferCreateInfo	bufferCreateInfo		=
 	{
 		VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,	// VkStructureType		sType;

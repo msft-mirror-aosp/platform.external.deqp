@@ -137,6 +137,7 @@ if (NOT DEFINED TCUTIL_PLATFORM_SRCS)
 			osx/tcuOSXMetalView.mm
 			osx/tcuOSXMetalView.hpp
 			)
+		list(APPEND TCUTIL_PLATFORM_LIBS ${QUARTZCORE_LIBRARY} ${COCOA_LIBRARY})
 
 	else ()
 		set(TCUTIL_PLATFORM_SRCS
@@ -178,3 +179,7 @@ if (DEQP_USE_X11)
 		add_definitions(-DDEQP_SUPPORT_WAYLAND=1)
 	endif ()
 endif ()
+
+if (DE_OS_IS_WIN32)
+	target_link_libraries(tcutil-platform "version")
+endif()
