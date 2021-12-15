@@ -1832,7 +1832,6 @@ dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.std430
 dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.std430_comp_access
 dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.std430_instance_array
 dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.std430_instance_array_comp_access
-dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.scalar
 dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.scalar_comp_access
 dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.scalar_instance_array
 dEQP-VK.ssbo.phys.layout.unsized_struct_array.per_block_buffer.scalar_instance_array_comp_access
