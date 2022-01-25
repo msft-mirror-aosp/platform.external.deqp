@@ -1,8 +1,5 @@
 # OpenGL ES 3.0 Tests to exclude when Testing ANGLE.
 
-# http://anglebug.com/6673
-dEQP-GLES3.functional.shaders.builtin_variable.depth_range_vertex
-
 # http://anglebug.com/6645
 dEQP-GLES3.functional.shaders.operator.unary_operator.minus.lowp_uint_fragment
 dEQP-GLES3.functional.shaders.operator.unary_operator.minus.lowp_uint_vertex
