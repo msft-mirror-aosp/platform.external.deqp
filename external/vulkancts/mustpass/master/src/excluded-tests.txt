@@ -12,6 +12,3 @@ dEQP-VK.graphicsfuzz.cov-function-with-nested-loops-called-from-nested-loops
 # VK-GL-CTS 3005
 dEQP-VK.ray_tracing_pipeline.build.cpuht*1048576_1_1
 dEQP-VK.ray_tracing_pipeline.build.cpuht*65536_4_4
-
-# Excluded due to vk 1.3 landing before vulkan-cts-1.3.0 landing: b/216646980
-dEQP-VK.api.version_check
