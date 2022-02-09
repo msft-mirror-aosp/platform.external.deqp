@@ -57,7 +57,6 @@ VULKAN_MODULE					= getModuleByName("dEQP-VK")
 
 MASTER_EGL_COMMON_FILTERS		= [include("egl-master.txt"),
 								   exclude("egl-test-issues.txt"),
-								   exclude("egl-internal-api-tests.txt"),
 								   exclude("egl-manual-robustness.txt"),
 								   exclude("egl-driver-issues.txt"),
 								   exclude("egl-temp-excluded.txt")]
@@ -119,6 +118,7 @@ MASTER_GLES3_COMMON_FILTERS		= [
 		exclude("gles3-test-issues.txt"),
 		exclude("gles3-spec-issues.txt"),
 		exclude("gles3-temp-excluded.txt"),
+		exclude("gles3-waivers.txt"),
 	]
 MASTER_GLES3_PKG				= Package(module = GLES3_MODULE, configurations = [
 		# Master
@@ -201,6 +201,7 @@ MASTER_GLES31_COMMON_FILTERS	= [
 		exclude("gles31-test-issues.txt"),
 		exclude("gles31-spec-issues.txt"),
 		exclude("gles31-temp-excluded.txt"),
+		exclude("gles31-waivers.txt"),
 	]
 MASTER_GLES31_PKG				= Package(module = GLES31_MODULE, configurations = [
 		# Master
