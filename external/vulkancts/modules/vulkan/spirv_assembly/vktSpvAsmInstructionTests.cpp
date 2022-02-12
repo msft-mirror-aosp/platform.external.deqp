@@ -86,6 +86,7 @@
 #include "vktSpvAsmTrinaryMinMaxTests.hpp"
 #include "vktSpvAsmTerminateInvocationTests.hpp"
 #include "vktSpvAsmIntegerDotProductTests.hpp"
+#include "vktSpvAsmPhysicalStorageBufferPointerTests.hpp"
 
 #include <cmath>
 #include <limits>
@@ -849,62 +850,89 @@ struct CaseParameter
 //   output_data.elements[x] = -input_data.elements[x];
 // }
 
-static string getAsmForLocalSizeTest(bool useLiteralLocalSize, bool useSpecConstantWorkgroupSize, IVec3 workGroupSize, deUint32 ndx)
+static string getAsmForLocalSizeTest(bool useLiteralLocalSize, bool useLiteralLocalSizeId, bool useSpecConstantWorkgroupSize, IVec3 workGroupSize, deUint32 ndx)
 {
 	std::ostringstream out;
-	out << getComputeAsmShaderPreambleWithoutLocalSize();
+	out << "OpCapability Shader\n"
+		   "OpMemoryModel Logical GLSL450\n";
 
-	if (useLiteralLocalSize)
+	if (useLiteralLocalSizeId)
 	{
-		out << "OpExecutionMode %main LocalSize "
-			<< workGroupSize.x() << " " << workGroupSize.y() << " " << workGroupSize.z() << "\n";
+		out << "OpEntryPoint GLCompute %main \"main\" %id %indata %outdata\n"
+			   "OpExecutionModeId %main LocalSizeId %const_0 %const_1 %const_2\n";
+	}
+	else
+	{
+		out << "OpEntryPoint GLCompute %main \"main\" %id\n";
+
+		if (useLiteralLocalSize)
+		{
+			out << "OpExecutionMode %main LocalSize "
+				<< workGroupSize.x() << " " << workGroupSize.y() << " " << workGroupSize.z() << "\n";
+		}
 	}
 
 	out << "OpSource GLSL 430\n"
-		"OpName %main           \"main\"\n"
-		"OpName %id             \"gl_GlobalInvocationID\"\n"
-		"OpDecorate %id BuiltIn GlobalInvocationId\n";
+		   "OpName %main           \"main\"\n"
+		   "OpName %id             \"gl_GlobalInvocationID\"\n"
+		   "OpDecorate %id BuiltIn GlobalInvocationId\n";
 
 	if (useSpecConstantWorkgroupSize)
 	{
 		out << "OpDecorate %spec_0 SpecId 100\n"
-			<< "OpDecorate %spec_1 SpecId 101\n"
-			<< "OpDecorate %spec_2 SpecId 102\n"
-			<< "OpDecorate %gl_WorkGroupSize BuiltIn WorkgroupSize\n";
+			   "OpDecorate %spec_1 SpecId 101\n"
+			   "OpDecorate %spec_2 SpecId 102\n"
+			   "OpDecorate %gl_WorkGroupSize BuiltIn WorkgroupSize\n";
 	}
 
-	out << getComputeAsmInputOutputBufferTraits()
-		<< getComputeAsmCommonTypes()
-		<< getComputeAsmInputOutputBuffer()
-		<< "%id        = OpVariable %uvec3ptr Input\n"
-		<< "%zero      = OpConstant %i32 0 \n";
+	if (useLiteralLocalSizeId)
+	{
+		out << getComputeAsmInputOutputBufferTraits("Block")
+			<< getComputeAsmCommonTypes("StorageBuffer")
+			<< getComputeAsmInputOutputBuffer("StorageBuffer")
+			<< "%const_0  = OpConstant %u32 " << workGroupSize.x() << "\n"
+			   "%const_1  = OpConstant %u32 " << workGroupSize.y() << "\n"
+			   "%const_2  = OpConstant %u32 " << workGroupSize.z() << "\n";
+	}
+	else
+	{
+		out << getComputeAsmInputOutputBufferTraits()
+			<< getComputeAsmCommonTypes()
+			<< getComputeAsmInputOutputBuffer();
+	}
+
+	out << "%id        = OpVariable %uvec3ptr Input\n"
+		   "%zero      = OpConstant %i32 0 \n";
 
 	if (useSpecConstantWorkgroupSize)
 	{
-		out	<< "%spec_0   = OpSpecConstant %u32 "<< workGroupSize.x() << "\n"
-			<< "%spec_1   = OpSpecConstant %u32 "<< workGroupSize.y() << "\n"
-			<< "%spec_2   = OpSpecConstant %u32 "<< workGroupSize.z() << "\n"
-			<< "%gl_WorkGroupSize = OpSpecConstantComposite %uvec3 %spec_0 %spec_1 %spec_2\n";
+		out << "%spec_0   = OpSpecConstant %u32 "<< workGroupSize.x() << "\n"
+			   "%spec_1   = OpSpecConstant %u32 "<< workGroupSize.y() << "\n"
+			   "%spec_2   = OpSpecConstant %u32 "<< workGroupSize.z() << "\n"
+			   "%gl_WorkGroupSize = OpSpecConstantComposite %uvec3 %spec_0 %spec_1 %spec_2\n";
 	}
 
 	out << "%main      = OpFunction %void None %voidf\n"
-		<< "%label     = OpLabel\n"
-		<< "%idval     = OpLoad %uvec3 %id\n"
-		<< "%ndx         = OpCompositeExtract %u32 %idval " << ndx << "\n"
+		   "%label     = OpLabel\n"
+		   "%idval     = OpLoad %uvec3 %id\n"
+		   "%ndx       = OpCompositeExtract %u32 %idval " << ndx << "\n"
 
-			"%inloc     = OpAccessChain %f32ptr %indata %zero %ndx\n"
-			"%inval     = OpLoad %f32 %inloc\n"
-			"%neg       = OpFNegate %f32 %inval\n"
-			"%outloc    = OpAccessChain %f32ptr %outdata %zero %ndx\n"
-			"             OpStore %outloc %neg\n"
-			"             OpReturn\n"
-			"             OpFunctionEnd\n";
+		   "%inloc     = OpAccessChain %f32ptr %indata %zero %ndx\n"
+		   "%inval     = OpLoad %f32 %inloc\n"
+		   "%neg       = OpFNegate %f32 %inval\n"
+		   "%outloc    = OpAccessChain %f32ptr %outdata %zero %ndx\n"
+		   "             OpStore %outloc %neg\n"
+		   "             OpReturn\n"
+		   "             OpFunctionEnd\n";
+
 	return out.str();
 }
 
-tcu::TestCaseGroup* createLocalSizeGroup (tcu::TestContext& testCtx)
+tcu::TestCaseGroup* createLocalSizeGroup(tcu::TestContext& testCtx, bool useLocalSizeId)
 {
-	de::MovePtr<tcu::TestCaseGroup>	group			(new tcu::TestCaseGroup(testCtx, "localsize", ""));
+	const char*		groupName[]{ "localsize", "localsize_id" };
+
+	de::MovePtr<tcu::TestCaseGroup>	group			(new tcu::TestCaseGroup(testCtx, groupName[useLocalSizeId], ""));
 	ComputeShaderSpec				spec;
 	de::Random						rnd				(deStringHash(group->getName()));
 	const deUint32					numElements		= 64u;
@@ -919,45 +947,63 @@ tcu::TestCaseGroup* createLocalSizeGroup (tcu::TestContext& testCtx)
 	spec.inputs.push_back(BufferSp(new Float32Buffer(positiveFloats)));
 	spec.outputs.push_back(BufferSp(new Float32Buffer(negativeFloats)));
 
+	if (useLocalSizeId)
+	{
+		spec.spirvVersion = SPIRV_VERSION_1_5;
+		spec.extensions.push_back("VK_KHR_maintenance4");
+	}
+
 	spec.numWorkGroups = IVec3(numElements, 1, 1);
 
-	spec.assembly = getAsmForLocalSizeTest(true, false, IVec3(1, 1, 1), 0u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, false, IVec3(1, 1, 1), 0u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_localsize", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(true, true, IVec3(1, 1, 1), 0u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, true, IVec3(1, 1, 1), 0u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_and_specid_localsize", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(false, true, IVec3(1, 1, 1), 0u);
-	group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize", "", spec));
+	if (!useLocalSizeId)	// dont repeat this test when useLocalSizeId is true
+	{
+		spec.assembly = getAsmForLocalSizeTest(false, false, true, IVec3(1, 1, 1), 0u);
+		group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize", "", spec));
+	}
 
 	spec.numWorkGroups = IVec3(1, 1, 1);
 
-	spec.assembly = getAsmForLocalSizeTest(true, false, IVec3(numElements, 1, 1), 0u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, false, IVec3(numElements, 1, 1), 0u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_localsize_x", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(true, true, IVec3(numElements, 1, 1), 0u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, true, IVec3(numElements, 1, 1), 0u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_and_specid_localsize_x", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(false, true, IVec3(numElements, 1, 1), 0u);
-	group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize_x", "", spec));
+	if (!useLocalSizeId)	// dont repeat this test when useLocalSizeId is true
+	{
+		spec.assembly = getAsmForLocalSizeTest(false, false, true, IVec3(numElements, 1, 1), 0u);
+		group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize_x", "", spec));
+	}
 
-	spec.assembly = getAsmForLocalSizeTest(true, false, IVec3(1, numElements, 1), 1u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, false, IVec3(1, numElements, 1), 1u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_localsize_y", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(true, true, IVec3(1, numElements, 1), 1u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, true, IVec3(1, numElements, 1), 1u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_and_specid_localsize_y", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(false, true, IVec3(1, numElements, 1), 1u);
-	group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize_y", "", spec));
+	if (!useLocalSizeId)	// dont repeat this test when useLocalSizeId is true
+	{
+		spec.assembly = getAsmForLocalSizeTest(false, false, true, IVec3(1, numElements, 1), 1u);
+		group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize_y", "", spec));
+	}
 
-	spec.assembly = getAsmForLocalSizeTest(true, false, IVec3(1, 1, numElements), 2u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, false, IVec3(1, 1, numElements), 2u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_localsize_z", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(true, true, IVec3(1, 1, numElements), 2u);
+	spec.assembly = getAsmForLocalSizeTest(true, useLocalSizeId, true, IVec3(1, 1, numElements), 2u);
 	group->addChild(new SpvAsmComputeShaderCase(testCtx, "literal_and_specid_localsize_z", "", spec));
 
-	spec.assembly = getAsmForLocalSizeTest(false, true, IVec3(1, 1, numElements), 2u);
-	group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize_z", "", spec));
+	if (!useLocalSizeId)	// dont repeat this test when useLocalSizeId is true
+	{
+		spec.assembly = getAsmForLocalSizeTest(false, false, true, IVec3(1, 1, numElements), 2u);
+		group->addChild(new SpvAsmComputeShaderCase(testCtx, "specid_localsize_z", "", spec));
+	}
 
 	return group.release();
 }
@@ -1444,7 +1490,7 @@ tcu::TestCaseGroup* createOpAtomicGroup (tcu::TestContext& testCtx, bool useStor
 		if (volatileAtomic)
 		{
 			spec.extensions.push_back("VK_KHR_vulkan_memory_model");
-			spec.requestedVulkanFeatures.extVulkanMemoryModel = EXTVULKANMEMORYMODELFEATURES_ENABLE;
+			spec.requestedVulkanFeatures.extVulkanMemoryModel.vulkanMemoryModel = true;
 
 			// volatile, queuefamily scope
 			specializations["SEMANTICS"] = "%volbit";
@@ -3868,7 +3914,7 @@ tcu::TestCaseGroup* createSpecConstantGroup (tcu::TestContext& testCtx)
 		// Special SPIR-V code when using 16-bit floats.
 		if (cases[caseNdx].caseFlags & FLAG_F16)
 		{
-			spec.requestedVulkanFeatures.extFloat16Int8	|= EXTFLOAT16INT8FEATURES_FLOAT16;
+			spec.requestedVulkanFeatures.extFloat16Int8.shaderFloat16 = true;
 			specializations["CAPABILITIES"]				+= "OpCapability Float16\n";						// Adds 16-bit float capability
 			specializations["OPTYPE_DEFINITIONS"]		+= "%f16 = OpTypeFloat 16\n";						// Adds 16-bit float type
 			if (cases[caseNdx].caseFlags & FLAG_CONVERT)
@@ -3878,7 +3924,7 @@ tcu::TestCaseGroup* createSpecConstantGroup (tcu::TestContext& testCtx)
 		// Special SPIR-V code when using 8-bit integers.
 		if (cases[caseNdx].caseFlags & FLAG_I8)
 		{
-			spec.requestedVulkanFeatures.extFloat16Int8	|= EXTFLOAT16INT8FEATURES_INT8;
+			spec.requestedVulkanFeatures.extFloat16Int8.shaderInt8 = true;
 			specializations["CAPABILITIES"]				+= "OpCapability Int8\n";						// Adds 8-bit integer capability
 			specializations["OPTYPE_DEFINITIONS"]		+= "%i8 = OpTypeInt 8 1\n";						// Adds 8-bit integer type
 			if (cases[caseNdx].caseFlags & FLAG_CONVERT)
@@ -4134,7 +4180,7 @@ void createOpPhiVartypeTests (de::MovePtr<tcu::TestCaseGroup>& group, tcu::TestC
 	specFloat16.inputs.push_back(BufferSp(new Uint32Buffer(inputUints)));
 	specFloat16.outputs.push_back(BufferSp(new Uint32Buffer(outputUints)));
 	specFloat16.numWorkGroups = IVec3(numElements, 1, 1);
-	specFloat16.requestedVulkanFeatures.extFloat16Int8 = EXTFLOAT16INT8FEATURES_FLOAT16;
+	specFloat16.requestedVulkanFeatures.extFloat16Int8.shaderFloat16 = true;
 
 	specMat4.assembly =
 		string(getComputeAsmShaderPreamble()) +
@@ -7109,7 +7155,7 @@ tcu::TestCaseGroup* createFloat16OpConstantCompositeGroup (tcu::TestContext& tes
 
 		spec.extensions.push_back("VK_KHR_shader_float16_int8");
 
-		spec.requestedVulkanFeatures.extFloat16Int8 = EXTFLOAT16INT8FEATURES_FLOAT16;
+		spec.requestedVulkanFeatures.extFloat16Int8.shaderFloat16 = true;
 
 		group->addChild(new SpvAsmComputeShaderCase(testCtx, cases[caseNdx].name, cases[caseNdx].name, spec));
 	}
@@ -8290,7 +8336,7 @@ tcu::TestCaseGroup* createSpecConstantTests (tcu::TestContext& testCtx)
 		// Special SPIR-V code when using 16-bit floats.
 		if (cases[caseNdx].caseFlags & FLAG_F16)
 		{
-			requiredFeatures.extFloat16Int8				|= EXTFLOAT16INT8FEATURES_FLOAT16;
+			requiredFeatures.extFloat16Int8.shaderFloat16 = true;
 			fragments["capability"]						+= "OpCapability Float16\n";						// Adds 16-bit float capability
 			specializations["OPTYPE_DEFINITIONS"]		+= "%f16 = OpTypeFloat 16\n";						// Adds 16-bit float type
 			if (cases[caseNdx].caseFlags & FLAG_CONVERT)
@@ -8300,7 +8346,7 @@ tcu::TestCaseGroup* createSpecConstantTests (tcu::TestContext& testCtx)
 		// Special SPIR-V code when using 8-bit integers.
 		if (cases[caseNdx].caseFlags & FLAG_I8)
 		{
-			requiredFeatures.extFloat16Int8				|= EXTFLOAT16INT8FEATURES_INT8;
+			requiredFeatures.extFloat16Int8.shaderInt8 = true;
 			fragments["capability"]						+= "OpCapability Int8\n";						// Adds 8-bit integer capability
 			specializations["OPTYPE_DEFINITIONS"]		+= "%i8 = OpTypeInt 8 1\n";						// Adds 8-bit integer type
 			if (cases[caseNdx].caseFlags & FLAG_CONVERT)
@@ -8616,7 +8662,7 @@ tcu::TestCaseGroup* createOpPhiTests(tcu::TestContext& testCtx)
 
 	extensions4.push_back("VK_KHR_shader_float16_int8");
 
-	vulkanFeatures4.extFloat16Int8	= EXTFLOAT16INT8FEATURES_FLOAT16;
+	vulkanFeatures4.extFloat16Int8.shaderFloat16 = true;
 
 	outputColors4[0]			= RGBA(127, 127, 127, 255);
 	outputColors4[1]			= RGBA(127, 0,   0,   255);
@@ -10384,7 +10430,7 @@ void getVulkanFeaturesAndExtensions (ConversionDataType from, ConversionDataType
 	if ((usesInt16(from, to) || usesFloat16(from, to)) && useStorageExt)
 	{
 		extensions.push_back("VK_KHR_16bit_storage");
-		vulkanFeatures.ext16BitStorage |= EXT16BITSTORAGEFEATURES_UNIFORM_BUFFER_BLOCK;
+		vulkanFeatures.ext16BitStorage.storageBuffer16BitAccess = true;
 	}
 
 	if (usesFloat16(from, to) || usesInt8(from, to))
@@ -10393,15 +10439,15 @@ void getVulkanFeaturesAndExtensions (ConversionDataType from, ConversionDataType
 
 		if (usesFloat16(from, to))
 		{
-			vulkanFeatures.extFloat16Int8 |= EXTFLOAT16INT8FEATURES_FLOAT16;
+			vulkanFeatures.extFloat16Int8.shaderFloat16 = true;
 		}
 
 		if (usesInt8(from, to))
 		{
-			vulkanFeatures.extFloat16Int8 |= EXTFLOAT16INT8FEATURES_INT8;
+			vulkanFeatures.extFloat16Int8.shaderInt8 = true;
 
 			extensions.push_back("VK_KHR_8bit_storage");
-			vulkanFeatures.ext8BitStorage |= EXT8BITSTORAGEFEATURES_STORAGE_BUFFER;
+			vulkanFeatures.ext8BitStorage.storageBuffer8BitAccess = true;
 		}
 	}
 }
@@ -11295,7 +11341,7 @@ tcu::TestCaseGroup* createOpConstantFloat16Tests(tcu::TestContext& testCtx)
 	outputColors[3] = RGBA(127, 127, 255, 255);
 
 	extensions.push_back("VK_KHR_shader_float16_int8");
-	features.extFloat16Int8 = EXTFLOAT16INT8FEATURES_FLOAT16;
+	features.extFloat16Int8.shaderFloat16 = true;
 
 	for (size_t testNdx = 0; testNdx < sizeof(tests) / sizeof(NameConstantsCode); ++testNdx)
 	{
@@ -11377,8 +11423,8 @@ tcu::TestCaseGroup* createFloat16LogicalSet (tcu::TestContext& testCtx, const bo
 	const vector<deFloat16>				float16Data2		= squarize(float16DataScalar, 1);
 	const vector<deFloat16>				float16DataVec1		= squarizeVector(float16DataVector, 0);		// Total Size: 2 * (square(square(sizeof(float16DataVector))))
 	const vector<deFloat16>				float16DataVec2		= squarizeVector(float16DataVector, 1);
-	const vector<deFloat16>				float16OutDummy		(float16Data1.size(), 0);
-	const vector<deFloat16>				float16OutVecDummy	(float16DataVec1.size(), 0);
+	const vector<deFloat16>				float16OutUnused	(float16Data1.size(), 0);
+	const vector<deFloat16>				float16OutVecUnused	(float16DataVec1.size(), 0);
 
 	struct TestOp
 	{
@@ -11517,7 +11563,7 @@ tcu::TestCaseGroup* createFloat16LogicalSet (tcu::TestContext& testCtx, const bo
 
 			specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16Data1)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 			specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16Data2)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
-			specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutDummy)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+			specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutUnused)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 			specResource.verifyIO = nanSupported ? testOp.verifyFuncNan : testOp.verifyFuncNonNan;
 
 			extensions.push_back("VK_KHR_shader_float16_int8");
@@ -11529,7 +11575,7 @@ tcu::TestCaseGroup* createFloat16LogicalSet (tcu::TestContext& testCtx, const bo
 				features.floatControlsProperties.shaderSignedZeroInfNanPreserveFloat16 = DE_TRUE;
 			}
 
-			features.extFloat16Int8 = EXTFLOAT16INT8FEATURES_FLOAT16;
+			features.extFloat16Int8.shaderFloat16 = true;
 
 			finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 		}
@@ -11646,7 +11692,7 @@ tcu::TestCaseGroup* createFloat16LogicalSet (tcu::TestContext& testCtx, const bo
 
 			specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16DataVec1)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 			specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16DataVec2)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
-			specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutVecDummy)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+			specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutVecUnused)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 			specResource.verifyIO = nanSupported ? testOp.verifyFuncNan : testOp.verifyFuncNonNan;
 
 			extensions.push_back("VK_KHR_shader_float16_int8");
@@ -11658,7 +11704,7 @@ tcu::TestCaseGroup* createFloat16LogicalSet (tcu::TestContext& testCtx, const bo
 				features.floatControlsProperties.shaderSignedZeroInfNanPreserveFloat16 = DE_TRUE;
 			}
 
-			features.extFloat16Int8 = EXTFLOAT16INT8FEATURES_FLOAT16;
+			features.extFloat16Int8.shaderFloat16 = true;
 
 			finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1), true);
 		}
@@ -11702,7 +11748,7 @@ tcu::TestCaseGroup* createFloat16FuncSet (tcu::TestContext& testCtx)
 	const StringTemplate				capabilities		("OpCapability Float16\n");
 	const deUint32						numDataPoints		= 256;
 	const vector<deFloat16>				float16InputData	= getFloat16s(rnd, numDataPoints);
-	const vector<deFloat16>				float16OutputDummy	(float16InputData.size(), 0);
+	const vector<deFloat16>				float16OutputUnused	(float16InputData.size(), 0);
 	map<string, string>					fragments;
 
 	struct TestType
@@ -11859,12 +11905,12 @@ tcu::TestCaseGroup* createFloat16FuncSet (tcu::TestContext& testCtx)
 		fragments["testfun"]		+= StringTemplate(testType.storeFunc).specialize({{"var", "ssbo_dst"}});
 
 		specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16InputData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
-		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputDummy)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputUnused)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 		specResource.verifyIO = compareFP16FunctionSetFunc;
 
 		extensions.push_back("VK_KHR_shader_float16_int8");
 
-		features.extFloat16Int8	= EXTFLOAT16INT8FEATURES_FLOAT16;
+		features.extFloat16Int8.shaderFloat16 = true;
 
 		finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 	}
@@ -11924,7 +11970,7 @@ tcu::TestCaseGroup* createFloat16VectorExtractSet (tcu::TestContext& testCtx)
 	de::Random							rnd					(deStringHash(testGroup->getName()));
 	const deUint32						numDataPoints		= 256;
 	const vector<deFloat16>				float16InputData	= getFloat16s(rnd, numDataPoints);
-	const vector<deFloat16>				float16OutputDummy	(float16InputData.size(), 0);
+	const vector<deFloat16>				float16OutputUnused	(float16InputData.size(), 0);
 
 	struct TestType
 	{
@@ -12112,12 +12158,12 @@ tcu::TestCaseGroup* createFloat16VectorExtractSet (tcu::TestContext& testCtx)
 
 		specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16InputData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 		specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inputDataNdx)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
-		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputDummy)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputUnused)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 		specResource.verifyIO = compareFP16VectorExtractFunc;
 
 		extensions.push_back("VK_KHR_shader_float16_int8");
 
-		features.extFloat16Int8		= EXTFLOAT16INT8FEATURES_FLOAT16;
+		features.extFloat16Int8.shaderFloat16 = true;
 
 		finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 	}
@@ -12185,7 +12231,7 @@ tcu::TestCaseGroup* createFloat16VectorInsertSet (tcu::TestContext& testCtx)
 	const deUint32						replacement			= 42;
 	const deUint32						numDataPoints		= 256;
 	const vector<deFloat16>				float16InputData	= getFloat16s(rnd, numDataPoints);
-	const vector<deFloat16>				float16OutputDummy	(float16InputData.size(), 0);
+	const vector<deFloat16>				float16OutputUnused	(float16InputData.size(), 0);
 
 	struct TestType
 	{
@@ -12369,12 +12415,12 @@ tcu::TestCaseGroup* createFloat16VectorInsertSet (tcu::TestContext& testCtx)
 
 		specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16InputData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 		specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inputDataNdx)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
-		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputDummy)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputUnused)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 		specResource.verifyIO = testType.verifyIOFunc;
 
 		extensions.push_back("VK_KHR_shader_float16_int8");
 
-		features.extFloat16Int8		= EXTFLOAT16INT8FEATURES_FLOAT16;
+		features.extFloat16Int8.shaderFloat16 = true;
 
 		finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 	}
@@ -12684,7 +12730,7 @@ tcu::TestCaseGroup* createFloat16VectorShuffleSet (tcu::TestContext& testCtx)
 				const deUint32			outputStride		= (dstType.typeComponents == 3) ? 4 : dstType.typeComponents;
 				const vector<deFloat16>	float16Input0Data	= getFloat16s(rnd, input0Stride * numDataPoints);
 				const vector<deFloat16>	float16Input1Data	= getFloat16s(rnd, input1Stride * numDataPoints);
-				const vector<deFloat16>	float16OutputDummy	(outputStride * numDataPoints, 0);
+				const vector<deFloat16>	float16OutputUnused	(outputStride * numDataPoints, 0);
 				const string			testName			= de::toString(dstType.typeComponents) + de::toString(src0Type.typeComponents) + de::toString(src1Type.typeComponents);
 				deUint32				caseCount			= 0;
 				SpecResource			specResource;
@@ -12749,12 +12795,12 @@ tcu::TestCaseGroup* createFloat16VectorShuffleSet (tcu::TestContext& testCtx)
 
 				specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16Input0Data)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 				specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(float16Input1Data)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
-				specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputDummy)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+				specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16OutputUnused)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 				specResource.verifyIO = getFloat16VectorShuffleVerifyIOFunc(dstType.typeComponents, src0Type.typeComponents, src1Type.typeComponents);
 
 				extensions.push_back("VK_KHR_shader_float16_int8");
 
-				features.extFloat16Int8		= EXTFLOAT16INT8FEATURES_FLOAT16;
+				features.extFloat16Int8.shaderFloat16 = true;
 
 				finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 			}
@@ -13260,7 +13306,7 @@ tcu::TestCaseGroup* createFloat16CompositeConstructSet (tcu::TestContext& testCt
 
 		extensions.push_back("VK_KHR_shader_float16_int8");
 
-		features.extFloat16Int8		= EXTFLOAT16INT8FEATURES_FLOAT16;
+		features.extFloat16Int8.shaderFloat16 = true;
 
 		finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 	}
@@ -14123,14 +14169,14 @@ tcu::TestCaseGroup* createFloat16CompositeInsertExtractSet (tcu::TestContext& te
 		map<string, string>	fragments;
 		vector<string>		extensions;
 		vector<deFloat16>	inputFP16;
-		vector<deFloat16>	dummyFP16Output;
+		vector<deFloat16>	unusedFP16Output;
 
 		// Generate values for input
 		inputFP16.reserve(structItemsCount);
 		for (deUint32 structItemNdx = 0; structItemNdx < structItemsCount; ++structItemNdx)
 			inputFP16.push_back((accessPath[structItemNdx] == DE_NULL) ? exceptionValue : tcu::Float16(float(structItemNdx)).bits());
 
-		dummyFP16Output.resize(structItemsCount);
+		unusedFP16Output.resize(structItemsCount);
 
 		// Generate cases for OpSwitch
 		{
@@ -14185,12 +14231,12 @@ tcu::TestCaseGroup* createFloat16CompositeInsertExtractSet (tcu::TestContext& te
 		}
 
 		specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(inputFP16)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
-		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(dummyFP16Output)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+		specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(unusedFP16Output)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 		specResource.verifyIO = compareFP16CompositeFunc;
 
 		extensions.push_back("VK_KHR_shader_float16_int8");
 
-		features.extFloat16Int8		= EXTFLOAT16INT8FEATURES_FLOAT16;
+		features.extFloat16Int8.shaderFloat16 = true;
 
 		finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 	}
@@ -15115,10 +15161,10 @@ struct fp16ModfInt : public fp16PerComponent
 		const fp16type	x		(*in[0]);
 		const double	d		(x.asDouble());
 		double			i		(0.0);
-		const double	dummy	(deModf(d, &i));
+		const double	unused	(deModf(d, &i));
 		const double	result	(i);
 
-		DE_UNREF(dummy);
+		DE_UNREF(unused);
 
 		if (x.isInf() || x.isNaN())
 			return false;
@@ -15160,10 +15206,10 @@ struct fp16FrexpE : public fp16PerComponent
 		const fp16type	x		(*in[0]);
 		const double	d		(x.asDouble());
 		int				e		(0);
-		const double	dummy	(deFrExp(d, &e));
+		const double	unused	(deFrExp(d, &e));
 		const double	result	(static_cast<double>(e));
 
-		DE_UNREF(dummy);
+		DE_UNREF(unused);
 
 		if (x.isNaN() || x.isInf())
 			return false;
@@ -18325,17 +18371,17 @@ void createFloat16ArithmeticFuncTest (tcu::TestContext& testCtx, tcu::TestCaseGr
 
 	const Math16ArgFragments	argFragmentModfInt	=
 	{
-		" %val_src0 = OpFunctionCall %${t0} %ld_arg_ssbo_src0 %ndx\n"
-		"%val_dummy = ${op} %${tr} ${ext_inst} %val_src0 %tmp\n"
-		"     %tmp0 = OpAccessChain %fp_tmp %tmp\n"
-		"  %val_dst = OpLoad %${tr} %tmp0\n"
-		"      %dst = OpFunctionCall %void %st_fn_ssbo_dst %val_dst %ndx\n",
+		" %val_src0  = OpFunctionCall %${t0} %ld_arg_ssbo_src0 %ndx\n"
+		"%val_unused = ${op} %${tr} ${ext_inst} %val_src0 %tmp\n"
+		"     %tmp0  = OpAccessChain %fp_tmp %tmp\n"
+		"  %val_dst  = OpLoad %${tr} %tmp0\n"
+		"      %dst  = OpFunctionCall %void %st_fn_ssbo_dst %val_dst %ndx\n",
 
-		"   %fp_tmp = OpTypePointer Function %${tr}\n",
+		"   %fp_tmp  = OpTypePointer Function %${tr}\n",
 
 		"",
 
-		"      %tmp = OpVariable %fp_tmp Function\n",
+		"      %tmp  = OpVariable %fp_tmp Function\n",
 	};
 
 	const Math16ArgFragments	argFragmentModfStruct	=
@@ -18416,18 +18462,18 @@ void createFloat16ArithmeticFuncTest (tcu::TestContext& testCtx, tcu::TestCaseGr
 
 	const Math16ArgFragments	argFragmentFrexpE		=
 	{
-		" %val_src0 = OpFunctionCall %${t0} %ld_arg_ssbo_src0 %ndx\n"
-		"  %out_exp = OpAccessChain %fp_${dr}i32 %tmp\n"
-		"%val_dummy = ${op} %${tr} ${ext_inst} %val_src0 %out_exp\n"
-		"%val_dst_i = OpLoad %${dr}i32 %out_exp\n"
-		"  %val_dst = OpConvertSToF %${tr} %val_dst_i\n"
-		"      %dst = OpFunctionCall %void %st_fn_ssbo_dst %val_dst %ndx\n",
+		" %val_src0  = OpFunctionCall %${t0} %ld_arg_ssbo_src0 %ndx\n"
+		"  %out_exp  = OpAccessChain %fp_${dr}i32 %tmp\n"
+		"%val_unused = ${op} %${tr} ${ext_inst} %val_src0 %out_exp\n"
+		"%val_dst_i  = OpLoad %${dr}i32 %out_exp\n"
+		"  %val_dst  = OpConvertSToF %${tr} %val_dst_i\n"
+		"      %dst  = OpFunctionCall %void %st_fn_ssbo_dst %val_dst %ndx\n",
 
 		"",
 
 		"",
 
-		"      %tmp = OpVariable %fp_${dr}i32 Function\n",
+		"      %tmp  = OpVariable %fp_${dr}i32 Function\n",
 	};
 
 	string load_funcs[MATH16_TYPE_LAST];
@@ -18469,7 +18515,7 @@ void createFloat16ArithmeticFuncTest (tcu::TestContext& testCtx, tcu::TestCaseGr
 	const size_t				numFloatsPerArg0Type	= testTypes[testFunc.typeArg0].typeArrayStride / sizeof(deFloat16);
 	const size_t				iterations				= numDataPoints / numFloatsPerArg0Type;
 	const size_t				numFloatsPerResultType	= testTypes[testFunc.typeResult].typeArrayStride / sizeof(deFloat16);
-	const vector<deFloat16>		float16DummyOutput		(iterations * numFloatsPerResultType, 0);
+	const vector<deFloat16>		float16UnusedOutput		(iterations * numFloatsPerResultType, 0);
 	VulkanFeatures				features;
 	SpecResource				specResource;
 	map<string, string>			specs;
@@ -18624,12 +18670,12 @@ void createFloat16ArithmeticFuncTest (tcu::TestContext& testCtx, tcu::TestCaseGr
 		specResource.inputs.push_back(Resource(BufferSp(new Float16Buffer(inputData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 	}
 
-	specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16DummyOutput)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
+	specResource.outputs.push_back(Resource(BufferSp(new Float16Buffer(float16UnusedOutput)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 	specResource.verifyIO = testFunc.verifyFunc;
 
 	extensions.push_back("VK_KHR_shader_float16_int8");
 
-	features.extFloat16Int8		= EXTFLOAT16INT8FEATURES_FLOAT16;
+	features.extFloat16Int8.shaderFloat16 = true;
 
 	finalizeTestsCreation(specResource, fragments, testCtx, testGroup, testName, features, extensions, IVec3(1, 1, 1));
 }
@@ -19941,9 +19987,9 @@ tcu::TestCaseGroup* createBoolMixedBitSizeGroup (tcu::TestContext& testCtx)
 		spec.outputs.push_back(BufferSp(new Float32Buffer(outputData)));
 		spec.numWorkGroups = IVec3(numElements, 1, 1);
 		if (hasFloat16)
-			spec.requestedVulkanFeatures.extFloat16Int8 |= EXTFLOAT16INT8FEATURES_FLOAT16;
+			spec.requestedVulkanFeatures.extFloat16Int8.shaderFloat16 = true;
 		if (hasInt8)
-			spec.requestedVulkanFeatures.extFloat16Int8 |= EXTFLOAT16INT8FEATURES_INT8;
+			spec.requestedVulkanFeatures.extFloat16Int8.shaderInt8 = true;
 		spec.extensions.push_back("VK_KHR_shader_float16_int8");
 
 		string testName = "b" + de::toString(cases[caseNdx][0]) + "b" + de::toString(cases[caseNdx][1]) + "b" + de::toString(cases[caseNdx][2]) + "b" + de::toString(cases[caseNdx][3]);
@@ -20237,8 +20283,11 @@ void createSparseIdsAbuseTest (tcu::TestContext& testCtx, de::MovePtr<tcu::TestC
 	specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inData2)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 	specResource.outputs.push_back(Resource(BufferSp(new Uint32Buffer(outData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 
-	features.coreFeatures.vertexPipelineStoresAndAtomics	= true;
-	features.coreFeatures.fragmentStoresAndAtomics			= true;
+	if (std::is_base_of<GraphicsResources, SpecResource>::value)
+	{
+		features.coreFeatures.vertexPipelineStoresAndAtomics	= true;
+		features.coreFeatures.fragmentStoresAndAtomics			= true;
+	}
 
 	finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 }
@@ -20382,8 +20431,11 @@ void createLotsIdsAbuseTest (tcu::TestContext& testCtx, de::MovePtr<tcu::TestCas
 	specResource.inputs.push_back(Resource(BufferSp(new Uint32Buffer(inData2)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 	specResource.outputs.push_back(Resource(BufferSp(new Uint32Buffer(outData)), VK_DESCRIPTOR_TYPE_STORAGE_BUFFER));
 
-	features.coreFeatures.vertexPipelineStoresAndAtomics	= true;
-	features.coreFeatures.fragmentStoresAndAtomics			= true;
+	if (std::is_base_of<GraphicsResources, SpecResource>::value)
+	{
+		features.coreFeatures.vertexPipelineStoresAndAtomics	= true;
+		features.coreFeatures.fragmentStoresAndAtomics			= true;
+	}
 
 	finalizeTestsCreation(specResource, fragments, testCtx, *testGroup.get(), testName, features, extensions, IVec3(1, 1, 1));
 }
@@ -20553,7 +20605,8 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	de::MovePtr<tcu::TestCaseGroup> graphicsTests		(new tcu::TestCaseGroup(testCtx, "graphics", "Graphics Instructions with special opcodes/operands"));
 
 	computeTests->addChild(createSpivVersionCheckTests(testCtx, testComputePipeline));
-	computeTests->addChild(createLocalSizeGroup(testCtx));
+	computeTests->addChild(createLocalSizeGroup(testCtx, false));
+	computeTests->addChild(createLocalSizeGroup(testCtx, true));
 	computeTests->addChild(createNonSemanticInfoGroup(testCtx));
 	computeTests->addChild(createOpNopGroup(testCtx));
 	computeTests->addChild(createOpFUnordGroup(testCtx, TEST_WITHOUT_NAN));
@@ -20647,6 +20700,7 @@ tcu::TestCaseGroup* createInstructionTests (tcu::TestContext& testCtx)
 	computeTests->addChild(createEmptyStructComputeGroup(testCtx));
 	computeTests->addChild(create64bitCompareComputeGroup(testCtx));
 	computeTests->addChild(createOpArrayLengthComputeGroup(testCtx));
+	computeTests->addChild(createPhysicalStorageBufferTestGroup(testCtx));
 
 	graphicsTests->addChild(createCrossStageInterfaceTests(testCtx));
 	graphicsTests->addChild(createSpivVersionCheckTests(testCtx, !testComputePipeline));
