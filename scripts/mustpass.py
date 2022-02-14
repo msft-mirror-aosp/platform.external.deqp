@@ -342,6 +342,11 @@ def genAndroidTestXml (mustpass):
 	addOptionElement(preparerElement, "cleanup-apks", "true")
 	addOptionElement(preparerElement, "test-file-name", "com.drawelements.deqp.apk")
 
+	# Target preparer for incremental dEQP
+	preparerElement = ElementTree.SubElement(configElement, "target_preparer")
+	preparerElement.set("class", "com.android.compatibility.common.tradefed.targetprep.IncrementalDeqpPreparer")
+	addOptionElement(preparerElement, "disable", "true")
+
 	# add in metadata option for component name
 	ElementTree.SubElement(configElement, "option", name="test-suite-tag", value="cts")
 	ElementTree.SubElement(configElement, "option", key="component", name="config-descriptor:metadata", value="deqp")
@@ -362,7 +367,12 @@ def genAndroidTestXml (mustpass):
 			testElement = ElementTree.SubElement(configElement, "test")
 			testElement.set("class", RUNNER_CLASS)
 			addOptionElement(testElement, "deqp-package", package.module.name)
-			addOptionElement(testElement, "deqp-caselist-file", getCaseListFileName(package,config))
+			caseListFile = getCaseListFileName(package,config)
+			addOptionElement(testElement, "deqp-caselist-file", caseListFile)
+			if caseListFile.startswith("gles3"):
+				addOptionElement(testElement, "incremental-deqp-include-file", "gles3-incremental-deqp.txt")
+			elif caseListFile.startswith("vk"):
+				addOptionElement(testElement, "incremental-deqp-include-file", "vk-incremental-deqp.txt")
 			# \todo [2015-10-16 kalle]: Replace with just command line? - requires simplifications in the runner/tests as well.
 			if config.glconfig != None:
 				addOptionElement(testElement, "deqp-gl-config-name", config.glconfig)
