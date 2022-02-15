@@ -2519,16 +2519,12 @@ deUint32 getResultBinding (const VkShaderStageFlagBits shaderStage)
 	{
 		case VK_SHADER_STAGE_VERTEX_BIT:
 			return 0u;
-			break;
 		case VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT:
 			return 1u;
-			break;
 		case VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT:
 			return 2u;
-			break;
 		case VK_SHADER_STAGE_GEOMETRY_BIT:
 			return 3u;
-			break;
 		default:
 			DE_ASSERT(0);
 			return -1;
@@ -3838,7 +3834,7 @@ tcu::TestStatus vkt::subgroups::makeComputeTestRequiredSubgroupSize (Context&			
 	const VkDevice											device							= context.getDevice();
 	const VkQueue											queue							= context.getUniversalQueue();
 	const deUint32											queueFamilyIndex				= context.getUniversalQueueFamilyIndex();
-	const VkPhysicalDeviceSubgroupSizeControlPropertiesEXT&	subgroupSizeControlProperties	= context.getSubgroupSizeControlPropertiesEXT();
+	const VkPhysicalDeviceSubgroupSizeControlPropertiesEXT&	subgroupSizeControlProperties	= context.getSubgroupSizeControlProperties();
 	const VkDeviceSize										elementSize						= getFormatSizeInBytes(format);
 	const VkDeviceSize										maxSubgroupSize					= isRequiredSubgroupSize
 																							? deMax32(subgroupSizeControlProperties.maxSubgroupSize, maxSupportedSubgroupSize())
