@@ -549,9 +549,7 @@ deUint32 getGLShaderType (ShaderType shaderType)
 		0,
 		0,
 		0,
-		0,
-		0,
-		0,
+		0
 	};
 	DE_STATIC_ASSERT(DE_LENGTH_OF_ARRAY(s_typeMap) == SHADERTYPE_LAST);
 	DE_ASSERT(de::inBounds<int>(shaderType, 0, DE_LENGTH_OF_ARRAY(s_typeMap)));
@@ -573,9 +571,7 @@ deUint32 getGLShaderTypeBit (ShaderType shaderType)
 		0,
 		0,
 		0,
-		0,
-		0,
-		0,
+		0
 	};
 	DE_STATIC_ASSERT(DE_LENGTH_OF_ARRAY(s_typebitMap) == SHADERTYPE_LAST);
 	DE_ASSERT(de::inBounds<int>(shaderType, 0, DE_LENGTH_OF_ARRAY(s_typebitMap)));
@@ -598,8 +594,6 @@ qpShaderType getLogShaderType (ShaderType shaderType)
 		QP_SHADER_TYPE_MISS,
 		QP_SHADER_TYPE_INTERSECTION,
 		QP_SHADER_TYPE_CALLABLE,
-		QP_SHADER_TYPE_TASK,
-		QP_SHADER_TYPE_MESH,
 	};
 	DE_STATIC_ASSERT(DE_LENGTH_OF_ARRAY(s_typeMap) == SHADERTYPE_LAST);
 	DE_ASSERT(de::inBounds<int>(shaderType, 0, DE_LENGTH_OF_ARRAY(s_typeMap)));
@@ -651,8 +645,6 @@ static void logShaderProgram (tcu::TestLog& log, const ProgramInfo& programInfo,
 			{ "MissCompileTime",			"Miss shader compile time"						},
 			{ "IntersectionCompileTime",	"Intersection shader compile time"				},
 			{ "CallableCompileTime",		"Callable shader compile time"					},
-			{ "TaskCompileTime",			"Task shader compile time"						},
-			{ "MeshCompileTime",			"Mesh shader compile time"						},
 		};
 		DE_STATIC_ASSERT(DE_LENGTH_OF_ARRAY(s_compileTimeDesc) == SHADERTYPE_LAST);
 

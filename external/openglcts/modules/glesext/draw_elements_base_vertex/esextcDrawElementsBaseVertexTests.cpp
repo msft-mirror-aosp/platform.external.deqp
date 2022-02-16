@@ -843,10 +843,14 @@ std::string DrawElementsBaseVertexTestBase::getFunctionName(_function_type funct
 		if (glu::isContextTypeES(m_context.getRenderContext().getType()))
 		{
 			result = "glDrawElementsBaseVertexEXT()";
+
+			break;
 		}
 		else
 		{
 			result = "glDrawElementsBaseVertex()";
+
+			break;
 		}
 
 		break;
@@ -857,10 +861,14 @@ std::string DrawElementsBaseVertexTestBase::getFunctionName(_function_type funct
 		if (glu::isContextTypeES(m_context.getRenderContext().getType()))
 		{
 			result = "glDrawElementsInstancedBaseVertexEXT()";
+
+			break;
 		}
 		else
 		{
 			result = "glDrawElementsInstancedBaseVertex()";
+
+			break;
 		}
 
 		break;
@@ -871,10 +879,14 @@ std::string DrawElementsBaseVertexTestBase::getFunctionName(_function_type funct
 		if (glu::isContextTypeES(m_context.getRenderContext().getType()))
 		{
 			result = "glDrawRangeElementsBaseVertexEXT()";
+
+			break;
 		}
 		else
 		{
 			result = "glDrawRangeElementsBaseVertex()";
+
+			break;
 		}
 
 		break;
@@ -885,10 +897,14 @@ std::string DrawElementsBaseVertexTestBase::getFunctionName(_function_type funct
 		if (glu::isContextTypeES(m_context.getRenderContext().getType()))
 		{
 			result = "glMultiDrawElementsBaseVertexEXT()";
+
+			break;
 		}
 		else
 		{
 			result = "glMultiDrawElementsBaseVertex()";
+
+			break;
 		}
 
 		break;
@@ -897,6 +913,8 @@ std::string DrawElementsBaseVertexTestBase::getFunctionName(_function_type funct
 	default:
 	{
 		TCU_FAIL("Unknown function type");
+
+		break;
 	}
 	} /* switch (function_type) */
 

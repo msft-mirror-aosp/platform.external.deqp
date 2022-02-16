@@ -36,7 +36,6 @@ class DynamicLibrary
 {
 public:
 						DynamicLibrary			(const char* fileName);
-						DynamicLibrary			(const char* fileNames[]);
 						~DynamicLibrary			(void);
 
 	deFunctionPtr		getFunction				(const char* name) const { return deDynamicLibrary_getFunction(m_library, name); }

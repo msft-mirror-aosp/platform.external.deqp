@@ -33,15 +33,12 @@ namespace Draw
 class ShaderDrawParametersTests : public tcu::TestCaseGroup
 {
 public:
-								ShaderDrawParametersTests	(tcu::TestContext& testCtx, bool useDynamicRendering);
+								ShaderDrawParametersTests	(tcu::TestContext& testCtx);
 	void						init						(void);
 
 private:
 								ShaderDrawParametersTests	(const ShaderDrawParametersTests& other);
 	ShaderDrawParametersTests&	operator=					(const ShaderDrawParametersTests& other);
-
-private:
-	const bool m_useDynamicRendering;
 };
 
 } // Draw

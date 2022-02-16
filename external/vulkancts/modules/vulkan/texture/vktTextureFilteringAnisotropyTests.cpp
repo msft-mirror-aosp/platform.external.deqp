@@ -58,13 +58,11 @@ struct AnisotropyParams : public ReferenceParams
 						 const float				maxAnisotropy_,
 						 const Sampler::FilterMode	minFilter_,
 						 const Sampler::FilterMode	magFilter_,
-						 const bool					singleLevelImage_ = false,
 						 const bool					mipMap_ = false)
 		: ReferenceParams	(texType_)
 		, maxAnisotropy		(maxAnisotropy_)
 		, minFilter			(minFilter_)
 		, magFilter			(magFilter_)
-		, singleLevelImage	(singleLevelImage_)
 		, mipMap			(mipMap_)
 	{
 	}
@@ -72,7 +70,6 @@ struct AnisotropyParams : public ReferenceParams
 	float				maxAnisotropy;
 	Sampler::FilterMode	minFilter;
 	Sampler::FilterMode	magFilter;
-	bool				singleLevelImage;
 	bool				mipMap;
 };
 
@@ -102,24 +99,17 @@ public:
 
 	tcu::TestStatus	iterate	(void)
 	{
-		TextureRenderer	renderer(m_context, VK_SAMPLE_COUNT_1_BIT, ANISOTROPY_TEST_RESOLUTION, ANISOTROPY_TEST_RESOLUTION);
-		TestTexture2DSp	texture;
+		// Check device for anisotropic filtering support
+		if (!m_context.getDeviceFeatures().samplerAnisotropy)
+			TCU_THROW(NotSupportedError, "Skipping anisotropic tests since the device does not support anisotropic filtering.");
 
-		if (m_refParams.singleLevelImage)
+		TextureRenderer	renderer	(m_context, VK_SAMPLE_COUNT_1_BIT, ANISOTROPY_TEST_RESOLUTION, ANISOTROPY_TEST_RESOLUTION);
+		TestTexture2DSp	texture		= TestTexture2DSp(new pipeline::TestTexture2D(vk::mapVkFormat(VK_FORMAT_R8G8B8A8_UNORM), ANISOTROPY_TEST_RESOLUTION, ANISOTROPY_TEST_RESOLUTION));
+
+		for (int levelNdx = 0; levelNdx < m_refParams.maxLevel + 1; levelNdx++)
 		{
-			// Add miplevel count (1u) as parameter if we want to test anisotropic filtering on image that has a single mip level.
-			texture				= TestTexture2DSp(new pipeline::TestTexture2D(vk::mapVkFormat(VK_FORMAT_R8G8B8A8_UNORM), ANISOTROPY_TEST_RESOLUTION, ANISOTROPY_TEST_RESOLUTION, 1u));
-			const int gridSize	= max(texture->getLevel(0, 0).getHeight() / 8, 1);
-			tcu::fillWithGrid(texture->getLevel(0, 0), gridSize, Vec4(0.0f, 0.0f, 0.0f, 1.0f), Vec4(1.0f));
-		}
-		else
-		{
-			texture = TestTexture2DSp(new pipeline::TestTexture2D(vk::mapVkFormat(VK_FORMAT_R8G8B8A8_UNORM), ANISOTROPY_TEST_RESOLUTION, ANISOTROPY_TEST_RESOLUTION));
-			for (int levelNdx = 0; levelNdx < m_refParams.maxLevel + 1; levelNdx++)
-			{
-				const int gridSize = max(texture->getLevel(levelNdx, 0).getHeight() / 8, 1);
-				tcu::fillWithGrid(texture->getLevel(levelNdx, 0), gridSize, Vec4(0.0f, 0.0f, 0.0f, 1.0f), Vec4(1.0f));
-			}
+			const int gridSize = max(texture->getLevel(levelNdx, 0).getHeight() / 8, 1);
+			tcu::fillWithGrid(texture->getLevel(levelNdx, 0), gridSize, Vec4(0.0f, 0.0f, 0.0f, 1.0f), Vec4(1.0f));
 		}
 
 		renderer.setViewport(0.0f, 0.0f, static_cast<float>(ANISOTROPY_TEST_RESOLUTION), static_cast<float>(ANISOTROPY_TEST_RESOLUTION));
@@ -186,14 +176,6 @@ public:
 	{
 		return new FilteringAnisotropyInstance(context, m_refParams);
 	}
-
-	virtual void	checkSupport				(Context&	context) const
-	{
-		// Check device for anisotropic filtering support.
-		if (!context.getDeviceFeatures().samplerAnisotropy)
-			TCU_THROW(NotSupportedError, "Skipping anisotropic tests since the device does not support anisotropic filtering.");
-	}
-
 private :
 	const AnisotropyParams	m_refParams;
 };
@@ -203,9 +185,8 @@ private :
 tcu::TestCaseGroup* createFilteringAnisotropyTests (tcu::TestContext& testCtx)
 {
 	de::MovePtr<tcu::TestCaseGroup>	filteringAnisotropyTests	(new tcu::TestCaseGroup(testCtx,	"filtering_anisotropy",	"Filtering anisotropy tests"));
-	de::MovePtr<tcu::TestCaseGroup>	basicTests					(new tcu::TestCaseGroup(testCtx,	"basic", "Filtering anisotropy tests"));
-	de::MovePtr<tcu::TestCaseGroup>	mipmapTests					(new tcu::TestCaseGroup(testCtx,	"mipmap", "Filtering anisotropy tests"));
-	de::MovePtr<tcu::TestCaseGroup>	singleLevelImageTests		(new tcu::TestCaseGroup(testCtx,	"single_level", "Filtering anisotropy tests"));
+	de::MovePtr<tcu::TestCaseGroup>	basicTests					(new tcu::TestCaseGroup(testCtx, "basic", "Filtering anisotropy tests"));
+	de::MovePtr<tcu::TestCaseGroup>	mipmapTests					(new tcu::TestCaseGroup(testCtx, "mipmap", "Filtering anisotropy tests"));
 	const char*						valueName[]					=
 	{
 		"anisotropy_2",
@@ -231,7 +212,6 @@ tcu::TestCaseGroup* createFilteringAnisotropyTests (tcu::TestContext& testCtx)
 		Sampler::LINEAR
 	};
 
-	// Basic anisotrophy filtering tests.
 	{
 		const tcu::Sampler::FilterMode*	minFilters		= magFilters;
 		const char**					minFilterName	= magFilterName;
@@ -245,35 +225,12 @@ tcu::TestCaseGroup* createFilteringAnisotropyTests (tcu::TestContext& testCtx)
 			{
 				AnisotropyParams	refParams	(TEXTURETYPE_2D, maxAnisotropy[anisotropyNdx] ,minFilters[minFilterNdx], magFilters[magFilterNdx]);
 				levelAnisotropyGroups->addChild(new FilteringAnisotropyTests(testCtx,
-																			 "mag_" + string(magFilterName[magFilterNdx]) + "_min_" + string(minFilterName[minFilterNdx]),
-																			 "Texture filtering anisotropy basic tests", refParams));
+														"mag_" + string(magFilterName[magFilterNdx]) + "_min_" + string(minFilterName[minFilterNdx]),
+														"Texture filtering anisotropy basic tests", refParams));
 			}
 			basicTests->addChild(levelAnisotropyGroups.release());
 		}
 		filteringAnisotropyTests->addChild(basicTests.release());
-	}
-
-
-	// Same as basic tests but with single imagelevel.
-	{
-		const tcu::Sampler::FilterMode*	minFilters		= magFilters;
-		const char**					minFilterName	= magFilterName;
-
-		for (int anisotropyNdx = 0; anisotropyNdx < DE_LENGTH_OF_ARRAY(maxAnisotropy); anisotropyNdx++)
-		{
-			de::MovePtr<tcu::TestCaseGroup> levelAnisotropyGroups (new tcu::TestCaseGroup(testCtx, valueName[anisotropyNdx], "Filtering anisotropy tests"));
-
-			for (int minFilterNdx = 0; minFilterNdx < DE_LENGTH_OF_ARRAY(magFilters); minFilterNdx++)
-			for (int magFilterNdx = 0; magFilterNdx < DE_LENGTH_OF_ARRAY(magFilters); magFilterNdx++)
-			{
-				AnisotropyParams	refParams	(TEXTURETYPE_2D, maxAnisotropy[anisotropyNdx] ,minFilters[minFilterNdx], magFilters[magFilterNdx], true);
-				levelAnisotropyGroups->addChild(new FilteringAnisotropyTests(testCtx,
-																			 "mag_" + string(magFilterName[magFilterNdx]) + "_min_" + string(minFilterName[minFilterNdx]),
-																			 "Texture filtering anisotropy basic tests", refParams));
-			}
-			singleLevelImageTests->addChild(levelAnisotropyGroups.release());
-		}
-		filteringAnisotropyTests->addChild(singleLevelImageTests.release());
 	}
 
 	{
@@ -299,7 +256,7 @@ tcu::TestCaseGroup* createFilteringAnisotropyTests (tcu::TestContext& testCtx)
 			for (int minFilterNdx = 0; minFilterNdx < DE_LENGTH_OF_ARRAY(minFilters); minFilterNdx++)
 			for (int magFilterNdx = 0; magFilterNdx < DE_LENGTH_OF_ARRAY(magFilters); magFilterNdx++)
 			{
-				AnisotropyParams	refParams	(TEXTURETYPE_2D, maxAnisotropy[anisotropyNdx] ,minFilters[minFilterNdx], magFilters[magFilterNdx], false, true);
+				AnisotropyParams	refParams	(TEXTURETYPE_2D, maxAnisotropy[anisotropyNdx] ,minFilters[minFilterNdx], magFilters[magFilterNdx], true);
 				levelAnisotropyGroups->addChild(new FilteringAnisotropyTests(testCtx,
 														"mag_" + string(magFilterName[magFilterNdx]) + "_min_" + string(minFilterName[minFilterNdx]),
 														"Texture filtering anisotropy basic tests", refParams));

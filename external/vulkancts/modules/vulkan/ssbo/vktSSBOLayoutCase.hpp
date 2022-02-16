@@ -244,7 +244,6 @@ public:
 	virtual void				delayedInit					(void);
 	virtual void				initPrograms				(vk::SourceCollections& programCollection) const;
 	virtual TestInstance*		createInstance				(Context& context) const;
-	virtual void				checkSupport				(Context &context) const;
 
 protected:
 	BufferMode					m_bufferMode;

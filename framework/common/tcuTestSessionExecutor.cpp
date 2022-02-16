@@ -280,9 +280,7 @@ void TestSessionExecutor::leaveTestCase (TestCase* testCase)
 		}
 
 		// terminateAfter, Resource error or any error in deinit means that execution should end
-		if (terminateAfter || testResult == QP_TEST_RESULT_RESOURCE_ERROR ||
-			(m_status.numFailed > 0 && m_testCtx.getCommandLine().isTerminateOnFailEnabled()))
-
+		if (terminateAfter || testResult == QP_TEST_RESULT_RESOURCE_ERROR)
 			m_abortSession = true;
 	}
 

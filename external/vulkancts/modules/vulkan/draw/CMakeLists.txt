@@ -1,7 +1,4 @@
-include_directories(
-	..
-	${DEQP_INL_DIR}
-)
+include_directories(..)
 
 set(DEQP_VK_DRAW_SRCS
 	vktDrawTests.hpp
@@ -14,8 +11,6 @@ set(DEQP_VK_DRAW_SRCS
 	vktDrawInstancedTests.cpp
 	vktDrawInvertedDepthRangesTests.hpp
 	vktDrawInvertedDepthRangesTests.cpp
-	vktDrawMultiExtTests.hpp
-	vktDrawMultiExtTests.cpp
 	vktDrawShaderDrawParametersTests.hpp
 	vktDrawShaderDrawParametersTests.cpp
 	vktDrawShaderLayerTests.hpp

@@ -1,7 +1,4 @@
-include_directories(
-	..
-	${DEQP_INL_DIR}
-)
+include_directories(..)
 
 set(DEQP_VK_IMAGELESS_FRAMEBUFFER_SRCS
 	vktImagelessFramebufferTests.hpp
