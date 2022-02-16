@@ -32,7 +32,7 @@ namespace vkt
 namespace Draw
 {
 
-tcu::TestCaseGroup*	createDepthClampTests (tcu::TestContext& testCtx, bool useDynamicRendering);
+tcu::TestCaseGroup*	createDepthClampTests (tcu::TestContext& testCtx);
 
 }	// Draw
 }	// vkt
