@@ -32,7 +32,7 @@ namespace vkt
 namespace pipeline
 {
 
-tcu::TestCaseGroup* createMultisampleTests (tcu::TestContext& testCtx, bool useFragmentShadingRate);
+tcu::TestCaseGroup* createMultisampleTests (tcu::TestContext& testCtx);
 
 } // pipeline
 } // vkt

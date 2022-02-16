@@ -412,12 +412,9 @@ bool SampleShadingRenderingCase::verifyImage (const tcu::Surface& resultImage)
 std::string SampleShadingRenderingCase::genFragmentSource (int numSamples) const
 {
 	DE_UNREF(numSamples);
-
-        const bool supportsES32orGL45 =
-		glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2)) ||
-		glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 5));
-
-	const glu::GLSLVersion	version	= supportsES32orGL45 ? glu::GLSL_VERSION_320_ES : glu::GLSL_VERSION_310_ES;
+	const glu::GLSLVersion	version	= contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2))
+									? glu::GLSL_VERSION_320_ES
+									: glu::GLSL_VERSION_310_ES;
 	std::ostringstream		buf;
 
 	buf <<	glu::getGLSLVersionDeclaration(version) << "\n"

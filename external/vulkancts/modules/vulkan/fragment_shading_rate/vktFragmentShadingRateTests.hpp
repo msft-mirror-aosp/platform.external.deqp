@@ -34,7 +34,7 @@ namespace FragmentShadingRate
 
 tcu::TestCaseGroup* createTests (tcu::TestContext& testCtx);
 
-} // FragmentShadingRate
+} // FragmentShaderInterlock
 } // vkt
 
 #endif // _VKTFRAGMENTSHADINGRATETESTS_HPP
