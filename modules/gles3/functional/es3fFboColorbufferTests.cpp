@@ -243,10 +243,8 @@ protected:
 		multiTexShader.setUniforms (*getCurrentContext(), multiTexShaderID);
 
 		// Framebuffers.
-		deUint32				fbo0 = 0;
-		deUint32				fbo1 = 0;
-		deUint32				tex0 = 0;
-		deUint32				tex1 = 0;
+		deUint32				fbo0, fbo1;
+		deUint32				tex0, tex1;
 
 		for (int ndx = 0; ndx < 2; ndx++)
 		{

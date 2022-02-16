@@ -1,7 +1,4 @@
-include_directories(
-	..
-	${DEQP_INL_DIR}
-	)
+include_directories(..)
 
 set(DEQP_VK_RAY_TRACING_SRCS
 	vktRayTracingBarrierTests.cpp
@@ -30,8 +27,6 @@ set(DEQP_VK_RAY_TRACING_SRCS
 	vktRayTracingMemGuaranteeTests.hpp
 	vktRayTracingMiscTests.cpp
 	vktRayTracingMiscTests.hpp
-	vktRayTracingNonUniformArgsTests.cpp
-	vktRayTracingNonUniformArgsTests.hpp
 	vktRayTracingNullASTests.cpp
 	vktRayTracingNullASTests.hpp
 	vktRayTracingShaderBindingTableTests.cpp

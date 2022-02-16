@@ -174,7 +174,6 @@ NearestEdgeTestCase::NearestEdgeTestCase (deqp::Context& context, OffsetDirectio
 	, m_texFormat		{toTextureFormat(context, m_format)}
 	, m_texFormatInfo	{tcu::getTextureFormatInfo(m_texFormat)}
 	, m_transFormat		{glu::getTransferFormat(m_texFormat)}
-	, m_texture			(0)
 {
 }
 

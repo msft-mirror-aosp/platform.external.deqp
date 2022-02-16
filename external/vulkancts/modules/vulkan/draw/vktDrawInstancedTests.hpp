@@ -34,15 +34,12 @@ namespace Draw
 class InstancedTests : public tcu::TestCaseGroup
 {
 public:
-					InstancedTests	(tcu::TestContext &testCtx, bool useDynamicRendering);
+					InstancedTests	(tcu::TestContext &testCtx);
 					~InstancedTests	(void);
 
 private:
 					InstancedTests	(const InstancedTests &other);
 	InstancedTests&	operator=		(const InstancedTests &other);
-
-private:
-	const bool m_useDynamicRendering;
 };
 
 } // Draw

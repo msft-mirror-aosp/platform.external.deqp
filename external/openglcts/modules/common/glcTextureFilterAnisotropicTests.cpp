@@ -122,6 +122,7 @@ void texImage(const Functions& gl, GLenum target, GLint level, GLenum internal_f
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 }
 
@@ -155,6 +156,7 @@ void subImage(const Functions& gl, GLenum target, GLint level, GLint x, GLint y,
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 }
 

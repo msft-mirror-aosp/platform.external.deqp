@@ -44,10 +44,6 @@ StringTemplate::StringTemplate (const std::string& str)
 	setString(str);
 }
 
-StringTemplate::StringTemplate (StringTemplate&& other)
-	: m_template(std::move(other.m_template))
-{}
-
 StringTemplate::~StringTemplate (void)
 {
 }

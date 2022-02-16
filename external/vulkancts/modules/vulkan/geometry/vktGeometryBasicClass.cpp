@@ -62,7 +62,6 @@ GeometryExpanderRenderTestInstance::GeometryExpanderRenderTestInstance (Context&
 	: TestInstance		(context)
 	, m_primitiveType	(primitiveType)
 	, m_name			(name)
-	, m_numDrawVertices	(0)
 {
 }
 

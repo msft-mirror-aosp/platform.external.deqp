@@ -178,11 +178,9 @@ const Type Type::uvec4   = Type::GetType(Type::Uint, 1, 4);
 std::vector<GLubyte> Type::GenerateData() const
 {
 	const GLuint alignment = GetActualAlignment(0, false);
-	const GLuint padding = alignment - GetTypeSize(m_basic_type) * m_n_rows;
-	const GLuint data_size = alignment * m_n_columns - padding;
 
 	std::vector<GLubyte> data;
-	data.resize(data_size);
+	data.resize(alignment * m_n_columns);
 
 	for (GLuint column = 0; column < m_n_columns; ++column)
 	{
@@ -3458,6 +3456,7 @@ void Texture::Storage(const Functions& gl, TYPES tex_type, GLuint width, GLuint 
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 }
 
@@ -3524,6 +3523,7 @@ void Texture::Update(const Functions& gl, TYPES tex_type, GLuint width, GLuint h
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 }
 
@@ -4070,6 +4070,7 @@ std::string Variable::Descriptor::GetDefinition(FLAVOUR flavour, STORAGE storage
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	if (BUILTIN != m_type)
@@ -4121,6 +4122,7 @@ std::string Variable::Descriptor::GetDefinition(FLAVOUR flavour, STORAGE storage
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	replaceToken("STORAGE", position, storage_str, definition);
@@ -4686,6 +4688,7 @@ void ProgramInterface::cloneVariableForStage(const Variable& variable, Shader::S
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 }
 
@@ -4770,6 +4773,7 @@ Variable* ProgramInterface::cloneVariableForStage(const Variable& variable, Shad
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	return result;
@@ -5164,6 +5168,7 @@ GLint TestBase::getLastInputLocation(Utils::Shader::STAGES stage, const Utils::T
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	/* Zero means no array, but 1 slot is required */
@@ -5238,6 +5243,7 @@ GLint TestBase::getLastOutputLocation(Utils::Shader::STAGES stage, const Utils::
 		break;
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	/* Zero means no array, but 1 slot is required */
@@ -8858,15 +8864,15 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							  "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
 							  "\n"
 							  "LAYOUTuniform Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "writeonly uniform image2D uni_image;\n"
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    vec4 result = uni_block.b + uni_block.a;\n"
+							  "    vec4 result = uni_block.boy + uni_block.man;\n"
 							  "\n"
 							  "    imageStore(uni_image, ivec2(gl_GlobalInvocationID.xy), result);\n"
 							  "}\n"
@@ -8875,8 +8881,8 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							  "#extension GL_ARB_enhanced_layouts : require\n"
 							  "\n"
 							  "LAYOUTuniform Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "in  vec4 gs_fs;\n"
@@ -8884,7 +8890,7 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    fs_out = gs_fs + uni_block.b + uni_block.a;\n"
+							  "    fs_out = gs_fs + uni_block.boy + uni_block.man;\n"
 							  "}\n"
 							  "\n";
 	static const GLchar* gs = "#version 430 core\n"
@@ -8894,8 +8900,8 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							  "layout(triangle_strip, max_vertices = 4) out;\n"
 							  "\n"
 							  "LAYOUTuniform Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "in  vec4 tes_gs[];\n"
@@ -8903,16 +8909,16 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(-1, -1, 0, 1);\n"
 							  "    EmitVertex();\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(-1, 1, 0, 1);\n"
 							  "    EmitVertex();\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(1, -1, 0, 1);\n"
 							  "    EmitVertex();\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(1, 1, 0, 1);\n"
 							  "    EmitVertex();\n"
 							  "}\n"
@@ -8924,8 +8930,8 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 		"layout(vertices = 1) out;\n"
 		"\n"
 		"LAYOUTuniform Block {\n"
-		"    layout(offset = 16) vec4 b;\n"
-		"    layout(align  = 64) vec4 a;\n"
+		"    layout(offset = 16) vec4 boy;\n"
+		"    layout(align  = 64) vec4 man;\n"
 		"} uni_block;\n"
 		"\n"
 		"in  vec4 vs_tcs[];\n"
@@ -8934,7 +8940,7 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 		"void main()\n"
 		"{\n"
 		"\n"
-		"    tcs_tes[gl_InvocationID] = vs_tcs[gl_InvocationID] + uni_block.b + uni_block.a;\n"
+		"    tcs_tes[gl_InvocationID] = vs_tcs[gl_InvocationID] + uni_block.boy + uni_block.man;\n"
 		"\n"
 		"    gl_TessLevelOuter[0] = 1.0;\n"
 		"    gl_TessLevelOuter[1] = 1.0;\n"
@@ -8950,8 +8956,8 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							   "layout(isolines, point_mode) in;\n"
 							   "\n"
 							   "LAYOUTuniform Block {\n"
-							   "    layout(offset = 16) vec4 b;\n"
-							   "    layout(align  = 64) vec4 a;\n"
+							   "    layout(offset = 16) vec4 boy;\n"
+							   "    layout(align  = 64) vec4 man;\n"
 							   "} uni_block;\n"
 							   "\n"
 							   "in  vec4 tcs_tes[];\n"
@@ -8959,15 +8965,15 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							   "\n"
 							   "void main()\n"
 							   "{\n"
-							   "    tes_gs = tcs_tes[0] + uni_block.b + uni_block.a;\n"
+							   "    tes_gs = tcs_tes[0] + uni_block.boy + uni_block.man;\n"
 							   "}\n"
 							   "\n";
 	static const GLchar* vs = "#version 430 core\n"
 							  "#extension GL_ARB_enhanced_layouts : require\n"
 							  "\n"
 							  "LAYOUTuniform Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "in  vec4 in_vs;\n"
@@ -8975,7 +8981,7 @@ std::string UniformBlockLayoutQualifierConflictTest::getShaderSource(GLuint				 
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    vs_tcs = in_vs + uni_block.b + uni_block.a;\n"
+							  "    vs_tcs = in_vs + uni_block.boy + uni_block.man;\n"
 							  "}\n"
 							  "\n";
 
@@ -9620,8 +9626,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 							  "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
 							  "\n"
 							  "layout (std140) uniform Block {\n"
-							  "    layout (offset = B_OFFSET) B_TYPE b;\n"
-							  "    layout (offset = A_OFFSET) A_TYPE a;\n"
+							  "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+							  "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 							  "} block;\n"
 							  "\n"
 							  "writeonly uniform image2D uni_image;\n"
@@ -9630,8 +9636,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 							  "{\n"
 							  "    vec4 result = vec4(1, 0, 0.5, 1);\n"
 							  "\n"
-							  "    if ((B_TYPE(1) == block.b) ||\n"
-							  "        (A_TYPE(0) == block.a) )\n"
+							  "    if ((BOY_TYPE(1) == block.boy) ||\n"
+							  "        (MAN_TYPE(0) == block.man) )\n"
 							  "    {\n"
 							  "        result = vec4(1, 1, 1, 1);\n"
 							  "    }\n"
@@ -9654,8 +9660,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) uniform Block {\n"
-									 "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									 "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									 "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									 "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 gs_fs;\n"
@@ -9663,8 +9669,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if ((B_TYPE(1) == block.b) ||\n"
-									 "        (A_TYPE(0) == block.a) )\n"
+									 "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									 "        (MAN_TYPE(0) == block.man) )\n"
 									 "    {\n"
 									 "        fs_out = vec4(1, 1, 1, 1);\n"
 									 "    }\n"
@@ -9704,8 +9710,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									 "layout(triangle_strip, max_vertices = 4) out;\n"
 									 "\n"
 									 "layout (std140) uniform Block {\n"
-									 "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									 "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									 "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									 "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 tes_gs[];\n"
@@ -9713,8 +9719,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if ((B_TYPE(1) == block.b) ||\n"
-									 "        (A_TYPE(0) == block.a) )\n"
+									 "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									 "        (MAN_TYPE(0) == block.man) )\n"
 									 "    {\n"
 									 "        gs_fs = vec4(1, 1, 1, 1);\n"
 									 "    }\n"
@@ -9760,8 +9766,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									  "layout(vertices = 1) out;\n"
 									  "\n"
 									  "layout (std140) uniform Block {\n"
-									  "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									  "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									  "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									  "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 vs_tcs[];\n"
@@ -9769,8 +9775,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if ((B_TYPE(1) == block.b) ||\n"
-									  "        (A_TYPE(0) == block.a) )\n"
+									  "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									  "        (MAN_TYPE(0) == block.man) )\n"
 									  "    {\n"
 									  "        tcs_tes[gl_InvocationID] = vec4(1, 1, 1, 1);\n"
 									  "    }\n"
@@ -9805,8 +9811,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									  "layout(isolines, point_mode) in;\n"
 									  "\n"
 									  "layout (std140) uniform Block {\n"
-									  "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									  "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									  "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									  "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 tcs_tes[];\n"
@@ -9814,8 +9820,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if ((B_TYPE(1) == block.b) ||\n"
-									  "        (A_TYPE(0) == block.a) )\n"
+									  "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									  "        (MAN_TYPE(0) == block.man) )\n"
 									  "    {\n"
 									  "        tes_gs = vec4(1, 1, 1, 1);\n"
 									  "    }\n"
@@ -9838,8 +9844,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) uniform Block {\n"
-									 "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									 "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									 "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									 "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 in_vs;\n"
@@ -9847,8 +9853,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if ((B_TYPE(1) == block.b) ||\n"
-									 "        (A_TYPE(0) == block.a) )\n"
+									 "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									 "        (MAN_TYPE(0) == block.man) )\n"
 									 "    {\n"
 									 "        vs_tcs = vec4(1, 1, 1, 1);\n"
 									 "    }\n"
@@ -9863,12 +9869,12 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 	if (test_case.m_stage == stage)
 	{
 		GLchar			   buffer[16];
-		const GLuint	   b_offset	= test_case.m_b_offset;
-		const Utils::Type& b_type		 = test_case.m_b_type;
-		const GLchar*	  b_type_name = b_type.GetGLSLTypeName();
-		const GLuint	   a_offset	= test_case.m_a_offset;
-		const Utils::Type& a_type		 = test_case.m_a_type;
-		const GLchar*	  a_type_name = a_type.GetGLSLTypeName();
+		const GLuint	   boy_offset	= test_case.m_boy_offset;
+		const Utils::Type& boy_type		 = test_case.m_boy_type;
+		const GLchar*	  boy_type_name = boy_type.GetGLSLTypeName();
+		const GLuint	   man_offset	= test_case.m_man_offset;
+		const Utils::Type& man_type		 = test_case.m_man_type;
+		const GLchar*	  man_type_name = man_type.GetGLSLTypeName();
 		size_t			   position		 = 0;
 
 		switch (stage)
@@ -9895,14 +9901,14 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getShaderSource(GLuint				
 			TCU_FAIL("Invalid enum");
 		}
 
-		sprintf(buffer, "%d", b_offset);
-		Utils::replaceToken("B_OFFSET", position, buffer, source);
-		Utils::replaceToken("B_TYPE", position, b_type_name, source);
-		sprintf(buffer, "%d", a_offset);
-		Utils::replaceToken("A_OFFSET", position, buffer, source);
-		Utils::replaceToken("A_TYPE", position, a_type_name, source);
-		Utils::replaceToken("B_TYPE", position, b_type_name, source);
-		Utils::replaceToken("A_TYPE", position, a_type_name, source);
+		sprintf(buffer, "%d", boy_offset);
+		Utils::replaceToken("BOY_OFFSET", position, buffer, source);
+		Utils::replaceToken("BOY_TYPE", position, boy_type_name, source);
+		sprintf(buffer, "%d", man_offset);
+		Utils::replaceToken("MAN_OFFSET", position, buffer, source);
+		Utils::replaceToken("MAN_TYPE", position, man_type_name, source);
+		Utils::replaceToken("BOY_TYPE", position, boy_type_name, source);
+		Utils::replaceToken("MAN_TYPE", position, man_type_name, source);
 	}
 	else
 	{
@@ -9942,8 +9948,8 @@ std::string UniformBlockMemberOverlappingOffsetsTest::getTestCaseName(GLuint tes
 	std::stringstream stream;
 	testCase&		  test_case = m_test_cases[test_case_index];
 
-	stream << "Type: " << test_case.m_b_type.GetGLSLTypeName() << ", offset: " << test_case.m_b_offset
-		   << ". Type: " << test_case.m_a_type.GetGLSLTypeName() << ", offset: " << test_case.m_a_offset;
+	stream << "Type: " << test_case.m_boy_type.GetGLSLTypeName() << ", offset: " << test_case.m_boy_offset
+		   << ". Type: " << test_case.m_man_type.GetGLSLTypeName() << ", offset: " << test_case.m_man_offset;
 
 	return stream.str();
 }
@@ -9994,20 +10000,20 @@ void UniformBlockMemberOverlappingOffsetsTest::testInit()
 
 	for (GLuint i = 0; i < n_types; ++i)
 	{
-		const Utils::Type& b_type = getType(i);
-		const GLuint	   b_size = b_type.GetActualAlignment(1 /* align */, false /* is_array*/);
+		const Utils::Type& boy_type = getType(i);
+		const GLuint	   boy_size = boy_type.GetActualAlignment(1 /* align */, false /* is_array*/);
 
 		for (GLuint j = 0; j < n_types; ++j)
 		{
-			const Utils::Type& a_type  = getType(j);
-			const GLuint	   a_align = a_type.GetBaseAlignment(false);
-			const GLuint	   a_size  = a_type.GetActualAlignment(1 /* align */, false /* is_array*/);
+			const Utils::Type& man_type  = getType(j);
+			const GLuint	   man_align = man_type.GetBaseAlignment(false);
+			const GLuint	   man_size  = man_type.GetActualAlignment(1 /* align */, false /* is_array*/);
 
-			const GLuint b_offset		  = lcm(b_size, a_size);
-			const GLuint a_after_start  = b_offset + 1;
-			const GLuint a_after_off	= a_type.GetActualOffset(a_after_start, a_size);
-			const GLuint a_before_start = b_offset - a_align;
-			const GLuint a_before_off   = a_type.GetActualOffset(a_before_start, a_size);
+			const GLuint boy_offset		  = lcm(boy_size, man_size);
+			const GLuint man_after_start  = boy_offset + 1;
+			const GLuint man_after_off	= man_type.GetActualOffset(man_after_start, man_size);
+			const GLuint man_before_start = boy_offset - man_align;
+			const GLuint man_before_off   = man_type.GetActualOffset(man_before_start, man_size);
 
 			for (GLuint stage = 0; stage < Utils::Shader::STAGE_MAX; ++stage)
 			{
@@ -10016,24 +10022,24 @@ void UniformBlockMemberOverlappingOffsetsTest::testInit()
 					continue;
 				}
 
-				if ((b_offset > a_before_off) && (b_offset < a_before_off + a_size))
+				if ((boy_offset > man_before_off) && (boy_offset < man_before_off + man_size))
 				{
-					testCase test_case = { b_offset, b_type, a_before_off, a_type,
+					testCase test_case = { boy_offset, boy_type, man_before_off, man_type,
 										   (Utils::Shader::STAGES)stage };
 
 					m_test_cases.push_back(test_case);
 				}
 
-				if ((b_offset < a_after_off) && (b_offset + b_size > a_after_off))
+				if ((boy_offset < man_after_off) && (boy_offset + boy_size > man_after_off))
 				{
-					testCase test_case = { b_offset, b_type, a_after_off, a_type,
+					testCase test_case = { boy_offset, boy_type, man_after_off, man_type,
 										   (Utils::Shader::STAGES)stage };
 
 					m_test_cases.push_back(test_case);
 				}
 
-				/* b offset, should be fine for both types */
-				testCase test_case = { b_offset, b_type, b_offset, a_type, (Utils::Shader::STAGES)stage };
+				/* Boy offset, should be fine for both types */
+				testCase test_case = { boy_offset, boy_type, boy_offset, man_type, (Utils::Shader::STAGES)stage };
 
 				m_test_cases.push_back(test_case);
 			}
@@ -10115,8 +10121,8 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 							  "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
 							  "\n"
 							  "layout (std140) uniform Block {\n"
-							  "    vec4 b;\n"
-							  "    layout (align = ALIGN) TYPE a;\n"
+							  "    vec4 boy;\n"
+							  "    layout (align = ALIGN) TYPE man;\n"
 							  "} block;\n"
 							  "\n"
 							  "writeonly uniform image2D uni_image;\n"
@@ -10125,9 +10131,9 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 							  "{\n"
 							  "    vec4 result = vec4(1, 0, 0.5, 1);\n"
 							  "\n"
-							  "    if (TYPE(0) == block.a)\n"
+							  "    if (TYPE(0) == block.man)\n"
 							  "    {\n"
-							  "        result = vec4(1, 1, 1, 1) - block.b;\n"
+							  "        result = vec4(1, 1, 1, 1) - block.boy;\n"
 							  "    }\n"
 							  "\n"
 							  "    imageStore(uni_image, ivec2(gl_GlobalInvocationID.xy), result);\n"
@@ -10148,8 +10154,8 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) uniform Block {\n"
-									 "    vec4 b;\n"
-									 "    layout (align = ALIGN) TYPE a;\n"
+									 "    vec4 boy;\n"
+									 "    layout (align = ALIGN) TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 gs_fs;\n"
@@ -10157,9 +10163,9 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if (TYPE(0) == block.a)\n"
+									 "    if (TYPE(0) == block.man)\n"
 									 "    {\n"
-									 "        fs_out = block.b;\n"
+									 "        fs_out = block.boy;\n"
 									 "    }\n"
 									 "\n"
 									 "    fs_out += gs_fs;\n"
@@ -10197,8 +10203,8 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									 "layout(triangle_strip, max_vertices = 4) out;\n"
 									 "\n"
 									 "layout (std140) uniform Block {\n"
-									 "    vec4 b;\n"
-									 "    layout (align = ALIGN) TYPE a;\n"
+									 "    vec4 boy;\n"
+									 "    layout (align = ALIGN) TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 tes_gs[];\n"
@@ -10206,9 +10212,9 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if (TYPE(0) == block.a)\n"
+									 "    if (TYPE(0) == block.man)\n"
 									 "    {\n"
-									 "        gs_fs = block.b;\n"
+									 "        gs_fs = block.boy;\n"
 									 "    }\n"
 									 "\n"
 									 "    gs_fs += tes_gs[0];\n"
@@ -10252,8 +10258,8 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									  "layout(vertices = 1) out;\n"
 									  "\n"
 									  "layout (std140) uniform Block {\n"
-									  "    vec4 b;\n"
-									  "    layout (align = ALIGN) TYPE a;\n"
+									  "    vec4 boy;\n"
+									  "    layout (align = ALIGN) TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 vs_tcs[];\n"
@@ -10261,9 +10267,9 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if (TYPE(0) == block.a)\n"
+									  "    if (TYPE(0) == block.man)\n"
 									  "    {\n"
-									  "        tcs_tes[gl_InvocationID] = block.b;\n"
+									  "        tcs_tes[gl_InvocationID] = block.boy;\n"
 									  "    }\n"
 									  "\n"
 									  "\n"
@@ -10296,8 +10302,8 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									  "layout(isolines, point_mode) in;\n"
 									  "\n"
 									  "layout (std140) uniform Block {\n"
-									  "    vec4 b;\n"
-									  "    layout (align = ALIGN) TYPE a;\n"
+									  "    vec4 boy;\n"
+									  "    layout (align = ALIGN) TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 tcs_tes[];\n"
@@ -10305,9 +10311,9 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if (TYPE(0) == block.a)\n"
+									  "    if (TYPE(0) == block.man)\n"
 									  "    {\n"
-									  "        tes_gs = block.b;\n"
+									  "        tes_gs = block.boy;\n"
 									  "    }\n"
 									  "\n"
 									  "    tes_gs += tcs_tes[0];\n"
@@ -10328,8 +10334,8 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) uniform Block {\n"
-									 "    vec4 b;\n"
-									 "    layout (align = ALIGN) TYPE a;\n"
+									 "    vec4 boy;\n"
+									 "    layout (align = ALIGN) TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 in_vs;\n"
@@ -10337,9 +10343,9 @@ std::string UniformBlockMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if (TYPE(0) == block.a)\n"
+									 "    if (TYPE(0) == block.man)\n"
 									 "    {\n"
-									 "        vs_tcs = block.b;\n"
+									 "        vs_tcs = block.boy;\n"
 									 "    }\n"
 									 "\n"
 									 "    vs_tcs += in_vs;\n"
@@ -10855,15 +10861,15 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							  "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
 							  "\n"
 							  "layout (QUALIFIERbinding = BINDING) buffer cs_Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "writeonly uniform image2D uni_image;\n"
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    vec4 result = uni_block.b + uni_block.a;\n"
+							  "    vec4 result = uni_block.boy + uni_block.man;\n"
 							  "\n"
 							  "    imageStore(uni_image, ivec2(gl_GlobalInvocationID.xy), result);\n"
 							  "}\n"
@@ -10872,8 +10878,8 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							  "#extension GL_ARB_enhanced_layouts : require\n"
 							  "\n"
 							  "layout (QUALIFIERbinding = BINDING) buffer Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "in  vec4 gs_fs;\n"
@@ -10881,7 +10887,7 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    fs_out = gs_fs + uni_block.b + uni_block.a;\n"
+							  "    fs_out = gs_fs + uni_block.boy + uni_block.man;\n"
 							  "}\n"
 							  "\n";
 	static const GLchar* gs = "#version 430 core\n"
@@ -10891,8 +10897,8 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							  "layout(triangle_strip, max_vertices = 4) out;\n"
 							  "\n"
 							  "layout (QUALIFIERbinding = BINDING) buffer gs_Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "in  vec4 tes_gs[];\n"
@@ -10900,16 +10906,16 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(-1, -1, 0, 1);\n"
 							  "    EmitVertex();\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(-1, 1, 0, 1);\n"
 							  "    EmitVertex();\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(1, -1, 0, 1);\n"
 							  "    EmitVertex();\n"
-							  "    gs_fs = tes_gs[0] + uni_block.b + uni_block.a;\n"
+							  "    gs_fs = tes_gs[0] + uni_block.boy + uni_block.man;\n"
 							  "    gl_Position  = vec4(1, 1, 0, 1);\n"
 							  "    EmitVertex();\n"
 							  "}\n"
@@ -10921,8 +10927,8 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 		"layout(vertices = 1) out;\n"
 		"\n"
 		"layout (QUALIFIERbinding = BINDING) buffer tcs_Block {\n"
-		"    layout(offset = 16) vec4 b;\n"
-		"    layout(align  = 64) vec4 a;\n"
+		"    layout(offset = 16) vec4 boy;\n"
+		"    layout(align  = 64) vec4 man;\n"
 		"} uni_block;\n"
 		"\n"
 		"in  vec4 vs_tcs[];\n"
@@ -10931,7 +10937,7 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 		"void main()\n"
 		"{\n"
 		"\n"
-		"    tcs_tes[gl_InvocationID] = vs_tcs[gl_InvocationID] + uni_block.b + uni_block.a;\n"
+		"    tcs_tes[gl_InvocationID] = vs_tcs[gl_InvocationID] + uni_block.boy + uni_block.man;\n"
 		"\n"
 		"    gl_TessLevelOuter[0] = 1.0;\n"
 		"    gl_TessLevelOuter[1] = 1.0;\n"
@@ -10947,8 +10953,8 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							   "layout(isolines, point_mode) in;\n"
 							   "\n"
 							   "layout (QUALIFIERbinding = BINDING) buffer tes_Block {\n"
-							   "    layout(offset = 16) vec4 b;\n"
-							   "    layout(align  = 64) vec4 a;\n"
+							   "    layout(offset = 16) vec4 boy;\n"
+							   "    layout(align  = 64) vec4 man;\n"
 							   "} uni_block;\n"
 							   "\n"
 							   "in  vec4 tcs_tes[];\n"
@@ -10956,15 +10962,15 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							   "\n"
 							   "void main()\n"
 							   "{\n"
-							   "    tes_gs = tcs_tes[0] + uni_block.b + uni_block.a;\n"
+							   "    tes_gs = tcs_tes[0] + uni_block.boy + uni_block.man;\n"
 							   "}\n"
 							   "\n";
 	static const GLchar* vs = "#version 430 core\n"
 							  "#extension GL_ARB_enhanced_layouts : require\n"
 							  "\n"
 							  "layout (QUALIFIERbinding = BINDING) buffer vs_Block {\n"
-							  "    layout(offset = 16) vec4 b;\n"
-							  "    layout(align  = 64) vec4 a;\n"
+							  "    layout(offset = 16) vec4 boy;\n"
+							  "    layout(align  = 64) vec4 man;\n"
 							  "} uni_block;\n"
 							  "\n"
 							  "in  vec4 in_vs;\n"
@@ -10972,7 +10978,7 @@ std::string SSBLayoutQualifierConflictTest::getShaderSource(GLuint test_case_ind
 							  "\n"
 							  "void main()\n"
 							  "{\n"
-							  "    vs_tcs = in_vs + uni_block.b + uni_block.a;\n"
+							  "    vs_tcs = in_vs + uni_block.boy + uni_block.man;\n"
 							  "}\n"
 							  "\n";
 
@@ -11581,8 +11587,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 							  "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
 							  "\n"
 							  "layout (std140) buffer Block {\n"
-							  "    layout (offset = B_OFFSET) B_TYPE b;\n"
-							  "    layout (offset = A_OFFSET) A_TYPE a;\n"
+							  "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+							  "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 							  "} block;\n"
 							  "\n"
 							  "writeonly uniform image2D uni_image;\n"
@@ -11591,8 +11597,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 							  "{\n"
 							  "    vec4 result = vec4(1, 0, 0.5, 1);\n"
 							  "\n"
-							  "    if ((B_TYPE(1) == block.b) ||\n"
-							  "        (A_TYPE(0) == block.a) )\n"
+							  "    if ((BOY_TYPE(1) == block.boy) ||\n"
+							  "        (MAN_TYPE(0) == block.man) )\n"
 							  "    {\n"
 							  "        result = vec4(1, 1, 1, 1);\n"
 							  "    }\n"
@@ -11615,8 +11621,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) buffer Block {\n"
-									 "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									 "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									 "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									 "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 gs_fs;\n"
@@ -11624,8 +11630,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if ((B_TYPE(1) == block.b) ||\n"
-									 "        (A_TYPE(0) == block.a) )\n"
+									 "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									 "        (MAN_TYPE(0) == block.man) )\n"
 									 "    {\n"
 									 "        fs_out = vec4(1, 1, 1, 1);\n"
 									 "    }\n"
@@ -11665,8 +11671,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									 "layout(triangle_strip, max_vertices = 4) out;\n"
 									 "\n"
 									 "layout (std140) buffer Block {\n"
-									 "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									 "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									 "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									 "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 tes_gs[];\n"
@@ -11674,8 +11680,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if ((B_TYPE(1) == block.b) ||\n"
-									 "        (A_TYPE(0) == block.a) )\n"
+									 "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									 "        (MAN_TYPE(0) == block.man) )\n"
 									 "    {\n"
 									 "        gs_fs = vec4(1, 1, 1, 1);\n"
 									 "    }\n"
@@ -11721,8 +11727,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									  "layout(vertices = 1) out;\n"
 									  "\n"
 									  "layout (std140) buffer Block {\n"
-									  "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									  "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									  "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									  "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 vs_tcs[];\n"
@@ -11730,8 +11736,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if ((B_TYPE(1) == block.b) ||\n"
-									  "        (A_TYPE(0) == block.a) )\n"
+									  "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									  "        (MAN_TYPE(0) == block.man) )\n"
 									  "    {\n"
 									  "        tcs_tes[gl_InvocationID] = vec4(1, 1, 1, 1);\n"
 									  "    }\n"
@@ -11766,8 +11772,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									  "layout(isolines, point_mode) in;\n"
 									  "\n"
 									  "layout (std140) buffer Block {\n"
-									  "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									  "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									  "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									  "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 tcs_tes[];\n"
@@ -11775,8 +11781,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if ((B_TYPE(1) == block.b) ||\n"
-									  "        (A_TYPE(0) == block.a) )\n"
+									  "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									  "        (MAN_TYPE(0) == block.man) )\n"
 									  "    {\n"
 									  "        tes_gs = vec4(1, 1, 1, 1);\n"
 									  "    }\n"
@@ -11799,8 +11805,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) buffer Block {\n"
-									 "    layout (offset = B_OFFSET) B_TYPE b;\n"
-									 "    layout (offset = A_OFFSET) A_TYPE a;\n"
+									 "    layout (offset = BOY_OFFSET) BOY_TYPE boy;\n"
+									 "    layout (offset = MAN_OFFSET) MAN_TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 in_vs;\n"
@@ -11808,8 +11814,8 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if ((B_TYPE(1) == block.b) ||\n"
-									 "        (A_TYPE(0) == block.a) )\n"
+									 "    if ((BOY_TYPE(1) == block.boy) ||\n"
+									 "        (MAN_TYPE(0) == block.man) )\n"
 									 "    {\n"
 									 "        vs_tcs = vec4(1, 1, 1, 1);\n"
 									 "    }\n"
@@ -11824,13 +11830,13 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 	if (test_case.m_stage == stage)
 	{
 		GLchar			   buffer[16];
-		const GLuint	   b_offset		= test_case.m_b_offset;
-		const Utils::Type& b_type		= test_case.m_b_type;
-		const GLchar*	   b_type_name	= b_type.GetGLSLTypeName();
-		const GLuint	   a_offset		= test_case.m_a_offset;
-		const Utils::Type& a_type		= test_case.m_a_type;
-		const GLchar*	   a_type_name	= a_type.GetGLSLTypeName();
-		size_t			   position		= 0;
+		const GLuint	   boy_offset	= test_case.m_boy_offset;
+		const Utils::Type& boy_type		 = test_case.m_boy_type;
+		const GLchar*	  boy_type_name = boy_type.GetGLSLTypeName();
+		const GLuint	   man_offset	= test_case.m_man_offset;
+		const Utils::Type& man_type		 = test_case.m_man_type;
+		const GLchar*	  man_type_name = man_type.GetGLSLTypeName();
+		size_t			   position		 = 0;
 
 		switch (stage)
 		{
@@ -11856,14 +11862,14 @@ std::string SSBMemberOverlappingOffsetsTest::getShaderSource(GLuint test_case_in
 			TCU_FAIL("Invalid enum");
 		}
 
-		sprintf(buffer, "%d", b_offset);
-		Utils::replaceToken("B_OFFSET", position, buffer, source);
-		Utils::replaceToken("B_TYPE", position, b_type_name, source);
-		sprintf(buffer, "%d", a_offset);
-		Utils::replaceToken("A_OFFSET", position, buffer, source);
-		Utils::replaceToken("A_TYPE", position, a_type_name, source);
-		Utils::replaceToken("B_TYPE", position, b_type_name, source);
-		Utils::replaceToken("A_TYPE", position, a_type_name, source);
+		sprintf(buffer, "%d", boy_offset);
+		Utils::replaceToken("BOY_OFFSET", position, buffer, source);
+		Utils::replaceToken("BOY_TYPE", position, boy_type_name, source);
+		sprintf(buffer, "%d", man_offset);
+		Utils::replaceToken("MAN_OFFSET", position, buffer, source);
+		Utils::replaceToken("MAN_TYPE", position, man_type_name, source);
+		Utils::replaceToken("BOY_TYPE", position, boy_type_name, source);
+		Utils::replaceToken("MAN_TYPE", position, man_type_name, source);
 	}
 	else
 	{
@@ -11960,8 +11966,8 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 							  "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
 							  "\n"
 							  "layout (std140) buffer Block {\n"
-							  "    vec4 b;\n"
-							  "    layout (align = ALIGN) TYPE a;\n"
+							  "    vec4 boy;\n"
+							  "    layout (align = ALIGN) TYPE man;\n"
 							  "} block;\n"
 							  "\n"
 							  "writeonly uniform image2D uni_image;\n"
@@ -11970,9 +11976,9 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 							  "{\n"
 							  "    vec4 result = vec4(1, 0, 0.5, 1);\n"
 							  "\n"
-							  "    if (TYPE(0) == block.a)\n"
+							  "    if (TYPE(0) == block.man)\n"
 							  "    {\n"
-							  "        result = vec4(1, 1, 1, 1) - block.b;\n"
+							  "        result = vec4(1, 1, 1, 1) - block.boy;\n"
 							  "    }\n"
 							  "\n"
 							  "    imageStore(uni_image, ivec2(gl_GlobalInvocationID.xy), result);\n"
@@ -11993,8 +11999,8 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) buffer Block {\n"
-									 "    vec4 b;\n"
-									 "    layout (align = ALIGN) TYPE a;\n"
+									 "    vec4 boy;\n"
+									 "    layout (align = ALIGN) TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 gs_fs;\n"
@@ -12002,9 +12008,9 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if (TYPE(0) == block.a)\n"
+									 "    if (TYPE(0) == block.man)\n"
 									 "    {\n"
-									 "        fs_out = block.b;\n"
+									 "        fs_out = block.boy;\n"
 									 "    }\n"
 									 "\n"
 									 "    fs_out += gs_fs;\n"
@@ -12042,8 +12048,8 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									 "layout(triangle_strip, max_vertices = 4) out;\n"
 									 "\n"
 									 "layout (std140) buffer Block {\n"
-									 "    vec4 b;\n"
-									 "    layout (align = ALIGN) TYPE a;\n"
+									 "    vec4 boy;\n"
+									 "    layout (align = ALIGN) TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 tes_gs[];\n"
@@ -12051,9 +12057,9 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if (TYPE(0) == block.a)\n"
+									 "    if (TYPE(0) == block.man)\n"
 									 "    {\n"
-									 "        gs_fs = block.b;\n"
+									 "        gs_fs = block.boy;\n"
 									 "    }\n"
 									 "\n"
 									 "    gs_fs += tes_gs[0];\n"
@@ -12097,8 +12103,8 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									  "layout(vertices = 1) out;\n"
 									  "\n"
 									  "layout (std140) buffer Block {\n"
-									  "    vec4 b;\n"
-									  "    layout (align = ALIGN) TYPE a;\n"
+									  "    vec4 boy;\n"
+									  "    layout (align = ALIGN) TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 vs_tcs[];\n"
@@ -12106,9 +12112,9 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if (TYPE(0) == block.a)\n"
+									  "    if (TYPE(0) == block.man)\n"
 									  "    {\n"
-									  "        tcs_tes[gl_InvocationID] = block.b;\n"
+									  "        tcs_tes[gl_InvocationID] = block.boy;\n"
 									  "    }\n"
 									  "\n"
 									  "\n"
@@ -12141,8 +12147,8 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									  "layout(isolines, point_mode) in;\n"
 									  "\n"
 									  "layout (std140) buffer Block {\n"
-									  "    vec4 b;\n"
-									  "    layout (align = ALIGN) TYPE a;\n"
+									  "    vec4 boy;\n"
+									  "    layout (align = ALIGN) TYPE man;\n"
 									  "} block;\n"
 									  "\n"
 									  "in  vec4 tcs_tes[];\n"
@@ -12150,9 +12156,9 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									  "\n"
 									  "void main()\n"
 									  "{\n"
-									  "    if (TYPE(0) == block.a)\n"
+									  "    if (TYPE(0) == block.man)\n"
 									  "    {\n"
-									  "        tes_gs = block.b;\n"
+									  "        tes_gs = block.boy;\n"
 									  "    }\n"
 									  "\n"
 									  "    tes_gs += tcs_tes[0];\n"
@@ -12173,8 +12179,8 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									 "#extension GL_ARB_enhanced_layouts : require\n"
 									 "\n"
 									 "layout (std140) buffer Block {\n"
-									 "    vec4 b;\n"
-									 "    layout (align = ALIGN) TYPE a;\n"
+									 "    vec4 boy;\n"
+									 "    layout (align = ALIGN) TYPE man;\n"
 									 "} block;\n"
 									 "\n"
 									 "in  vec4 in_vs;\n"
@@ -12182,9 +12188,9 @@ std::string SSBMemberAlignNonPowerOf2Test::getShaderSource(GLuint test_case_inde
 									 "\n"
 									 "void main()\n"
 									 "{\n"
-									 "    if (TYPE(0) == block.a)\n"
+									 "    if (TYPE(0) == block.man)\n"
 									 "    {\n"
-									 "        vs_tcs = block.b;\n"
+									 "        vs_tcs = block.boy;\n"
 									 "    }\n"
 									 "\n"
 									 "    vs_tcs += in_vs;\n"
@@ -19775,9 +19781,6 @@ FragmentDataLocationAPITest::FragmentDataLocationAPITest(deqp::Context& context)
 	, m_gohan(context)
 	, m_goten(context)
 	, m_chichi(context)
-	, m_goku_location(0)
-	, m_gohan_location(0)
-	, m_chichi_location(0)
 {
 }
 
@@ -21446,6 +21449,7 @@ std::string XFBTooSmallStrideTest::getShaderSource(GLuint test_case_index, Utils
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -21787,6 +21791,7 @@ std::string XFBVariableStrideTest::getShaderSource(GLuint test_case_index, Utils
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -22140,6 +22145,7 @@ std::string XFBBlockStrideTest::getShaderSource(GLuint test_case_index, Utils::S
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -22615,6 +22621,7 @@ std::string XFBDuplicatedStrideTest::getShaderSource(GLuint test_case_index, Uti
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -23256,14 +23263,13 @@ void XFBOverrideQualifiersWithAPITest::getBufferDescriptors(glw::GLuint				  tes
 	const std::vector<GLubyte>& goku_data_pck = type.GenerateDataPacked();
 
 	const GLuint type_size	 = static_cast<GLuint>(vegeta_data.size());
-	const GLuint padded_type_size = type.GetBaseAlignment(false) * type.m_n_columns;
 	const GLuint type_size_pck = static_cast<GLuint>(vegeta_data_pck.size());
 
 	/* Uniform data */
-	uniform.m_initial_data.resize(3 * padded_type_size);
+	uniform.m_initial_data.resize(3 * type_size);
 	memcpy(&uniform.m_initial_data[0] + 0, &vegeta_data[0], type_size);
-	memcpy(&uniform.m_initial_data[0] + padded_type_size, &trunks_data[0], type_size);
-	memcpy(&uniform.m_initial_data[0] + 2 * padded_type_size, &goku_data[0], type_size);
+	memcpy(&uniform.m_initial_data[0] + type_size, &trunks_data[0], type_size);
+	memcpy(&uniform.m_initial_data[0] + 2 * type_size, &goku_data[0], type_size);
 
 	/* XFB data */
 	xfb.m_initial_data.resize(3 * type_size_pck);
@@ -24028,6 +24034,7 @@ std::string XFBExceedBufferLimitTest::getShaderSource(GLuint test_case_index, Ut
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -24368,6 +24375,7 @@ std::string XFBExceedOffsetLimitTest::getShaderSource(GLuint test_case_index, Ut
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -24503,17 +24511,16 @@ void XFBGlobalBufferTest::getBufferDescriptors(glw::GLuint test_case_index, buff
 	const std::vector<GLubyte>& goten_data_pck  = type.GenerateDataPacked();
 
 	const GLuint type_size	 = static_cast<GLuint>(chichi_data.size());
-	const GLuint padded_type_size	= type.GetBaseAlignment(false) * type.m_n_columns;
 	const GLuint type_size_pck = static_cast<GLuint>(chichi_data_pck.size());
 
 	/* Uniform data */
-	uniform.m_initial_data.resize(6 * padded_type_size);
+	uniform.m_initial_data.resize(6 * type_size);
 	memcpy(&uniform.m_initial_data[0] + 0, &chichi_data[0], type_size);
-	memcpy(&uniform.m_initial_data[0] + padded_type_size, &bulma_data[0], type_size);
-	memcpy(&uniform.m_initial_data[0] + 2 * padded_type_size, &trunks_data[0], type_size);
-	memcpy(&uniform.m_initial_data[0] + 3 * padded_type_size, &bra_data[0], type_size);
-	memcpy(&uniform.m_initial_data[0] + 4 * padded_type_size, &gohan_data[0], type_size);
-	memcpy(&uniform.m_initial_data[0] + 5 * padded_type_size, &goten_data[0], type_size);
+	memcpy(&uniform.m_initial_data[0] + type_size, &bulma_data[0], type_size);
+	memcpy(&uniform.m_initial_data[0] + 2 * type_size, &trunks_data[0], type_size);
+	memcpy(&uniform.m_initial_data[0] + 3 * type_size, &bra_data[0], type_size);
+	memcpy(&uniform.m_initial_data[0] + 4 * type_size, &gohan_data[0], type_size);
+	memcpy(&uniform.m_initial_data[0] + 5 * type_size, &goten_data[0], type_size);
 
 	/* XFB data */
 	xfb_1.m_initial_data.resize(3 * type_size_pck);
@@ -24758,6 +24765,7 @@ std::string XFBGlobalBufferTest::getShaderSource(GLuint test_case_index, Utils::
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -25106,6 +25114,7 @@ std::string XFBStrideTest::getShaderSource(GLuint test_case_index, Utils::Shader
 
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	/* */
@@ -25376,6 +25385,7 @@ std::string XFBBlockMemberBufferTest::getShaderSource(GLuint test_case_index, Ut
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -25658,6 +25668,7 @@ std::string XFBOutputOverlappingTest::getShaderSource(GLuint test_case_index, Ut
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -25956,6 +25967,7 @@ std::string XFBInvalidOffsetAlignmentTest::getShaderSource(GLuint test_case_inde
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -26284,6 +26296,7 @@ std::string XFBCaptureInactiveOutputVariableTest::getShaderSource(GLuint test_ca
 
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	/* */
@@ -26717,6 +26730,7 @@ std::string XFBCaptureInactiveOutputComponentTest::getShaderSource(GLuint test_c
 
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	/* */
@@ -27094,6 +27108,7 @@ std::string XFBCaptureInactiveOutputBlockMemberTest::getShaderSource(GLuint				 
 
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	/* */
@@ -27443,6 +27458,7 @@ std::string XFBCaptureStructTest::getShaderSource(GLuint test_case_index, Utils:
 
 	default:
 		TCU_FAIL("Invalid enum");
+		break;
 	}
 
 	/* */
@@ -27619,6 +27635,7 @@ std::string XFBCaptureUnsizedArrayTest::getShaderSource(GLuint test_case_index, 
 			break;
 		default:
 			TCU_FAIL("Invalid enum");
+			break;
 		}
 	}
 
@@ -27679,841 +27696,6 @@ void XFBCaptureUnsizedArrayTest::testInit()
 		testCase test_case = { (Utils::Shader::STAGES)stage };
 
 		m_test_cases.push_back(test_case);
-	}
-}
-
-/** Constructor
- *
- * @param context Test context
- **/
-XFBExplicitLocationTest::XFBExplicitLocationTest(deqp::Context& context)
-	: BufferTestBase(context, "xfb_explicit_location", "Test verifies that explicit location on matrices and arrays does not impact xfb output")
-{
-	/* Nothing to be done here */
-}
-
-/** Execute drawArrays for single vertex
- *
- * @param test_case_index
- *
- * @return true
- **/
-bool XFBExplicitLocationTest::executeDrawCall(bool /* tesEnabled */, GLuint test_case_index)
-{
-	const Functions& gl				= m_context.getRenderContext().getFunctions();
-	GLenum			 primitive_type = GL_PATCHES;
-	const testCase&  test_case		= m_test_cases[test_case_index];
-
-	if (Utils::Shader::VERTEX == test_case.m_stage)
-	{
-		primitive_type = GL_POINTS;
-	}
-
-	gl.disable(GL_RASTERIZER_DISCARD);
-	GLU_EXPECT_NO_ERROR(gl.getError(), "Disable");
-
-	gl.beginTransformFeedback(GL_POINTS);
-	GLU_EXPECT_NO_ERROR(gl.getError(), "BeginTransformFeedback");
-
-	gl.drawArrays(primitive_type, 0 /* first */, 2 /* count */);
-	GLU_EXPECT_NO_ERROR(gl.getError(), "DrawArrays");
-
-	gl.endTransformFeedback();
-	GLU_EXPECT_NO_ERROR(gl.getError(), "EndTransformFeedback");
-
-	return true;
-}
-
-/** Get descriptors of buffers necessary for test
- *
- * @param test_case_index Index of test case
- * @param out_descriptors Descriptors of buffers used by test
- **/
-void XFBExplicitLocationTest::getBufferDescriptors(GLuint test_case_index, bufferDescriptor::Vector& out_descriptors)
-{
-	const testCase&	test_case = m_test_cases[test_case_index];
-	const Utils::Type& type		 = test_case.m_type;
-
-	/* Test needs single uniform and xfb */
-	out_descriptors.resize(2);
-
-	/* Get references */
-	bufferDescriptor& uniform	= out_descriptors[0];
-	bufferDescriptor& xfb		= out_descriptors[1];
-
-	/* Index */
-	uniform.m_index = 0;
-	xfb.m_index		= 0;
-
-	/* Target */
-	uniform.m_target = Utils::Buffer::Uniform;
-	xfb.m_target	 = Utils::Buffer::Transform_feedback;
-
-	/* Data */
-	const GLuint			rand_start   = Utils::s_rand;
-	std::vector<GLubyte>	uniform_data;
-
-	for (GLuint i = 0; i < std::max(test_case.m_array_size, 1u); i++)
-	{
-		const std::vector<GLubyte>& type_uniform_data = type.GenerateData();
-		/**
-		 * Rule 4 of Section 7.6.2.2:
-		 *
-		 * If the member is an array of scalars or vectors, the base alignment and array stride
-		 * are set to match the base alignment of a single array element, according to rules (1),
-		 * (2), and (3), and rounded up to the base alignment of a vec4.
-		 */
-		uniform_data.resize(Utils::align(uniform_data.size(), 16));
-		uniform_data.insert(uniform_data.end(), type_uniform_data.begin(), type_uniform_data.end());
-	}
-
-	Utils::s_rand = rand_start;
-	std::vector<GLubyte>	xfb_data;
-
-	for (GLuint i = 0; i < std::max(test_case.m_array_size, 1u); i++)
-	{
-		const std::vector<GLubyte>& type_xfb_data = type.GenerateDataPacked();
-		xfb_data.insert(xfb_data.end(), type_xfb_data.begin(), type_xfb_data.end());
-	}
-
-	const GLuint uni_type_size = static_cast<GLuint>(uniform_data.size());
-	const GLuint xfb_type_size = static_cast<GLuint>(xfb_data.size());
-	/*
-	 Note: If xfb varying output from vertex shader, the variable "goku" will only output once to transform feedback buffer,
-	 if xfb varying output from TES or GS, because the input primitive type in TES is defined as "layout(isolines, point_mode) in;",
-	 the primitive type is line which make the variable "goku" will output twice to transform feedback buffer, so for vertex shader
-	 only one valid data should be initialized in xfb.m_expected_data
-	 */
-	const GLuint xfb_data_size = (test_case.m_stage == Utils::Shader::VERTEX) ? xfb_type_size : xfb_type_size * 2;
-	/* Uniform data */
-	uniform.m_initial_data.resize(uni_type_size);
-	memcpy(&uniform.m_initial_data[0] + 0 * uni_type_size, &uniform_data[0], uni_type_size);
-
-	/* XFB data */
-	xfb.m_initial_data.resize(xfb_data_size, 0);
-	xfb.m_expected_data.resize(xfb_data_size);
-
-	if (test_case.m_stage == Utils::Shader::VERTEX)
-	{
-		memcpy(&xfb.m_expected_data[0] + 0 * xfb_type_size, &xfb_data[0], xfb_type_size);
-	}
-	else
-	{
-		memcpy(&xfb.m_expected_data[0] + 0 * xfb_type_size, &xfb_data[0], xfb_type_size);
-		memcpy(&xfb.m_expected_data[0] + 1 * xfb_type_size, &xfb_data[0], xfb_type_size);
-	}
-}
-
-/** Get body of main function for given shader stage
- *
- * @param test_case_index  Index of test case
- * @param stage            Shader stage
- * @param out_assignments  Set to empty
- * @param out_calculations Set to empty
- **/
-void XFBExplicitLocationTest::getShaderBody(GLuint test_case_index, Utils::Shader::STAGES stage, std::string& out_assignments,
-								  std::string& out_calculations)
-{
-	const testCase& test_case = m_test_cases[test_case_index];
-
-	out_calculations = "";
-
-	static const GLchar* vs_tes_gs = "    goku = uni_goku;\n";
-
-	const GLchar* assignments = "";
-
-	if (test_case.m_stage == stage)
-	{
-		switch (stage)
-		{
-		case Utils::Shader::GEOMETRY:
-			assignments = vs_tes_gs;
-			break;
-		case Utils::Shader::TESS_EVAL:
-			assignments = vs_tes_gs;
-			break;
-		case Utils::Shader::VERTEX:
-			assignments = vs_tes_gs;
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-	else
-	{
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-			assignments = "";
-			break;
-		case Utils::Shader::GEOMETRY:
-		case Utils::Shader::TESS_CTRL:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-
-	out_assignments = assignments;
-
-	if (Utils::Shader::FRAGMENT == stage)
-	{
-		Utils::replaceAllTokens("TYPE", test_case.m_type.GetGLSLTypeName(), out_assignments);
-	}
-}
-
-/** Get interface of shader
- *
- * @param test_case_index  Index of test case
- * @param stage            Shader stage
- * @param out_interface    Set to ""
- **/
-void XFBExplicitLocationTest::getShaderInterface(GLuint test_case_index, Utils::Shader::STAGES stage, std::string& out_interface)
-{
-	static const GLchar* vs_tes_gs = "layout (location = 0, xfb_offset = 0) FLAT out TYPE gokuARRAY;\n"
-									 "\n"
-									 "layout(std140, binding = 0) uniform Goku {\n"
-									 "    TYPE uni_gokuARRAY;\n"
-									 "};\n";
-
-	const testCase& test_case = m_test_cases[test_case_index];
-	const GLchar*   interface = "";
-	const GLchar*   flat	  = "";
-
-	if (test_case.m_stage == stage)
-	{
-		switch (stage)
-		{
-		case Utils::Shader::GEOMETRY:
-			interface = vs_tes_gs;
-			break;
-		case Utils::Shader::TESS_EVAL:
-			interface = vs_tes_gs;
-			break;
-		case Utils::Shader::VERTEX:
-			interface = vs_tes_gs;
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-	else
-	{
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-			interface = "";
-			break;
-		case Utils::Shader::GEOMETRY:
-		case Utils::Shader::TESS_CTRL:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-
-	out_interface = interface;
-
-	if (Utils::Type::Float != test_case.m_type.m_basic_type)
-	{
-		flat = "flat";
-	}
-
-	/* Array size */
-	if (0 == test_case.m_array_size)
-	{
-		Utils::replaceAllTokens("ARRAY", "", out_interface);
-	}
-	else
-	{
-		char buffer[16];
-		sprintf(buffer, "[%d]", test_case.m_array_size);
-
-		Utils::replaceAllTokens("ARRAY", buffer, out_interface);
-	}
-
-	Utils::replaceAllTokens("FLAT", flat, out_interface);
-	Utils::replaceAllTokens("TYPE", test_case.m_type.GetGLSLTypeName(), out_interface);
-}
-
-/** Get source code of shader
- *
- * @param test_case_index Index of test case
- * @param stage           Shader stage
- *
- * @return Source
- **/
-std::string XFBExplicitLocationTest::getShaderSource(GLuint test_case_index, Utils::Shader::STAGES stage)
-{
-	std::string		source;
-	const testCase& test_case = m_test_cases[test_case_index];
-
-	switch (test_case.m_stage)
-	{
-	case Utils::Shader::VERTEX:
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-		case Utils::Shader::VERTEX:
-			source = BufferTestBase::getShaderSource(test_case_index, stage);
-			break;
-		default:
-			break;
-		}
-		break;
-
-	case Utils::Shader::TESS_EVAL:
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-		case Utils::Shader::TESS_CTRL:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			source = BufferTestBase::getShaderSource(test_case_index, stage);
-			break;
-		default:
-			break;
-		}
-		break;
-
-	case Utils::Shader::GEOMETRY:
-		source = BufferTestBase::getShaderSource(test_case_index, stage);
-		break;
-
-	default:
-		TCU_FAIL("Invalid enum");
-	}
-
-	/* */
-	return source;
-}
-
-/** Get name of test case
- *
- * @param test_case_index Index of test case
- *
- * @return Name of tested stage
- **/
-std::string XFBExplicitLocationTest::getTestCaseName(glw::GLuint test_case_index)
-{
-	std::stringstream stream;
-	const testCase&   test_case = m_test_cases[test_case_index];
-
-	stream << "Type: " << test_case.m_type.GetGLSLTypeName()
-		   << ", stage: " << Utils::Shader::GetStageName(test_case.m_stage);
-
-	return stream.str();
-}
-
-/** Returns number of test cases
- *
- * @return TEST_MAX
- **/
-glw::GLuint XFBExplicitLocationTest::getTestCaseNumber()
-{
-	return static_cast<GLuint>(m_test_cases.size());
-}
-
-/** Prepare all test cases
- *
- **/
-void XFBExplicitLocationTest::testInit()
-{
-	const Functions& gl = m_context.getRenderContext().getFunctions();
-	GLint			 max_xfb_int;
-
-	gl.getIntegerv(GL_MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS, &max_xfb_int);
-	GLU_EXPECT_NO_ERROR(gl.getError(), "GetIntegerv");
-
-	const GLuint n_types = getTypesNumber();
-
-	for (GLuint i = 0; i < n_types; ++i)
-	{
-		const Utils::Type& type = getType(i);
-
-		for (GLuint stage = 0; stage < Utils::Shader::STAGE_MAX; ++stage)
-		{
-			if ((Utils::Shader::COMPUTE == stage) || (Utils::Shader::FRAGMENT == stage) ||
-				(Utils::Shader::TESS_CTRL == stage))
-			{
-				continue;
-			}
-
-			if (type.m_n_columns > 1)
-			{
-				testCase test_case = { (Utils::Shader::STAGES)stage, type, 0 };
-
-				m_test_cases.push_back(test_case);
-			}
-
-			for (GLuint array_size = 3; array_size > 1; array_size--)
-			{
-				if (type.GetNumComponents() * array_size <= GLuint(max_xfb_int))
-				{
-					testCase test_case = { (Utils::Shader::STAGES)stage, type, array_size };
-
-					m_test_cases.push_back(test_case);
-
-					break;
-				}
-			}
-		}
-	}
-}
-
-/** Constructor
- *
- * @param context Test context
- **/
-XFBExplicitLocationStructTest::XFBExplicitLocationStructTest(deqp::Context& context)
-	: BufferTestBase(context, "xfb_struct_explicit_location", "Test verifies that explicit location on structs does not impact xfb output")
-{
-	/* Nothing to be done here */
-}
-
-/** Execute drawArrays for single vertex
- *
- * @param test_case_index
- *
- * @return true
- **/
-bool XFBExplicitLocationStructTest::executeDrawCall(bool /* tesEnabled */, GLuint test_case_index)
-{
-	const Functions& gl				= m_context.getRenderContext().getFunctions();
-	GLenum			 primitive_type = GL_PATCHES;
-	const testCase&  test_case		= m_test_cases[test_case_index];
-
-	if (Utils::Shader::VERTEX == test_case.m_stage)
-	{
-		primitive_type = GL_POINTS;
-	}
-
-	gl.disable(GL_RASTERIZER_DISCARD);
-	GLU_EXPECT_NO_ERROR(gl.getError(), "Disable");
-
-	gl.beginTransformFeedback(GL_POINTS);
-	GLU_EXPECT_NO_ERROR(gl.getError(), "BeginTransformFeedback");
-
-	gl.drawArrays(primitive_type, 0 /* first */, 2 /* count */);
-	GLU_EXPECT_NO_ERROR(gl.getError(), "DrawArrays");
-
-	gl.endTransformFeedback();
-	GLU_EXPECT_NO_ERROR(gl.getError(), "EndTransformFeedback");
-
-	return true;
-}
-
-/** Get descriptors of buffers necessary for test
- *
- * @param test_case_index Index of test case
- * @param out_descriptors Descriptors of buffers used by test
- **/
-void XFBExplicitLocationStructTest::getBufferDescriptors(GLuint test_case_index, bufferDescriptor::Vector& out_descriptors)
-{
-	const testCase&	test_case = m_test_cases[test_case_index];
-
-	/* Test needs single uniform and xfb */
-	out_descriptors.resize(2);
-
-	/* Get references */
-	bufferDescriptor& uniform	= out_descriptors[0];
-	bufferDescriptor& xfb		= out_descriptors[1];
-
-	/* Index */
-	uniform.m_index = 0;
-	xfb.m_index		= 0;
-
-	/* Target */
-	uniform.m_target = Utils::Buffer::Uniform;
-	xfb.m_target	 = Utils::Buffer::Transform_feedback;
-
-	/* Data */
-	const GLuint			rand_start   = Utils::s_rand;
-	std::vector<GLubyte>	uniform_data;
-	GLuint max_aligment = 1;
-
-	for (const testType& type : test_case.m_types)
-	{
-		GLuint base_aligment = type.m_type.GetBaseAlignment(false);
-		if (type.m_array_size > 0)
-		{
-			/**
-			 * Rule 4 of Section 7.6.2.2:
-			 *
-			 * If the member is an array of scalars or vectors, the base alignment and array stride
-			 * are set to match the base alignment of a single array element, according to rules (1),
-			 * (2), and (3), and rounded up to the base alignment of a vec4.
-			 */
-			base_aligment = Utils::align(base_aligment, Utils::Type::vec4.GetBaseAlignment(false));
-		}
-
-		max_aligment = std::max(base_aligment, max_aligment);
-
-		uniform_data.resize(Utils::align(uniform_data.size(), base_aligment), 0);
-
-		for (GLuint i = 0; i < std::max(type.m_array_size, 1u); i++)
-		{
-			const std::vector<GLubyte>& type_uniform_data = type.m_type.GenerateData();
-			uniform_data.insert(uniform_data.end(), type_uniform_data.begin(), type_uniform_data.end());
-
-			if (type.m_array_size > 0)
-			{
-				uniform_data.resize(Utils::align(uniform_data.size(), base_aligment), 0);
-			}
-		}
-	}
-
-	const GLuint struct_aligment = Utils::align(max_aligment, Utils::Type::vec4.GetBaseAlignment(false));
-
-	if (test_case.m_nested_struct)
-	{
-		uniform_data.resize(Utils::align(uniform_data.size(), struct_aligment), 0);
-
-		const GLuint old_size = uniform_data.size();
-		uniform_data.resize(2 * old_size);
-		std::copy_n(uniform_data.begin(), old_size, uniform_data.begin() + old_size);
-	}
-
-	uniform_data.resize(Utils::align(uniform_data.size(), struct_aligment), 0);
-
-	Utils::s_rand = rand_start;
-	std::vector<GLubyte>	xfb_data;
-
-	GLuint max_type_size = 1;
-	for (const testType& type : test_case.m_types)
-	{
-		const GLuint basic_type_size = Utils::Type::GetTypeSize(type.m_type.m_basic_type);
-		max_type_size = std::max(max_type_size, basic_type_size);
-
-		/* Align per current type's aligment requirements */
-		xfb_data.resize(Utils::align(xfb_data.size(), basic_type_size), 0);
-
-		for (GLuint i = 0; i < std::max(type.m_array_size, 1u); i++)
-		{
-			const std::vector<GLubyte>& type_xfb_data = type.m_type.GenerateDataPacked();
-			xfb_data.insert(xfb_data.end(), type_xfb_data.begin(), type_xfb_data.end());
-		}
-	}
-
-	if (test_case.m_nested_struct)
-	{
-		/* Struct has aligment requirement equal to largest requirement of its members */
-		xfb_data.resize(Utils::align(xfb_data.size(), max_type_size), 0);
-
-		const GLuint old_size = xfb_data.size();
-		xfb_data.resize(2 * old_size);
-		std::copy_n(xfb_data.begin(), old_size, xfb_data.begin() + old_size);
-	}
-
-	xfb_data.resize(Utils::align(xfb_data.size(), max_type_size), 0);
-
-	const GLuint uni_type_size = static_cast<GLuint>(uniform_data.size());
-	const GLuint xfb_type_size = static_cast<GLuint>(xfb_data.size());
-
-	/* Do not exceed the minimum value of MAX_TRANSFORM_FEEDBACK_INTERLEAVED_COMPONENTS */
-	DE_ASSERT(xfb_type_size <= 64 * sizeof(GLuint));
-
-	/*
-	 Note: If xfb varying output from vertex shader, the variable "goku" will only output once to transform feedback buffer,
-	 if xfb varying output from TES or GS, because the input primitive type in TES is defined as "layout(isolines, point_mode) in;",
-	 the primitive type is line which make the variable "goku" will output twice to transform feedback buffer, so for vertex shader
-	 only one valid data should be initialized in xfb.m_expected_data
-	 */
-	const GLuint xfb_data_size = (test_case.m_stage == Utils::Shader::VERTEX) ? xfb_type_size : xfb_type_size * 2;
-	/* Uniform data */
-	uniform.m_initial_data.resize(uni_type_size);
-	memcpy(&uniform.m_initial_data[0] + 0 * uni_type_size, &uniform_data[0], uni_type_size);
-
-	/* XFB data */
-	xfb.m_initial_data.resize(xfb_data_size, 0);
-	xfb.m_expected_data.resize(xfb_data_size);
-
-	if (test_case.m_stage == Utils::Shader::VERTEX)
-	{
-		memcpy(&xfb.m_expected_data[0] + 0 * xfb_type_size, &xfb_data[0], xfb_type_size);
-	}
-	else
-	{
-		memcpy(&xfb.m_expected_data[0] + 0 * xfb_type_size, &xfb_data[0], xfb_type_size);
-		memcpy(&xfb.m_expected_data[0] + 1 * xfb_type_size, &xfb_data[0], xfb_type_size);
-	}
-}
-
-/** Get body of main function for given shader stage
- *
- * @param test_case_index  Index of test case
- * @param stage            Shader stage
- * @param out_assignments  Set to empty
- * @param out_calculations Set to empty
- **/
-void XFBExplicitLocationStructTest::getShaderBody(GLuint test_case_index, Utils::Shader::STAGES stage, std::string& out_assignments,
-								  std::string& out_calculations)
-{
-	const testCase& test_case = m_test_cases[test_case_index];
-
-	out_calculations = "";
-
-	static const GLchar* vs_tes_gs = "    goku = uni_goku;\n";
-	static const GLchar* vs_tes_gs_nested = "    goku.inner_struct_a = uni_goku;\n"
-											"    goku.inner_struct_b = uni_goku;\n";
-
-	const GLchar* assignments = "";
-
-	if (test_case.m_stage == stage)
-	{
-		switch (stage)
-		{
-		case Utils::Shader::GEOMETRY:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			if (test_case.m_nested_struct)
-			{
-				assignments = vs_tes_gs_nested;
-			}
-			else
-			{
-				assignments = vs_tes_gs;
-			}
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-	else
-	{
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-			assignments = "";
-			break;
-		case Utils::Shader::GEOMETRY:
-		case Utils::Shader::TESS_CTRL:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-
-	out_assignments = assignments;
-}
-
-/** Get interface of shader
- *
- * @param test_case_index  Index of test case
- * @param stage            Shader stage
- * @param out_interface    Set to ""
- **/
-void XFBExplicitLocationStructTest::getShaderInterface(GLuint test_case_index, Utils::Shader::STAGES stage, std::string& out_interface)
-{
-	static const GLchar* vs_tes_gs = "struct TestStruct {\n"
-									 "STRUCT_MEMBERS"
-									 "};\n"
-									 "layout (location = 0, xfb_offset = 0) flat out TestStruct goku;\n"
-									 "\n"
-									 "layout(std140, binding = 0) uniform Goku {\n"
-									 "    TestStruct uni_goku;\n"
-									 "};\n";
-
-	static const GLchar* vs_tes_gs_nested = "struct TestStruct {\n"
-											"STRUCT_MEMBERS"
-											"};\n"
-											"struct OuterStruct {\n"
-											"    TestStruct inner_struct_a;\n"
-											"    TestStruct inner_struct_b;\n"
-											"};\n"
-											"layout (location = 0, xfb_offset = 0) flat out OuterStruct goku;\n"
-											"\n"
-											"layout(std140, binding = 0) uniform Goku {\n"
-											"    TestStruct uni_goku;\n"
-											"};\n";
-
-	const testCase& test_case = m_test_cases[test_case_index];
-	const GLchar*   interface = "";
-
-	if (test_case.m_stage == stage)
-	{
-		switch (stage)
-		{
-		case Utils::Shader::GEOMETRY:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			if (test_case.m_nested_struct)
-			{
-				interface = vs_tes_gs_nested;
-			}
-			else
-			{
-				interface = vs_tes_gs;
-			}
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-	else
-	{
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-			interface = "";
-			break;
-		case Utils::Shader::GEOMETRY:
-		case Utils::Shader::TESS_CTRL:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			break;
-		default:
-			TCU_FAIL("Invalid enum");
-		}
-	}
-
-	out_interface = interface;
-
-	std::stringstream stream;
-
-	char member_name = 'a';
-	for (const testType& type : test_case.m_types)
-	{
-		stream << "   " << type.m_type.GetGLSLTypeName() << " " << member_name++;
-		if (type.m_array_size > 0)
-		{
-			stream << "[" << type.m_array_size << "]";
-		}
-		stream << ";\n";
-	}
-
-	Utils::replaceAllTokens("STRUCT_MEMBERS", stream.str().c_str(), out_interface);
-}
-
-/** Get source code of shader
- *
- * @param test_case_index Index of test case
- * @param stage           Shader stage
- *
- * @return Source
- **/
-std::string XFBExplicitLocationStructTest::getShaderSource(GLuint test_case_index, Utils::Shader::STAGES stage)
-{
-	std::string		source;
-	const testCase& test_case = m_test_cases[test_case_index];
-
-	switch (test_case.m_stage)
-	{
-	case Utils::Shader::VERTEX:
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-		case Utils::Shader::VERTEX:
-			source = BufferTestBase::getShaderSource(test_case_index, stage);
-			break;
-		default:
-			break;
-		}
-		break;
-
-	case Utils::Shader::TESS_EVAL:
-		switch (stage)
-		{
-		case Utils::Shader::FRAGMENT:
-		case Utils::Shader::TESS_CTRL:
-		case Utils::Shader::TESS_EVAL:
-		case Utils::Shader::VERTEX:
-			source = BufferTestBase::getShaderSource(test_case_index, stage);
-			break;
-		default:
-			break;
-		}
-		break;
-
-	case Utils::Shader::GEOMETRY:
-		source = BufferTestBase::getShaderSource(test_case_index, stage);
-		break;
-
-	default:
-		TCU_FAIL("Invalid enum");
-	}
-
-	/* */
-	return source;
-}
-
-/** Get name of test case
- *
- * @param test_case_index Index of test case
- *
- * @return Name of tested stage
- **/
-std::string XFBExplicitLocationStructTest::getTestCaseName(glw::GLuint test_case_index)
-{
-	std::stringstream stream;
-	const testCase&   test_case = m_test_cases[test_case_index];
-
-	stream << "Struct: { ";
-
-	for (const testType& type : test_case.m_types)
-	{
-		stream << type.m_type.GetGLSLTypeName() << "@" << type.m_array_size << ", ";
-	}
-
-	stream << "}, stage: " << Utils::Shader::GetStageName(test_case.m_stage);
-
-	return stream.str();
-}
-
-/** Returns number of test cases
- *
- * @return TEST_MAX
- **/
-glw::GLuint XFBExplicitLocationStructTest::getTestCaseNumber()
-{
-	return static_cast<GLuint>(m_test_cases.size());
-}
-
-/** Prepare all test cases
- *
- **/
-void XFBExplicitLocationStructTest::testInit()
-{
-	for (GLuint stage = 0; stage < Utils::Shader::STAGE_MAX; ++stage)
-	{
-		if ((Utils::Shader::COMPUTE == stage) || (Utils::Shader::FRAGMENT == stage) ||
-			(Utils::Shader::TESS_CTRL == stage))
-		{
-			continue;
-		}
-
-		const GLuint n_types = getTypesNumber();
-
-		for (GLuint i = 0; i < n_types; ++i)
-		{
-			const Utils::Type& type = getType(i);
-
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_float, 0}, {type, 0} }, false });
-		}
-
-		for (bool is_nested_struct : {false, true})
-		{
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_double, 0}, {Utils::Type::dvec2, 0}, {Utils::Type::dmat3, 0} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_double, 0}, {Utils::Type::vec3, 0} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::dvec3, 0}, {Utils::Type::mat4x3, 0} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_float, 0}, {Utils::Type::dvec3, 0}, {Utils::Type::_float, 0}, {Utils::Type::_double, 0} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::vec2, 0}, {Utils::Type::dvec3, 0}, {Utils::Type::_float, 0}, {Utils::Type::_double, 0} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_double, 0}, {Utils::Type::_float, 0}, {Utils::Type::dvec2, 0}, {Utils::Type::vec3, 0} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::dmat3x4, 0}, {Utils::Type::_double, 0}, {Utils::Type::_float, 0}, {Utils::Type::dvec2, 0} }, is_nested_struct });
-
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_float, 3}, {Utils::Type::dvec3, 0}, {Utils::Type::_double, 2} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_int, 1}, {Utils::Type::_double, 1}, {Utils::Type::_float, 1}, {Utils::Type::dmat2x4, 1} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::_int, 5}, {Utils::Type::dvec3, 2}, {Utils::Type::uvec3, 0}, {Utils::Type::_double, 1} }, is_nested_struct });
-			m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::mat2x3, 3}, {Utils::Type::uvec4, 1}, {Utils::Type::dvec4, 0} }, is_nested_struct });
-		}
-
-		m_test_cases.push_back(testCase{(Utils::Shader::STAGES) stage, { {Utils::Type::dmat2x3, 2}, {Utils::Type::mat2x3, 2}, {Utils::Type::dvec2, 0} }, false });
 	}
 }
 } /* EnhancedLayouts namespace */
@@ -28594,8 +27776,6 @@ void EnhancedLayoutsTests::init(void)
 	addChild(new EnhancedLayouts::XFBOverrideQualifiersWithAPITest(m_context));
 	addChild(new EnhancedLayouts::XFBVertexStreamsTest(m_context));
 	addChild(new EnhancedLayouts::XFBGlobalBufferTest(m_context));
-	addChild(new EnhancedLayouts::XFBExplicitLocationTest(m_context));
-	addChild(new EnhancedLayouts::XFBExplicitLocationStructTest(m_context));
 	addChild(new EnhancedLayouts::FragmentDataLocationAPITest(m_context));
 	addChild(new EnhancedLayouts::VaryingLocationLimitTest(m_context));
 	addChild(new EnhancedLayouts::VaryingComponentsTest(m_context));

@@ -45,7 +45,6 @@ enum RunMode
 	RUNMODE_DUMP_XML_CASELIST,		//! Test program dumps the list of contained test cases in XML format.
 	RUNMODE_DUMP_TEXT_CASELIST,		//! Test program dumps the list of contained test cases in plain-text format.
 	RUNMODE_DUMP_STDOUT_CASELIST,	//! Test program dumps the list of contained test cases in plain-text format into stdout.
-	RUNMODE_VERIFY_AMBER_COHERENCY, //! Test program verifies that amber tests have coherent capability requirements
 
 	RUNMODE_LAST
 };
@@ -127,7 +126,7 @@ private:
 	de::MovePtr<const CasePaths>	m_casePaths;
 	std::vector<int>				m_caseFraction;
 	de::MovePtr<const CasePaths>	m_caseFractionMandatoryTests;
-	tcu::TestRunnerType				m_runnerType;
+	const tcu::TestRunnerType		m_runnerType;
 };
 
 /*--------------------------------------------------------------------*//*!
@@ -231,9 +230,6 @@ public:
 	//! Print validation errors to standard error or keep them in the log only.
 	bool							printValidationErrors			(void) const;
 
-	//! Log of decompiled SPIR-V shader source (--deqp-log-decompiled-spirv)
-	bool							isLogDecompiledSpirvEnabled		(void) const;
-
 	//! Should we run tests that exhaust memory (--deqp-test-oom)
 	bool							isOutOfMemoryTestEnabled		(void) const;
 
@@ -269,9 +265,6 @@ public:
 
 	//! Get runner type (--deqp-runner-type)
 	tcu::TestRunnerType				getRunnerType				(void) const;
-
-	//! Should the run be terminated on first failure (--deqp-terminate-on-fail)
-	bool							isTerminateOnFailEnabled	(void) const;
 
 	/*--------------------------------------------------------------------*//*!
 	 * \brief Creates case list filter
