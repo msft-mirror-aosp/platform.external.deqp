@@ -30,38 +30,31 @@ DeviceFeatures::DeviceFeatures	(const InstanceInterface&			vki,
 								 const deUint32						apiVersion,
 								 const VkPhysicalDevice				physicalDevice,
 								 const std::vector<std::string>&	instanceExtensions,
-								 const std::vector<std::string>&	deviceExtensions,
-								 const deBool						enableAllFeatures)
+								 const std::vector<std::string>&	deviceExtensions)
 {
-	VkPhysicalDeviceRobustness2FeaturesEXT*					robustness2Features					= nullptr;
-	VkPhysicalDeviceImageRobustnessFeaturesEXT*				imageRobustnessFeatures				= nullptr;
-	VkPhysicalDeviceFragmentShadingRateFeaturesKHR*			fragmentShadingRateFeatures			= nullptr;
-	VkPhysicalDeviceShadingRateImageFeaturesNV*				shadingRateImageFeatures			= nullptr;
-	VkPhysicalDeviceFragmentDensityMapFeaturesEXT*			fragmentDensityMapFeatures			= nullptr;
-	VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT*	pageableDeviceLocalMemoryFeatures	= nullptr;
+	VkPhysicalDeviceRobustness2FeaturesEXT*			robustness2Features			= nullptr;
+	VkPhysicalDeviceImageRobustnessFeaturesEXT*		imageRobustnessFeatures		= nullptr;
+	VkPhysicalDeviceFragmentShadingRateFeaturesKHR*	fragmentShadingRateFeatures	= nullptr;
+	VkPhysicalDeviceShadingRateImageFeaturesNV*		shadingRateImageFeatures	= nullptr;
+	VkPhysicalDeviceFragmentDensityMapFeaturesEXT*	fragmentDensityMapFeatures	= nullptr;
 
 	m_coreFeatures2		= initVulkanStructure();
 	m_vulkan11Features	= initVulkanStructure();
 	m_vulkan12Features	= initVulkanStructure();
-	m_vulkan13Features	= initVulkanStructure();
 
 	if (isInstanceExtensionSupported(apiVersion, instanceExtensions, "VK_KHR_get_physical_device_properties2"))
 	{
 		const std::vector<VkExtensionProperties>	deviceExtensionProperties	= enumerateDeviceExtensionProperties(vki, physicalDevice, DE_NULL);
 		void**										nextPtr						= &m_coreFeatures2.pNext;
 		std::vector<FeatureStructWrapperBase*>		featuresToFillFromBlob;
-		bool										vk13Supported				= (apiVersion >= VK_API_VERSION_1_3);
-		bool										vk12Supported				= (apiVersion >= VK_API_VERSION_1_2);
+		bool										vk12Supported				= (apiVersion >= VK_MAKE_VERSION(1, 2, 0));
 
-		// since vk12 we have blob structures combining features of couple previously
-		// available feature structures, that now in vk12+ must be removed from chain
+		// in vk12 we have blob structures combining features of couple previously
+		// available feature structures, that now in vk12 must be removed from chain
 		if (vk12Supported)
 		{
 			addToChainVulkanStructure(&nextPtr, m_vulkan11Features);
 			addToChainVulkanStructure(&nextPtr, m_vulkan12Features);
-
-			if (vk13Supported)
-				addToChainVulkanStructure(&nextPtr, m_vulkan13Features);
 		}
 
 		// iterate over data for all feature that are defined in specification
@@ -77,15 +70,11 @@ DeviceFeatures::DeviceFeatures	(const InstanceInterface&			vki,
 				if (p == DE_NULL)
 					continue;
 
-				// if feature struct is part of VkPhysicalDeviceVulkan1{1,2,3}Features
+				// if feature struct is part of VkPhysicalDeviceVulkan1{1,2}Features
 				// we dont add it to the chain but store and fill later from blob data
 				bool featureFilledFromBlob = false;
 				if (vk12Supported)
-				{
-					deUint32 blobApiVersion = getBlobFeaturesVersion(p->getFeatureDesc().sType);
-					if (blobApiVersion)
-						featureFilledFromBlob = (apiVersion >= blobApiVersion);
-				}
+					featureFilledFromBlob = isPartOfBlobFeatures(p->getFeatureDesc().sType);
 
 				if (featureFilledFromBlob)
 					featuresToFillFromBlob.push_back(p);
@@ -104,8 +93,6 @@ DeviceFeatures::DeviceFeatures	(const InstanceInterface&			vki,
 						shadingRateImageFeatures = reinterpret_cast<VkPhysicalDeviceShadingRateImageFeaturesNV*>(rawStructPtr);
 					else if (structType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_DENSITY_MAP_FEATURES_EXT)
 						fragmentDensityMapFeatures = reinterpret_cast<VkPhysicalDeviceFragmentDensityMapFeaturesEXT*>(rawStructPtr);
-					else if (structType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT)
-						pageableDeviceLocalMemoryFeatures = reinterpret_cast<VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT*>(rawStructPtr);
 
 					// add to chain
 					*nextPtr	= rawStructPtr;
@@ -117,14 +104,13 @@ DeviceFeatures::DeviceFeatures	(const InstanceInterface&			vki,
 
 		vki.getPhysicalDeviceFeatures2(physicalDevice, &m_coreFeatures2);
 
-		// fill data from VkPhysicalDeviceVulkan1{1,2,3}Features
+		// fill data from VkPhysicalDeviceVulkan1{1,2}Features
 		if (vk12Supported)
 		{
 			AllFeaturesBlobs allBlobs =
 			{
 				m_vulkan11Features,
 				m_vulkan12Features,
-				m_vulkan13Features,
 				// add blobs from future vulkan versions here
 			};
 
@@ -135,41 +121,31 @@ DeviceFeatures::DeviceFeatures	(const InstanceInterface&			vki,
 	else
 		m_coreFeatures2.features = getPhysicalDeviceFeatures(vki, physicalDevice);
 
-	// 'enableAllFeatures' is used to create a complete list of supported features.
-	if (!enableAllFeatures)
+	// Disable robustness by default, as it has an impact on performance on some HW.
+	if (robustness2Features)
 	{
-		// Disable robustness by default, as it has an impact on performance on some HW.
-		if (robustness2Features)
-		{
-			robustness2Features->robustBufferAccess2	= false;
-			robustness2Features->robustImageAccess2		= false;
-			robustness2Features->nullDescriptor			= false;
-		}
-		if (imageRobustnessFeatures)
-		{
-			imageRobustnessFeatures->robustImageAccess	= false;
-		}
-		m_coreFeatures2.features.robustBufferAccess = false;
-
-		// Disable VK_EXT_fragment_density_map and VK_NV_shading_rate_image features
-		// that must: not be enabled if KHR fragment shading rate features are enabled.
-		if (fragmentShadingRateFeatures &&
-			(fragmentShadingRateFeatures->pipelineFragmentShadingRate ||
-				fragmentShadingRateFeatures->primitiveFragmentShadingRate ||
-				fragmentShadingRateFeatures->attachmentFragmentShadingRate))
-		{
-			if (shadingRateImageFeatures)
-				shadingRateImageFeatures->shadingRateImage = false;
-			if (fragmentDensityMapFeatures)
-				fragmentDensityMapFeatures->fragmentDensityMap = false;
-		}
+		robustness2Features->robustBufferAccess2	= false;
+		robustness2Features->robustImageAccess2		= false;
+		robustness2Features->nullDescriptor			= false;
 	}
+	if (imageRobustnessFeatures)
+	{
+		imageRobustnessFeatures->robustImageAccess	= false;
+	}
+	m_coreFeatures2.features.robustBufferAccess = false;
 
-	// Disable pageableDeviceLocalMemory by default since it may modify the behavior
-	// of device-local, and even host-local, memory allocations for all tests.
-	// pageableDeviceLocalMemory will use targetted testing on a custom device.
-	if (pageableDeviceLocalMemoryFeatures)
-		pageableDeviceLocalMemoryFeatures->pageableDeviceLocalMemory = false;
+	// Disable VK_EXT_fragment_density_map and VK_NV_shading_rate_image features
+	// that must: not be enabled if KHR fragment shading rate features are enabled.
+	if (fragmentShadingRateFeatures &&
+		(fragmentShadingRateFeatures->pipelineFragmentShadingRate ||
+			fragmentShadingRateFeatures->primitiveFragmentShadingRate ||
+			fragmentShadingRateFeatures->attachmentFragmentShadingRate))
+	{
+		if (shadingRateImageFeatures)
+			shadingRateImageFeatures->shadingRateImage = false;
+		if (fragmentDensityMapFeatures)
+			fragmentDensityMapFeatures->fragmentDensityMap = false;
+	}
 }
 
 bool DeviceFeatures::verifyFeatureAddCriteria (const FeatureStructCreationData& item, const std::vector<VkExtensionProperties>& properties)

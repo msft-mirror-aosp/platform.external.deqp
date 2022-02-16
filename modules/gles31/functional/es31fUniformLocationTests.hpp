@@ -43,7 +43,7 @@ typedef std::vector<glu::StructType*> StructList;
 class UniformLocationTests : public TestCaseGroup
 {
 public:
-							UniformLocationTests	(Context& context, bool isGL45);
+							UniformLocationTests	(Context& context);
 	virtual					~UniformLocationTests	(void);
 
 	void					init					(void);
@@ -53,8 +53,6 @@ private:
 	UniformLocationTests&	operator=				(const UniformLocationTests& other);
 
 	StructList				structTypes;
-
-	bool					m_isGL45;
 };
 
 } // Functional

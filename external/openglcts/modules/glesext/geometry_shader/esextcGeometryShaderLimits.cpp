@@ -1747,8 +1747,6 @@ GeometryShaderMaxOutputComponentsTest::GeometryShaderMaxOutputComponentsTest(Con
 																			 const ExtParameters& extParams,
 																			 const char* name, const char* description)
 	: GeometryShaderLimitsRenderingBase(context, extParams, name, description)
-	, m_fragment_shader_code_c_str(0)
-	, m_geometry_shader_code_c_str(0)
 	, m_texture_width(0)
 	, m_max_output_components(0)
 	, m_max_output_vectors(0)
@@ -2080,8 +2078,6 @@ tcu::TestCase::IterateResult GeometryShaderMaxOutputVerticesTest::iterate()
 GeometryShaderMaxOutputComponentsSinglePointTest::GeometryShaderMaxOutputComponentsSinglePointTest(
 	Context& context, const ExtParameters& extParams, const char* name, const char* description)
 	: GeometryShaderLimitsRenderingBase(context, extParams, name, description)
-	, m_fragment_shader_code_c_str(0)
-	, m_geometry_shader_code_c_str(0)
 	, m_max_output_components(0)
 	, m_max_output_vectors(0)
 	, m_n_available_vectors(0)

@@ -269,7 +269,6 @@ struct OcclusionQueryTestVector
 	bool						queryResultsAvailability;
 	vk::VkPrimitiveTopology		primitiveTopology;
 	bool						discardHalf;
-	deBool						queryResultsDstOffset;
 };
 
 class BasicOcclusionQueryTestInstance : public vkt::TestInstance
@@ -559,11 +558,7 @@ OcclusionQueryTestInstance::OcclusionQueryTestInstance (vkt::Context &context, c
 
 	if (m_testVector.queryResultsMode == RESULTS_MODE_COPY || m_testVector.queryResultsMode == RESULTS_MODE_COPY_RESET)
 	{
-		deUint32				numQueriesinPool			= NUM_QUERIES_IN_POOL + (m_testVector.queryResultsDstOffset ? 1 : 0);
-		const vk::VkDeviceSize	elementSize					= m_testVector.queryResultSize == RESULT_SIZE_32_BIT ? sizeof(deUint32) : sizeof(deUint64);
-		const vk::VkDeviceSize	resultsBufferSize			= m_testVector.queryResultsStride == 0
-															? (elementSize + elementSize * m_testVector.queryResultsAvailability) * numQueriesinPool
-															: m_testVector.queryResultsStride * numQueriesinPool;
+		const vk::VkDeviceSize	resultsBufferSize			= m_testVector.queryResultsStride * NUM_QUERIES_IN_POOL;
 								m_queryPoolResultsBuffer	= Buffer::createAndAlloc(vk, device, BufferCreateInfo(resultsBufferSize, vk::VK_BUFFER_USAGE_TRANSFER_DST_BIT), m_context.getDefaultAllocator(), vk::MemoryRequirement::HostVisible);
 	}
 
@@ -857,23 +852,7 @@ vk::Move<vk::VkCommandBuffer> OcclusionQueryTestInstance::recordRender (vk::VkCo
 	if ((m_testVector.queryResultsMode == RESULTS_MODE_COPY || m_testVector.queryResultsMode == RESULTS_MODE_COPY_RESET)
 		&& !hasSeparateCopyCmdBuf())
 	{
-		vk::VkDeviceSize dstOffset = m_testVector.queryResultsDstOffset ? m_testVector.queryResultsStride : 0u;
-
-		if (m_testVector.queryResultsStride != 0u)
-		{
-			vk.cmdCopyQueryPoolResults(*cmdBuffer, m_queryPool, 0, NUM_QUERIES_IN_POOL, m_queryPoolResultsBuffer->object(), dstOffset, m_testVector.queryResultsStride, m_queryResultFlags);
-		}
-		else
-		{
-			const vk::VkDeviceSize	elementSize	= m_testVector.queryResultSize == RESULT_SIZE_32_BIT ? sizeof(deUint32) : sizeof(deUint64);
-			const vk::VkDeviceSize	strideSize	= elementSize + elementSize * m_testVector.queryResultsAvailability;
-
-			for (int queryNdx = 0; queryNdx < NUM_QUERIES_IN_POOL; queryNdx++)
-			{
-				vk.cmdCopyQueryPoolResults(*cmdBuffer, m_queryPool, queryNdx, 1, m_queryPoolResultsBuffer->object(), strideSize * queryNdx, 0, m_queryResultFlags);
-			}
-		}
-
+		vk.cmdCopyQueryPoolResults(*cmdBuffer, m_queryPool, 0, NUM_QUERIES_IN_POOL, m_queryPoolResultsBuffer->object(), /*dstOffset*/ 0, m_testVector.queryResultsStride, m_queryResultFlags);
 		bufferBarrier(vk, *cmdBuffer, m_queryPoolResultsBuffer->object(), vk::VK_ACCESS_TRANSFER_WRITE_BIT, vk::VK_ACCESS_HOST_READ_BIT, vk::VK_PIPELINE_STAGE_TRANSFER_BIT, vk::VK_PIPELINE_STAGE_HOST_BIT);
 	}
 
@@ -894,26 +873,8 @@ vk::Move<vk::VkCommandBuffer> OcclusionQueryTestInstance::recordCopyResults (vk:
 	vk::Move<vk::VkCommandBuffer>	cmdBuffer	(vk::allocateCommandBuffer(vk, device, cmdPool, vk::VK_COMMAND_BUFFER_LEVEL_PRIMARY));
 
 	beginCommandBuffer(vk, *cmdBuffer);
-
-	vk::VkDeviceSize dstOffset = m_testVector.queryResultsDstOffset ? m_testVector.queryResultsStride : 0u;
-
-	if (m_testVector.queryResultsStride != 0u)
-	{
-		vk.cmdCopyQueryPoolResults(*cmdBuffer, m_queryPool, 0, NUM_QUERIES_IN_POOL, m_queryPoolResultsBuffer->object(), dstOffset, m_testVector.queryResultsStride, m_queryResultFlags);
-	}
-	else
-	{
-		const vk::VkDeviceSize	elementSize	= m_testVector.queryResultSize == RESULT_SIZE_32_BIT ? sizeof(deUint32) : sizeof(deUint64);
-		const vk::VkDeviceSize	strideSize	= elementSize + elementSize * m_testVector.queryResultsAvailability;
-
-		for (int queryNdx = 0; queryNdx < NUM_QUERIES_IN_POOL; queryNdx++)
-		{
-			vk.cmdCopyQueryPoolResults(*cmdBuffer, m_queryPool, queryNdx, 1, m_queryPoolResultsBuffer->object(), strideSize * queryNdx, 0, m_queryResultFlags);
-		}
-	}
-
+	vk.cmdCopyQueryPoolResults(*cmdBuffer, m_queryPool, 0, NUM_QUERIES_IN_POOL, m_queryPoolResultsBuffer->object(), /*dstOffset*/ 0, m_testVector.queryResultsStride, m_queryResultFlags);
 	bufferBarrier(vk, *cmdBuffer, m_queryPoolResultsBuffer->object(), vk::VK_ACCESS_TRANSFER_WRITE_BIT, vk::VK_ACCESS_HOST_READ_BIT, vk::VK_PIPELINE_STAGE_TRANSFER_BIT, vk::VK_PIPELINE_STAGE_HOST_BIT);
-
 	endCommandBuffer(vk, *cmdBuffer);
 
 	return cmdBuffer;
@@ -921,13 +882,10 @@ vk::Move<vk::VkCommandBuffer> OcclusionQueryTestInstance::recordCopyResults (vk:
 
 void OcclusionQueryTestInstance::captureResults (deUint64* retResults, deUint64* retAvailAbility, bool allowNotReady)
 {
+
 	const vk::VkDevice			device			= m_context.getDevice();
 	const vk::DeviceInterface&	vk				= m_context.getDeviceInterface();
-	const vk::VkDeviceSize		elementSize		= m_testVector.queryResultSize == RESULT_SIZE_32_BIT ? sizeof(deUint32) : sizeof(deUint64);
-	const vk::VkDeviceSize		resultsSize		= m_testVector.queryResultsStride == 0
-												? elementSize + elementSize * m_testVector.queryResultsAvailability
-												: m_testVector.queryResultsStride;
-	std::vector<deUint8>		resultsBuffer	(static_cast<size_t>(resultsSize * NUM_QUERIES_IN_POOL));
+	std::vector<deUint8>		resultsBuffer	(static_cast<size_t>(m_testVector.queryResultsStride) * NUM_QUERIES_IN_POOL);
 
 	if (m_testVector.queryResultsMode == RESULTS_MODE_GET || m_testVector.queryResultsMode == RESULTS_MODE_GET_RESET)
 	{
@@ -944,18 +902,16 @@ void OcclusionQueryTestInstance::captureResults (deUint64* retResults, deUint64*
 	else if (m_testVector.queryResultsMode == RESULTS_MODE_COPY || m_testVector.queryResultsMode == RESULTS_MODE_COPY_RESET)
 	{
 		const vk::Allocation& allocation = m_queryPoolResultsBuffer->getBoundMemory();
-		const deUint8* allocationData = static_cast<deUint8*>(allocation.getHostPtr());
-		const deInt32 indexData = m_testVector.queryResultsDstOffset ? (deInt32)m_testVector.queryResultsStride : 0u;
+		const void* allocationData = allocation.getHostPtr();
 
 		vk::invalidateAlloc(vk, device, allocation);
 
-		deMemcpy(&resultsBuffer[0], &allocationData[indexData], resultsBuffer.size());
+		deMemcpy(&resultsBuffer[0], allocationData, resultsBuffer.size());
 	}
 
 	for (int queryNdx = 0; queryNdx < NUM_QUERIES_IN_POOL; queryNdx++)
 	{
-		const void* srcPtr = &resultsBuffer[queryNdx * static_cast<size_t>(resultsSize)];
-
+		const void* srcPtr = &resultsBuffer[queryNdx * static_cast<size_t>(m_testVector.queryResultsStride)];
 		if (m_testVector.queryResultSize == RESULT_SIZE_32_BIT)
 		{
 			const deUint32* srcPtrTyped = static_cast<const deUint32*>(srcPtr);
@@ -984,7 +940,6 @@ void OcclusionQueryTestInstance::captureResults (deUint64* retResults, deUint64*
 	if (m_testVector.queryResultsMode == RESULTS_MODE_GET_RESET)
 	{
 		vk.resetQueryPool(device, m_queryPool, 0, NUM_QUERIES_IN_POOL);
-
 		vk::VkResult queryResult = vk.getQueryPoolResults(device, m_queryPool, 0, NUM_QUERIES_IN_POOL, resultsBuffer.size(), &resultsBuffer[0], m_testVector.queryResultsStride, m_queryResultFlags);
 
 		if (queryResult != vk::VK_NOT_READY)
@@ -1000,7 +955,7 @@ void OcclusionQueryTestInstance::captureResults (deUint64* retResults, deUint64*
 		 */
 		for (int queryNdx = 0; queryNdx < NUM_QUERIES_IN_POOL; queryNdx++)
 		{
-			const void* srcPtr = &resultsBuffer[queryNdx * static_cast<size_t>(resultsSize)];
+			const void* srcPtr = &resultsBuffer[queryNdx * static_cast<size_t>(m_testVector.queryResultsStride)];
 			if (m_testVector.queryResultSize == RESULT_SIZE_32_BIT)
 			{
 				const deUint32* srcPtrTyped = static_cast<const deUint32*>(srcPtr);
@@ -1360,9 +1315,6 @@ void QueryPoolOcclusionTests::init (void)
 			const OcclusionQueryResultSize	resultSizes[]	= { RESULT_SIZE_32_BIT, RESULT_SIZE_64_BIT };
 			const char* const				resultSizeStr[] = { "32", "64" };
 
-			const deBool		copyQueryDstOffset[] =		{ DE_TRUE,		DE_FALSE };
-			const char *const	copyQueryDstOffsetStr[] =	{ "_dstoffset",	""};
-
 			const bool			testAvailability[]		= { false,		true	};
 			const char* const	testAvailabilityStr[]	= { "without",	"with"	};
 
@@ -1383,7 +1335,6 @@ void QueryPoolOcclusionTests::init (void)
 					// \todo [2015-12-18 scygan] Ensure only stride values aligned to resultSize are allowed. Otherwise test should be extended.
 					const vk::VkDeviceSize strides[]	=
 					{
-						0u,
 						1 * resultSize,
 						2 * resultSize,
 						3 * resultSize,
@@ -1393,54 +1344,34 @@ void QueryPoolOcclusionTests::init (void)
 						1024 * resultSize
 					};
 
-					for (int dstOffsetIdx = 0; dstOffsetIdx < DE_LENGTH_OF_ARRAY(copyQueryDstOffset); dstOffsetIdx++)
+					for (int strideIdx = 0; strideIdx < DE_LENGTH_OF_ARRAY(strides); strideIdx++)
 					{
-						for (int strideIdx = 0; strideIdx < DE_LENGTH_OF_ARRAY(strides); strideIdx++)
+						OcclusionQueryTestVector testVector		= baseTestVector;
+						testVector.queryResultsMode				= resultsMode[resultsModeIdx];
+						testVector.queryResultSize				= resultSizes[resultSizeIdx];
+						testVector.queryResultsAvailability		= testAvailability[testAvailabilityIdx];
+						testVector.queryResultsStride			= strides[strideIdx];
+
+						const vk::VkDeviceSize elementSize		= (testVector.queryResultsAvailability ? resultSize * 2 : resultSize);
+
+						if (elementSize > testVector.queryResultsStride)
 						{
-							OcclusionQueryTestVector testVector		= baseTestVector;
-							testVector.queryResultsMode				= resultsMode[resultsModeIdx];
-							testVector.queryResultSize				= resultSizes[resultSizeIdx];
-							testVector.queryResultsAvailability		= testAvailability[testAvailabilityIdx];
-							testVector.queryResultsStride			= strides[strideIdx];
-							testVector.queryResultsDstOffset		= copyQueryDstOffset[dstOffsetIdx];
-
-							const vk::VkDeviceSize elementSize		= (testVector.queryResultsAvailability ? resultSize * 2 : resultSize);
-
-							if (elementSize > testVector.queryResultsStride && strides[strideIdx] != 0)
-							{
-								continue;
-							}
-
-							if (strides[strideIdx] == 0)
-							{
-								// Due to the nature of the test, the dstOffset is tested automatically when stride size is 0.
-								if (testVector.queryResultsDstOffset)
-								{
-									continue;
-								}
-
-								// We are testing only VkCmdCopyQueryPoolResults with stride 0.
-								if (testVector.queryResultsMode != RESULTS_MODE_COPY)
-								{
-									continue;
-								}
-							}
-
-							std::ostringstream testName;
-							std::ostringstream testDescr;
-
-							testName << resultsModeStr[resultsModeIdx]
-									 << "_results_size_" << resultSizeStr[resultSizeIdx]
-									 << "_stride_" << strides[strideIdx]
-									 << "_" << testAvailabilityStr[testAvailabilityIdx] << "_availability"
-									 << copyQueryDstOffsetStr[dstOffsetIdx];
-
-							testDescr << resultsModeStr[resultsModeIdx] << " results "
-									  << testAvailabilityStr[testAvailabilityIdx] << " availability bit as "
-									  << resultSizeStr[resultSizeIdx] << "bit variables, with stride" << strides[strideIdx];
-
-							addChild(new QueryPoolOcclusionTest<OcclusionQueryTestInstance>(m_testCtx, testName.str().c_str(), testDescr.str().c_str(), testVector));
+							continue;
 						}
+
+						std::ostringstream testName;
+						std::ostringstream testDescr;
+
+						testName << resultsModeStr[resultsModeIdx]
+								 << "_results_size_" << resultSizeStr[resultSizeIdx]
+								 << "_stride_" << strides[strideIdx]
+								 << "_" << testAvailabilityStr[testAvailabilityIdx] << "_availability";
+
+						testDescr << resultsModeStr[resultsModeIdx] << " results "
+								  << testAvailabilityStr[testAvailabilityIdx] << " availability bit as "
+								  << resultSizeStr[resultSizeIdx] << "bit variables, with stride" << strides[strideIdx];
+
+						addChild(new QueryPoolOcclusionTest<OcclusionQueryTestInstance>(m_testCtx, testName.str().c_str(), testDescr.str().c_str(), testVector));
 					}
 				}
 			}

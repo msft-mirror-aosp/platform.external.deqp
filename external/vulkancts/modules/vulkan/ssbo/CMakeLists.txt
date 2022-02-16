@@ -1,6 +1,5 @@
 include_directories(
 	..
-	${DEQP_INL_DIR}
 )
 
 set(DEQP_VK_SSBO_SRCS
@@ -8,10 +7,6 @@ set(DEQP_VK_SSBO_SRCS
 	vktSSBOLayoutCase.hpp
 	vktSSBOLayoutTests.cpp
 	vktSSBOLayoutTests.hpp
-	vktSSBOCornerCase.cpp
-	vktSSBOCornerCase.hpp
-	../util/vktTypeComparisonUtil.cpp
-	../util/vktTypeComparisonUtil.hpp
 )
 
 set(DEQP_VK_SSBO_LIBS
