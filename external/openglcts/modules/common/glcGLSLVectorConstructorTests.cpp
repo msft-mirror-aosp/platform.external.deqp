@@ -426,8 +426,6 @@ GLSLVectorConstructorTestCase::GLSLVectorConstructorTestCase(deqp::Context& cont
 	: TestCase(context, params.name.c_str(), params.description.c_str())
 	, m_glslVersion(glslVersion)
 	, m_params(params)
-	, m_fboId(0)
-	, m_rboId(0)
 {
 	switch(m_params.testType)
 	{
@@ -474,6 +472,7 @@ GLSLVectorConstructorTestCase::IterateResult GLSLVectorConstructorTestCase::iter
 			return STOP;
 		default:
 			TCU_FAIL("Shader compilation failed:\nVertex shader:\n" + m_vertexShader + "\nFragment shader:\n" + m_fragmentShader);
+			break;
 		}
 	}
 

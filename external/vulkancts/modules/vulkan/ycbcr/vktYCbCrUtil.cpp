@@ -38,8 +38,6 @@
 #include "deSTLUtil.hpp"
 #include "deUniquePtr.hpp"
 
-#include <limits>
-
 namespace vkt
 {
 namespace ycbcr

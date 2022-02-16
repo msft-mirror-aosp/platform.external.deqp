@@ -165,7 +165,6 @@ private:
 TestFunctionWrapper::TestFunctionWrapper (void)
 	: m_type(TYPE_NULL)
 {
-	m_func.coreFn = 0;
 }
 
 TestFunctionWrapper::TestFunctionWrapper (CoreTestFunc func)
@@ -2804,9 +2803,9 @@ GroupStackDepthQueryCase::IterateResult GroupStackDepthQueryCase::iterate (void)
 	return STOP;
 }
 
-extern "C" void GLW_APIENTRY emptyCallback(GLenum, GLenum, GLuint, GLenum, GLsizei, const char*, const void*)
+extern "C" void GLW_APIENTRY dummyCallback(GLenum, GLenum, GLuint, GLenum, GLsizei, const char*, const void*)
 {
-	// empty
+	// dummy
 }
 
 class DebugCallbackFunctionCase : public TestCase
@@ -2840,8 +2839,8 @@ DebugCallbackFunctionCase::IterateResult DebugCallbackFunctionCase::iterate (voi
 	{
 		const tcu::ScopedLogSection	section(m_testCtx.getLog(), "Set", "Set");
 
-		gl.glDebugMessageCallback(emptyCallback, DE_NULL);
-		verifyStatePointer(result, gl, GL_DEBUG_CALLBACK_FUNCTION, (const void*)emptyCallback, QUERY_POINTER);
+		gl.glDebugMessageCallback(dummyCallback, DE_NULL);
+		verifyStatePointer(result, gl, GL_DEBUG_CALLBACK_FUNCTION, (const void*)dummyCallback, QUERY_POINTER);
 	}
 
 	result.setTestContextResult(m_testCtx);
@@ -2881,7 +2880,7 @@ DebugCallbackUserParamCase::IterateResult DebugCallbackUserParamCase::iterate (v
 		const tcu::ScopedLogSection	section	(m_testCtx.getLog(), "Set", "Set");
 		const void*					param	= (void*)(int*)0x123;
 
-		gl.glDebugMessageCallback(emptyCallback, param);
+		gl.glDebugMessageCallback(dummyCallback, param);
 		verifyStatePointer(result, gl, GL_DEBUG_CALLBACK_USER_PARAM, param, QUERY_POINTER);
 	}
 

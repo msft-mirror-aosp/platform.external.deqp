@@ -317,28 +317,23 @@ PACKAGES = [
 	GitRepo(
 		"https://github.com/KhronosGroup/SPIRV-Tools.git",
 		None,
-		"20b122b2e0d43fcc322a383354d1a3f4514e3757",
+		"e065c482c6c98ef22900822d32a21df8c5473054",
 		"spirv-tools"),
 	GitRepo(
 		"https://github.com/KhronosGroup/glslang.git",
 		None,
-		"c34bb3b6c55f6ab084124ad964be95a699700d34",
+		"5c4f421121c4d24aad23a507e630dc5dc6c92c7c",
 		"glslang",
 		removeTags = ["master-tot"]),
 	GitRepo(
 		"https://github.com/KhronosGroup/SPIRV-Headers.git",
 		None,
-		"b42ba6d92faf6b4938e6f22ddd186dbdacc98d78",
+		"449bc986ba6f4c5e10e32828783f9daef2a77644",
 		"spirv-headers"),
-	GitRepo(
-		"https://github.com/KhronosGroup/Vulkan-Docs.git",
-		None,
-		"ee155139142a2a71b56238419bf0a6859f7b0a93",
-		"vulkan-docs"),
 	GitRepo(
 		"https://github.com/google/amber.git",
 		None,
-		"615ab4863f7d2e31d3037d0c6a0f641fd6fc0d07",
+		"dabae26164714abf951c6815a2b4513260f7c6a4",
 		"amber"),
 ]
 

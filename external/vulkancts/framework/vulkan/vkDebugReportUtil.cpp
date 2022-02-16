@@ -134,19 +134,9 @@ VKAPI_ATTR VkBool32	VKAPI_CALL debugReportCallback (VkDebugReportFlagsEXT		flags
 	return VK_FALSE;
 }
 
-} // anonymous
-
-DebugReportRecorder::DebugReportRecorder (bool printValidationErrors)
-	: m_messages		(1024)
-	, m_print_errors	(printValidationErrors)
-{
-}
-
-DebugReportRecorder::~DebugReportRecorder (void)
-{
-}
-
-VkDebugReportCallbackCreateInfoEXT DebugReportRecorder::makeCreateInfo (void)
+Move<VkDebugReportCallbackEXT> createCallback (const InstanceInterface&				vki,
+											   VkInstance							instance,
+											   DebugReportRecorder*					recorder)
 {
 	const VkDebugReportFlagsEXT					allFlags	= VK_DEBUG_REPORT_INFORMATION_BIT_EXT
 															| VK_DEBUG_REPORT_WARNING_BIT_EXT
@@ -157,19 +147,26 @@ VkDebugReportCallbackCreateInfoEXT DebugReportRecorder::makeCreateInfo (void)
 	const VkDebugReportCallbackCreateInfoEXT	createInfo	=
 	{
 		VK_STRUCTURE_TYPE_DEBUG_REPORT_CALLBACK_CREATE_INFO_EXT,
-		nullptr,
+		DE_NULL,
 		allFlags,
 		debugReportCallback,
-		this,
+		recorder,
 	};
 
-	return createInfo;
+	return createDebugReportCallbackEXT(vki, instance, &createInfo);
 }
 
-Move<VkDebugReportCallbackEXT> DebugReportRecorder::createCallback (const InstanceInterface& vki, VkInstance instance)
+} // anonymous
+
+DebugReportRecorder::DebugReportRecorder (const InstanceInterface& vki, VkInstance instance, bool printValidationErrors)
+	: m_messages		(1024)
+	, m_callback		(createCallback(vki, instance, this))
+	, m_print_errors	(printValidationErrors)
 {
-	const auto createInfo = makeCreateInfo();
-	return createDebugReportCallbackEXT(vki, instance, &createInfo);
+}
+
+DebugReportRecorder::~DebugReportRecorder (void)
+{
 }
 
 bool isDebugReportSupported (const PlatformInterface& vkp)
