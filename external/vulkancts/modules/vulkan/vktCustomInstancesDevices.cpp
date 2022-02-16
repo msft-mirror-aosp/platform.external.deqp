@@ -25,13 +25,10 @@
 #include "vkRefUtil.hpp"
 #include "vkQueryUtil.hpp"
 #include "vkDeviceUtil.hpp"
-#include "vkDebugReportUtil.hpp"
 #include "tcuCommandLine.hpp"
 #include "vktCustomInstancesDevices.hpp"
 
 #include <algorithm>
-#include <memory>
-#include <set>
 
 using std::vector;
 using std::string;
@@ -39,8 +36,6 @@ using vk::Move;
 using vk::VkInstance;
 using vk::InstanceDriver;
 using vk::DebugReportRecorder;
-using vk::VkDebugReportCallbackCreateInfoEXT;
-using vk::VkDebugReportCallbackEXT;
 
 namespace vkt
 {
@@ -93,21 +88,19 @@ vector<const char*> getValidationLayers (const vk::InstanceInterface& vki, vk::V
 	return getValidationLayers(enumerateDeviceLayerProperties(vki, physicalDevice));
 }
 
-CustomInstance::CustomInstance (Context& context, Move<VkInstance> instance, std::unique_ptr<vk::DebugReportRecorder>& recorder)
+CustomInstance::CustomInstance (Context& context, Move<VkInstance> instance, bool enableDebugReportRecorder, bool printValidationErrors)
 	: m_context		(&context)
-	, m_recorder	(recorder.release())
 	, m_instance	(instance)
 	, m_driver		(new InstanceDriver(context.getPlatformInterface(), *m_instance))
-	, m_callback	(m_recorder ? m_recorder->createCallback(*m_driver, *m_instance) : Move<VkDebugReportCallbackEXT>())
+	, m_recorder	(enableDebugReportRecorder ? (new DebugReportRecorder(*m_driver, *m_instance, printValidationErrors)) : nullptr)
 {
 }
 
 CustomInstance::CustomInstance ()
 	: m_context		(nullptr)
-	, m_recorder	(nullptr)
 	, m_instance	()
 	, m_driver		(nullptr)
-	, m_callback	()
+	, m_recorder	(nullptr)
 {
 }
 
@@ -133,10 +126,9 @@ CustomInstance&	CustomInstance::operator= (CustomInstance&& other)
 void CustomInstance::swap (CustomInstance& other)
 {
 	std::swap(m_context, other.m_context);
-	m_recorder.swap(other.m_recorder);
 	Move<VkInstance> aux = m_instance; m_instance = other.m_instance; other.m_instance = aux;
 	m_driver.swap(other.m_driver);
-	Move<VkDebugReportCallbackEXT> aux2 = m_callback; m_callback = other.m_callback; other.m_callback = aux2;
+	m_recorder.swap(other.m_recorder);
 }
 
 CustomInstance::operator VkInstance () const
@@ -157,21 +149,19 @@ void CustomInstance::collectMessages ()
 
 UncheckedInstance::UncheckedInstance ()
 	: m_context		(nullptr)
-	, m_recorder	(nullptr)
 	, m_allocator	(nullptr)
 	, m_instance	(DE_NULL)
 	, m_driver		(nullptr)
-	, m_callback	()
+	, m_recorder	(nullptr)
 {
 }
 
-UncheckedInstance::UncheckedInstance (Context& context, vk::VkInstance instance, const vk::VkAllocationCallbacks* pAllocator, std::unique_ptr<DebugReportRecorder>& recorder)
+UncheckedInstance::UncheckedInstance (Context& context, vk::VkInstance instance, const vk::VkAllocationCallbacks* pAllocator, bool enableDebugReportRecorder, bool printValidationErrors)
 	: m_context		(&context)
-	, m_recorder	(recorder.release())
 	, m_allocator	(pAllocator)
 	, m_instance	(instance)
 	, m_driver		((m_instance != DE_NULL) ? new InstanceDriver(context.getPlatformInterface(), m_instance) : nullptr)
-	, m_callback	(m_recorder ? m_recorder->createCallback(*m_driver, m_instance) : Move<VkDebugReportCallbackEXT>())
+	, m_recorder	((enableDebugReportRecorder && m_instance != DE_NULL) ? (new DebugReportRecorder(*m_driver, m_instance, printValidationErrors)) : nullptr)
 {
 }
 
@@ -190,11 +180,10 @@ UncheckedInstance::~UncheckedInstance ()
 void UncheckedInstance::swap (UncheckedInstance& other)
 {
 	std::swap(m_context, other.m_context);
-	m_recorder.swap(other.m_recorder);
 	std::swap(m_allocator, other.m_allocator);
 	vk::VkInstance aux = m_instance; m_instance = other.m_instance; other.m_instance = aux;
 	m_driver.swap(other.m_driver);
-	Move<VkDebugReportCallbackEXT> aux2 = m_callback; m_callback = other.m_callback; other.m_callback = aux2;
+	m_recorder.swap(other.m_recorder);
 }
 
 UncheckedInstance::UncheckedInstance (UncheckedInstance&& other)
@@ -225,54 +214,36 @@ CustomInstance createCustomInstanceWithExtensions (Context& context, const std::
 	vector<const char*>	enabledLayers;
 	vector<string>		enabledLayersStr;
 	const auto&			cmdLine					= context.getTestContext().getCommandLine();
-	const bool			validationRequested		= (cmdLine.isValidationEnabled() && allowLayers);
+	const bool			validationEnabled		= (cmdLine.isValidationEnabled() && allowLayers);
 	const bool			printValidationErrors	= cmdLine.printValidationErrors();
 
-	if (validationRequested)
+	if (validationEnabled)
 	{
 		enabledLayers = getValidationLayers(context.getPlatformInterface());
 		enabledLayersStr = vector<string>(begin(enabledLayers), end(enabledLayers));
 	}
 
-	const bool validationEnabled = !enabledLayers.empty();
-
 	// Filter extension list and throw NotSupported if a required extension is not supported.
 	const deUint32									apiVersion			= context.getUsedApiVersion();
 	const vk::PlatformInterface&					vkp					= context.getPlatformInterface();
-	const vector<vk::VkExtensionProperties>			availableExtensions	= vk::enumerateInstanceExtensionProperties(vkp, DE_NULL);
-	std::set<string>								usedExtensions;
+	const std::vector<vk::VkExtensionProperties>	availableExtensions	= vk::enumerateInstanceExtensionProperties(vkp, DE_NULL);
+	vector<string>									extensionPtrs;
 
-	// Get list of available extension names.
 	vector<string> availableExtensionNames;
 	for (const auto& ext : availableExtensions)
 		availableExtensionNames.push_back(ext.extensionName);
 
-	// Filter duplicates and remove core extensions.
 	for (const auto& ext : extensions)
-	{
-		if (!vk::isCoreInstanceExtension(apiVersion, ext))
-			usedExtensions.insert(ext);
-	}
-
-	// Add debug extension if validation is enabled.
-	if (validationEnabled)
-		usedExtensions.insert("VK_EXT_debug_report");
-
-	// Check extension support.
-	for (const auto& ext : usedExtensions)
 	{
 		if (!vk::isInstanceExtensionSupported(apiVersion, availableExtensionNames, ext))
 			TCU_THROW(NotSupportedError, ext + " is not supported");
+
+		if (!vk::isCoreInstanceExtension(apiVersion, ext))
+			extensionPtrs.push_back(ext);
 	}
 
-	std::unique_ptr<DebugReportRecorder> debugReportRecorder;
-	if (validationEnabled)
-		debugReportRecorder.reset(new DebugReportRecorder(printValidationErrors));
-
-	// Create custom instance.
-	const vector<string> usedExtensionsVec(begin(usedExtensions), end(usedExtensions));
-	Move<VkInstance> instance = vk::createDefaultInstance(vkp, apiVersion, enabledLayersStr, usedExtensionsVec, debugReportRecorder.get(), pAllocator);
-	return CustomInstance(context, instance, debugReportRecorder);
+	Move<VkInstance> instance = vk::createDefaultInstance(vkp, apiVersion, enabledLayersStr, extensionPtrs, pAllocator);
+	return CustomInstance(context, instance, validationEnabled, printValidationErrors);
 }
 
 CustomInstance createCustomInstanceWithExtension (Context& context, const std::string& extension, const vk::VkAllocationCallbacks* pAllocator, bool allowLayers)
@@ -310,15 +281,13 @@ vector<const char*> addDebugReportExt(const vk::PlatformInterface& vkp, const vk
 
 CustomInstance createCustomInstanceFromInfo (Context& context, const vk::VkInstanceCreateInfo* instanceCreateInfo, const vk::VkAllocationCallbacks* pAllocator, bool allowLayers)
 {
-	vector<const char*>						enabledLayers;
-	vector<const char*>						enabledExtensions;
-	vk::VkInstanceCreateInfo				createInfo				= *instanceCreateInfo;
-	const auto&								cmdLine					= context.getTestContext().getCommandLine();
-	const bool								validationEnabled		= cmdLine.isValidationEnabled();
-	const bool								printValidationErrors	= cmdLine.printValidationErrors();
-	const vk::PlatformInterface&			vkp						= context.getPlatformInterface();
-	std::unique_ptr<DebugReportRecorder>	recorder;
-	VkDebugReportCallbackCreateInfoEXT		callbackInfo;
+	vector<const char*>				enabledLayers;
+	vector<const char*>				enabledExtensions;
+	vk::VkInstanceCreateInfo		createInfo				= *instanceCreateInfo;
+	const auto&						cmdLine					= context.getTestContext().getCommandLine();
+	const bool						validationEnabled		= cmdLine.isValidationEnabled();
+	const bool						printValidationErrors	= cmdLine.printValidationErrors();
+	const vk::PlatformInterface&	vkp						= context.getPlatformInterface();
 
 	if (validationEnabled && allowLayers)
 	{
@@ -334,28 +303,21 @@ CustomInstance createCustomInstanceFromInfo (Context& context, const vk::VkInsta
 		enabledExtensions = addDebugReportExt(vkp, createInfo);
 		createInfo.enabledExtensionCount = static_cast<deUint32>(enabledExtensions.size());
 		createInfo.ppEnabledExtensionNames = enabledExtensions.data();
-
-		recorder.reset(new DebugReportRecorder(printValidationErrors));
-		callbackInfo		= recorder->makeCreateInfo();
-		callbackInfo.pNext	= createInfo.pNext;
-		createInfo.pNext	= &callbackInfo;
 	}
 
-	return CustomInstance(context, vk::createInstance(vkp, &createInfo, pAllocator), recorder);
+	return CustomInstance(context, vk::createInstance(vkp, &createInfo, pAllocator), validationEnabled, printValidationErrors);
 }
 
 vk::VkResult createUncheckedInstance (Context& context, const vk::VkInstanceCreateInfo* instanceCreateInfo, const vk::VkAllocationCallbacks* pAllocator, UncheckedInstance* instance, bool allowLayers)
 {
-	vector<const char*>						enabledLayers;
-	vector<const char*>						enabledExtensions;
-	vk::VkInstanceCreateInfo				createInfo				= *instanceCreateInfo;
-	const auto&								cmdLine					= context.getTestContext().getCommandLine();
-	const bool								validationEnabled		= cmdLine.isValidationEnabled();
-	const bool								printValidationErrors	= cmdLine.printValidationErrors();
-	const vk::PlatformInterface&			vkp						= context.getPlatformInterface();
-	const bool								addLayers				= (validationEnabled && allowLayers);
-	std::unique_ptr<DebugReportRecorder>	recorder;
-	VkDebugReportCallbackCreateInfoEXT		callbackInfo;
+	vector<const char*>				enabledLayers;
+	vector<const char*>				enabledExtensions;
+	vk::VkInstanceCreateInfo		createInfo				= *instanceCreateInfo;
+	const auto&						cmdLine					= context.getTestContext().getCommandLine();
+	const bool						validationEnabled		= cmdLine.isValidationEnabled();
+	const bool						printValidationErrors	= cmdLine.printValidationErrors();
+	const vk::PlatformInterface&	vkp						= context.getPlatformInterface();
+	const bool						addLayers				= (validationEnabled && allowLayers);
 
 	if (addLayers)
 	{
@@ -371,18 +333,12 @@ vk::VkResult createUncheckedInstance (Context& context, const vk::VkInstanceCrea
 		enabledExtensions = addDebugReportExt(vkp, createInfo);
 		createInfo.enabledExtensionCount = static_cast<deUint32>(enabledExtensions.size());
 		createInfo.ppEnabledExtensionNames = enabledExtensions.data();
-
-		// Prepare debug report recorder also for instance creation.
-		recorder.reset(new DebugReportRecorder(printValidationErrors));
-		callbackInfo		= recorder->makeCreateInfo();
-		callbackInfo.pNext	= createInfo.pNext;
-		createInfo.pNext	= &callbackInfo;
 	}
 
 	vk::VkInstance	raw_instance = DE_NULL;
 	vk::VkResult	result = vkp.createInstance(&createInfo, pAllocator, &raw_instance);
 
-	*instance = UncheckedInstance(context, raw_instance, pAllocator, recorder);
+	*instance = UncheckedInstance(context, raw_instance, pAllocator, addLayers, printValidationErrors);
 
 	return result;
 }

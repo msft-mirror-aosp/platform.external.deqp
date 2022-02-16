@@ -1105,7 +1105,7 @@ void verifyInteger (tcu::ResultCollector& result, QueriedState& state, int expec
 			{
 				std::ostringstream buf;
 				buf << "Expected " << reference << "(" << de::toString(tcu::Format::Hex<8>(reference)) << "), got "
-					<< state.getUintAccess() << "(" << de::toString(tcu::Format::Hex<8>(state.getUintAccess())) << ")";
+					<< state.getInt64Access() << "(" << de::toString(tcu::Format::Hex<8>(state.getInt64Access())) << ")";
 				result.fail(buf.str());
 			}
 			break;

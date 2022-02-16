@@ -6,7 +6,6 @@ if (DEQP_SUPPORT_WGL)
 endif ()
 
 add_subdirectory(subgroups)
-include_directories(subgroups)
 
 set(GLCTS_COMMON_SRCS
 	glcAggressiveShaderOptimizationsTests.cpp
@@ -85,6 +84,8 @@ set(GLCTS_COMMON_SRCS
 	glcShaderRenderCase.hpp
 	glcShaderStructTests.cpp
 	glcShaderStructTests.hpp
+	glcShaderSwitchTests.cpp
+	glcShaderSwitchTests.hpp
 	glcSampleVariablesTests.cpp
 	glcSampleVariablesTests.hpp
 	glcSpirvUtils.cpp
@@ -95,8 +96,6 @@ set(GLCTS_COMMON_SRCS
 	glcTestCaseWrapper.hpp
 	glcTestPackage.cpp
 	glcTestPackage.hpp
-	glcTextureCompatibilityTests.cpp
-	glcTextureCompatibilityTests.hpp
 	glcTextureFilterAnisotropicTests.cpp
 	glcTextureFilterAnisotropicTests.hpp
 	glcTextureRepeatModeTests.cpp
@@ -120,9 +119,6 @@ set(GLCTS_COMMON_SRCS
 	glcGLSLVectorConstructorTests.hpp
 	glcFramebufferCompleteness.cpp
 	glcFramebufferCompleteness.hpp
-	glcCompressedFormatTests_data.inl
-	glcCompressedFormatTests.cpp
-	glcCompressedFormatTests.hpp
 	)
 
 set(GLCTS_COMMON_LIBS
@@ -148,7 +144,6 @@ set(GLCTS_COMMON_LIBS ${GLCTS_COMMON_LIBS} ${GLSLANG_LIBRARIES})
 # Add spirv-tools
 include_directories(${spirv-tools_SOURCE_DIR}/include)
 include_directories(${spirv-tools_SOURCE_DIR}/external/include)
-include_directories(${PROJECT_BINARY_DIR}/external/vulkancts/framework/vulkan)
 
 set(GLCTS_COMMON_LIBS ${GLCTS_COMMON_LIBS} SPIRV-Tools)
 
@@ -156,7 +151,6 @@ set(GLCTS_COMMON_LIBS ${GLCTS_COMMON_LIBS} SPIRV-Tools)
 PCH(GLCTS_COMMON_SRCS ../pch.cpp)
 
 add_library(glcts-common STATIC ${GLCTS_COMMON_SRCS})
-add_dependencies(glcts-common deqp-vk-inl)
 target_link_libraries(glcts-common ${GLCTS_COMMON_LIBS})
 
 set(GLCTS_COMMON_NOCONTEXTPACKAGE_SRCS

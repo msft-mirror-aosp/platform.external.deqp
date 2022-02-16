@@ -32,7 +32,7 @@ namespace egl
 namespace Image
 {
 
-de::MovePtr<ImageSource> createAndroidNativeImageSource		(glw::GLenum format, deUint32 numLayers, bool isYUV);
+de::MovePtr<ImageSource> createAndroidNativeImageSource		(glw::GLenum format);
 
 } // Image
 } // egl

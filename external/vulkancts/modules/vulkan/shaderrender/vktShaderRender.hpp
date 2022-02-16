@@ -111,7 +111,7 @@ public:
 					vk::VkComponentMapping			componentMapping_	= vk::makeComponentMappingRGBA(),
 					vk::VkSampleCountFlagBits		samples_			= vk::VK_SAMPLE_COUNT_1_BIT,
 					Init							initialization_		= INIT_UPLOAD_DATA,
-					const tcu::Maybe<MinMaxLod>&	minMaxLod_			= tcu::Nothing)
+					const tcu::Maybe<MinMaxLod>&	minMaxLod_			= tcu::nothing<MinMaxLod>())
 			: baseMipLevel		(baseMipLevel_)
 			, componentMapping	(componentMapping_)
 			, samples			(samples_)

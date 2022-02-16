@@ -54,7 +54,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Reader;
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -172,6 +171,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private Map<String, Optional<Integer>> mDeviceFeatures;
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
     private IRunUtil mRunUtil = RunUtil.getDefault();
+    // When set will override the mCaselistFile for testing purposes.
+    private Reader mCaselistReader = null;
 
     private IRecovery mDeviceRecovery = new Recovery(); {
         mDeviceRecovery.setSleepProvider(new SleepProvider());
@@ -261,6 +262,13 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     public void setRunUtil(IRunUtil runUtil) {
         mRunUtil = runUtil;
+    }
+
+    /**
+     * Exposed for unit testing
+     */
+    public void setCaselistReader(Reader caselistReader) {
+        mCaselistReader = caselistReader;
     }
 
     private static final class CapabilityQueryFailureException extends Exception {
@@ -1007,58 +1015,33 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         }
     }
 
-
-    private static void addTestsToInstancesMap(
-        File testlist,
-        String configName,
-        String screenRotation,
-        String surfaceType,
-        boolean required,
-        Map<TestDescription, Set<BatchRunConfiguration>> instances) {
-
-        try (final FileReader testlistInnerReader = new FileReader(testlist);
-             final BufferedReader testlistReader = new BufferedReader(testlistInnerReader)) {
-
+    private static Map<TestDescription, Set<BatchRunConfiguration>> generateTestInstances(
+            Reader testlist, String configName, String screenRotation, String surfaceType,
+            boolean required) {
+        // Note: This is specifically a LinkedHashMap to guarantee that tests are iterated
+        // in the insertion order.
+        final Map<TestDescription, Set<BatchRunConfiguration>> instances = new LinkedHashMap<>();
+        try {
+            BufferedReader testlistReader = new BufferedReader(testlist);
             String testName;
             while ((testName = testlistReader.readLine()) != null) {
-                testName = testName.trim();
-
-                // Skip empty lines.
-                if (testName.isEmpty()) {
-                    continue;
+                if (testName.length() > 0) {
+                    // Test name -> testId -> only one config -> done.
+                    final Set<BatchRunConfiguration> testInstanceSet = new LinkedHashSet<>();
+                    BatchRunConfiguration config = new BatchRunConfiguration(configName, screenRotation, surfaceType, required);
+                    testInstanceSet.add(config);
+                    TestDescription test = pathToIdentifier(testName);
+                    instances.put(test, testInstanceSet);
                 }
-
-                // Lines starting with "#" are comments.
-                if (testName.startsWith("#")) {
-                    continue;
-                }
-
-                // If the "testName" ends with .txt, then it is a path to another test list
-                // (relative to the current test list, path separator is "/") that we need to
-                // read.
-                if (testName.endsWith(".txt")) {
-                    addTestsToInstancesMap(
-                        Paths.get(testlist.getParent(), testName.split("/")).toFile(),
-                        configName,
-                        screenRotation,
-                        surfaceType,
-                        required,
-                        instances);
-                    continue;
-                }
-
-                // Test name -> testId -> only one config -> done.
-                final Set<BatchRunConfiguration> testInstanceSet = new LinkedHashSet<>();
-                BatchRunConfiguration config = new BatchRunConfiguration(configName, screenRotation, surfaceType, required);
-                testInstanceSet.add(config);
-                TestDescription test = pathToIdentifier(testName);
-                instances.put(test, testInstanceSet);
             }
+            testlistReader.close();
         }
         catch (IOException e)
         {
             throw new RuntimeException("Failure while reading the test case list for deqp: " + e.getMessage());
         }
+
+        return instances;
     }
 
     private Set<BatchRunConfiguration> getTestRunConfigs(TestDescription testId) {
@@ -1458,7 +1441,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         }
 
         final String command = String.format(
-                "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\""
+                "am instrument %s -w -e deqpLogFileName \"%s\" -e deqpCmdLine \"%s\""
                     + " -e deqpLogData \"%s\" %s",
                 AbiUtils.createAbiFlag(mAbi.getName()), APP_DIR + LOG_FILE_NAME,
                 deqpCmdLine.toString(), mLogData, instrumentationName);
@@ -2063,31 +2046,30 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private void loadTests() {
         if (mTestInstances != null) throw new AssertionError("Re-load of tests not supported");
 
-        // Note: This is specifically a LinkedHashMap to guarantee that tests are iterated
-        // in the insertion order.
-        mTestInstances = new LinkedHashMap<>();
-
         try {
-            File testlist = new File(mBuildHelper.getTestsDir(), mCaselistFile);
-            if (!testlist.isFile()) {
-                // Finding file in sub directory if no matching file in the first layer of
-                // testdir.
-                testlist = FileUtil.findFile(mBuildHelper.getTestsDir(), mCaselistFile);
-                if (testlist == null || !testlist.isFile()) {
-                    throw new FileNotFoundException("Cannot find deqp test list file: "
-                        + mCaselistFile);
+            Reader reader = mCaselistReader;
+            if (reader == null) {
+                File testlist = new File(mBuildHelper.getTestsDir(), mCaselistFile);
+                if (!testlist.isFile()) {
+                    // Finding file in sub directory if no matching file in the first layer of
+                    // testdir.
+                    testlist = FileUtil.findFile(mBuildHelper.getTestsDir(), mCaselistFile);
+                    if (testlist == null || !testlist.isFile()) {
+                        throw new FileNotFoundException("Cannot find deqp test list file: "
+                            + mCaselistFile);
+                    }
                 }
+                reader = new FileReader(testlist);
             }
-            addTestsToInstancesMap(
-                testlist,
-                mConfigName,
-                mScreenRotation,
-                mSurfaceType,
-                mConfigRequired,
-                mTestInstances);
+            mTestInstances = generateTestInstances(reader, mConfigName, mScreenRotation, mSurfaceType, mConfigRequired);
+            mCaselistReader = null;
+            reader.close();
         }
         catch (FileNotFoundException e) {
             throw new RuntimeException("Cannot read deqp test list file: "  + mCaselistFile);
+        }
+        catch (IOException e) {
+            CLog.w("Failed to close test list reader.");
         }
 
         try

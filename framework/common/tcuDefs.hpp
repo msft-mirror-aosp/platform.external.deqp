@@ -55,12 +55,10 @@ public:
 						Exception			(const std::string& message);
 	virtual				~Exception			(void) throw() {}
 
-	const char*			getMessage			(void) const { return m_message.what(); }
+	const char*			getMessage			(void) const { return m_message.c_str(); }
 
 private:
-	// std::runtime_error is used here as an immutable ref-counted string.
-	// This allows the copy constructor in the class to be noexcept.
-	const std::runtime_error m_message;
+	const std::string	m_message;
 };
 
 //! Base exception class for test exceptions that affect test result
@@ -93,7 +91,6 @@ class InternalError : public TestException
 {
 public:
 					InternalError		(const char* message, const char* expr, const char* file, int line);
-					InternalError		(const std::string& message, const char* expr, const char* file, int line);
 					InternalError		(const std::string& message);
 	virtual			~InternalError		(void) throw() {}
 };
