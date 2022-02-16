@@ -25,10 +25,8 @@
 
 #include "vktTestCase.hpp"
 #include "tcuTestLog.hpp"
-#include "vktCustomInstancesDevices.hpp"
 
 #include "vkPlatform.hpp"
-#include "tcuCommandLine.hpp"
 #include "gluVarType.hpp"
 #include "deStringUtil.hpp"
 #include "vkPrograms.hpp"
@@ -142,13 +140,6 @@ protected:
 	deUint32							value;
 };
 
-enum PriorityMode
-{
-	PRIORITY_MODE_DEFAULT,
-	PRIORITY_MODE_STATIC,
-	PRIORITY_MODE_DYNAMIC,
-};
-
 struct BindingCaseParameters
 {
 	VkBufferCreateFlags					flags;
@@ -158,14 +149,14 @@ struct BindingCaseParameters
 	VkExtent3D							imageSize;
 	deUint32							targetsCount;
 	VkImageCreateFlags					imageCreateFlags;
-	PriorityMode						priorityMode;
+	bool								usePriority;
 };
 
 BindingCaseParameters					makeBindingCaseParameters			(deUint32				targetsCount,
 																			 deUint32				width,
 																			 deUint32				height,
 																			 VkImageCreateFlags		imageCreateFlags,
-																			 PriorityMode			priorityMode)
+																			 bool					usePriority)
 {
 	BindingCaseParameters				params;
 	deMemset(&params, 0, sizeof(BindingCaseParameters));
@@ -176,7 +167,7 @@ BindingCaseParameters					makeBindingCaseParameters			(deUint32				targetsCount,
 	params.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	params.targetsCount = targetsCount;
 	params.imageCreateFlags = imageCreateFlags;
-	params.priorityMode = priorityMode;
+	params.usePriority = usePriority;
 	return params;
 }
 
@@ -185,7 +176,7 @@ BindingCaseParameters					makeBindingCaseParameters			(deUint32				targetsCount,
 																			 VkSharingMode			sharing,
 																			 VkDeviceSize			bufferSize,
 																			 VkImageCreateFlags		imageCreateFlags,
-																			 PriorityMode			priorityMode)
+																			 bool					usePriority)
 {
 	BindingCaseParameters				params								=
 	{
@@ -196,7 +187,7 @@ BindingCaseParameters					makeBindingCaseParameters			(deUint32				targetsCount,
 		{0u, 0u, 0u},														// VkExtent3D			imageSize;
 		targetsCount,														// deUint32				targetsCount;
 		imageCreateFlags,													// VkImageCreateFlags	imageCreateFlags
-		priorityMode,														// PriorityMode			priorityMode
+		usePriority,														// bool					usePriority
 	};
 	return params;
 }
@@ -435,152 +426,64 @@ Move<VkCommandBuffer>					createCommandBuffer					(const DeviceInterface&	vk,
 	return allocateCommandBuffer(vk, device, &allocInfo);
 }
 
-class BaseTestInstance : public TestInstance
-{
-public:
-	BaseTestInstance	(Context&				ctx,
-		BindingCaseParameters	params)
-		: TestInstance	(ctx)
-		, m_params		(params)
-	{
-		if (m_params.priorityMode == PRIORITY_MODE_DYNAMIC)
-		{
-			VkInstance										instance				(m_context.getInstance());
-			InstanceDriver									instanceDriver			(m_context.getPlatformInterface(), instance);
-			const float										queuePriority			= 1.0f;
 
-			VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT pageableDeviceLocalMemoryFeature =
-			{
-				VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PAGEABLE_DEVICE_LOCAL_MEMORY_FEATURES_EXT,	// VkStructureType					sType
-				DE_NULL,																		// const void*						pNext
-				VK_FALSE,																		// VkBool32							pageableDeviceLocalMemory;
-			};
-
-			VkPhysicalDeviceFeatures				features;
-			deMemset(&features, 0, sizeof(vk::VkPhysicalDeviceFeatures));
-
-			VkPhysicalDeviceFeatures2				features2		=
-			{
-				VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,				// VkStructureType					sType
-				&pageableDeviceLocalMemoryFeature,									// const void*						pNext
-				features													// VkPhysicalDeviceFeatures			features
-			};
-
-			instanceDriver.getPhysicalDeviceFeatures2(m_context.getPhysicalDevice(), &features2);
-
-			if (!pageableDeviceLocalMemoryFeature.pageableDeviceLocalMemory)
-				TCU_FAIL("pageableDeviceLocalMemory feature not supported but VK_EXT_pageable_device_local_memory advertised");
-
-			pageableDeviceLocalMemoryFeature.pageableDeviceLocalMemory = VK_TRUE;
-
-			std::vector<const char*>						deviceExtensions;
-			deviceExtensions.push_back("VK_EXT_pageable_device_local_memory");
-
-			VkDeviceQueueCreateInfo							queueInfo		=
-			{
-				VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,					// VkStructureType					sType;
-				DE_NULL,													// const void*						pNext;
-				0u,															// VkDeviceQueueCreateFlags			flags;
-				0u,															// deUint32							queueFamilyIndex;
-				1u,															// deUint32							queueCount;
-				&queuePriority												// const float*						pQueuePriorities;
-			};
-
-			const VkDeviceCreateInfo						deviceInfo		=
-			{
-				VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,							// VkStructureType					sType;
-				&features2,														// const void*						pNext;
-				(VkDeviceCreateFlags)0,											// VkDeviceCreateFlags				flags;
-				1u,																// uint32_t							queueCreateInfoCount;
-				&queueInfo,														// const VkDeviceQueueCreateInfo*	pQueueCreateInfos;
-				0u,																// uint32_t							enabledLayerCount;
-				DE_NULL,														// const char* const*				ppEnabledLayerNames;
-				deUint32(deviceExtensions.size()),								// uint32_t							enabledExtensionCount;
-				(deviceExtensions.empty()) ? DE_NULL : deviceExtensions.data(),	// const char* const*				ppEnabledExtensionNames;
-				DE_NULL															// const VkPhysicalDeviceFeatures*	pEnabledFeatures;
-			};
-
-			m_logicalDevice		= createCustomDevice(m_context.getTestContext().getCommandLine().isValidationEnabled(), m_context.getPlatformInterface(), instance, instanceDriver, m_context.getPhysicalDevice(), &deviceInfo);
-		}
-	};
-
-protected:
-	vk::VkDevice				getDevice							(void)	{ return (m_params.priorityMode == PRIORITY_MODE_DYNAMIC) ? m_logicalDevice.get() : m_context.getDevice(); }
-
-	template<typename TTarget>
-	void						createBindingTargets				(std::vector<de::SharedPtr<Move<TTarget> > >& targets);
-
-	template<typename TTarget, deBool TDedicated>
-	void						createMemory						(std::vector<de::SharedPtr<Move<TTarget> > >&	targets,
-																	 MemoryRegionsList&								memory);
-
-	template<typename TTarget>
-	void						makeBinding							(std::vector<de::SharedPtr<Move<TTarget> > >& targets,
-																	 MemoryRegionsList&		memory);
-
-	template <typename TTarget>
-	void						fillUpResource						(Move<VkBuffer>&		source,
-																	 Move<TTarget>&			target);
-
-	template <typename TTarget>
-	void						readUpResource						(Move<TTarget>&			source,
-																	 Move<VkBuffer>&		target);
-
-	template <typename TTarget>
-	void						layoutTransitionResource			(Move<TTarget>&			target);
-
-	void						createBuffer						(Move<VkBuffer>&		buffer,
-																	 Move<VkDeviceMemory>&	memory);
-
-	void						pushData							(VkDeviceMemory			memory,
-																	 deUint32				dataSeed);
-
-	deBool						checkData							(VkDeviceMemory			memory,
-																	 deUint32				dataSeed);
-
-	BindingCaseParameters		m_params;
-
-private:
-	vk::Move<vk::VkDevice>		m_logicalDevice;
-};
+template<typename TTarget>
+void									createBindingTargets				(std::vector<de::SharedPtr<Move<TTarget> > >&
+																									targets,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params);
 
 template<>
-void					BaseTestInstance::createBindingTargets<VkBuffer>		(BuffersList&			targets)
+void									createBindingTargets<VkBuffer>		(BuffersList&			targets,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	const deUint32						count								= m_params.targetsCount;
-	const VkDevice						vkDevice							= getDevice();
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
+	const deUint32						count								= params.targetsCount;
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
 
 	targets.reserve(count);
 	for (deUint32 i = 0u; i < count; ++i)
 	{
-		VkBufferCreateInfo				bufferParams						= makeBufferCreateInfo(m_context, m_params);
-		targets.push_back(BufferPtr(new Move<VkBuffer>(vk::createBuffer(vk, vkDevice, &bufferParams))));
+		VkBufferCreateInfo				bufferParams						= makeBufferCreateInfo(ctx, params);
+		targets.push_back(BufferPtr(new Move<VkBuffer>(createBuffer(vk, vkDevice, &bufferParams))));
 	}
 }
 
 template<>
-void					BaseTestInstance::createBindingTargets<VkImage>		(ImagesList&			targets)
+void									createBindingTargets<VkImage>		(ImagesList&			targets,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	const deUint32						count								= m_params.targetsCount;
-	const VkDevice						vkDevice							= getDevice();
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
+	const deUint32						count								= params.targetsCount;
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
 
 	targets.reserve(count);
 	for (deUint32 i = 0u; i < count; ++i)
 	{
-		VkImageCreateInfo				imageParams							= makeImageCreateInfo(m_params);
+		VkImageCreateInfo				imageParams							= makeImageCreateInfo(params);
 		targets.push_back(ImagePtr(new Move<VkImage>(createImage(vk, vkDevice, &imageParams))));
 	}
 }
 
+template<typename TTarget, deBool TDedicated>
+void									createMemory						(std::vector<de::SharedPtr<Move<TTarget> > >&
+																									targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params);
+
 template<>
-void					BaseTestInstance::createMemory<VkBuffer, DE_FALSE>	(BuffersList&			targets,
-																			 MemoryRegionsList&		memory)
+void									createMemory<VkBuffer, DE_FALSE>	(BuffersList&			targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
+	DE_UNREF(params);
 	const deUint32						count								= static_cast<deUint32>(targets.size());
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
 
 	memory.reserve(count);
 	for (deUint32 i = 0; i < count; ++i)
@@ -590,25 +493,24 @@ void					BaseTestInstance::createMemory<VkBuffer, DE_FALSE>	(BuffersList&			targ
 		vk.getBufferMemoryRequirements(vkDevice, **targets[i], &memReqs);
 
 		VkMemoryPriorityAllocateInfoEXT	priority							= makeMemoryPriorityAllocateInfo(DE_NULL, ((float)i)/((float)count));
-		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, (m_params.priorityMode == PRIORITY_MODE_STATIC) ? &priority : DE_NULL);
+		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, params.usePriority ? &priority : DE_NULL);
 		VkDeviceMemory					rawMemory							= DE_NULL;
 
 		vk.allocateMemory(vkDevice, &memAlloc, (VkAllocationCallbacks*)DE_NULL, &rawMemory);
-
-		if (m_params.priorityMode == PRIORITY_MODE_DYNAMIC)
-			vk.setDeviceMemoryPriorityEXT(vkDevice, rawMemory, priority.priority);
-
 		memory.push_back(MemoryRegionPtr(new Move<VkDeviceMemory>(check<VkDeviceMemory>(rawMemory), Deleter<VkDeviceMemory>(vk, vkDevice, DE_NULL))));
 	}
 }
 
 template<>
-void				BaseTestInstance::createMemory<VkImage, DE_FALSE>		(ImagesList&			targets,
-																			 MemoryRegionsList&		memory)
+void									createMemory<VkImage, DE_FALSE>		(ImagesList&			targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
+	DE_UNREF(params);
 	const deUint32						count								= static_cast<deUint32>(targets.size());
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
 
 	memory.reserve(count);
 	for (deUint32 i = 0; i < count; ++i)
@@ -617,25 +519,24 @@ void				BaseTestInstance::createMemory<VkImage, DE_FALSE>		(ImagesList&			target
 		vk.getImageMemoryRequirements(vkDevice, **targets[i], &memReqs);
 
 		VkMemoryPriorityAllocateInfoEXT	priority							= makeMemoryPriorityAllocateInfo(DE_NULL, ((float)i)/((float)count));
-		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, (m_params.priorityMode == PRIORITY_MODE_STATIC) ? &priority : DE_NULL);
+		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, params.usePriority ? &priority : DE_NULL);
 		VkDeviceMemory					rawMemory							= DE_NULL;
 
 		vk.allocateMemory(vkDevice, &memAlloc, (VkAllocationCallbacks*)DE_NULL, &rawMemory);
-
-		if (m_params.priorityMode == PRIORITY_MODE_DYNAMIC)
-			vk.setDeviceMemoryPriorityEXT(vkDevice, rawMemory, priority.priority);
-
 		memory.push_back(de::SharedPtr<Move<VkDeviceMemory> >(new Move<VkDeviceMemory>(check<VkDeviceMemory>(rawMemory), Deleter<VkDeviceMemory>(vk, vkDevice, DE_NULL))));
 	}
 }
 
 template<>
-void				BaseTestInstance::createMemory<VkBuffer, DE_TRUE>		(BuffersList&			targets,
-																			 MemoryRegionsList&		memory)
+void									createMemory<VkBuffer, DE_TRUE>		(BuffersList&			targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
+	DE_UNREF(params);
 	const deUint32						count								= static_cast<deUint32>(targets.size());
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
 
 	memory.reserve(count);
 	for (deUint32 i = 0; i < count; ++i)
@@ -644,27 +545,26 @@ void				BaseTestInstance::createMemory<VkBuffer, DE_TRUE>		(BuffersList&			targe
 
 		vk.getBufferMemoryRequirements(vkDevice, **targets[i], &memReqs);
 
-		ConstDedicatedInfo				dedicatedAllocationInfo				= makeDedicatedAllocationInfo(**targets[i]);
+		ConstDedicatedInfo				dedicatedAllocationInfo				= makeDedicatedAllocationInfo(**targets[i]);;
 		VkMemoryPriorityAllocateInfoEXT	priority							= makeMemoryPriorityAllocateInfo(&dedicatedAllocationInfo, ((float)i)/((float)count));
-		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, (m_params.priorityMode == PRIORITY_MODE_STATIC) ? &priority : (const void *)&dedicatedAllocationInfo);
+		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, params.usePriority ? &priority : (const void *)&dedicatedAllocationInfo);
 		VkDeviceMemory					rawMemory							= DE_NULL;
 
 		vk.allocateMemory(vkDevice, &memAlloc, static_cast<VkAllocationCallbacks*>(DE_NULL), &rawMemory);
-
-		if (m_params.priorityMode == PRIORITY_MODE_DYNAMIC)
-			vk.setDeviceMemoryPriorityEXT(vkDevice, rawMemory, priority.priority);
-
 		memory.push_back(MemoryRegionPtr(new Move<VkDeviceMemory>(check<VkDeviceMemory>(rawMemory), Deleter<VkDeviceMemory>(vk, vkDevice, DE_NULL))));
 	}
 }
 
 template<>
-void				BaseTestInstance::createMemory<VkImage, DE_TRUE>		(ImagesList&			targets,
-																			 MemoryRegionsList&		memory)
+void									createMemory<VkImage, DE_TRUE>		(ImagesList&			targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
+	DE_UNREF(params);
 	const deUint32						count								= static_cast<deUint32>(targets.size());
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
 
 	memory.reserve(count);
 	for (deUint32 i = 0; i < count; ++i)
@@ -674,25 +574,31 @@ void				BaseTestInstance::createMemory<VkImage, DE_TRUE>		(ImagesList&			targets
 
 		ConstDedicatedInfo				dedicatedAllocationInfo				= makeDedicatedAllocationInfo(**targets[i]);
 		VkMemoryPriorityAllocateInfoEXT	priority							= makeMemoryPriorityAllocateInfo(&dedicatedAllocationInfo, ((float)i)/((float)count));
-		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, (m_params.priorityMode == PRIORITY_MODE_STATIC) ? &priority : (const void *)&dedicatedAllocationInfo);
+		const VkMemoryAllocateInfo		memAlloc							= makeMemoryAllocateInfo(memReqs, params.usePriority ? &priority : (const void *)&dedicatedAllocationInfo);
 		VkDeviceMemory					rawMemory							= DE_NULL;
 
 		vk.allocateMemory(vkDevice, &memAlloc, static_cast<VkAllocationCallbacks*>(DE_NULL), &rawMemory);
-
-		if (m_params.priorityMode == PRIORITY_MODE_DYNAMIC)
-			vk.setDeviceMemoryPriorityEXT(vkDevice, rawMemory, priority.priority);
-
 		memory.push_back(MemoryRegionPtr(new Move<VkDeviceMemory>(check<VkDeviceMemory>(rawMemory), Deleter<VkDeviceMemory>(vk, vkDevice, DE_NULL))));
 	}
 }
 
+template<typename TTarget>
+void									makeBinding							(std::vector<de::SharedPtr<Move<TTarget> > >&
+																									targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params);
+
 template<>
-void					BaseTestInstance::makeBinding<VkBuffer>				(BuffersList&			targets,
-																			 MemoryRegionsList&		memory)
+void									makeBinding<VkBuffer>				(BuffersList&			targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
+	DE_UNREF(params);
 	const deUint32						count								= static_cast<deUint32>(targets.size());
-	const VkDevice						vkDevice							= getDevice();
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
 	BindBufferMemoryInfosList			bindMemoryInfos;
 
 	for (deUint32 i = 0; i < count; ++i)
@@ -704,12 +610,15 @@ void					BaseTestInstance::makeBinding<VkBuffer>				(BuffersList&			targets,
 }
 
 template<>
-void					BaseTestInstance::makeBinding<VkImage>				(ImagesList&			targets,
-																			 MemoryRegionsList&		memory)
+void									makeBinding<VkImage>				(ImagesList&			targets,
+																			 MemoryRegionsList&		memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
+	DE_UNREF(params);
 	const deUint32						count								= static_cast<deUint32>(targets.size());
-	const VkDevice						vkDevice							= getDevice();
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
 	BindImageMemoryInfosList			bindMemoryInfos;
 
 	for (deUint32 i = 0; i < count; ++i)
@@ -720,20 +629,28 @@ void					BaseTestInstance::makeBinding<VkImage>				(ImagesList&			targets,
 	VK_CHECK(vk.bindImageMemory2(vkDevice, count, &bindMemoryInfos.front()));
 }
 
-template <>
-void					BaseTestInstance::fillUpResource<VkBuffer>			(Move<VkBuffer>&		source,
-																			 Move<VkBuffer>&		target)
-{
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
-	const VkQueue						queue								= m_context.getUniversalQueue();
+template <typename TTarget>
+void									fillUpResource						(Move<VkBuffer>&		source,
+																			 Move<TTarget>&			target,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params);
 
-	const VkBufferMemoryBarrier			srcBufferBarrier					= makeMemoryBarrierInfo(*source, m_params.bufferSize, TransferFromResource);
-	const VkBufferMemoryBarrier			dstBufferBarrier					= makeMemoryBarrierInfo(*target, m_params.bufferSize, TransferToResource);
+template <>
+void									fillUpResource<VkBuffer>			(Move<VkBuffer>&		source,
+																			 Move<VkBuffer>&		target,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
+{
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const VkQueue						queue								= ctx.getUniversalQueue();
+
+	const VkBufferMemoryBarrier			srcBufferBarrier					= makeMemoryBarrierInfo(*source, params.bufferSize, TransferFromResource);
+	const VkBufferMemoryBarrier			dstBufferBarrier					= makeMemoryBarrierInfo(*target, params.bufferSize, TransferToResource);
 
 	Move<VkCommandPool>					commandPool							= createCommandPool(vk, vkDevice, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, 0);
 	Move<VkCommandBuffer>				cmdBuffer							= createCommandBuffer(vk, vkDevice, *commandPool);
-	VkBufferCopy						bufferCopy							= { 0u, 0u, m_params.bufferSize };
+	VkBufferCopy						bufferCopy							= { 0u, 0u, params.bufferSize };
 
 	beginCommandBuffer(vk, *cmdBuffer);
 	vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)DE_NULL, 1, &srcBufferBarrier, 0, (const VkImageMemoryBarrier*)DE_NULL);
@@ -745,14 +662,16 @@ void					BaseTestInstance::fillUpResource<VkBuffer>			(Move<VkBuffer>&		source,
 }
 
 template <>
-void				BaseTestInstance::fillUpResource<VkImage>				(Move<VkBuffer>&		source,
-																			 Move<VkImage>&			target)
+void									fillUpResource<VkImage>				(Move<VkBuffer>&		source,
+																			 Move<VkImage>&			target,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
-	const VkQueue						queue								= m_context.getUniversalQueue();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const VkQueue						queue								= ctx.getUniversalQueue();
 
-	const VkBufferMemoryBarrier			srcBufferBarrier					= makeMemoryBarrierInfo(*source, m_params.bufferSize, TransferFromResource);
+	const VkBufferMemoryBarrier			srcBufferBarrier					= makeMemoryBarrierInfo(*source, params.bufferSize, TransferFromResource);
 	const VkImageMemoryBarrier			preImageBarrier						= makeMemoryBarrierInfo(*target, 0u, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	const VkImageMemoryBarrier			dstImageBarrier						= makeMemoryBarrierInfo(*target, VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -762,8 +681,8 @@ void				BaseTestInstance::fillUpResource<VkImage>				(Move<VkBuffer>&		source,
 	const VkBufferImageCopy				copyRegion							=
 	{
 		0u,																	// VkDeviceSize			bufferOffset;
-		m_params.imageSize.width,											// deUint32				bufferRowLength;
-		m_params.imageSize.height,											// deUint32				bufferImageHeight;
+		params.imageSize.width,												// deUint32				bufferRowLength;
+		params.imageSize.height,											// deUint32				bufferImageHeight;
 		{
 			VK_IMAGE_ASPECT_COLOR_BIT,										// VkImageAspectFlags	aspect;
 			0u,																// deUint32				mipLevel;
@@ -771,7 +690,7 @@ void				BaseTestInstance::fillUpResource<VkImage>				(Move<VkBuffer>&		source,
 			1u,																// deUint32				layerCount;
 		},																	// VkImageSubresourceLayers imageSubresource;
 		{ 0, 0, 0 },														// VkOffset3D			imageOffset;
-		m_params.imageSize													// VkExtent3D			imageExtent;
+		params.imageSize													// VkExtent3D			imageExtent;
 	};
 
 	beginCommandBuffer(vk, *cmdBuffer);
@@ -783,43 +702,61 @@ void				BaseTestInstance::fillUpResource<VkImage>				(Move<VkBuffer>&		source,
 	submitCommandsAndWait(vk, vkDevice, queue, *cmdBuffer);
 }
 
+template <typename TTarget>
+void									readUpResource						(Move<TTarget>&			source,
+																			 Move<VkBuffer>&		target,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params);
+
 template <>
-void				BaseTestInstance::readUpResource						(Move<VkBuffer>&		source,
-																			 Move<VkBuffer>&		target)
+void									readUpResource						(Move<VkBuffer>&		source,
+																			 Move<VkBuffer>&		target,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	fillUpResource(source, target);
+	fillUpResource(source, target, ctx, params);
 }
 
 template <>
-void				BaseTestInstance::readUpResource						(Move<VkImage>&			source,
-																			 Move<VkBuffer>&		target)
+void									readUpResource						(Move<VkImage>&			source,
+																			 Move<VkBuffer>&		target,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
-	const VkQueue						queue								= m_context.getUniversalQueue();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const VkQueue						queue								= ctx.getUniversalQueue();
 
 	Move<VkCommandPool>					commandPool							= createCommandPool(vk, vkDevice, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, 0);
 	Move<VkCommandBuffer>				cmdBuffer							= createCommandBuffer(vk, vkDevice, *commandPool);
 
 	beginCommandBuffer(vk, *cmdBuffer);
-	copyImageToBuffer(vk, *cmdBuffer, *source, *target, tcu::IVec2(m_params.imageSize.width, m_params.imageSize.height), VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	copyImageToBuffer(vk, *cmdBuffer, *source, *target, tcu::IVec2(params.imageSize.width, params.imageSize.height), VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	endCommandBuffer(vk, *cmdBuffer);
 
 	submitCommandsAndWait(vk, vkDevice, queue, *cmdBuffer);
 }
 
+
+template <typename TTarget>
+void									layoutTransitionResource			(Move<TTarget>&			target,
+																			 Context&				ctx);
+
 template <>
-void					BaseTestInstance::layoutTransitionResource			(Move<VkBuffer>&		target)
+void									layoutTransitionResource			(Move<VkBuffer>&		target,
+																			 Context&				ctx)
 {
 	DE_UNREF(target);
+	DE_UNREF(ctx);
 }
 
 template <>
-void					BaseTestInstance::layoutTransitionResource<VkImage>	(Move<VkImage>&			target)
+void									layoutTransitionResource<VkImage>	(Move<VkImage>&			target,
+																			 Context&				ctx)
 {
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
-	const VkQueue						queue								= m_context.getUniversalQueue();
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	const VkQueue						queue								= ctx.getUniversalQueue();
 
 	const VkImageMemoryBarrier			preImageBarrier						= makeMemoryBarrierInfo(*target, 0u, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
@@ -834,18 +771,20 @@ void					BaseTestInstance::layoutTransitionResource<VkImage>	(Move<VkImage>&			t
 }
 
 
-void					BaseTestInstance::createBuffer						(Move<VkBuffer>&		buffer,
-																			 Move<VkDeviceMemory>&	memory)
+void									createBuffer						(Move<VkBuffer>&		buffer,
+																			 Move<VkDeviceMemory>&	memory,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
-	VkBufferCreateInfo					bufferParams						= makeBufferCreateInfo(m_context, m_params);
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	VkBufferCreateInfo					bufferParams						= makeBufferCreateInfo(ctx, params);
 	VkMemoryRequirements				memReqs;
 
-	buffer = vk::createBuffer(vk, vkDevice, &bufferParams);
+	buffer = createBuffer(vk, vkDevice, &bufferParams);
 	vk.getBufferMemoryRequirements(vkDevice, *buffer, &memReqs);
 
-	const VkMemoryAllocateInfo			memAlloc							= makeMemoryAllocateInfo(m_context, memReqs, MemoryHostVisible);
+	const VkMemoryAllocateInfo			memAlloc							= makeMemoryAllocateInfo(ctx, memReqs, MemoryHostVisible);
 	VkDeviceMemory						rawMemory							= DE_NULL;
 
 	vk.allocateMemory(vkDevice, &memAlloc, static_cast<VkAllocationCallbacks*>(DE_NULL), &rawMemory);
@@ -853,34 +792,38 @@ void					BaseTestInstance::createBuffer						(Move<VkBuffer>&		buffer,
 	VK_CHECK(vk.bindBufferMemory(vkDevice, *buffer, *memory, 0u));
 }
 
-void					BaseTestInstance::pushData							(VkDeviceMemory			memory,
-																			 deUint32				dataSeed)
+void									pushData							(VkDeviceMemory			memory,
+																			 deUint32				dataSeed,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
-	MemoryMappingRAII					hostMemory							(vk, vkDevice, memory, 0u, m_params.bufferSize, 0u);
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	MemoryMappingRAII					hostMemory							(vk, vkDevice, memory, 0u, params.bufferSize, 0u);
 	deUint8*							hostBuffer							= static_cast<deUint8*>(hostMemory.ptr());
 	SimpleRandomGenerator				random								(dataSeed);
 
-	for (deUint32 i = 0u; i < m_params.bufferSize; ++i)
+	for (deUint32 i = 0u; i < params.bufferSize; ++i)
 	{
 		hostBuffer[i] = static_cast<deUint8>(random.getNext() & 0xFFu);
 	}
 	hostMemory.flush();
 }
 
-deBool					BaseTestInstance::checkData							(VkDeviceMemory			memory,
-																			 deUint32				dataSeed)
+deBool									checkData							(VkDeviceMemory			memory,
+																			 deUint32				dataSeed,
+																			 Context&				ctx,
+																			 BindingCaseParameters	params)
 {
-	const DeviceInterface&				vk									= m_context.getDeviceInterface();
-	const VkDevice						vkDevice							= getDevice();
-	MemoryMappingRAII					hostMemory							(vk, vkDevice, memory, 0u, m_params.bufferSize, 0u);
+	const DeviceInterface&				vk									= ctx.getDeviceInterface();
+	const VkDevice						vkDevice							= ctx.getDevice();
+	MemoryMappingRAII					hostMemory							(vk, vkDevice, memory, 0u, params.bufferSize, 0u);
 	deUint8*							hostBuffer							= static_cast<deUint8*>(hostMemory.ptr());
 	SimpleRandomGenerator				random								(dataSeed);
 
 	hostMemory.invalidate();
 
-	for (deUint32 i = 0u; i < m_params.bufferSize; ++i)
+	for (deUint32 i = 0u; i < params.bufferSize; ++i)
 	{
 		if (hostBuffer[i] != static_cast<deUint8>(random.getNext() & 0xFFu) )
 			return DE_FALSE;
@@ -889,12 +832,13 @@ deBool					BaseTestInstance::checkData							(VkDeviceMemory			memory,
 }
 
 template<typename TTarget, deBool TDedicated>
-class MemoryBindingInstance : public BaseTestInstance
+class MemoryBindingInstance : public TestInstance
 {
 public:
 										MemoryBindingInstance				(Context&				ctx,
 																			 BindingCaseParameters	params)
-										: BaseTestInstance					(ctx, params)
+										: TestInstance						(ctx)
+										, m_params							(params)
 	{
 	}
 
@@ -904,40 +848,43 @@ public:
 										targets;
 		MemoryRegionsList				memory;
 
-		createBindingTargets<TTarget>(targets);
-		createMemory<TTarget, TDedicated>(targets, memory);
-		makeBinding<TTarget>(targets, memory);
+		createBindingTargets<TTarget>(targets, m_context, m_params);
+		createMemory<TTarget, TDedicated>(targets, memory, m_context, m_params);
+		makeBinding<TTarget>(targets, memory, m_context, m_params);
 
 		Move<VkBuffer>					srcBuffer;
 		Move<VkDeviceMemory>			srcMemory;
 
-		createBuffer(srcBuffer, srcMemory);
-		pushData(*srcMemory, 1);
+		createBuffer(srcBuffer, srcMemory, m_context, m_params);
+		pushData(*srcMemory, 1, m_context, m_params);
 
 		Move<VkBuffer>					dstBuffer;
 		Move<VkDeviceMemory>			dstMemory;
 
-		createBuffer(dstBuffer, dstMemory);
+		createBuffer(dstBuffer, dstMemory, m_context, m_params);
 
 		deBool							passed								= DE_TRUE;
 		for (deUint32 i = 0; passed && i < m_params.targetsCount; ++i)
 		{
-			fillUpResource(srcBuffer, *targets[i]);
-			readUpResource(*targets[i], dstBuffer);
-			passed = checkData(*dstMemory, 1);
+			fillUpResource(srcBuffer, *targets[i], m_context, m_params);
+			readUpResource(*targets[i], dstBuffer, m_context, m_params);
+			passed = checkData(*dstMemory, 1, m_context, m_params);
 		}
 
 		return passed ? tcu::TestStatus::pass("Pass") : tcu::TestStatus::fail("Failed");
 	}
+private:
+	BindingCaseParameters				m_params;
 };
 
 template<typename TTarget, deBool TDedicated>
-class AliasedMemoryBindingInstance : public BaseTestInstance
+class AliasedMemoryBindingInstance : public TestInstance
 {
 public:
 										AliasedMemoryBindingInstance		(Context&				ctx,
 																			 BindingCaseParameters	params)
-										: BaseTestInstance					(ctx, params)
+										: TestInstance						(ctx)
+										, m_params							(params)
 	{
 	}
 
@@ -948,34 +895,36 @@ public:
 		MemoryRegionsList				memory;
 
 		for (deUint32 i = 0; i < DE_LENGTH_OF_ARRAY(targets); ++i)
-			createBindingTargets<TTarget>(targets[i]);
-		createMemory<TTarget, TDedicated>(targets[0], memory);
+			createBindingTargets<TTarget>(targets[i], m_context, m_params);
+		createMemory<TTarget, TDedicated>(targets[0], memory, m_context, m_params);
 		for (deUint32 i = 0; i < DE_LENGTH_OF_ARRAY(targets); ++i)
-			makeBinding<TTarget>(targets[i], memory);
+			makeBinding<TTarget>(targets[i], memory, m_context, m_params);
 
 		Move<VkBuffer>					srcBuffer;
 		Move<VkDeviceMemory>			srcMemory;
 
-		createBuffer(srcBuffer, srcMemory);
-		pushData(*srcMemory, 2);
+		createBuffer(srcBuffer, srcMemory, m_context, m_params);
+		pushData(*srcMemory, 2, m_context, m_params);
 
 		Move<VkBuffer>					dstBuffer;
 		Move<VkDeviceMemory>			dstMemory;
 
-		createBuffer(dstBuffer, dstMemory);
+		createBuffer(dstBuffer, dstMemory, m_context, m_params);
 
 		deBool							passed								= DE_TRUE;
 		for (deUint32 i = 0; passed && i < m_params.targetsCount; ++i)
 		{
 			// Do a layout transition on alias 1 before we transition and write to alias 0
-			layoutTransitionResource(*(targets[1][i]));
-			fillUpResource(srcBuffer, *(targets[0][i]));
-			readUpResource(*(targets[1][i]), dstBuffer);
-			passed = checkData(*dstMemory, 2);
+			layoutTransitionResource(*(targets[1][i]), m_context);
+			fillUpResource(srcBuffer, *(targets[0][i]), m_context, m_params);
+			readUpResource(*(targets[1][i]), dstBuffer, m_context, m_params);
+			passed = checkData(*dstMemory, 2, m_context, m_params);
 		}
 
 		return passed ? tcu::TestStatus::pass("Pass") : tcu::TestStatus::fail("Failed");
 	}
+private:
+	BindingCaseParameters				m_params;
 };
 
 template<typename TInstance>
@@ -1004,10 +953,8 @@ public:
 	{
 		ctx.requireDeviceFunctionality("VK_KHR_bind_memory2");
 
-		if ((m_params.priorityMode != PRIORITY_MODE_DEFAULT) && !ctx.getMemoryPriorityFeaturesEXT().memoryPriority)
+		if (m_params.usePriority && !ctx.getMemoryPriorityFeaturesEXT().memoryPriority)
 			TCU_THROW(NotSupportedError, "VK_EXT_memory_priority Not supported");
-		if ((m_params.priorityMode == PRIORITY_MODE_DYNAMIC) &&  !ctx.isDeviceFunctionalitySupported("VK_EXT_pageable_device_local_memory"))
-			TCU_THROW(NotSupportedError, "VK_EXT_pageable_device_local_memory Not supported");
 	}
 
 private:
@@ -1020,9 +967,9 @@ tcu::TestCaseGroup* createMemoryBindingTests (tcu::TestContext& testCtx)
 {
 	de::MovePtr<tcu::TestCaseGroup>		group								(new tcu::TestCaseGroup(testCtx, "binding", "Memory binding tests."));
 
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < 2; ++i)
 	{
-		PriorityMode priorityMode = PriorityMode(i);
+		bool usePriority = i != 0;
 		de::MovePtr<tcu::TestCaseGroup>		regular								(new tcu::TestCaseGroup(testCtx, "regular", "Basic memory binding tests."));
 		de::MovePtr<tcu::TestCaseGroup>		aliasing							(new tcu::TestCaseGroup(testCtx, "aliasing", "Memory binding tests with aliasing of two resources."));
 
@@ -1036,8 +983,8 @@ tcu::TestCaseGroup* createMemoryBindingTests (tcu::TestContext& testCtx)
 		for (deUint32 sizeNdx = 0u; sizeNdx < DE_LENGTH_OF_ARRAY(allocationSizes); ++sizeNdx )
 		{
 			const VkDeviceSize				bufferSize							= allocationSizes[sizeNdx];
-			const BindingCaseParameters		params								= makeBindingCaseParameters(10, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_SHARING_MODE_EXCLUSIVE, bufferSize, 0u, priorityMode);
-			const BindingCaseParameters		aliasparams							= makeBindingCaseParameters(10, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_SHARING_MODE_EXCLUSIVE, bufferSize, VK_IMAGE_CREATE_ALIAS_BIT, priorityMode);
+			const BindingCaseParameters		params								= makeBindingCaseParameters(10, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_SHARING_MODE_EXCLUSIVE, bufferSize, 0u, usePriority);
+			const BindingCaseParameters		aliasparams							= makeBindingCaseParameters(10, VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, VK_SHARING_MODE_EXCLUSIVE, bufferSize, VK_IMAGE_CREATE_ALIAS_BIT, usePriority);
 			std::ostringstream				testName;
 
 			testName << "buffer_" << bufferSize;
@@ -1053,8 +1000,8 @@ tcu::TestCaseGroup* createMemoryBindingTests (tcu::TestContext& testCtx)
 		{
 			const deUint32					width								= imageSizes[widthNdx];
 			const deUint32					height								= imageSizes[heightNdx];
-			const BindingCaseParameters		regularparams						= makeBindingCaseParameters(10, width, height, 0u, priorityMode);
-			const BindingCaseParameters		aliasparams							= makeBindingCaseParameters(10, width, height, VK_IMAGE_CREATE_ALIAS_BIT, priorityMode);
+			const BindingCaseParameters		regularparams						= makeBindingCaseParameters(10, width, height, 0u, usePriority);
+			const BindingCaseParameters		aliasparams							= makeBindingCaseParameters(10, width, height, VK_IMAGE_CREATE_ALIAS_BIT, usePriority);
 			std::ostringstream				testName;
 
 			testName << "image_" << width << '_' << height;
@@ -1067,8 +1014,8 @@ tcu::TestCaseGroup* createMemoryBindingTests (tcu::TestContext& testCtx)
 		regular->addChild(regular_dedicated.release());
 
 		aliasing->addChild(aliasing_suballocated.release());
-		if (priorityMode != PRIORITY_MODE_DEFAULT) {
-			de::MovePtr<tcu::TestCaseGroup>		priority	(new tcu::TestCaseGroup(testCtx, (priorityMode == PRIORITY_MODE_DYNAMIC) ? "priority_dynamic" : "priority", (priorityMode == PRIORITY_MODE_DYNAMIC) ? "Using VK_EXT_pageable_device_local_memory" : "Using VK_EXT_memory_priority."));
+		if (usePriority) {
+			de::MovePtr<tcu::TestCaseGroup>		priority	(new tcu::TestCaseGroup(testCtx, "priority", "Using VK_EXT_memory_priority."));
 			priority->addChild(regular.release());
 			priority->addChild(aliasing.release());
 			group->addChild(priority.release());

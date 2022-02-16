@@ -38,9 +38,8 @@ public:
 											 const SpirVFunction	function,
 											 const ImageType		imageType,
 											 const tcu::UVec3&		imageSize,
-											 const vk::VkFormat		format,
-											 const std::string&		operand)
-		: SparseShaderIntrinsicsCaseBase (testCtx, name, function, imageType, imageSize, format, operand) {}
+											 const vk::VkFormat		format)
+		: SparseShaderIntrinsicsCaseBase (testCtx, name, function, imageType, imageSize, format) {}
 
 	void				initPrograms		(vk::SourceCollections&	programCollection) const;
 
@@ -59,9 +58,8 @@ public:
 												 const SpirVFunction	function,
 												 const ImageType		imageType,
 												 const tcu::UVec3&		imageSize,
-												 const vk::VkFormat		format,
-												 const std::string&		operand)
-		: SparseShaderIntrinsicsCaseSampledBase (testCtx, name, function, imageType, imageSize, format, operand) {}
+												 const vk::VkFormat		format)
+		: SparseShaderIntrinsicsCaseSampledBase (testCtx, name, function, imageType, imageSize, format) {}
 
 	TestInstance*	createInstance				(Context&				context) const;
 };
@@ -74,9 +72,8 @@ public:
 												 const SpirVFunction	function,
 												 const ImageType		imageType,
 												 const tcu::UVec3&		imageSize,
-												 const vk::VkFormat		format,
-												 const std::string&		operand)
-		: SparseShaderIntrinsicsCaseSampledExplicit (testCtx, name, function, imageType, imageSize, format, operand) {}
+												 const vk::VkFormat		format)
+		: SparseShaderIntrinsicsCaseSampledExplicit (testCtx, name, function, imageType, imageSize, format) {}
 
 	std::string	sparseImageOpString				(const std::string&		resultVariable,
 												 const std::string&		resultType,
@@ -93,9 +90,8 @@ public:
 												 const SpirVFunction	function,
 												 const ImageType		imageType,
 												 const tcu::UVec3&		imageSize,
-												 const vk::VkFormat		format,
-												 const std::string&		operand)
-		: SparseShaderIntrinsicsCaseSampledBase (testCtx, name, function, imageType, imageSize, format, operand) {}
+												 const vk::VkFormat		format)
+		: SparseShaderIntrinsicsCaseSampledBase (testCtx, name, function, imageType, imageSize, format) {}
 
 	TestInstance*	createInstance				(Context&				context) const;
 };
@@ -108,9 +104,8 @@ public:
 												 const SpirVFunction	function,
 												 const ImageType		imageType,
 												 const tcu::UVec3&		imageSize,
-												 const vk::VkFormat		format,
-												 const std::string&		operand)
-		: SparseShaderIntrinsicsCaseSampledImplicit (testCtx, name, function, imageType, imageSize, format, operand) {}
+												 const vk::VkFormat		format)
+		: SparseShaderIntrinsicsCaseSampledImplicit (testCtx, name, function, imageType, imageSize, format) {}
 
 	std::string	sparseImageOpString				(const std::string&		resultVariable,
 												 const std::string&		resultType,
@@ -127,9 +122,8 @@ public:
 										 const SpirVFunction	function,
 										 const ImageType		imageType,
 										 const tcu::UVec3&		imageSize,
-										 const vk::VkFormat		format,
-										 const std::string&		operand)
-		: SparseShaderIntrinsicsCaseSampledImplicit (testCtx, name, function, imageType, imageSize, format, operand) {}
+										 const vk::VkFormat		format)
+		: SparseShaderIntrinsicsCaseSampledImplicit (testCtx, name, function, imageType, imageSize, format) {}
 
 	std::string	sparseImageOpString		(const std::string&		resultVariable,
 										 const std::string&		resultType,

@@ -36,7 +36,7 @@ namespace Functional
 class TextureBorderClampTests : public TestCaseGroup
 {
 public:
-								TextureBorderClampTests		(Context& context, bool isGL45);
+								TextureBorderClampTests		(Context& context);
 								~TextureBorderClampTests	(void);
 
 	void						init						(void);
@@ -44,8 +44,6 @@ public:
 private:
 								TextureBorderClampTests		(const TextureBorderClampTests& other);
 	TextureBorderClampTests&	operator=					(const TextureBorderClampTests& other);
-
-	bool						m_isGL45;
 };
 
 } // Functional

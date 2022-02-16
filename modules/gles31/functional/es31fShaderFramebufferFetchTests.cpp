@@ -319,10 +319,6 @@ void FramebufferFetchTestCase::init (void)
 	checkFramebufferFetchSupport (m_context);
 	checkFormatSupport(m_context, m_format);
 
-	if (glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 5)) && tcu::isSRGB(m_texFmt)) {
-		m_gl.enable(GL_FRAMEBUFFER_SRGB);
-	}
-
 	DE_ASSERT(!m_program);
 	m_program = new glu::ShaderProgram(m_context.getRenderContext(), genShaderSources());
 
@@ -342,10 +338,6 @@ void FramebufferFetchTestCase::deinit (void)
 {
 	delete m_program;
 	m_program = DE_NULL;
-
-	if (glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 5))) {
-		m_gl.disable(GL_FRAMEBUFFER_SRGB);
-	}
 
 	if (m_framebuffer)
 	{
@@ -585,7 +577,7 @@ class TextureFormatTestCase : public FramebufferFetchTestCase
 {
 public:
 						TextureFormatTestCase		(Context& context, const char* name, const char* desc, deUint32 format);
-						~TextureFormatTestCase		(void) {}
+						~TextureFormatTestCase		(void) {};
 
 	IterateResult		iterate						(void);
 
@@ -812,7 +804,7 @@ class LastFragDataTestCase : public FramebufferFetchTestCase
 {
 public:
 						LastFragDataTestCase			(Context& context, const char* name, const char* desc, deUint32 format);
-						~LastFragDataTestCase			(void) {}
+						~LastFragDataTestCase			(void) {};
 
 	IterateResult		iterate							(void);
 

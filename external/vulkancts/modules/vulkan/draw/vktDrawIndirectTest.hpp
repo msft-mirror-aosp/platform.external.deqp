@@ -33,7 +33,7 @@ namespace Draw
 class IndirectDrawTests : public tcu::TestCaseGroup
 {
 public:
-						IndirectDrawTests		(tcu::TestContext &testCtx, bool useDynamicRendering);
+						IndirectDrawTests		(tcu::TestContext &testCtx);
 						~IndirectDrawTests		(void);
 	void				init					(void);
 
@@ -41,8 +41,6 @@ private:
 	IndirectDrawTests							(const IndirectDrawTests &other);
 	IndirectDrawTests&	operator=				(const IndirectDrawTests &other);
 
-private:
-	const bool m_useDynamicRendering;
 };
 } // Draw
 } // vkt

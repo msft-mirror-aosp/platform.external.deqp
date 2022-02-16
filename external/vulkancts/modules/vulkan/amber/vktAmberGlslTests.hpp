@@ -33,7 +33,6 @@ namespace cts_amber
 {
 
 tcu::TestCaseGroup* createCombinedOperationsGroup	(tcu::TestContext&);
-tcu::TestCaseGroup* createCrashTestGroup			(tcu::TestContext&);
 
 } // cts_amber
 } // vkt
