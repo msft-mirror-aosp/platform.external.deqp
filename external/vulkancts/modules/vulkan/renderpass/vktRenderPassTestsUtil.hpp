@@ -38,11 +38,10 @@ namespace renderpass
 
 using namespace vk;
 
-enum RenderingType
+enum RenderPassType
 {
-	RENDERING_TYPE_RENDERPASS_LEGACY = 0,
-	RENDERING_TYPE_RENDERPASS2,
-	RENDERING_TYPE_DYNAMIC_RENDERING
+	RENDERPASS_TYPE_LEGACY = 0,
+	RENDERPASS_TYPE_RENDERPASS2,
 };
 
 enum SynchronizationType
@@ -422,7 +421,7 @@ private:
 Move<VkRenderPass> createRenderPass (const DeviceInterface&	vk,
 									 VkDevice				device,
 									 const RenderPass&		renderPassInfo,
-									 RenderingType			renderingType,
+									 RenderPassType			renderPassType,
 									 SynchronizationType	synchronizationType = SYNCHRONIZATION_TYPE_LEGACY);
 
 } // renderpass

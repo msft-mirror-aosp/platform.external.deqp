@@ -31,7 +31,6 @@
 #include "vktPipelineLogicOpTests.hpp"
 #include "vktPipelineImageTests.hpp"
 #include "vktPipelineInputAssemblyTests.hpp"
-#include "vktPipelineInterfaceMatchingTests.hpp"
 #include "vktPipelineSamplerTests.hpp"
 #include "vktPipelineImageViewTests.hpp"
 #include "vktPipelinePushConstantTests.hpp"
@@ -86,13 +85,11 @@ void createChildren (tcu::TestCaseGroup* pipelineTests)
 	pipelineTests->addChild(createPushDescriptorTests			(testCtx));
 	pipelineTests->addChild(createSpecConstantTests				(testCtx));
 	pipelineTests->addChild(createMatchedAttachmentsTests		(testCtx));
-	pipelineTests->addChild(createMultisampleTests				(testCtx, false));
-	pipelineTests->addChild(createMultisampleTests				(testCtx, true));
+	pipelineTests->addChild(createMultisampleTests				(testCtx));
 	pipelineTests->addChild(createMultisampleInterpolationTests	(testCtx));
 	pipelineTests->addChild(createMultisampleShaderBuiltInTests	(testCtx));
 	pipelineTests->addChild(createTestGroup						(testCtx,	"vertex_input", "", createVertexInputTests));
 	pipelineTests->addChild(createInputAssemblyTests			(testCtx));
-	pipelineTests->addChild(createInterfaceMatchingTests		(testCtx));
 	pipelineTests->addChild(createTimestampTests				(testCtx));
 	pipelineTests->addChild(createCacheTests					(testCtx));
 	pipelineTests->addChild(createRenderToImageTests			(testCtx));

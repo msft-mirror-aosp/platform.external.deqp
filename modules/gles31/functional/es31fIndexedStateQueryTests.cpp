@@ -824,10 +824,7 @@ ImageBindingFormatCase::IterateResult ImageBindingFormatCase::iterate (void)
 		const tcu::ScopedLogSection section(m_testCtx.getLog(), "Initial", "Initial value");
 
 		for (int ndx = 0; ndx < maxImages; ++ndx)
-			if (glu::isContextTypeES(m_context.getRenderContext().getType()))
-				verifyStateIndexedInteger(result, gl, GL_IMAGE_BINDING_FORMAT, ndx, GL_R32UI, m_verifierType);
-			else
-				verifyStateIndexedInteger(result, gl, GL_IMAGE_BINDING_FORMAT, ndx, GL_R8, m_verifierType);
+			verifyStateIndexedInteger(result, gl, GL_IMAGE_BINDING_FORMAT, ndx, GL_R32UI, m_verifierType);
 	}
 
 	{

@@ -738,19 +738,16 @@ bool floatThresholdCompare (TestLog& log, const char* imageSetName, const char* 
  * \param result		Result image
  * \param threshold		Maximum allowed difference
  * \param logMode		Logging mode
- * \param use64Bits		Use 64-bit components when reading image data.
  * \return true if comparison passes, false otherwise
  *//*--------------------------------------------------------------------*/
-bool intThresholdCompare (TestLog& log, const char* imageSetName, const char* imageSetDesc, const ConstPixelBufferAccess& reference, const ConstPixelBufferAccess& result, const UVec4& threshold, CompareLogMode logMode, bool use64Bits)
+bool intThresholdCompare (TestLog& log, const char* imageSetName, const char* imageSetDesc, const ConstPixelBufferAccess& reference, const ConstPixelBufferAccess& result, const UVec4& threshold, CompareLogMode logMode)
 {
 	int					width				= reference.getWidth();
 	int					height				= reference.getHeight();
 	int					depth				= reference.getDepth();
 	TextureLevel		errorMaskStorage	(TextureFormat(TextureFormat::RGB, TextureFormat::UNORM_INT8), width, height, depth);
 	PixelBufferAccess	errorMask			= errorMaskStorage.getAccess();
-	U64Vec4				maxDiff				(0u, 0u, 0u, 0u);
-	U64Vec4				diff				(0u, 0u, 0u, 0u);
-	const U64Vec4		threshold64			= threshold.cast<deUint64>();
+	UVec4				maxDiff				(0, 0, 0, 0);
 	Vec4				pixelBias			(0.0f, 0.0f, 0.0f, 0.0f);
 	Vec4				pixelScale			(1.0f, 1.0f, 1.0f, 1.0f);
 
@@ -762,28 +759,20 @@ bool intThresholdCompare (TestLog& log, const char* imageSetName, const char* im
 		{
 			for (int x = 0; x < width; x++)
 			{
-				if (use64Bits)
-				{
-					I64Vec4	refPix	= reference.getPixelInt64(x, y, z);
-					I64Vec4	cmpPix	= result.getPixelInt64(x, y, z);
-					diff			= abs(refPix - cmpPix).cast<deUint64>();
-				}
-				else
-				{
-					IVec4	refPix	= reference.getPixelInt(x, y, z);
-					IVec4	cmpPix	= result.getPixelInt(x, y, z);
-					diff			= abs(refPix - cmpPix).cast<deUint64>();
-				}
+				IVec4	refPix		= reference.getPixelInt(x, y, z);
+				IVec4	cmpPix		= result.getPixelInt(x, y, z);
+
+				UVec4	diff		= abs(refPix - cmpPix).cast<deUint32>();
+				bool	isOk		= boolAll(lessThanEqual(diff, threshold));
 
 				maxDiff = max(maxDiff, diff);
 
-				const bool isOk = boolAll(lessThanEqual(diff, threshold64));
 				errorMask.setPixel(isOk ? IVec4(0, 0xff, 0, 0xff) : IVec4(0xff, 0, 0, 0xff), x, y, z);
 			}
 		}
 	}
 
-	bool compareOk = boolAll(lessThanEqual(maxDiff, threshold64));
+	bool compareOk = boolAll(lessThanEqual(maxDiff, threshold));
 
 	if (!compareOk || logMode == COMPARE_LOG_EVERYTHING)
 	{

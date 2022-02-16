@@ -36,7 +36,6 @@
 #include "vktSynchronizationWin32KeyedMutexTests.hpp"
 #include "vktSynchronizationNoneStageTests.hpp"
 #include "vktSynchronizationUtil.hpp"
-#include "vktSynchronizationImageLayoutTransitionTests.hpp"
 
 #include "deUniquePtr.hpp"
 
@@ -103,7 +102,6 @@ tcu::TestCaseGroup* createTestsInternal (tcu::TestContext& testCtx, Synchronizat
 		testGroup->addChild(createSynchronization2SmokeTests(testCtx));
 		testGroup->addChild(createSynchronization2TimelineSemaphoreTests(testCtx));
 		testGroup->addChild(createNoneStageTests(testCtx));
-		testGroup->addChild(createImageLayoutTransitionTests(testCtx));
 	}
 	else // legacy synchronization
 	{

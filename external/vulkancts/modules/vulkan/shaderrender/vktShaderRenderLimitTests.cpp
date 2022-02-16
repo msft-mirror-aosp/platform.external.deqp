@@ -234,11 +234,10 @@ TestInstance* FragmentInputComponentCase::createInstance (Context& context) cons
 		TCU_THROW(NotSupportedError, notSupportedStr.c_str());
 	}
 
-	// gl_Position counts as an output component as well, so outputComponents = inputComponents + 4
-	if (m_inputComponents + 4 > maxVertexOutputComponents)
+	if (m_inputComponents > maxVertexOutputComponents)
 	{
 		const std::string notSupportedStr = "Unsupported number of user specified vertex output components (" +
-											de::toString(m_inputComponents + 4) +
+											de::toString(m_inputComponents) +
 											") maxVertexOutputComponents=" + de::toString(maxVertexOutputComponents);
 		TCU_THROW(NotSupportedError, notSupportedStr.c_str());
 	}
