@@ -671,7 +671,7 @@ const glw::GLchar* gl4cts::es31compatibility::ShaderFunctionalCompatibilityTest:
 
 const glw::GLchar* gl4cts::es31compatibility::ShaderFunctionalCompatibilityTest::s_vertex_shader_body =
 	"\n"
-	"out highp float vout;\n"
+	"out highp float dummy;\n"
 	"\n"
 	"void main()\n"
 	"{\n"
@@ -691,12 +691,12 @@ const glw::GLchar* gl4cts::es31compatibility::ShaderFunctionalCompatibilityTest:
 	"       break;\n"
 	"    }\n"
 	"\n"
-	"    vout = float(gl_VertexID % 4);\n   /* Always less than 4. */"
+	"    dummy = float(gl_VertexID % 4);\n   /* Always less than 4. */"
 	"}\n";
 
 const glw::GLchar* gl4cts::es31compatibility::ShaderFunctionalCompatibilityTest::s_fragment_shader_body =
 	"\n"
-	"in highp float vout;\n"
+	"in highp float dummy;\n"
 	"\n"
 	"out highp vec4 result;\n"
 	"\n"
@@ -704,7 +704,7 @@ const glw::GLchar* gl4cts::es31compatibility::ShaderFunctionalCompatibilityTest:
 	"{\n"
 	"    TTYPE a = LEFT;\n"
 	"    TTYPE b = RIGHT;\n"
-	"    BTYPE c = BDATA && BTYPE(vout < 4.0);\n    /* Making sure that expression is not compile time constant. */"
+	"    BTYPE c = BDATA && BTYPE(dummy < 4.0);\n    /* Making sure that expression is not compile time constant. */"
 	"\n"
 	"    TTYPE mixed = mix(a, b, c);\n"
 	"\n"

@@ -113,7 +113,6 @@ public:
 	};
 
 	static const float					quadDepths[QUAD_COUNT];
-	static const float					quadDepthsMinusOneToOne[QUAD_COUNT];
 
 										DepthTest				(tcu::TestContext&		testContext,
 																 const std::string&		name,
@@ -126,8 +125,7 @@ public:
 																 const float			depthBoundsMax					= 1.0f,
 																 const bool				depthTestEnable					= true,
 																 const bool				stencilTestEnable				= false,
-																 const bool				colorAttachmentEnable			= true,
-																 const bool				depthClipControl				= false);
+																 const bool				colorAttachmentEnable			= true);
 	virtual								~DepthTest				(void);
 	virtual void						initPrograms			(SourceCollections& programCollection) const;
 	virtual void						checkSupport			(Context& context) const;
@@ -142,7 +140,6 @@ private:
 	const bool							m_depthTestEnable;
 	const bool							m_stencilTestEnable;
 	const bool							m_colorAttachmentEnable;
-	const bool							m_depthClipControl;
 	VkCompareOp							m_depthCompareOps[QUAD_COUNT];
 };
 
@@ -158,8 +155,7 @@ public:
 																 const float		depthBoundsMax,
 																 const bool			depthTestEnable,
 																 const bool			stencilTestEnable,
-																 const bool			colorAttachmentEnable,
-																 const bool			depthClipControl);
+																 const bool			colorAttachmentEnable);
 	virtual								~DepthTestInstance		(void);
 	virtual tcu::TestStatus				iterate					(void);
 
@@ -178,7 +174,6 @@ private:
 	const bool							m_depthTestEnable;
 	const bool							m_stencilTestEnable;
 	const bool							m_colorAttachmentEnable;
-	const bool							m_depthClipControl;
 	VkImageSubresourceRange				m_depthImageSubresourceRange;
 
 	Move<VkImage>						m_colorImage;
@@ -212,15 +207,6 @@ const float DepthTest::quadDepths[QUAD_COUNT] =
 	0.2f
 };
 
-// Depth values suitable for the depth range of -1..1.
-const float DepthTest::quadDepthsMinusOneToOne[QUAD_COUNT] =
-{
-	-0.8f,
-	-1.0f,
-	 0.6f,
-	 0.2f
-};
-
 DepthTest::DepthTest (tcu::TestContext&		testContext,
 					  const std::string&	name,
 					  const std::string&	description,
@@ -232,8 +218,7 @@ DepthTest::DepthTest (tcu::TestContext&		testContext,
 					  const float			depthBoundsMax,
 					  const bool			depthTestEnable,
 					  const bool			stencilTestEnable,
-					  const bool			colorAttachmentEnable,
-					  const bool			depthClipControl)
+					  const bool			colorAttachmentEnable)
 	: vkt::TestCase	(testContext, name, description)
 	, m_depthFormat					(depthFormat)
 	, m_separateDepthStencilLayouts	(separateDepthStencilLayouts)
@@ -243,7 +228,6 @@ DepthTest::DepthTest (tcu::TestContext&		testContext,
 	, m_depthTestEnable				(depthTestEnable)
 	, m_stencilTestEnable			(stencilTestEnable)
 	, m_colorAttachmentEnable		(colorAttachmentEnable)
-	, m_depthClipControl			(depthClipControl)
 {
 	deMemcpy(m_depthCompareOps, depthCompareOps, sizeof(VkCompareOp) * QUAD_COUNT);
 }
@@ -262,14 +246,11 @@ void DepthTest::checkSupport (Context& context) const
 
 	if (m_separateDepthStencilLayouts && !context.isDeviceFunctionalitySupported("VK_KHR_separate_depth_stencil_layouts"))
 		TCU_THROW(NotSupportedError, "VK_KHR_separate_depth_stencil_layouts is not supported");
-
-	if (m_depthClipControl && !context.isDeviceFunctionalitySupported("VK_EXT_depth_clip_control"))
-		TCU_THROW(NotSupportedError, "VK_EXT_depth_clip_control is not supported");
 }
 
 TestInstance* DepthTest::createInstance (Context& context) const
 {
-	return new DepthTestInstance(context, m_depthFormat, m_depthCompareOps, m_separateDepthStencilLayouts, m_depthBoundsTestEnable, m_depthBoundsMin, m_depthBoundsMax, m_depthTestEnable, m_stencilTestEnable, m_colorAttachmentEnable, m_depthClipControl);
+	return new DepthTestInstance(context, m_depthFormat, m_depthCompareOps, m_separateDepthStencilLayouts, m_depthBoundsTestEnable, m_depthBoundsMin, m_depthBoundsMax, m_depthTestEnable, m_stencilTestEnable, m_colorAttachmentEnable);
 }
 
 void DepthTest::initPrograms (SourceCollections& programCollection) const
@@ -307,6 +288,7 @@ void DepthTest::initPrograms (SourceCollections& programCollection) const
 			"	gl_Position = position;\n"
 			"}\n");
 	}
+
 }
 
 DepthTestInstance::DepthTestInstance (Context&				context,
@@ -318,8 +300,7 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 									  const float			depthBoundsMax,
 									  const bool			depthTestEnable,
 									  const bool			stencilTestEnable,
-									  const bool			colorAttachmentEnable,
-									  const bool			depthClipControl)
+									  const bool			colorAttachmentEnable)
 	: vkt::TestInstance				(context)
 	, m_renderSize					(32, 32)
 	, m_colorFormat					(colorAttachmentEnable ? VK_FORMAT_R8G8B8A8_UNORM : VK_FORMAT_UNDEFINED)
@@ -331,7 +312,6 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 	, m_depthTestEnable				(depthTestEnable)
 	, m_stencilTestEnable			(stencilTestEnable)
 	, m_colorAttachmentEnable		(colorAttachmentEnable)
-	, m_depthClipControl			(depthClipControl)
 {
 	const DeviceInterface&		vk						= context.getDeviceInterface();
 	const VkDevice				vkDevice				= context.getDevice();
@@ -490,14 +470,17 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 
 	// Create pipeline
 	{
-		const VkVertexInputBindingDescription				vertexInputBindingDescription		=
+		const std::vector<VkViewport>				viewports							(1, makeViewport(m_renderSize));
+		const std::vector<VkRect2D>					scissors							(1, makeRect2D(m_renderSize));;
+
+		const VkVertexInputBindingDescription		vertexInputBindingDescription		=
 		{
 			0u,							// deUint32					binding;
 			sizeof(Vertex4RGBA),		// deUint32					strideInBytes;
 			VK_VERTEX_INPUT_RATE_VERTEX	// VkVertexInputStepRate	inputRate;
 		};
 
-		const VkVertexInputAttributeDescription				vertexInputAttributeDescriptions[2]	=
+		const VkVertexInputAttributeDescription		vertexInputAttributeDescriptions[2]	=
 		{
 			{
 				0u,									// deUint32	location;
@@ -513,7 +496,7 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 			}
 		};
 
-		const VkPipelineVertexInputStateCreateInfo			vertexInputStateParams				=
+		const VkPipelineVertexInputStateCreateInfo	vertexInputStateParams				=
 		{
 			VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,		// VkStructureType							sType;
 			DE_NULL,														// const void*								pNext;
@@ -524,7 +507,7 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 			vertexInputAttributeDescriptions								// const VkVertexInputAttributeDescription*	pVertexAttributeDescriptions;
 		};
 
-		VkPipelineDepthStencilStateCreateInfo				depthStencilStateParams				=
+		VkPipelineDepthStencilStateCreateInfo		depthStencilStateParams				=
 		{
 			VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,	// VkStructureType							sType;
 			DE_NULL,													// const void*								pNext;
@@ -554,12 +537,12 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 				0u,						// deUint32		writeMask;
 				0u,						// deUint32		reference;
 			},
-			m_depthBoundsMin,											// float									minDepthBounds;
-			m_depthBoundsMax,											// float									maxDepthBounds;
+			m_depthBoundsMin,			// float			minDepthBounds;
+			m_depthBoundsMax,			// float			maxDepthBounds;
 		};
 
 		// Make sure rasterization is not disabled when the fragment shader is missing.
-		const vk::VkPipelineRasterizationStateCreateInfo		rasterizationStateParams		=
+		const vk::VkPipelineRasterizationStateCreateInfo rasterizationStateParams =
 		{
 			vk::VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,	//	VkStructureType							sType;
 			nullptr,														//	const void*								pNext;
@@ -576,48 +559,27 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 			1.0f,															//	float									lineWidth;
 		};
 
-		const VkViewport										viewport						= makeViewport(m_renderSize);
-		const VkRect2D											scissor							= makeRect2D(m_renderSize);
-
-		const VkPipelineViewportDepthClipControlCreateInfoEXT	depthClipControlCreateInfo		=
-		{
-			VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_DEPTH_CLIP_CONTROL_CREATE_INFO_EXT,	// VkStructureType	sType;
-			DE_NULL,																// const void*		pNext;
-			VK_TRUE,																// VkBool32		negativeOneToOne;
-		};
-
-		const VkPipelineViewportStateCreateInfo					viewportStateCreateInfo			=
-		{
-			VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,		// VkStructureType						sType;
-			m_depthClipControl ? &depthClipControlCreateInfo : DE_NULL,	// const void*							pNext;
-			(VkPipelineViewportStateCreateFlags)0,						// VkPipelineViewportStateCreateFlags	flags;
-			1u,															// deUint32								viewportCount;
-			&viewport,													// const VkViewport*					pViewports;
-			1u,															// deUint32								scissorCount;
-			&scissor													// const VkRect2D*						pScissors;
-		};
-
 		for (int quadNdx = 0; quadNdx < DepthTest::QUAD_COUNT; quadNdx++)
 		{
 			depthStencilStateParams.depthCompareOp	= depthCompareOps[quadNdx];
-
-			m_graphicsPipelines[quadNdx]			= makeGraphicsPipeline(vk,									// const DeviceInterface&							vk;
-																		   vkDevice,							// const VkDevice									device;
-																		   *m_pipelineLayout,					// const VkPipelineLayout							pipelineLayout;
-																		   *m_vertexShaderModule,				// const VkShaderModule								vertexShaderModule;
-																		   DE_NULL,								// const VkShaderModule								tessellationControlModule;
-																		   DE_NULL,								// const VkShaderModule								tessellationEvalModule;
-																		   DE_NULL,								// const VkShaderModule								geometryShaderModule;
-																		   *m_fragmentShaderModule,				// const VkShaderModule								fragmentShaderModule;
-																		   *m_renderPass,						// const VkRenderPass								renderPass;
-																		   0u,									// const deUint32									subpass;
-																		   &vertexInputStateParams,				// const VkPipelineVertexInputStateCreateInfo*		vertexInputStateCreateInfo;
-																		   DE_NULL,								// const VkPipelineInputAssemblyStateCreateInfo*	inputAssemblyStateCreateInfo;
-																		   DE_NULL,								// const VkPipelineTessellationStateCreateInfo*		tessStateCreateInfo;
-																		   &viewportStateCreateInfo,			// const VkPipelineViewportStateCreateInfo*			viewportStateCreateInfo;
-																		   &rasterizationStateParams,			// const VkPipelineRasterizationStateCreateInfo*	rasterizationStateCreateInfo;
-																		   DE_NULL,								// const VkPipelineMultisampleStateCreateInfo*		multisampleStateCreateInfo;
-																		   &depthStencilStateParams);			// const VkPipelineDepthStencilStateCreateInfo*		depthStencilStateCreateInfo;
+			m_graphicsPipelines[quadNdx]			= makeGraphicsPipeline(vk,									// const DeviceInterface&                        vk
+																		   vkDevice,							// const VkDevice                                device
+																		   *m_pipelineLayout,					// const VkPipelineLayout                        pipelineLayout
+																		   *m_vertexShaderModule,				// const VkShaderModule                          vertexShaderModule
+																		   DE_NULL,								// const VkShaderModule                          tessellationControlModule
+																		   DE_NULL,								// const VkShaderModule                          tessellationEvalModule
+																		   DE_NULL,								// const VkShaderModule                          geometryShaderModule
+																		   *m_fragmentShaderModule,				// const VkShaderModule                          fragmentShaderModule
+																		   *m_renderPass,						// const VkRenderPass                            renderPass
+																		   viewports,							// const std::vector<VkViewport>&                viewports
+																		   scissors,							// const std::vector<VkRect2D>&                  scissors
+																		   VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,	// const VkPrimitiveTopology                     topology
+																		   0u,									// const deUint32                                subpass
+																		   0u,									// const deUint32                                patchControlPoints
+																		   &vertexInputStateParams,				// const VkPipelineVertexInputStateCreateInfo*   vertexInputStateCreateInfo
+																		   &rasterizationStateParams,			// const VkPipelineRasterizationStateCreateInfo* rasterizationStateCreateInfo
+																		   DE_NULL,								// const VkPipelineMultisampleStateCreateInfo*   multisampleStateCreateInfo
+																		   &depthStencilStateParams);			// const VkPipelineDepthStencilStateCreateInfo*  depthStencilStateCreateInfo
 		}
 	}
 
@@ -644,9 +606,7 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 		// Adjust depths
 		for (int quadNdx = 0; quadNdx < DepthTest::QUAD_COUNT; quadNdx++)
 			for (int vertexNdx = 0; vertexNdx < 6; vertexNdx++)
-			{
-				m_vertices[quadNdx * 6 + vertexNdx].position.z() = m_depthClipControl ? DepthTest::quadDepthsMinusOneToOne[quadNdx] : DepthTest::quadDepths[quadNdx];
-			}
+				m_vertices[quadNdx * 6 + vertexNdx].position.z() = DepthTest::quadDepths[quadNdx];
 
 		// Load vertices into vertex buffer
 		deMemcpy(m_vertexBufferAlloc->getHostPtr(), m_vertices.data(), m_vertices.size() * sizeof(Vertex4RGBA));
@@ -754,7 +714,7 @@ tcu::TestStatus DepthTestInstance::verifyImage (void)
 	const tcu::TextureFormat	tcuColorFormat	= mapVkFormat(VK_FORMAT_R8G8B8A8_UNORM);
 	const tcu::TextureFormat	tcuDepthFormat	= mapVkFormat(m_depthFormat);
 	const ColorVertexShader		vertexShader;
-	const ColorFragmentShader	fragmentShader	(tcuColorFormat, tcuDepthFormat, m_depthClipControl);
+	const ColorFragmentShader	fragmentShader	(tcuColorFormat, tcuDepthFormat);
 	const rr::Program			program			(&vertexShader, &fragmentShader);
 	ReferenceRenderer			refRenderer		(m_renderSize.x(), m_renderSize.y(), 1, tcuColorFormat, tcuDepthFormat, &program);
 	bool						colorCompareOk	= false;
@@ -848,6 +808,7 @@ tcu::TestStatus DepthTestInstance::verifyImage (void)
 			}
 			else if (tcu::getTextureChannelClass(result->getFormat().type) == tcu::TEXTURECHANNELCLASS_FLOATING_POINT)
 			{
+
 				depthThreshold = 0.0000001f;
 			}
 			else
@@ -1134,22 +1095,6 @@ tcu::TestCaseGroup* createDepthTests (tcu::TestContext& testCtx)
 		}
 	}
 	depthTests->addChild(noColorAttachmentTests.release());
-
-	de::MovePtr<tcu::TestCaseGroup>	depthClipControlTests		(new tcu::TestCaseGroup(testCtx, "depth_clip_control", "Depth tests with depth clip control enabled"));
-	{
-		const VkCompareOp compareOps[] = { VK_COMPARE_OP_ALWAYS, VK_COMPARE_OP_LESS };
-
-		for (const auto& format : depthFormats)
-			for (const auto& compareOp : compareOps)
-			{
-				std::string testName = getFormatCaseName(format) + "_" + de::toLower(std::string(getCompareOpName(compareOp)).substr(14));
-
-				const VkCompareOp ops[DepthTest::QUAD_COUNT] = { compareOp, compareOp, compareOp, compareOp };
-				depthClipControlTests->addChild(new DepthTest(testCtx, testName, "", format, ops, false, false,
-												0.0f, 1.0f, true, false, true, true));
-			}
-	}
-	depthTests->addChild(depthClipControlTests.release());
 
 	return depthTests.release();
 }

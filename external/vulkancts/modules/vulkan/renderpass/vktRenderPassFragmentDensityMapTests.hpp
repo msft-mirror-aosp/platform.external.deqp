@@ -31,7 +31,7 @@ namespace vkt
 namespace renderpass
 {
 
-tcu::TestCaseGroup* createFragmentDensityMapTests (tcu::TestContext& testCtx, RenderingType renderingType);
+tcu::TestCaseGroup* createFragmentDensityMapTests (tcu::TestContext& testCtx);
 
 } // renderpass
 } // vkt

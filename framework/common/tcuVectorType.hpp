@@ -50,16 +50,6 @@ typedef Vector<deUint32, 2>	UVec2;
 typedef Vector<deUint32, 3>	UVec3;
 typedef Vector<deUint32, 4>	UVec4;
 
-typedef Vector<deInt64, 1>	I64Vec1;
-typedef Vector<deInt64, 2>	I64Vec2;
-typedef Vector<deInt64, 3>	I64Vec3;
-typedef Vector<deInt64, 4>	I64Vec4;
-
-typedef Vector<deUint64, 1>	U64Vec1;
-typedef Vector<deUint64, 2>	U64Vec2;
-typedef Vector<deUint64, 3>	U64Vec3;
-typedef Vector<deUint64, 4>	U64Vec4;
-
 typedef Vector<bool, 1>		BVec1;
 typedef Vector<bool, 2>		BVec2;
 typedef Vector<bool, 3>		BVec3;

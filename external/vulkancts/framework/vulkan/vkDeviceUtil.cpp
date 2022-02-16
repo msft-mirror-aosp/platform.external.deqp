@@ -42,7 +42,6 @@ Move<VkInstance> createDefaultInstance (const PlatformInterface&		vkPlatform,
 										deUint32						apiVersion,
 										const vector<string>&			enabledLayers,
 										const vector<string>&			enabledExtensions,
-										DebugReportRecorder*			recorder,
 										const VkAllocationCallbacks*	pAllocator)
 {
 	bool			validationEnabled	= (!enabledLayers.empty());
@@ -56,8 +55,6 @@ Move<VkInstance> createDefaultInstance (const PlatformInterface&		vkPlatform,
 
 		if (!de::contains(begin(actualExtensions), end(actualExtensions), "VK_EXT_debug_report"))
 			actualExtensions.push_back("VK_EXT_debug_report");
-
-		DE_ASSERT(recorder);
 	}
 
 	vector<const char*>		layerNamePtrs		(enabledLayers.size());
@@ -79,19 +76,16 @@ Move<VkInstance> createDefaultInstance (const PlatformInterface&		vkPlatform,
 		qpGetReleaseId(),						// engineVersion
 		apiVersion								// apiVersion
 	};
-
-	const VkDebugReportCallbackCreateInfoEXT callbackInfo = (validationEnabled ? recorder->makeCreateInfo() : initVulkanStructure());
-
 	const struct VkInstanceCreateInfo	instanceInfo	=
 	{
 		VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
-		(validationEnabled ? &callbackInfo : nullptr),
+		DE_NULL,
 		(VkInstanceCreateFlags)0,
 		&appInfo,
 		(deUint32)layerNamePtrs.size(),
-		(validationEnabled ? layerNamePtrs.data() : nullptr),
+		(validationEnabled ? layerNamePtrs.data() : DE_NULL),
 		(deUint32)extensionNamePtrs.size(),
-		(extensionNamePtrs.empty() ? nullptr : extensionNamePtrs.data()),
+		(extensionNamePtrs.empty() ? DE_NULL : extensionNamePtrs.data()),
 	};
 
 	return createInstance(vkPlatform, &instanceInfo, pAllocator);
@@ -99,7 +93,7 @@ Move<VkInstance> createDefaultInstance (const PlatformInterface&		vkPlatform,
 
 Move<VkInstance> createDefaultInstance (const PlatformInterface& vkPlatform, deUint32 apiVersion)
 {
-	return createDefaultInstance(vkPlatform, apiVersion, vector<string>(), vector<string>(), nullptr, nullptr);
+	return createDefaultInstance(vkPlatform, apiVersion, vector<string>(), vector<string>(), DE_NULL);
 }
 
 deUint32 chooseDeviceIndex (const InstanceInterface& vkInstance, const VkInstance instance, const tcu::CommandLine& cmdLine)
