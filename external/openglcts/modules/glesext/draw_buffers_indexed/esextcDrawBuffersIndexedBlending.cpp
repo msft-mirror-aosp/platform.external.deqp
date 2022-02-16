@@ -44,7 +44,6 @@ namespace glcts
 DrawBuffersIndexedBlending::DrawBuffersIndexedBlending(Context& context, const ExtParameters& extParams,
 													   const char* name, const char* description)
 	: DrawBuffersIndexedBase(context, extParams, name, description)
-	, m_fbo(0)
 {
 	/* Left blank on purpose */
 }

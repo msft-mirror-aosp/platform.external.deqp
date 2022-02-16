@@ -680,6 +680,7 @@ GlxDrawable* createDrawable (GlxVisual& visual, const RenderConfig& config)
 
 		case RenderConfig::SURFACETYPE_WINDOW:
 			return new GlxWindow(visual, config);
+			break;
 
 		case RenderConfig::SURFACETYPE_OFFSCREEN_NATIVE:
 			// \todo [2013-11-28 lauri] Pixmaps

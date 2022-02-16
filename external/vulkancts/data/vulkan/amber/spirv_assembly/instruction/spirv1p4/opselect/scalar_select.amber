@@ -1,5 +1,4 @@
 [require]
-VK_KHR_spirv_1_4
 
 [compute shader spirv]
 ; OpSelect among scalars. This is in SPIR-V 1.0
