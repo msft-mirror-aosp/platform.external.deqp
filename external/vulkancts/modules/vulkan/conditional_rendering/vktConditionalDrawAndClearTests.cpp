@@ -288,13 +288,12 @@ protected:
 };
 
 ConditionalRenderingBaseTestInstance::ConditionalRenderingBaseTestInstance (Context& context)
-	: TestInstance							(context)
-	, m_vki									(m_context.getInstanceInterface())
-	, m_vkd									(m_context.getDeviceInterface())
-	, m_device								(m_context.getDevice())
-	, m_physicalDevice						(m_context.getPhysicalDevice())
-	, m_queue								(m_context.getUniversalQueue())
-	, m_conditionalRenderingBufferOffset	(0)
+	: TestInstance					(context)
+	, m_vki							(m_context.getInstanceInterface())
+	, m_vkd							(m_context.getDeviceInterface())
+	, m_device						(m_context.getDevice())
+	, m_physicalDevice				(m_context.getPhysicalDevice())
+	, m_queue						(m_context.getUniversalQueue())
 {
 }
 

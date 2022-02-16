@@ -36,7 +36,7 @@ namespace Functional
 class TessellationTests : public TestCaseGroup
 {
 public:
-						TessellationTests	(Context& context, bool isGL45);
+						TessellationTests	(Context& context);
 						~TessellationTests	(void);
 
 	void				init				(void);
@@ -44,8 +44,6 @@ public:
 private:
 						TessellationTests	(const TessellationTests& other);
 	TessellationTests&	operator=			(const TessellationTests& other);
-
-	bool				m_isGL45;
 };
 
 } // Functional

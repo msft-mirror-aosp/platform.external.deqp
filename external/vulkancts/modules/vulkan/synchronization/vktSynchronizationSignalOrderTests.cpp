@@ -59,6 +59,7 @@ namespace
 
 using namespace vk;
 using namespace vkt::ExternalMemoryUtil;
+using tcu::TestLog;
 using de::MovePtr;
 using de::SharedPtr;
 using de::UniquePtr;
@@ -1444,12 +1445,14 @@ public:
 		DE_ASSERT(semaphoreHandlesA.size() == iterations.size());
 
 		// Record all read operations into a single command buffer and track the union of their execution stages.
+		VkPipelineStageFlags2KHR readStages = 0;
 		ptrCmdBufferB = makeVkSharedPtr(makeCommandBuffer(vk, device, *cmdPoolB));
 		cmdBufferB = **(ptrCmdBufferB);
 		beginCommandBuffer(vk, cmdBufferB);
 		for (deUint32 iterIdx = 0; iterIdx < iterations.size(); iterIdx++)
 		{
 			QueueSubmitOrderIteration& iter = iterations[iterIdx];
+			readStages |= iter.readOp->getInSyncInfo().stageMask;
 			iter.readOp->recordCommands(cmdBufferB);
 		}
 		endCommandBuffer(vk, cmdBufferB);

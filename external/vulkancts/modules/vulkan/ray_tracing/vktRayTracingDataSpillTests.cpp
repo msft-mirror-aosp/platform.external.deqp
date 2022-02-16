@@ -1222,6 +1222,7 @@ void DataSpillTestCase::initPrograms (vk::SourceCollections& programCollection) 
 				calcEqual
 					<< "%component_after_" << i << " = OpLoad %" << componentTypeName << " %component_ptr_" << i << "\n"
 					<< "%equal_" << i << " = " << opEqual << " %bool %component_" << i << " %component_after_" << i << "\n";
+					;
 				if (i > 0)
 					calcEqual << "%and_" << i << " = OpLogicalAnd %bool %equal_" << (i - 1) << " %equal_" << i << "\n";
 				if (i == numComponents - 1)
@@ -1300,7 +1301,7 @@ void DataSpillTestCase::initPrograms (vk::SourceCollections& programCollection) 
 			<< "void main()\n"
 			<< "{\n"
 			<< "    calleeBuffer.val = 1u;\n"
-			<< "}\n"
+			<< "}\n";
 			;
 		programCollection.glslSources.add("chit") << glu::ClosestHitSource(updateRayTracingGLSL(chit.str())) << buildOptions;
 	}
@@ -1362,7 +1363,7 @@ void DataSpillTestCase::initPrograms (vk::SourceCollections& programCollection) 
 			<< "void main()\n"
 			<< "{\n"
 			<< "    calleeBuffer.val = 1u;\n"
-			<< "}\n"
+			<< "}\n";
 			;
 		programCollection.glslSources.add("ahit") << glu::AnyHitSource(updateRayTracingGLSL(ahit.str())) << buildOptions;
 	}
@@ -2073,7 +2074,7 @@ void DataSpillPipelineInterfaceTestCase::initPrograms (vk::SourceCollections& pr
 			<< "{\n"
 			<< "  storageBuffer.val[1] = uint(hitValue.x + hitValue.y + hitValue.z);\n"
 			<< "  hitValue = vec3(hitValue.x + 1.0, hitValue.y + 1.0, hitValue.z + 1.0);\n"
-			<< "}\n"
+			<< "}\n";
 			;
 		programCollection.glslSources.add("chit") << glu::ClosestHitSource(updateRayTracingGLSL(chit.str())) << buildOptions;
 	}
@@ -2153,7 +2154,7 @@ void DataSpillPipelineInterfaceTestCase::initPrograms (vk::SourceCollections& pr
 			<< "void main()\n"
 			<< "{\n"
 			<< "  storageBuffer.val[2] = uint(attribs.x + attribs.y + attribs.z);\n"
-			<< "}\n"
+			<< "}\n";
 			;
 		programCollection.glslSources.add("chit") << glu::ClosestHitSource(updateRayTracingGLSL(chit.str())) << buildOptions;
 

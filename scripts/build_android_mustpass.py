@@ -57,6 +57,7 @@ VULKAN_MODULE					= getModuleByName("dEQP-VK")
 
 MASTER_EGL_COMMON_FILTERS		= [include("egl-master.txt"),
 								   exclude("egl-test-issues.txt"),
+								   exclude("egl-internal-api-tests.txt"),
 								   exclude("egl-manual-robustness.txt"),
 								   exclude("egl-driver-issues.txt"),
 								   exclude("egl-temp-excluded.txt")]
@@ -118,7 +119,6 @@ MASTER_GLES3_COMMON_FILTERS		= [
 		exclude("gles3-test-issues.txt"),
 		exclude("gles3-spec-issues.txt"),
 		exclude("gles3-temp-excluded.txt"),
-		exclude("gles3-waivers.txt"),
 	]
 MASTER_GLES3_PKG				= Package(module = GLES3_MODULE, configurations = [
 		# Master
@@ -129,7 +129,7 @@ MASTER_GLES3_PKG				= Package(module = GLES3_MODULE, configurations = [
 					  required		= True,
 					  filters		= MASTER_GLES3_COMMON_FILTERS,
 					  runtime		= "1h50m",
-					  runByDefault	= False),
+					  runByDefault		= False),
 		Configuration(name			= "master-2020-03-01",
 					  glconfig		= "rgba8888d24s8ms0",
 					  rotation		= "unspecified",
@@ -191,7 +191,7 @@ MASTER_GLES3_PKG				= Package(module = GLES3_MODULE, configurations = [
 		Configuration(name			= "incremental-deqp",
 					  filters		= [include("gles3-incremental-deqp.txt")],
 					  runtime		= "5m",
-					  runByDefault	= False),
+                                          runByDefault  = False),
 	])
 
 MASTER_GLES31_COMMON_FILTERS	= [
@@ -201,7 +201,6 @@ MASTER_GLES31_COMMON_FILTERS	= [
 		exclude("gles31-test-issues.txt"),
 		exclude("gles31-spec-issues.txt"),
 		exclude("gles31-temp-excluded.txt"),
-		exclude("gles31-waivers.txt"),
 	]
 MASTER_GLES31_PKG				= Package(module = GLES31_MODULE, configurations = [
 		# Master
@@ -280,28 +279,23 @@ MASTER_VULKAN_FILTERS			= [
 		exclude("vk-temp-excluded.txt"),
 	]
 MASTER_VULKAN_PKG				= Package(module = VULKAN_MODULE, configurations = [
-		Configuration(name					= "master",
-					  filters				= MASTER_VULKAN_FILTERS,
-					  runtime				= "2h39m",
-					  runByDefault			= False,
-					  splitToMultipleFiles	= True),
-		Configuration(name					= "master-2019-03-01",
-					  filters				= [include("vk-master-2019-03-01.txt")],
-					  runtime				= "2h29m",
-					  splitToMultipleFiles	= True),
-		Configuration(name					= "master-2020-03-01",
-					  filters				= [include("vk-master-2020-03-01.txt")],
-					  runtime				= "2h29m",
-					  splitToMultipleFiles	= True),
-		Configuration(name					= "master-2021-03-01",
-					  filters				= MASTER_VULKAN_FILTERS + [exclude("vk-master-2019-03-01.txt"), exclude("vk-master-2020-03-01.txt")],
-					  runtime				= "10m",
-					  splitToMultipleFiles	= True),
-		Configuration(name					= "incremental-deqp",
-					  filters				= [include("vk-incremental-deqp.txt")],
-					  runtime				= "5m",
-					  runByDefault			= False,
-					  splitToMultipleFiles	= True),
+		Configuration(name			= "master",
+					  filters		= MASTER_VULKAN_FILTERS,
+					  runtime		= "2h39m",
+					  runByDefault		= False),
+		Configuration(name			= "master-2019-03-01",
+					  filters		= [include("vk-master-2019-03-01.txt")],
+					  runtime		= "2h29m"),
+		Configuration(name			= "master-2020-03-01",
+					  filters		= [include("vk-master-2020-03-01.txt")],
+					  runtime		= "2h29m"),
+		Configuration(name			= "master-2021-03-01",
+					  filters		= MASTER_VULKAN_FILTERS + [exclude("vk-master-2019-03-01.txt"), exclude("vk-master-2020-03-01.txt")],
+					  runtime		= "10m"),
+		Configuration(name			= "incremental-deqp",
+					  filters		= [include("vk-incremental-deqp.txt")],
+					  runtime		= "5m",
+					  runByDefault		= False),
 	])
 
 MUSTPASS_LISTS				= [

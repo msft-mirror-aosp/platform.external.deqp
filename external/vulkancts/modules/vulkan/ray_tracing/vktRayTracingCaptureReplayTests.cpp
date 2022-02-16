@@ -394,11 +394,11 @@ void TestShaderBindingTablesConfiguration::initShaderBindingTables (de::MovePtr<
 			DE_NULL											//VkBuffer           buffer;
 		};
 		deviceAddressInfo.buffer										= pipelineData.pipelines[0].raygenShaderBindingTable->get();
-		sbtSavedRaygenAddress											= vkd.getBufferOpaqueCaptureAddress( device, &deviceAddressInfo);
+		sbtSavedRaygenAddress											= vkd.getBufferDeviceAddress( device, &deviceAddressInfo);
 		deviceAddressInfo.buffer										= pipelineData.pipelines[0].missShaderBindingTable->get();
-		sbtSavedMissAddress												= vkd.getBufferOpaqueCaptureAddress( device, &deviceAddressInfo);
+		sbtSavedMissAddress												= vkd.getBufferDeviceAddress( device, &deviceAddressInfo);
 		deviceAddressInfo.buffer										= pipelineData.pipelines[0].hitShaderBindingTable->get();
-		sbtSavedHitAddress												= vkd.getBufferOpaqueCaptureAddress( device, &deviceAddressInfo);
+		sbtSavedHitAddress												= vkd.getBufferDeviceAddress( device, &deviceAddressInfo);
 	}
 	else // replay phase
 	{
@@ -466,6 +466,7 @@ void TestShaderBindingTablesConfiguration::initShaderBindingTables (de::MovePtr<
 			break;
 		default:
 			TCU_THROW(InternalError, "Wrong test type");
+			break;
 		}
 	}
 }

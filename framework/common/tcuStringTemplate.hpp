@@ -38,7 +38,6 @@ class StringTemplate
 public:
 						StringTemplate		(void);
 						StringTemplate		(const std::string& str);
-						StringTemplate		(StringTemplate&& other);
 						~StringTemplate		(void);
 
 	void				setString			(const std::string& str);
