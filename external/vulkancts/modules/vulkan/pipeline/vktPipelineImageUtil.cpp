@@ -211,7 +211,8 @@ de::MovePtr<tcu::TextureLevel> readColorAttachment (const vk::DeviceInterface&	v
 													vk::Allocator&				allocator,
 													vk::VkImage					image,
 													vk::VkFormat				format,
-													const tcu::UVec2&			renderSize)
+													const tcu::UVec2&			renderSize,
+													vk::VkImageLayout			oldLayout)
 {
 	Move<VkBuffer>					buffer;
 	de::MovePtr<Allocation>			bufferAlloc;
@@ -249,7 +250,7 @@ de::MovePtr<tcu::TextureLevel> readColorAttachment (const vk::DeviceInterface&	v
 	fence = createFence(vk, device);
 
 	beginCommandBuffer(vk, *cmdBuffer);
-	copyImageToBuffer(vk, *cmdBuffer, image, *buffer, tcu::IVec2(renderSize.x(), renderSize.y()));
+	copyImageToBuffer(vk, *cmdBuffer, image, *buffer, tcu::IVec2(renderSize.x(), renderSize.y()), VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, oldLayout);
 	endCommandBuffer(vk, *cmdBuffer);
 
 	submitCommandsAndWait(vk, device, queue, cmdBuffer.get());
@@ -1055,7 +1056,7 @@ de::MovePtr<TestTexture> TestTexture1D::copy(const tcu::TextureFormat format) co
 // TestTexture1DArray
 
 TestTexture1DArray::TestTexture1DArray (const tcu::TextureFormat& format, int width, int arraySize)
-	: TestTexture	(format, width, 1, arraySize)
+	: TestTexture	(format, width, arraySize, 1)
 	, m_texture		(format, width, arraySize)
 {
 	allocateLevels(m_texture);
@@ -1063,7 +1064,7 @@ TestTexture1DArray::TestTexture1DArray (const tcu::TextureFormat& format, int wi
 }
 
 TestTexture1DArray::TestTexture1DArray (const tcu::CompressedTexFormat& format, int width, int arraySize)
-	: TestTexture	(format, width, 1, arraySize)
+	: TestTexture	(format, width, arraySize, 1)
 	, m_texture		(tcu::getUncompressedFormat(format), width, arraySize)
 {
 	allocateLevels(m_texture);
