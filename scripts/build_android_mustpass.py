@@ -68,7 +68,22 @@ MASTER_EGL_PKG					= Package(module = EGL_MODULE, configurations = [
 					  surfacetype	= "window",
 					  required		= True,
 					  filters		= MASTER_EGL_COMMON_FILTERS,
-				      runtime		= "23m"),
+					  runtime		= "23m",
+					  runByDefault	= False),
+		Configuration(name			= "master-2021-03-01",
+					  glconfig		= "rgba8888d24s8ms0",
+					  rotation		= "unspecified",
+					  surfacetype	= "window",
+					  required		= True,
+					  filters		= [include("egl-master-2021-03-01.txt")],
+					  runtime		= "23m"),
+		Configuration(name			= "master-2022-03-01",
+					  glconfig		= "rgba8888d24s8ms0",
+					  rotation		= "unspecified",
+					  surfacetype	= "window",
+					  required		= True,
+					  filters		= MASTER_EGL_COMMON_FILTERS + [exclude("egl-master-2021-03-01.txt")],
+					  runtime		= "5m"),
 		# Risky subset
 		Configuration(name			= "master-risky",
 					  glconfig		= "rgba8888d24s8ms0",
@@ -76,7 +91,7 @@ MASTER_EGL_PKG					= Package(module = EGL_MODULE, configurations = [
 					  surfacetype	= "window",
 					  required		= True,
 					  filters		= [include("egl-temp-excluded.txt")],
-				      runtime		= "2m"),
+					  runtime		= "2m"),
 	])
 
 MASTER_GLES2_COMMON_FILTERS		= [
