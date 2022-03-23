@@ -1095,6 +1095,7 @@ void Texture::CompressedImage(const glw::Functions& gl, glw::GLenum target, glw:
 		break;
 	default:
 		TCU_FAIL("Invliad enum");
+		break;
 	}
 }
 
@@ -1199,6 +1200,7 @@ void Texture::Image(const glw::Functions& gl, glw::GLenum target, glw::GLint lev
 		break;
 	default:
 		TCU_FAIL("Invliad enum");
+		break;
 	}
 }
 
@@ -1259,6 +1261,7 @@ void Texture::Storage(const glw::Functions& gl, glw::GLenum target, glw::GLsizei
 		break;
 	default:
 		TCU_FAIL("Invliad enum");
+		break;
 	}
 }
 
@@ -1310,6 +1313,7 @@ void Texture::SubImage(const glw::Functions& gl, glw::GLenum target, glw::GLint 
 		break;
 	default:
 		TCU_FAIL("Invliad enum");
+		break;
 	}
 }
 
@@ -1370,7 +1374,7 @@ static const size_t s_n_texture_tragets = sizeof(s_texture_infos) / sizeof(s_tex
  * @param error_message  Message logged if generated error is not the expected one
  **/
 #define CHECK_ERROR(expected_error, error_message)                                                      \
-	do {                                                                                                   \
+	{                                                                                                   \
 		GLenum generated_error = gl.getError();                                                         \
                                                                                                         \
 		if (expected_error != generated_error)                                                          \
@@ -1382,7 +1386,7 @@ static const size_t s_n_texture_tragets = sizeof(s_texture_infos) / sizeof(s_tex
 				<< tcu::TestLog::EndMessage;                                                            \
 			TCU_FAIL("Invalid error generated");                                                        \
 		}                                                                                               \
-	} while (0)
+	}
 
 /* Prototypes */
 void replaceToken(const GLchar* token, size_t& search_position, const GLchar* text, std::string& string);

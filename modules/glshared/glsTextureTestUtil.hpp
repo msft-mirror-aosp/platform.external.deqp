@@ -131,7 +131,6 @@ public:
 
 	glu::ShaderProgram*						getProgram				(Program program);
 	void									clear					(void);
-	glu::Precision							getTexCoordPrecision	();
 
 private:
 											ProgramLibrary			(const ProgramLibrary& other);
@@ -154,7 +153,6 @@ public:
 
 	void						renderQuad				(int texUnit, const float* texCoord, glu::TextureTestUtil::TextureType texType);
 	void						renderQuad				(int texUnit, const float* texCoord, const glu::TextureTestUtil::RenderParams& params);
-	glu::Precision				getTexCoordPrecision	();
 
 private:
 								TextureRenderer			(const TextureRenderer& other);

@@ -219,13 +219,12 @@ tcu::TestStatus outOfPoolMemoryTest (Context& context)
 
 			const Unique<VkDescriptorPool>				descriptorPool(createDescriptorPool(vkd, device, &descriptorPoolCreateInfo));
 
-			VkShaderStageFlags stageFlags = (descriptorType != VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) ? VK_SHADER_STAGE_ALL : VK_SHADER_STAGE_FRAGMENT_BIT;
 			const VkDescriptorSetLayoutBinding			descriptorSetLayoutBinding =
 			{
 				0u,															// uint32_t              binding;
 				descriptorType,												// VkDescriptorType      descriptorType;
 				params.bindingDescriptorCount,								// uint32_t              descriptorCount;
-				stageFlags,													// VkShaderStageFlags    stageFlags;
+				VK_SHADER_STAGE_ALL,										// VkShaderStageFlags    stageFlags;
 				DE_NULL,													// const VkSampler*      pImmutableSamplers;
 			};
 

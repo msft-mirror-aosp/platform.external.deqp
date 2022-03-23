@@ -97,11 +97,8 @@ public:
 	bool		hasNaN			(void) const { return m_hasNaN; }
 	Interval	nan				(void) const { return m_hasNaN ? TCU_NAN : Interval(); }
 	bool		empty			(void) const { return m_lo > m_hi; }
-
-	// The interval is represented in double, it can extend outside the range of smaller floating-point formats
-	// and get rounded to infinity.
-	bool		isFinite		(double maxValue) const { return m_lo > -maxValue && m_hi < maxValue; }
-	bool		isOrdinary		(double maxValue) const { return !hasNaN() && !empty() && isFinite(maxValue); }
+	bool		isFinite		(void) const { return m_lo > -TCU_INFINITY && m_hi < TCU_INFINITY; }
+	bool		isOrdinary		(void) const { return !hasNaN() && !empty() && isFinite(); }
 
 	void		warning			(double lo_, double hi_)
 	{

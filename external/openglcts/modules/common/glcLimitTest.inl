@@ -27,48 +27,24 @@ template<typename DataType>
 LimitCase<DataType>::LimitCase(deqp::Context& context,
 							   const char* caseName,
 							   deUint32 limitToken,
-							   DataType limitBoundary,
-							   bool isBoundaryMaximum,
+							   DataType limitBoundry,
+							   bool isBoundryMaximum,
 							   const char* glslVersion,
 							   const char* glslBuiltin,
 							   const char* glslExtension)
 	: deqp::TestCase(context, caseName, "Token limit validation.")
 	, m_limitToken(limitToken)
-	, m_limitBoundary(limitBoundary)
-	, m_isBoundaryMaximum(isBoundaryMaximum)
+	, m_limitBoundry(limitBoundry)
+	, m_isBoundryMaximum(isBoundryMaximum)
 	, m_glslVersion(glslVersion)
 	, m_glslBuiltin(glslBuiltin)
 	, m_glslExtension(glslExtension)
 {
-	// GL_MAX_FRAGMENT_INTERPOLATION_OFFSET is special in that its limit is dependent on
-	// GL_FRAGMENT_INTERPOLATION_OFFSET_BITS.  Adjust the limit automatically here.
-	adjustBoundaryForMaxFragmentInterpolationOffset();
 }
 
 template<typename DataType>
 LimitCase<DataType>::~LimitCase(void)
 {
-}
-
-template<typename DataType>
-void LimitCase<DataType>::adjustBoundaryForMaxFragmentInterpolationOffset()
-{
-}
-
-template<>
-void LimitCase<GLfloat>::adjustBoundaryForMaxFragmentInterpolationOffset()
-{
-	if (m_limitToken == GL_MAX_FRAGMENT_INTERPOLATION_OFFSET)
-	{
-		const Functions& gl = m_context.getRenderContext().getFunctions();
-
-		GLfloat fragmentInterpolationOffsetBits = 0;
-		gl.getFloatv(GL_FRAGMENT_INTERPOLATION_OFFSET_BITS, &fragmentInterpolationOffsetBits);
-		GLU_EXPECT_NO_ERROR(gl.getError(), "glGetIntegerv");
-
-		GLfloat ULP = 1.0f / powf(2, fragmentInterpolationOffsetBits);
-		m_limitBoundary -= ULP;
-	}
 }
 
 template<typename DataType>
@@ -83,9 +59,9 @@ tcu::TestNode::IterateResult LimitCase<DataType>::iterate(void)
 	// check if limit was specified
 	if (m_limitToken)
 	{
-		// check if limit is not smaller or greater then boundary defined in specification
+		// check if limit is not smaller or greater then boundry defined in specification
 		limitValue = getLimitValue(gl);
-		if (!isWithinBoundary(limitValue))
+		if (!isWithinBoundry(limitValue))
 		{
 			m_testCtx.setTestResult(QP_TEST_RESULT_FAIL, "Fail");
 			return STOP;
@@ -158,15 +134,15 @@ tcu::TestNode::IterateResult LimitCase<DataType>::iterate(void)
 			m_testCtx.getLog() << tcu::TestLog::Message
 							   << "Shader builtin has value: "
 							   << builtinValue
-							   << " which is different from the value of corresponding limit: "
+							   << " which is different then the value of corresponding limit: "
 							   << limitValue
 							   << tcu::TestLog::EndMessage;
 		}
 	}
 	else
 	{
-		// limit token was not specified - compare builtin to the boundary
-		if (isWithinBoundary(builtinValue, true))
+		// limit token was not specified - compare builtin to the boundry
+		if (isWithinBoundry(builtinValue, true))
 		{
 			m_testCtx.setTestResult(QP_TEST_RESULT_PASS, "Pass");
 		}
@@ -176,7 +152,7 @@ tcu::TestNode::IterateResult LimitCase<DataType>::iterate(void)
 			m_testCtx.getLog() << tcu::TestLog::Message
 							   << "Shader builtin value is: "
 							   << builtinValue
-							   << " which is outside of specified boundary."
+							   << " which is outside of specified boundry."
 							   << tcu::TestLog::EndMessage;
 		}
 	}
@@ -185,34 +161,34 @@ tcu::TestNode::IterateResult LimitCase<DataType>::iterate(void)
 }
 
 template<typename DataType>
-bool LimitCase<DataType>::isWithinBoundary(DataType value, bool isBuiltin) const
+bool LimitCase<DataType>::isWithinBoundry(DataType value, bool isBuiltin) const
 {
-	if (m_isBoundaryMaximum)
+	if (m_isBoundryMaximum)
 	{
-		// value should be smaller or euqual to boundary
-		if (isGreater(value, m_limitBoundary))
+		// value should be smaller or euqual to boundry
+		if (isGreater(value, m_limitBoundry))
 		{
 			m_testCtx.getLog() << tcu::TestLog::Message
 							   << (isBuiltin ? "Builtin" : "Limit")
 							   << " value is: "
 							   << value
 							   << " when it should not be greater than "
-							   << m_limitBoundary
+							   << m_limitBoundry
 							   << tcu::TestLog::EndMessage;
 			return false;
 		}
 	}
 	else
 	{
-		// value should be greater or euqual to boundary
-		if (isSmaller(value, m_limitBoundary))
+		// value should be greater or euqual to boundry
+		if (isSmaller(value, m_limitBoundry))
 		{
 			m_testCtx.getLog() << tcu::TestLog::Message
 							   << (isBuiltin ? "Builtin" : "Limit")
 							   << " value is: "
 							   << value
 							   << "when it should not be smaller than "
-							   << m_limitBoundary
+							   << m_limitBoundry
 							   << tcu::TestLog::EndMessage;
 			return false;
 		}

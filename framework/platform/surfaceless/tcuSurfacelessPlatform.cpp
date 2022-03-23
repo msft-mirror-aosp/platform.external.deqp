@@ -221,8 +221,6 @@ public:
 	const tcu::RenderTarget&	getRenderTarget	(void) const;
 	void				postIterate	(void);
 
-	virtual glw::GenericFuncType    getProcAddress	(const char* name) const { return m_egl.getProcAddress(name); }
-
 private:
 	const eglw::DefaultLibrary      m_egl;
 	const glu::ContextType		m_contextType;

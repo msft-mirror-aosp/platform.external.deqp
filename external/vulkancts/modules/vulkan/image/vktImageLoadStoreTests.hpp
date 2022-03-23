@@ -37,7 +37,6 @@ tcu::TestCaseGroup*		createImageStoreTests				(tcu::TestContext& testCtx);
 tcu::TestCaseGroup*		createImageLoadStoreTests			(tcu::TestContext& testCtx);
 tcu::TestCaseGroup*		createImageFormatReinterpretTests	(tcu::TestContext& testCtx);
 tcu::TestCaseGroup*		createImageExtendOperandsTests		(tcu::TestContext& testCtx);
-tcu::TestCaseGroup*		createImageNontemporalOperandTests	(tcu::TestContext& testCtx);
 tcu::TestCaseGroup*		createImageLoadStoreLodAMDTests		(tcu::TestContext& testCtx);
 
 de::MovePtr<TestCase>	createImageQualifierRestrictCase	(tcu::TestContext& testCtx, const ImageType imageType, const std::string& name);
