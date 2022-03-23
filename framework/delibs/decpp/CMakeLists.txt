@@ -23,7 +23,6 @@ set(DECPP_SRCS
 	deDynamicLibrary.hpp
 	deFilePath.cpp
 	deFilePath.hpp
-	deMath.hpp
 	deMemPool.cpp
 	deMemPool.hpp
 	deMeta.cpp

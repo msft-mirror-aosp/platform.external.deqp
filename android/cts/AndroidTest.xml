@@ -22,34 +22,21 @@
 		<option name="cleanup-apks" value="true"/>
 		<option name="test-file-name" value="com.drawelements.deqp.apk"/>
 	</target_preparer>
-	<target_preparer class="com.android.compatibility.common.tradefed.targetprep.IncrementalDeqpPreparer">
-		<option name="disable" value="true"/>
-	</target_preparer>
 	<option name="test-suite-tag" value="cts"/>
 	<option key="component" name="config-descriptor:metadata" value="deqp"/>
 	<option key="parameter" name="config-descriptor:metadata" value="not_instant_app"/>
 	<option key="parameter" name="config-descriptor:metadata" value="multi_abi"/>
 	<option key="parameter" name="config-descriptor:metadata" value="secondary_user"/>
-	<option key="parameter" name="config-descriptor:metadata" value="no_foldable_states"/>
 	<object class="com.android.tradefed.testtype.suite.module.TestFailureModuleController" type="module_controller">
 		<option name="screenshot-on-failure" value="false"/>
 	</object>
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-EGL"/>
-		<option name="deqp-caselist-file" value="egl-master-2021-03-01.txt"/>
+		<option name="deqp-caselist-file" value="egl-master.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
 		<option name="runtime-hint" value="23m"/>
-		<option name="deqp-config-required" value="true"/>
-	</test>
-	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
-		<option name="deqp-package" value="dEQP-EGL"/>
-		<option name="deqp-caselist-file" value="egl-master-2022-03-01.txt"/>
-		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
-		<option name="deqp-surface-type" value="window"/>
-		<option name="deqp-screen-rotation" value="unspecified"/>
-		<option name="runtime-hint" value="5m"/>
 		<option name="deqp-config-required" value="true"/>
 	</test>
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
@@ -80,18 +67,8 @@
 		<option name="deqp-config-required" value="true"/>
 	</test>
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
-		<option name="deqp-package" value="dEQP-GLES2"/>
-		<option name="deqp-caselist-file" value="gles2-master-2022-03-01.txt"/>
-		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
-		<option name="deqp-surface-type" value="window"/>
-		<option name="deqp-screen-rotation" value="unspecified"/>
-		<option name="runtime-hint" value="10m"/>
-		<option name="deqp-config-required" value="true"/>
-	</test>
-	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-master-2020-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -101,17 +78,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-master-2021-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
-		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
-		<option name="deqp-surface-type" value="window"/>
-		<option name="deqp-screen-rotation" value="unspecified"/>
-		<option name="runtime-hint" value="10m"/>
-		<option name="deqp-config-required" value="true"/>
-	</test>
-	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
-		<option name="deqp-package" value="dEQP-GLES3"/>
-		<option name="deqp-caselist-file" value="gles3-master-2022-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -121,7 +87,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-rotate-portrait.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="0"/>
@@ -130,7 +95,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-rotate-landscape.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="90"/>
@@ -139,7 +103,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-rotate-reverse-portrait.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="180"/>
@@ -148,7 +111,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-rotate-reverse-landscape.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="270"/>
@@ -157,7 +119,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-multisample.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms4"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -166,7 +127,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES3"/>
 		<option name="deqp-caselist-file" value="gles3-565-no-depth-no-stencil.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgb565d0s0ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -175,7 +135,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-master-2020-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -185,17 +144,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-master-2021-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
-		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
-		<option name="deqp-surface-type" value="window"/>
-		<option name="deqp-screen-rotation" value="unspecified"/>
-		<option name="runtime-hint" value="10m"/>
-		<option name="deqp-config-required" value="true"/>
-	</test>
-	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
-		<option name="deqp-package" value="dEQP-GLES31"/>
-		<option name="deqp-caselist-file" value="gles31-master-2022-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -205,7 +153,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-rotate-portrait.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="0"/>
@@ -214,7 +161,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-rotate-landscape.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="90"/>
@@ -223,7 +169,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-rotate-reverse-portrait.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="180"/>
@@ -232,7 +177,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-rotate-reverse-landscape.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="270"/>
@@ -241,7 +185,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-multisample.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgba8888d24s8ms4"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -250,7 +193,6 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-GLES31"/>
 		<option name="deqp-caselist-file" value="gles31-565-no-depth-no-stencil.txt"/>
-		<option name="incremental-deqp-include-file" value="gles3-incremental-deqp.txt"/>
 		<option name="deqp-gl-config-name" value="rgb565d0s0ms0"/>
 		<option name="deqp-surface-type" value="window"/>
 		<option name="deqp-screen-rotation" value="unspecified"/>
@@ -259,25 +201,16 @@
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-VK"/>
 		<option name="deqp-caselist-file" value="vk-master-2019-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="vk-incremental-deqp.txt"/>
 		<option name="runtime-hint" value="2h29m"/>
 	</test>
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-VK"/>
 		<option name="deqp-caselist-file" value="vk-master-2020-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="vk-incremental-deqp.txt"/>
 		<option name="runtime-hint" value="2h29m"/>
 	</test>
 	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
 		<option name="deqp-package" value="dEQP-VK"/>
 		<option name="deqp-caselist-file" value="vk-master-2021-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="vk-incremental-deqp.txt"/>
-		<option name="runtime-hint" value="2h29m"/>
-	</test>
-	<test class="com.drawelements.deqp.runner.DeqpTestRunner">
-		<option name="deqp-package" value="dEQP-VK"/>
-		<option name="deqp-caselist-file" value="vk-master-2022-03-01.txt"/>
-		<option name="incremental-deqp-include-file" value="vk-incremental-deqp.txt"/>
 		<option name="runtime-hint" value="10m"/>
 	</test>
 </configuration>

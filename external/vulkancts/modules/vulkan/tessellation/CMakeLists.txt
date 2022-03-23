@@ -1,7 +1,4 @@
-include_directories(
-	..
-	${DEQP_INL_DIR}
-)
+include_directories(..)
 
 set(DEQP_VK_TESSELLATION_SRCS
 	vktTessellationTests.cpp

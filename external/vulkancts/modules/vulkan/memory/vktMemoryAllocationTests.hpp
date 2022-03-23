@@ -33,7 +33,6 @@ namespace memory
 
 tcu::TestCaseGroup* createAllocationTests				(tcu::TestContext& testCtx);
 tcu::TestCaseGroup* createDeviceGroupAllocationTests	(tcu::TestContext& testCtx);
-tcu::TestCaseGroup* createPageableAllocationTests		(tcu::TestContext& testCtx);
 
 } // memory
 } // vkt

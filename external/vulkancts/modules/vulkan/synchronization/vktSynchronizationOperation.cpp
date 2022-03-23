@@ -422,7 +422,7 @@ std::string getShaderImageType (const VkFormat format, const VkImageType imageTy
 
 		default:
 			DE_FATAL("Unknown image type");
-			return "";
+			return DE_NULL;
 	}
 }
 

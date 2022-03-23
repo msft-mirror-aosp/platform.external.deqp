@@ -35,7 +35,7 @@
 #include <iterator>
 #include <set>
 
-#include <wingdi.h>
+#include <WinGDI.h>
 
 // WGL_ARB_pixel_format
 #define WGL_NUMBER_PIXEL_FORMATS_ARB				0x2000
