@@ -32,7 +32,7 @@ namespace vkt
 namespace Draw
 {
 
-tcu::TestCaseGroup*	createExplicitVertexParameterTests (tcu::TestContext& testCtx, bool useDynamicRendering);
+tcu::TestCaseGroup*	createExplicitVertexParameterTests (tcu::TestContext& testCtx);
 
 } // Draw
 } // vkt

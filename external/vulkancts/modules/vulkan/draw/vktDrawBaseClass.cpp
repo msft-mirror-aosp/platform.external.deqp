@@ -31,10 +31,9 @@ namespace vkt
 namespace Draw
 {
 
-DrawTestsBaseClass::DrawTestsBaseClass (Context& context, const char* vertexShaderName, const char* fragmentShaderName, bool useDynamicRendering, vk::VkPrimitiveTopology topology)
+DrawTestsBaseClass::DrawTestsBaseClass (Context& context, const char* vertexShaderName, const char* fragmentShaderName, vk::VkPrimitiveTopology topology)
 	: TestInstance				(context)
 	, m_colorAttachmentFormat	(vk::VK_FORMAT_R8G8B8A8_UNORM)
-	, m_useDynamicRendering		(useDynamicRendering)
 	, m_topology				(topology)
 	, m_vk						(context.getDeviceInterface())
 	, m_vertexShaderName		(vertexShaderName)
@@ -59,43 +58,42 @@ void DrawTestsBaseClass::initialize (void)
 	const ImageViewCreateInfo colorTargetViewInfo(m_colorTargetImage->object(), vk::VK_IMAGE_VIEW_TYPE_2D, m_colorAttachmentFormat);
 	m_colorTargetView						= vk::createImageView(m_vk, device, &colorTargetViewInfo);
 
-	// create renderpass and framebuffer only when we are not using dynamic rendering
-	if (!m_useDynamicRendering)
+	RenderPassCreateInfo renderPassCreateInfo;
+	renderPassCreateInfo.addAttachment(AttachmentDescription(m_colorAttachmentFormat,
+															 vk::VK_SAMPLE_COUNT_1_BIT,
+															 vk::VK_ATTACHMENT_LOAD_OP_LOAD,
+															 vk::VK_ATTACHMENT_STORE_OP_STORE,
+															 vk::VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+															 vk::VK_ATTACHMENT_STORE_OP_STORE,
+															 vk::VK_IMAGE_LAYOUT_GENERAL,
+															 vk::VK_IMAGE_LAYOUT_GENERAL));
+
+
+	const vk::VkAttachmentReference colorAttachmentReference =
 	{
-		RenderPassCreateInfo renderPassCreateInfo;
-		renderPassCreateInfo.addAttachment(AttachmentDescription(m_colorAttachmentFormat,
-																 vk::VK_SAMPLE_COUNT_1_BIT,
-																 vk::VK_ATTACHMENT_LOAD_OP_LOAD,
-																 vk::VK_ATTACHMENT_STORE_OP_STORE,
-																 vk::VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-																 vk::VK_ATTACHMENT_STORE_OP_STORE,
-																 vk::VK_IMAGE_LAYOUT_GENERAL,
-																 vk::VK_IMAGE_LAYOUT_GENERAL));
+		0,
+		vk::VK_IMAGE_LAYOUT_GENERAL
+	};
 
-		const vk::VkAttachmentReference colorAttachmentReference
-		{
-			0,
-			vk::VK_IMAGE_LAYOUT_GENERAL
-		};
+	renderPassCreateInfo.addSubpass(SubpassDescription(vk::VK_PIPELINE_BIND_POINT_GRAPHICS,
+													   0,
+													   0,
+													   DE_NULL,
+													   1,
+													   &colorAttachmentReference,
+													   DE_NULL,
+													   AttachmentReference(),
+													   0,
+													   DE_NULL));
 
-		renderPassCreateInfo.addSubpass(SubpassDescription(vk::VK_PIPELINE_BIND_POINT_GRAPHICS,
-														   0,
-														   0,
-														   DE_NULL,
-														   1,
-														   &colorAttachmentReference,
-														   DE_NULL,
-														   AttachmentReference(),
-														   0,
-														   DE_NULL));
+	m_renderPass		= vk::createRenderPass(m_vk, device, &renderPassCreateInfo);
 
-		m_renderPass = vk::createRenderPass(m_vk, device, &renderPassCreateInfo);
+	std::vector<vk::VkImageView> colorAttachments(1);
+	colorAttachments[0] = *m_colorTargetView;
 
-		// create framebuffer
-		std::vector<vk::VkImageView>	colorAttachments		{ *m_colorTargetView };
-		const FramebufferCreateInfo		framebufferCreateInfo	(*m_renderPass, colorAttachments, WIDTH, HEIGHT, 1);
-		m_framebuffer = vk::createFramebuffer(m_vk, device, &framebufferCreateInfo);
-	}
+	const FramebufferCreateInfo framebufferCreateInfo(*m_renderPass, colorAttachments, WIDTH, HEIGHT, 1);
+
+	m_framebuffer		= vk::createFramebuffer(m_vk, device, &framebufferCreateInfo);
 
 	const vk::VkVertexInputBindingDescription vertexInputBindingDescription =
 	{
@@ -168,26 +166,12 @@ void DrawTestsBaseClass::initPipeline (const vk::VkDevice device)
 	pipelineCreateInfo.addState(PipelineCreateInfo::RasterizerState());
 	pipelineCreateInfo.addState(PipelineCreateInfo::MultiSampleState());
 
-	vk::VkPipelineRenderingCreateInfoKHR renderingCreateInfo
-	{
-		vk::VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
-		DE_NULL,
-		0u,
-		1u,
-		&m_colorAttachmentFormat,
-		vk::VK_FORMAT_UNDEFINED,
-		vk::VK_FORMAT_UNDEFINED
-	};
-
-	if (m_useDynamicRendering)
-		pipelineCreateInfo.pNext = &renderingCreateInfo;
-
 	m_pipeline = vk::createGraphicsPipeline(m_vk, device, DE_NULL, &pipelineCreateInfo);
 }
 
-void DrawTestsBaseClass::beginRender (const vk::VkSubpassContents content)
+void DrawTestsBaseClass::beginRenderPass (const vk::VkSubpassContents content)
 {
-	const vk::VkClearValue clearColor { { { 0.0f, 0.0f, 0.0f, 1.0f } } };
+	const vk::VkClearColorValue clearColor = { { 0.0f, 0.0f, 0.0f, 1.0f } };
 
 	beginCommandBuffer(m_vk, *m_cmdBuffer, 0u);
 
@@ -196,7 +180,7 @@ void DrawTestsBaseClass::beginRender (const vk::VkSubpassContents content)
 
 	const ImageSubresourceRange subresourceRange(vk::VK_IMAGE_ASPECT_COLOR_BIT);
 	m_vk.cmdClearColorImage(*m_cmdBuffer, m_colorTargetImage->object(),
-		vk::VK_IMAGE_LAYOUT_GENERAL, &clearColor.color, 1, &subresourceRange);
+		vk::VK_IMAGE_LAYOUT_GENERAL, &clearColor, 1, &subresourceRange);
 
 	const vk::VkMemoryBarrier memBarrier =
 	{
@@ -211,24 +195,7 @@ void DrawTestsBaseClass::beginRender (const vk::VkSubpassContents content)
 		0, 1, &memBarrier, 0, DE_NULL, 0, DE_NULL);
 
 	const vk::VkRect2D renderArea = vk::makeRect2D(WIDTH, HEIGHT);
-	if (m_useDynamicRendering)
-	{
-		vk::VkRenderingFlagsKHR renderingFlags = 0;
-		if (content == vk::VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS)
-			renderingFlags = vk::VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT_KHR;
-
-		vk::beginRendering(m_vk, *m_cmdBuffer, *m_colorTargetView, renderArea, clearColor, vk::VK_IMAGE_LAYOUT_GENERAL, vk::VK_ATTACHMENT_LOAD_OP_LOAD, renderingFlags);
-	}
-	else
-		vk::beginRenderPass(m_vk, *m_cmdBuffer, *m_renderPass, *m_framebuffer, renderArea, content);
-}
-
-void DrawTestsBaseClass::endRender (void)
-{
-	if (m_useDynamicRendering)
-		vk::endRendering(m_vk, *m_cmdBuffer);
-	else
-		vk::endRenderPass(m_vk, *m_cmdBuffer);
+	vk::beginRenderPass(m_vk, *m_cmdBuffer, *m_renderPass, *m_framebuffer, renderArea, content);
 }
 
 }	// Draw

@@ -25,7 +25,6 @@
 #include "deRandom.hpp"
 #include "deThread.hpp"
 #include "deInt32.h"
-#include "deMemory.h"
 
 #include <vector>
 
@@ -239,8 +238,6 @@ public:
 	{
 		deUint8	tmp[1024];
 		Random	rnd(m_seed);
-
-		deMemset(tmp, 0, DE_LENGTH_OF_ARRAY(tmp));
 
 		for (;;)
 		{

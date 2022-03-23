@@ -26,7 +26,7 @@
 namespace tcu
 {
 
-//! Does some unused calculations to try and get the CPU working at full speed.
+//! Does some dummy calculations to try and get the CPU working at full speed.
 void warmupCPU (void);
 
 namespace warmupCPUInternal
@@ -34,18 +34,18 @@ namespace warmupCPUInternal
 
 // \note Used in an attempt to prevent compiler from doing optimizations. Not supposed to be touched elsewhere.
 
-class Unused
+class Dummy
 {
 public:
-								Unused	(void) : m_v(new float) {}
-								~Unused	(void) { delete m_v; }
+								Dummy	(void) : m_v(new float) {}
+								~Dummy	(void) { delete m_v; }
 
 	volatile float* volatile	m_v;
 };
 
-extern volatile Unused g_unused;
+extern volatile Dummy g_dummy;
 
-}
+};
 
 } // tcu
 
