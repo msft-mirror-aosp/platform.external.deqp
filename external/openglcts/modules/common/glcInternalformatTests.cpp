@@ -762,12 +762,7 @@ GLhalf InternalformatCaseBase::floatToHalf(float f)
 		// Store a denorm half-float value or zero
 		exp = (HALF_FLOAT_MIN_BIASED_EXP_AS_SINGLE_FP_EXP - exp) >> 23;
 		mantissa |= (1 << 23);
-
-		if (exp < 18)
-			mantissa >>= (14 + exp);
-		else
-			mantissa = 0;
-
+		mantissa >>= (14 + exp);
 		return (GLhalf)((((GLhalf)sign) << 15) | (GLhalf)(mantissa));
 	}
 
@@ -1157,16 +1152,18 @@ tcu::TestNode::IterateResult RenderbufferCase::iterate(void)
 		GLint hasDepthBuffer	= 0;
 		GLint hasStencilBuffer	= 0;
 
-		gl.getFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &hasDepthBuffer);
-		gl.getFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_STENCIL, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &hasStencilBuffer);
+		gl.getNamedFramebufferAttachmentParameteriv(0, GL_DEPTH, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE,
+													&hasDepthBuffer);
+		gl.getNamedFramebufferAttachmentParameteriv(0, GL_STENCIL, GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE,
+													&hasStencilBuffer);
 
 		if (hasDepthBuffer != GL_NONE)
-			gl.getFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_DEPTH, GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE,
-							       &defaultFramebufferDepthBits);
+			gl.getNamedFramebufferAttachmentParameteriv(0, GL_DEPTH, GL_FRAMEBUFFER_ATTACHMENT_DEPTH_SIZE,
+														&defaultFramebufferDepthBits);
 
 		if (hasStencilBuffer != GL_NONE)
-			gl.getFramebufferAttachmentParameteriv(GL_FRAMEBUFFER, GL_STENCIL, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE,
-							       &defaultFramebufferStencilBits);
+			gl.getNamedFramebufferAttachmentParameteriv(0, GL_STENCIL, GL_FRAMEBUFFER_ATTACHMENT_STENCIL_SIZE,
+														&defaultFramebufferStencilBits);
 	}
 
 	// Create two programs for rendering, one for rendering into default FB, and

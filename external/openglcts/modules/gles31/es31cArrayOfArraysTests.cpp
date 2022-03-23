@@ -68,7 +68,7 @@ const char* GL::shader_version_gpu5 = "#version 430 core\n\n";
 const char* GL::shader_version		= "#version 430 core\n\n";
 } /* namespace Interface */
 
-/* Minimal fragment shader source code.
+/* Dummy fragment shader source code.
  * Used when testing the vertex shader. */
 const std::string default_fragment_shader_source = "//default fragment shader\n"
 												   "out vec4 color;\n"
@@ -77,7 +77,7 @@ const std::string default_fragment_shader_source = "//default fragment shader\n"
 												   "    color = vec4(1.0);\n"
 												   "}\n";
 
-/* Minimal vertex shader source code.
+/* Dummy vertex shader source code.
  * Used when testing the fragment shader. */
 const std::string default_vertex_shader_source = "//default vertex shader\n"
 												 "\n"
@@ -86,7 +86,7 @@ const std::string default_vertex_shader_source = "//default vertex shader\n"
 												 "    gl_Position = vec4(0.0,0.0,0.0,1.0);\n"
 												 "}\n";
 
-/* Simple geometry shader source code.
+/* Dummy geometry shader source code.
  * Used when testing the other shaders. */
 const std::string default_geometry_shader_source = "//default geometry\n"
 												   "\n"
@@ -102,7 +102,7 @@ const std::string default_geometry_shader_source = "//default geometry\n"
 												   "    EmitVertex();\n"
 												   "}\n";
 
-/* Simple tesselation control shader source code.
+/* Dummy tesselation control shader source code.
  * Used when testing the other shaders. */
 const std::string default_tc_shader_source = "//default tcs\n"
 											 "\n"
@@ -116,7 +116,7 @@ const std::string default_tc_shader_source = "//default tcs\n"
 											 "    gl_TessLevelInner[1] = 1.0;\n"
 											 "}\n";
 
-/* Minimal tesselation evaluation shader source code.
+/* Dummy tesselation evaluation shader source code.
  * Used when testing the other shaders. */
 const std::string default_te_shader_source = "//default tes\n"
 											 "\n"
@@ -392,7 +392,7 @@ void initializeMap()
  * @param SOURCE Tested shader source
  **/
 #define DEFAULT_MAIN_ENDING(TYPE, SOURCE)                           \
-	do {                                                            \
+	{                                                               \
 		/* Apply stage specific stuff */                            \
 		switch (TYPE)                                               \
 		{                                                           \
@@ -418,7 +418,7 @@ void initializeMap()
                                                                     \
 		/* End main function */                                     \
 		SOURCE += shader_end;                                       \
-	} while (0)
+	}
 
 /** Macro executes positive test selected on USE_ALL_SHADER_STAGES
  *
@@ -427,7 +427,7 @@ void initializeMap()
  * @param DELETE Selects if program should be deleted afterwards
  **/
 #define EXECUTE_POSITIVE_TEST(TYPE, SOURCE, DELETE, GPU5)                              \
-	do {                                                                               \
+	{                                                                                  \
 		const std::string* cs  = &empty_string;                                        \
 		const std::string* vs  = &default_vertex_shader_source;                        \
 		const std::string* tcs = &default_tc_shader_source;                            \
@@ -473,7 +473,7 @@ void initializeMap()
 		{                                                                              \
 			this->execute_positive_test(*vs, *fs, DELETE, GPU5);                       \
 		}                                                                              \
-	} while (0)
+	}
 
 /** Macro executes either positive or negative test
  *
@@ -481,17 +481,15 @@ void initializeMap()
  * @param TYPE	Tested shader stage
  * @param SOURCE Tested shader source
  **/
-#define EXECUTE_SHADER_TEST(S, TYPE, SOURCE)                  \
-	do {                                                      \
-		if (S)                                                \
-		{                                                     \
-			EXECUTE_POSITIVE_TEST(TYPE, SOURCE, true, false); \
-		}                                                     \
-		else                                                  \
-		{                                                     \
-			this->execute_negative_test(TYPE, SOURCE);        \
-		}                                                     \
-	} while (0)
+#define EXECUTE_SHADER_TEST(S, TYPE, SOURCE)              \
+	if (S)                                                \
+	{                                                     \
+		EXECUTE_POSITIVE_TEST(TYPE, SOURCE, true, false); \
+	}                                                     \
+	else                                                  \
+	{                                                     \
+		this->execute_negative_test(TYPE, SOURCE);        \
+	}
 
 /** Test case constructor.
  *
@@ -1554,7 +1552,7 @@ void SizedDeclarationsTypenameStyle3<API>::test_shader_compilation(
 {
 	std::string shader_source = "struct{\n" + this->extend_string("    float", "[2]", 2);
 
-	shader_source += this->extend_string(" a", "[2]", 0);
+	shader_source += this->extend_string(" a", "[2]", API::MAX_ARRAY_DIMENSIONS - API::MAX_ARRAY_DIMENSIONS);
 	shader_source += ",";
 	shader_source += this->extend_string("    b", "[2]", 1);
 	shader_source += ",";
@@ -1630,7 +1628,7 @@ void SizedDeclarationsTypenameStyle5<API>::test_shader_compilation(
 	std::string shader_source = example_struct_begin;
 
 	shader_source += this->extend_string("    float", "[2]", 2);
-	shader_source += this->extend_string(" a", "[2]", 0);
+	shader_source += this->extend_string(" a", "[2]", API::MAX_ARRAY_DIMENSIONS - API::MAX_ARRAY_DIMENSIONS);
 	shader_source += ", ";
 	shader_source += this->extend_string("b", "[2]", 2);
 	shader_source += ", ";
@@ -8690,7 +8688,7 @@ void AtomicUsageTest<API>::execute(typename TestCaseBase<API>::TestShaderType te
 	default:
 		TCU_FAIL("Invalid enum");
 		break;
-	}
+	};
 
 	/* Prepare valid source */
 	valid_shader_source += varying_definition;
@@ -8756,7 +8754,7 @@ void AtomicUsageTest<API>::execute(typename TestCaseBase<API>::TestShaderType te
 		default:
 			TCU_FAIL("Invalid enum");
 			break;
-		}
+		};
 
 		if (API::USE_ALL_SHADER_STAGES)
 		{
