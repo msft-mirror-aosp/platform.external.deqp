@@ -79,7 +79,7 @@ class AmberIndexFileParser
 
 	void expect (char c)
 	{
-		if (m_idx >= m_len || m_str[m_idx] != c)
+		if (m_str[m_idx] != c || m_idx >= m_len)
 			TCU_THROW(ResourceError, "Error parsing amber index file");
 
 		m_idx++;

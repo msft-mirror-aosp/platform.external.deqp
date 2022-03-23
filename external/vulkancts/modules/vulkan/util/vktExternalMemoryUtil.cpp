@@ -118,11 +118,7 @@ NativeHandle::NativeHandle (const NativeHandle& other)
 		DE_ASSERT(other.m_fd == -1);
 		DE_ASSERT(!other.m_win32Handle.internal);
 		m_androidHardwareBuffer = other.m_androidHardwareBuffer;
-
-		if (AndroidHardwareBufferExternalApi* ahbApi = AndroidHardwareBufferExternalApi::getInstance())
-			ahbApi->acquire(m_androidHardwareBuffer);
-		else
-			DE_FATAL("Platform doesn't support Android Hardware Buffer handles");
+		AndroidHardwareBufferExternalApi::getInstance()->acquire(m_androidHardwareBuffer);
 	}
 	else
 		DE_FATAL("Native handle can't be duplicated");
@@ -198,11 +194,7 @@ void NativeHandle::reset (void)
 	{
 		DE_ASSERT(m_fd == -1);
 		DE_ASSERT(!m_win32Handle.internal);
-
-		if (AndroidHardwareBufferExternalApi* ahbApi = AndroidHardwareBufferExternalApi::getInstance())
-			ahbApi->release(m_androidHardwareBuffer);
-		else
-			DE_FATAL("Platform doesn't support Android Hardware Buffer handles");
+		AndroidHardwareBufferExternalApi::getInstance()->release(m_androidHardwareBuffer);
 	}
 	m_fd					= -1;
 	m_win32Handle			= vk::pt::Win32Handle(DE_NULL);
@@ -1100,7 +1092,7 @@ static vk::Move<vk::VkDeviceMemory> importMemory (const vk::DeviceInterface&				
 			0u
 		};
 
-		VK_CHECK(vkd.getAndroidHardwareBufferPropertiesANDROID(device, handle.getAndroidHardwareBuffer(), &ahbProperties));
+		vkd.getAndroidHardwareBufferPropertiesANDROID(device, handle.getAndroidHardwareBuffer(), &ahbProperties);
 
 		vk::VkImportAndroidHardwareBufferInfoANDROID	importInfo =
 		{

@@ -32,7 +32,7 @@ namespace vkt
 namespace FragmentShadingRate
 {
 
-void createBasicTests(tcu::TestContext& testCtx, tcu::TestCaseGroup* group, bool useDynamicRendering);
+void createBasicTests(tcu::TestContext& testCtx, tcu::TestCaseGroup* group);
 
 } // FragmentShaderInterlock
 } // vkt

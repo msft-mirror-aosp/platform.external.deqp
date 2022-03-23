@@ -31,7 +31,7 @@ namespace vkt
 namespace pipeline
 {
 
-tcu::TestCaseGroup* createMultisampleSampleLocationsExtTests (tcu::TestContext& testCtx, bool useFragmentShadingRate);
+tcu::TestCaseGroup* createMultisampleSampleLocationsExtTests (tcu::TestContext& testCtx);
 
 } // pipeline
 } // vkt

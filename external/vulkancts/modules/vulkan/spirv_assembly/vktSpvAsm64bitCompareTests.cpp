@@ -1072,6 +1072,24 @@ BufferWithMemory createStorageBuffer(const vk::DeviceInterface&	vkdi,
 	return bufmem;
 }
 
+vk::Move<vk::VkShaderModule> createShaderModule (const vk::DeviceInterface&	deviceInterface,
+												 vk::VkDevice				device,
+												 const vk::ProgramBinary&	binary)
+{
+	DE_ASSERT(binary.getFormat() == vk::PROGRAM_FORMAT_SPIRV);
+
+	const struct vk::VkShaderModuleCreateInfo shaderModuleInfo =
+	{
+		vk::VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+		DE_NULL,
+		0,
+		static_cast<deUintptr>(binary.getSize()),
+		reinterpret_cast<const deUint32*>(binary.getBinary()),
+	};
+
+	return createShaderModule(deviceInterface, device, &shaderModuleInfo);
+}
+
 // Make sure the length of the following vectors is a multiple of 4. This will make sure operands can be reused for vectorized tests.
 const OperandsVector<double>	DOUBLE_OPERANDS		=
 {
@@ -1703,12 +1721,11 @@ void T64bitCompareTest<T>::checkSupport (Context& context) const
 		DE_ASSERT(DE_NULL == "Invalid shader stage specified");
 	}
 
-	vk::VkPhysicalDeviceFloatControlsProperties fcFeatures;
+	ExtensionFloatControlsFeatures fcFeatures;
 	deMemset(&fcFeatures, 0, sizeof(fcFeatures));
 	fcFeatures.shaderSignedZeroInfNanPreserveFloat64 = VK_TRUE;
 
-	const char *unused;
-	if (m_params.requireNanPreserve && !isFloatControlsFeaturesSupported(context, fcFeatures, &unused))
+	if (m_params.requireNanPreserve && !isFloatControlsFeaturesSupported(context, fcFeatures))
 		TCU_THROW(NotSupportedError, "NaN preservation not supported");
 }
 
