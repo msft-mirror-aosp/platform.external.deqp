@@ -25,7 +25,6 @@
 
 #include "vktTestGroupUtil.hpp"
 #include "vktApiSmokeTests.hpp"
-#include "vktApiDeviceDrmPropertiesTests.hpp"
 #include "vktApiDeviceInitializationTests.hpp"
 #include "vktApiDriverPropertiesTests.hpp"
 #include "vktApiObjectManagementTests.hpp"
@@ -49,8 +48,6 @@
 #include "vktApiPipelineTests.hpp"
 #include "vktApiMemoryRequirementInvarianceTests.hpp"
 #include "vktApiToolingInfoTests.hpp"
-#include "vktApiFormatPropertiesExtendedKHRtests.hpp"
-#include "vktApiBufferMemoryRequirementsTests.hpp"
 
 namespace vkt
 {
@@ -76,7 +73,6 @@ void createApiTests (tcu::TestCaseGroup* apiTests)
 	apiTests->addChild(createDriverPropertiesTests				(testCtx));
 	apiTests->addChild(createSmokeTests							(testCtx));
 	apiTests->addChild(api::createFeatureInfoTests				(testCtx));
-	apiTests->addChild(createDeviceDrmPropertiesTests			(testCtx));
 	apiTests->addChild(createDeviceInitializationTests			(testCtx));
 	apiTests->addChild(createObjectManagementTests				(testCtx));
 	apiTests->addChild(createBufferTests						(testCtx));
@@ -96,8 +92,6 @@ void createApiTests (tcu::TestCaseGroup* apiTests)
 	apiTests->addChild(createPipelineTests						(testCtx));
 	apiTests->addChild(createMemoryRequirementInvarianceTests	(testCtx));
 	apiTests->addChild(createToolingInfoTests					(testCtx));
-	apiTests->addChild(createFormatPropertiesExtendedKHRTests	(testCtx));
-	apiTests->addChild(createBufferMemoryRequirementsTests		(testCtx));
 }
 
 } // anonymous

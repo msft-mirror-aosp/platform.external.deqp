@@ -22,7 +22,6 @@
  *//*--------------------------------------------------------------------*/
 
 #include "vktBindingDescriptorUpdateTests.hpp"
-#include "vktBindingDescriptorUpdateASTests.hpp"
 
 #include "vktTestCase.hpp"
 #include "vktTestCaseUtil.hpp"
@@ -1303,7 +1302,6 @@ tcu::TestCaseGroup* createDescriptorUpdateTests (tcu::TestContext& testCtx)
 	group->addChild(createEmptyDescriptorUpdateTests(testCtx));
 	group->addChild(createSamplerlessWriteTests(testCtx));
 	group->addChild(createRandomDescriptorUpdateTests(testCtx));
-	group->addChild(createDescriptorUpdateASTests(testCtx));
 
 	return group.release();
 }

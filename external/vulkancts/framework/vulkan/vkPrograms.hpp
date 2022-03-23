@@ -217,7 +217,7 @@ ProgramBinary*			assembleProgram		(const vk::SpirVAsmSource& program, SpirVProgr
 void					disassembleProgram	(const ProgramBinary& program, std::ostream* dst);
 bool					validateProgram		(const ProgramBinary& program, std::ostream* dst, const SpirvValidatorOptions&);
 
-Move<VkShaderModule>	createShaderModule	(const DeviceInterface& deviceInterface, VkDevice device, const ProgramBinary& binary, VkShaderModuleCreateFlags flags = 0u);
+Move<VkShaderModule>	createShaderModule	(const DeviceInterface& deviceInterface, VkDevice device, const ProgramBinary& binary, VkShaderModuleCreateFlags flags);
 
 glu::ShaderType			getGluShaderType	(VkShaderStageFlagBits shaderStage);
 VkShaderStageFlagBits	getVkShaderStage	(glu::ShaderType shaderType);

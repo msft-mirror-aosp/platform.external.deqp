@@ -136,9 +136,9 @@ void populateBufferWithValues (void*				buffer,
 
 // An adapter function matching FillBufferProcPtr interface. Fills a buffer with 0xBABABABABABA... pattern. Used to fill up output buffers.
 // Since this pattern cannot show up in generated test data it should not show up in the valid output.
-void populateBufferWithFiller (void*					buffer,
-							   VkDeviceSize				size,
-							   const void* const		blob)
+void populateBufferWithDummy (void*					buffer,
+							  VkDeviceSize			size,
+							  const void* const		blob)
 {
 	DE_UNREF(blob);
 	deMemset(buffer, 0xBA, static_cast<size_t>(size));
@@ -219,9 +219,6 @@ void RobustAccessWithPointersTest::checkSupport (Context &context) const
 	const auto& pointerFeatures = context.getVariablePointersFeatures();
 	if (!pointerFeatures.variablePointersStorageBuffer)
 		TCU_THROW(NotSupportedError, "VariablePointersStorageBuffer SPIR-V capability not supported");
-
-	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") && !context.getDeviceFeatures().robustBufferAccess)
-		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: robustBufferAccess not supported by this implementation");
 }
 
 // A subclass for testing reading with variable pointers
@@ -267,7 +264,7 @@ private:
 	const bool					m_accessOutOfBackingMemory;
 };
 
-// In case I detect that some prerequisites are not fullfilled I am creating this lightweight empty test instance instead of AccessInstance. Should be bit faster that way.
+// In case I detect that some prerequisites are not fullfilled I am creating this lightweight dummy test instance instead of AccessInstance. Should be bit faster that way.
 class NotSupportedInstance : public vkt::TestInstance
 {
 public:
@@ -818,7 +815,7 @@ public:
 };
 
 // A routing generating SPIRV code for all test cases in this group
-std::string MakeShader(VkShaderStageFlags shaderStage, ShaderType shaderType, VkFormat bufferFormat, bool reads, bool unused)
+std::string MakeShader(VkShaderStageFlags shaderStage, ShaderType shaderType, VkFormat bufferFormat, bool reads, bool dummy)
 {
 	const bool					isR64				= (bufferFormat == VK_FORMAT_R64_UINT || bufferFormat == VK_FORMAT_R64_SINT);
 	// faster to write
@@ -874,9 +871,9 @@ std::string MakeShader(VkShaderStageFlags shaderStage, ShaderType shaderType, Vk
 	}
 
 	// If we are testing vertex shader or fragment shader we need to provide the other one for the pipeline too.
-	// So the not tested one is 'unused'. It is then a minimal/simplest possible pass-through shader.
-	// If we are testing compute shader we dont need unused shader at all.
-	if (unused)
+	// So the not tested one is 'dummy'. It is then a minimal/simplest possible pass-through shader.
+	// If we are testing compute shader we dont need dummy shader at all.
+	if (dummy)
 	{
 		if (shaderStage == VK_SHADER_STAGE_FRAGMENT_BIT)
 		{
@@ -1244,7 +1241,7 @@ std::string MakeShader(VkShaderStageFlags shaderStage, ShaderType shaderType, Vk
 		}
 	}
 
-	// This is common for test shaders and unused ones
+	// This is common for test shaders and dummy ones
 	// We need to fill stage ouput from shader properly
 	// output vertices positions in vertex shader
 	if (shaderStage == VK_SHADER_STAGE_VERTEX_BIT)
@@ -1385,7 +1382,7 @@ AccessInstance::AccessInstance (Context&			context,
 	}
 
 	createTestBuffer(vk, *m_device, inBufferAccessRange, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, memAlloc, m_inBuffer, m_inBufferAlloc, m_inBufferAccess, &populateBufferWithValues, &m_bufferFormat);
-	createTestBuffer(vk, *m_device, outBufferAccessRange, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, memAlloc, m_outBuffer, m_outBufferAlloc, m_outBufferAccess, &populateBufferWithFiller, DE_NULL);
+	createTestBuffer(vk, *m_device, outBufferAccessRange, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, memAlloc, m_outBuffer, m_outBufferAlloc, m_outBufferAccess, &populateBufferWithDummy, DE_NULL);
 
 	deInt32 indices[] = {
 		(m_accessOutOfBackingMemory && (m_bufferAccessType == BUFFER_ACCESS_TYPE_READ_FROM_STORAGE)) ? static_cast<deInt32>(RobustAccessWithPointersTest::s_testArraySize) - 1 : 0,
