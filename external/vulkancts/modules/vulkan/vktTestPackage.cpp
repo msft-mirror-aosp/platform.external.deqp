@@ -103,8 +103,6 @@
 #include "vktRayQueryTests.hpp"
 #include "vktPostmortemTests.hpp"
 #include "vktFragmentShadingRateTests.hpp"
-#include "vktReconvergenceTests.hpp"
-#include "vktMeshShaderTests.hpp"
 
 #include <vector>
 #include <sstream>
@@ -263,8 +261,10 @@ void TestCaseExecutor::init (tcu::TestCase* testCase, const std::string& casePat
 	vk::ShaderBuildOptions		defaultHlslBuildOptions		(usedVulkanVersion, baselineSpirvVersion, 0u);
 	vk::SpirVAsmBuildOptions	defaultSpirvAsmBuildOptions	(usedVulkanVersion, baselineSpirvVersion);
 	vk::SourceCollections		sourceProgs					(usedVulkanVersion, defaultGlslBuildOptions, defaultHlslBuildOptions, defaultSpirvAsmBuildOptions);
+	const bool					doShaderLog					= log.isShaderLoggingEnabled();
 	const tcu::CommandLine&		commandLine					= m_context.getTestContext().getCommandLine();
-	const bool					doShaderLog					= commandLine.isLogDecompiledSpirvEnabled() && log.isShaderLoggingEnabled();
+
+	DE_UNREF(casePath); // \todo [2015-03-13 pyry] Use this to identify ProgramCollection storage path
 
 	if (!vktCase)
 		TCU_THROW(InternalError, "Test node not an instance of vkt::TestCase");
@@ -499,7 +499,6 @@ void createGlslTests (tcu::TestCaseGroup* glslTests)
 
 	// Amber GLSL tests.
 	glslTests->addChild(cts_amber::createCombinedOperationsGroup		(testCtx));
-	glslTests->addChild(cts_amber::createCrashTestGroup					(testCtx));
 }
 
 // TestPackage
@@ -547,7 +546,6 @@ void TestPackage::init (void)
 	addChild(createTestGroup					(m_testCtx, "glsl", "GLSL shader execution tests", createGlslTests));
 	addChild(createRenderPassTests				(m_testCtx));
 	addChild(createRenderPass2Tests				(m_testCtx));
-	addChild(createDynamicRenderingTests		(m_testCtx));
 	addChild(ubo::createTests					(m_testCtx));
 	addChild(DynamicState::createTests			(m_testCtx));
 	addChild(ssbo::createTests					(m_testCtx));
@@ -582,14 +580,11 @@ void TestPackage::init (void)
 	addChild(RayTracing::createTests			(m_testCtx));
 	addChild(RayQuery::createTests				(m_testCtx));
 	addChild(FragmentShadingRate::createTests	(m_testCtx));
-	addChild(Reconvergence::createTests			(m_testCtx, false));
-	addChild(MeshShader::createTests			(m_testCtx));
 }
 
 void ExperimentalTestPackage::init (void)
 {
 	addChild(postmortem::createTests			(m_testCtx));
-	addChild(Reconvergence::createTests			(m_testCtx, true));
 }
 
 } // vkt

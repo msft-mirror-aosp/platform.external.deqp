@@ -20,7 +20,7 @@
  *
  *//*!
  * \file
- * \brief Null (do-nothing) Vulkan implementation.
+ * \brief Null (dummy) Vulkan implementation.
  *//*--------------------------------------------------------------------*/
 
 #include "vkDefs.hpp"

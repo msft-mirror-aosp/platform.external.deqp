@@ -351,7 +351,7 @@ By default the CTS package will contain libdeqp.so built for `armeabi-v7a`, `arm
 To pick which ABI to use at install time, following commands must be used
 instead:
 
-	adb install -g --abi <ABI name> <build root>/Khronos-CTS.apk /data/local/tmp/Khronos-CTS.apk
+	adb install --abi <ABI name> <build root>/Khronos-CTS.apk /data/local/tmp/Khronos-CTS.apk
 
 Porting
 ------------------------
@@ -559,9 +559,6 @@ Full list of parameters for the `glcts` binary:
   --deqp-caselist-file=<value>
     Read case list (in trie format) from given file
 
-  --deqp-caselist-resource=<value>
-    Read case list (in trie format) from given file located application's assets
-
   --deqp-stdin-caselist
     Read case list (in trie format) from stdin
 
@@ -651,45 +648,20 @@ Full list of parameters for the `glcts` binary:
     default: 'enable'
 
   --deqp-log-shader-sources=[enable|disable]
-    Enable or disable logging of shader sources
+    Enable or disable logging of shaders
     default: 'enable'
 
   --deqp-test-oom=[enable|disable]
     Run tests that exhaust memory on purpose
-    default: 'enable'
+    default: 'disable'
 
   --deqp-archive-dir=<value>
     Path to test resource files
-    default: '.'
+    default: current working directory
 
-  --deqp-log-flush=[enable|disable]
-    Enable or disable log file fflush
-    default: 'enable'
-
-
-  --deqp-renderdoc=[enable|disable]
-    Enable RenderDoc frame markers
-    default: 'disable'
-
-  --deqp-fraction=<value>
+  --deqp-case-fraction=<value>,<value>
     Run a fraction of the test cases (e.g. N,M means run group%M==N)
     default: ''
-
-  --deqp-fraction-mandatory-caselist-file=<value>
-    Case list file that must be run for each fraction
-    default: ''
-
-  --deqp-waiver-file=<value>
-    Read waived tests from given file
-    default: ''
-
-  --deqp-runner-type=[any|none|amber]
-    Filter test cases based on runner
-    default: 'any'
-
-  --deqp-terminate-on-fail=[enable|disable]
-    Terminate the run on first failure
-    default: 'disable'
 
   --deqp-egl-config-id=<value>
     Legacy name for --deqp-gl-config-id

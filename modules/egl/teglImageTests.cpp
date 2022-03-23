@@ -391,7 +391,7 @@ public:
 
 			case EGL_NATIVE_BUFFER_ANDROID:
 				DE_ASSERT(format == 0u && type == 0u);
-				return createAndroidNativeImageSource(internalFormat, 1u, false);
+				return createAndroidNativeImageSource(internalFormat);
 
 			default:
 				DE_FATAL("Impossible");

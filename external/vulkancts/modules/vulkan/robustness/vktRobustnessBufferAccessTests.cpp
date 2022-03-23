@@ -82,8 +82,6 @@ public:
 
 	virtual						~RobustBufferAccessTest		(void) {}
 
-	virtual void				checkSupport				(Context& context) const;
-
 private:
 	static void					genBufferShaderAccess		(ShaderType				shaderType,
 															 VkFormat				bufferFormat,
@@ -268,12 +266,6 @@ RobustBufferAccessTest::RobustBufferAccessTest (tcu::TestContext&		testContext,
 	, m_bufferFormat	(bufferFormat)
 {
 	DE_ASSERT(m_shaderStage == VK_SHADER_STAGE_VERTEX_BIT || m_shaderStage == VK_SHADER_STAGE_FRAGMENT_BIT || m_shaderStage == VK_SHADER_STAGE_COMPUTE_BIT);
-}
-
-void RobustBufferAccessTest::checkSupport(Context& context) const
-{
-	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") && !context.getDeviceFeatures().robustBufferAccess)
-		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: robustBufferAccess not supported by this implementation");
 }
 
 void RobustBufferAccessTest::genBufferShaderAccess (ShaderType			shaderType,

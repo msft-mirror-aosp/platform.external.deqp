@@ -955,7 +955,7 @@ static int accumulateShader (const ProgramInterfaceDefinition::Shader* shader,
 	return retVal;
 }
 
-static bool unusedTrueConstantTypeFilter (glu::DataType d)
+static bool dummyTrueConstantTypeFilter (glu::DataType d)
 {
 	DE_UNREF(d);
 	return true;
@@ -1024,7 +1024,7 @@ static int getNumTypeInstances (const ProgramInterfaceDefinition::Shader* shader
 
 static int getNumTypeInstances (const ProgramInterfaceDefinition::Shader* shader, glu::Storage storage)
 {
-	return getNumTypeInstances(shader, storage, unusedTrueConstantTypeFilter);
+	return getNumTypeInstances(shader, storage, dummyTrueConstantTypeFilter);
 }
 
 static int accumulateShaderStorage (const ProgramInterfaceDefinition::Shader* shader, glu::Storage storage, int (*typeMap)(glu::DataType))
@@ -1503,18 +1503,18 @@ std::vector<std::string> getProgramInterfaceResourceList (const ProgramInterface
 }
 
 /**
- * Name of the unused uniform added by generateProgramInterfaceProgramSources
+ * Name of the dummy uniform added by generateProgramInterfaceProgramSources
  *
- * A uniform named "unusedZero" is added by
+ * A uniform named "dummyZero" is added by
  * generateProgramInterfaceProgramSources.  It is used in expressions to
  * prevent various program resources from being eliminated by the GLSL
  * compiler's optimizer.
  *
  * \sa deqp::gles31::Functional::ProgramInterfaceDefinition::generateProgramInterfaceProgramSources
  */
-const char* getUnusedZeroUniformName()
+const char* getDummyZeroUniformName()
 {
-	return "unusedZero";
+	return "dummyZero";
 }
 
 glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfaceDefinition::Program* program)
@@ -1555,10 +1555,10 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 
 		// Use inputs and outputs so that they won't be removed by the optimizer
 
-		usageBuf <<	"highp uniform vec4 " << getUnusedZeroUniformName() << "; // Default value is vec4(0.0).\n"
+		usageBuf <<	"highp uniform vec4 " << getDummyZeroUniformName() << "; // Default value is vec4(0.0).\n"
 					"highp vec4 readInputs()\n"
 					"{\n"
-					"	highp vec4 retValue = " << getUnusedZeroUniformName() << ";\n";
+					"	highp vec4 retValue = " << getDummyZeroUniformName() << ";\n";
 
 		// User-defined inputs
 
@@ -1633,7 +1633,7 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 		usageBuf <<	"	return retValue;\n"
 					"}\n\n";
 
-		usageBuf <<	"void writeOutputs(in highp vec4 unusedValue)\n"
+		usageBuf <<	"void writeOutputs(in highp vec4 dummyValue)\n"
 					"{\n";
 
 		// User-defined outputs
@@ -1644,7 +1644,7 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 				shader->getDefaultBlock().variables[ndx].storage == glu::STORAGE_PATCH_OUT)
 			{
 				writeVariableWriteExpression(usageBuf,
-											 "unusedValue",
+											 "dummyValue",
 											 shader->getDefaultBlock().variables[ndx].name,
 											 shader->getType(),
 											 shader->getDefaultBlock().variables[ndx].storage,
@@ -1659,7 +1659,7 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 			const glu::InterfaceBlock& interface = shader->getDefaultBlock().interfaceBlocks[interfaceNdx];
 			if (isWritableInterface(interface))
 			{
-				writeInterfaceWriteExpression(usageBuf, "unusedValue", interface, shader->getType(), program);
+				writeInterfaceWriteExpression(usageBuf, "dummyValue", interface, shader->getType(), program);
 				containsUserDefinedOutputs = true;
 			}
 		}
@@ -1667,12 +1667,12 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 		// Builtin-outputs that must be written to
 
 		if (shader->getType() == glu::SHADERTYPE_VERTEX)
-			usageBuf << "	gl_Position = unusedValue;\n";
+			usageBuf << "	gl_Position = dummyValue;\n";
 		else if (shader->getType() == glu::SHADERTYPE_GEOMETRY)
-			usageBuf << "	gl_Position = unusedValue;\n"
+			usageBuf << "	gl_Position = dummyValue;\n"
 						 "	EmitVertex();\n";
 		else if (shader->getType() == glu::SHADERTYPE_TESSELLATION_CONTROL)
-			usageBuf << "	gl_out[gl_InvocationID].gl_Position = unusedValue;\n"
+			usageBuf << "	gl_out[gl_InvocationID].gl_Position = dummyValue;\n"
 						"	gl_TessLevelOuter[0] = 2.8;\n"
 						"	gl_TessLevelOuter[1] = 2.8;\n"
 						"	gl_TessLevelOuter[2] = 2.8;\n"
@@ -1680,16 +1680,16 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 						"	gl_TessLevelInner[0] = 2.8;\n"
 						"	gl_TessLevelInner[1] = 2.8;\n";
 		else if (shader->getType() == glu::SHADERTYPE_TESSELLATION_EVALUATION)
-			usageBuf << "	gl_Position = unusedValue;\n";
+			usageBuf << "	gl_Position = dummyValue;\n";
 
 		// Output to sink input data to
 
 		if (!containsUserDefinedOutputs)
 		{
 			if (shader->getType() == glu::SHADERTYPE_FRAGMENT)
-				usageBuf << "	gl_FragDepth = dot(unusedValue.xy, unusedValue.xw);\n";
+				usageBuf << "	gl_FragDepth = dot(dummyValue.xy, dummyValue.xw);\n";
 			else if (shader->getType() == glu::SHADERTYPE_COMPUTE)
-				usageBuf << "	unusedOutputBlock.unusedValue = unusedValue;\n";
+				usageBuf << "	dummyOutputBlock.dummyValue = dummyValue;\n";
 		}
 
 		usageBuf <<	"}\n\n"
@@ -1698,14 +1698,14 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 					"	writeOutputs(readInputs());\n"
 					"}\n";
 
-		// Interface for unused output
+		// Interface for dummy output
 
 		if (shader->getType() == glu::SHADERTYPE_COMPUTE && !containsUserDefinedOutputs)
 		{
-			sourceBuf	<< "writeonly buffer UnusedOutputInterface\n"
+			sourceBuf	<< "writeonly buffer DummyOutputInterface\n"
 						<< "{\n"
-						<< "	highp vec4 unusedValue;\n"
-						<< "} unusedOutputBlock;\n\n";
+						<< "	highp vec4 dummyValue;\n"
+						<< "} dummyOutputBlock;\n\n";
 		}
 
 		sources << glu::ShaderSource(shader->getType(), sourceBuf.str() + usageBuf.str());

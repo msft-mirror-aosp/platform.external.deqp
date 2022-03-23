@@ -56,8 +56,7 @@ elseif (EXISTS "${PROJECT_SOURCE_DIR}/.git" AND GIT_FOUND)
 
 		execute_process(COMMAND ${GIT_EXECUTABLE} --git-dir=${PROJECT_SOURCE_DIR}/.git rev-parse --git-dir
 						OUTPUT_VARIABLE DE_GIT_DIR
-						OUTPUT_STRIP_TRAILING_WHITESPACE
-						ENCODING UTF8)
+						OUTPUT_STRIP_TRAILING_WHITESPACE)
 
 		add_custom_command(OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/qpReleaseInfo.inl
 						   COMMAND ${PYTHON_EXECUTABLE} -B ${CMAKE_CURRENT_SOURCE_DIR}/gen_release_info.py --git --git-dir=${DE_GIT_DIR} --out=${CMAKE_CURRENT_BINARY_DIR}/qpReleaseInfo.inl

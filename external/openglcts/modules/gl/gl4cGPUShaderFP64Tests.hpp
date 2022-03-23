@@ -484,7 +484,7 @@ private:
 
 	void inspectProgram(glw::GLuint program_id, glw::GLint n_uniforms, const uniformTypeDetails& uniform_type,
 						glw::GLint& out_buffer_size, uniformDetails& out_offsets,
-						glw::GLuint& uniform_block_index) const;
+						glw::GLuint uniform_block_index) const;
 
 	void prepareBoilerplateShader(const glw::GLchar* stage_specific_layout, const glw::GLchar* stage_specific_main_body,
 								  std::string& out_source_code) const;
@@ -552,27 +552,27 @@ private:
  *  in a named uniform block.
  *  The following members should be defined in the block:
  *
- *  ivec3   unused1[3];
+ *  ivec3   dummy1[3];
  *  double  double_value;
- *  bool    unused2;
+ *  bool    dummy2;
  *  dvec2   dvec2_value;
- *  bvec3   unused3;
+ *  bvec3   dummy3;
  *  dvec3   dvec3_value;
- *  int     unused4[3];
+ *  int     dummy4[3];
  *  dvec4   dvec4_value;
- *  bool    unused5;
- *  bool    unused6[2];
+ *  bool    dummy5;
+ *  bool    dummy6[2];
  *  dmat2   dmat2_value;
  *  dmat3   dmat3_value;
- *  bool    unused7;
+ *  bool    dummy7;
  *  dmat4   dmat4_value;
  *  dmat2x3 dmat2x3_value;
- *  uvec3   unused8;
+ *  uvec3   dummy8;
  *  dmat2x4 dmat2x4_value;
  *  dmat3x2 dmat3x2_value;
- *  bool    unused9;
+ *  bool    dummy9;
  *  dmat3x4 dmat3x4_value;
- *  int     unused10;
+ *  int     dummy10;
  *  dmat4x2 dmat4x2_value;
  *  dmat4x3 dmat4x3_value;
  *
