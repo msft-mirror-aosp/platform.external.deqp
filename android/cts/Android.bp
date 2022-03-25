@@ -26,6 +26,7 @@ filegroup {
     name: "deqp_master_caselists",
     srcs: [
         "master/*.txt",
+        "master/vk-*/*.txt",
     ],
     path: "master",
 }
