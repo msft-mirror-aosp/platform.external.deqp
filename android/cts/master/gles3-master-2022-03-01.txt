@@ -31,3 +31,15 @@ dEQP-GLES3.functional.texture.filtering.3d.formats.srgb_rg8_linear_mipmap_neares
 dEQP-GLES3.functional.texture.filtering.3d.formats.srgb_rg8_nearest_mipmap_linear
 dEQP-GLES3.functional.texture.filtering.3d.formats.srgb_rg8_linear_mipmap_linear
 dEQP-GLES3.functional.texture.specification.texsubimage2d_pbo.pbo_bounds_2d
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component32f_stencil_index8_basic
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component32f_stencil_index8_scale
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component32f_stencil_index8_depth_only
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component32f_stencil_index8_stencil_only
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component24_stencil_index8_basic
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component24_stencil_index8_scale
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component24_stencil_index8_depth_only
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component24_stencil_index8_stencil_only
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component16_stencil_index8_basic
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component16_stencil_index8_scale
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component16_stencil_index8_depth_only
+dEQP-GLES3.functional.fbo.blit.depth_stencil.depth_component16_stencil_index8_stencil_only
