@@ -111,6 +111,7 @@ MASTER_GLES3_COMMON_FILTERS		= [
 		exclude("gles3-test-issues.txt"),
 		exclude("gles3-spec-issues.txt"),
 		exclude("gles3-temp-excluded.txt"),
+		exclude("gles3-waivers.txt"),
 	]
 MASTER_GLES3_PKG				= Package(module = GLES3_MODULE, configurations = [
 		# Master
@@ -185,6 +186,7 @@ MASTER_GLES31_COMMON_FILTERS	= [
 		exclude("gles31-test-issues.txt"),
 		exclude("gles31-spec-issues.txt"),
 		exclude("gles31-temp-excluded.txt"),
+		exclude("gles31-waivers.txt"),
 	]
 MASTER_GLES31_PKG				= Package(module = GLES31_MODULE, configurations = [
 		# Master
