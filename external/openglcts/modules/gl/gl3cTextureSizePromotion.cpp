@@ -129,7 +129,7 @@ tcu::TestNode::IterateResult FunctionalTest::iterate()
 						{
 							prepareSourceTexture(s_formats[i], s_source_texture_targets[j]);
 						}
-						catch (tcu::NotSupportedError&)
+						catch (tcu::NotSupportedError& e)
 						{
 							continue;
 						}
@@ -244,18 +244,6 @@ void FunctionalTest::prepareSourceTexture(TextureInternalFormatDescriptor descri
 
 	if (!isTargetMultisampled(target))
 	{
-		glu::ContextType context_type = m_context.getRenderContext().getType();
-		if (isDepthType(descriptor) && glu::contextSupports(context_type, glu::ApiType::core(3, 1)))
-		{
-			/* 3.1 context may have GL_ARB_compatibility which has
-			 * GL_DEPTH_TEXTURE_MODE set to GL_LUMINANCE by default.
-			 * Set it to GL_RED since we expect depth texture sampling
-			 * to return vec4(depth, 0, 0, 1).
-			 */
-			gl.texParameteri(target, 0x884B, GL_RED);
-			gl.getError();
-		}
-
 		gl.texParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 		gl.texParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
@@ -746,6 +734,8 @@ glw::GLuint FunctionalTest::prepareProgram(glw::GLenum target, TextureInternalFo
 			sampler_prefix = "u";
 		}
 	}
+
+	std::string template_verison = "#version 150";
 
 	/* Preprocessing fragment shader source code. */
 	std::string fragment_shader = s_fragment_shader_template;
@@ -1390,7 +1380,7 @@ const FunctionalTest::TextureInternalFormatDescriptor FunctionalTest::s_formats[
 
 const glw::GLuint FunctionalTest::s_formats_size = sizeof(s_formats) / sizeof(s_formats[0]);
 
-const glw::GLchar* FunctionalTest::s_vertex_shader_code = "#version 140\n"
+const glw::GLchar* FunctionalTest::s_vertex_shader_code = "#version 150\n"
 														  "\n"
 														  "void main()\n"
 														  "{\n"
@@ -1412,8 +1402,7 @@ const glw::GLchar* FunctionalTest::s_vertex_shader_code = "#version 140\n"
 														  "}\n";
 
 const glw::GLchar* FunctionalTest::s_fragment_shader_template =
-	"#version 140\n"
-	"#extension GL_ARB_texture_multisample : enable\n"
+	"#version 150\n"
 	"\n"
 	"out TEMPLATE_TYPE result;\n"
 	"\n"

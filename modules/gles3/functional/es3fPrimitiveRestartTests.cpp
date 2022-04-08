@@ -215,30 +215,15 @@ void* PrimitiveRestartCase::getIndexPtr (int indexNdx)
 void PrimitiveRestartCase::init (void)
 {
 	// Create shader program.
-	std::string vertShaderSource;
-	if (m_primType == PRIMITIVE_POINTS)
-	{
-		vertShaderSource =
-			"#version 300 es\n"
-			"in highp vec4 a_position;\n"
-			"\n"
-			"void main()\n"
-			"{\n"
-			"	gl_Position = a_position;\n"
-			"	gl_PointSize = 1.0f;\n"
-			"}\n";
-	}
-	else
-	{
-		vertShaderSource =
-			"#version 300 es\n"
-			"in highp vec4 a_position;\n"
-			"\n"
-			"void main()\n"
-			"{\n"
-			"	gl_Position = a_position;\n"
-			"}\n";
-	}
+
+	static const char* vertShaderSource =
+		"#version 300 es\n"
+		"in highp vec4 a_position;\n"
+		"\n"
+		"void main()\n"
+		"{\n"
+		"	gl_Position = a_position;\n"
+		"}\n";
 
 	static const char* fragShaderSource =
 		"#version 300 es\n"

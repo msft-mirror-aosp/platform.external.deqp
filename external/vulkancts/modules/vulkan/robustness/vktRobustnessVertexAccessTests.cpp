@@ -259,8 +259,6 @@ void VertexAccessTest::initPrograms (SourceCollections& programCollection) const
 	const deUint32			numScalarsPerVertex		= numChannels * 3; // Use 3 identical attributes
 	deUint32				numValues				= 0;
 
-	const bool				isR64					= (m_inputFormat == VK_FORMAT_R64_UINT || m_inputFormat == VK_FORMAT_R64_SINT);
-
 	if (numChannels == 1)
 	{
 		if (isUintFormat(m_inputFormat))
@@ -269,8 +267,6 @@ void VertexAccessTest::initPrograms (SourceCollections& programCollection) const
 			attributeTypeStr << "int";
 		else
 			attributeTypeStr << "float";
-
-		attributeTypeStr << (isR64 ? "64_t" : " ");
 	}
 	else
 	{
@@ -304,7 +300,7 @@ void VertexAccessTest::initPrograms (SourceCollections& programCollection) const
 
 	attributeUse << "\n";
 
-	std::string outType = "";
+	const char *outType = "";
 	if (isUintFormat(m_inputFormat))
 		outType = "uint";
 	else if (isIntFormat(m_inputFormat))
@@ -312,20 +308,9 @@ void VertexAccessTest::initPrograms (SourceCollections& programCollection) const
 	else
 		outType = "float";
 
-	outType += isR64 ? "64_t" : "";
-
-	std::string extensions	= "";
-	std::string version		= "#version 310 es\n";
-	if (isR64)
-	{
-		extensions	= "#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require\n";
-		version		= "#version 440\n";
-	}
-
 	vertexShaderSource <<
-		version <<
+		"#version 310 es\n"
 		"precision highp float;\n"
-		<< extensions
 		<< attributeDeclaration.str() <<
 		"layout(set = 0, binding = 0, std430) buffer outBuffer\n"
 		"{\n"
@@ -462,16 +447,6 @@ VertexAccessInstance::VertexAccessInstance (Context&						context,
 	{
 		TCU_THROW(NotSupportedError, "Stores not supported in vertex stage");
 	}
-
-	if (m_inputFormat == VK_FORMAT_R64_UINT || m_inputFormat == VK_FORMAT_R64_SINT)
-	{
-		const VkFormatProperties formatProperties = getPhysicalDeviceFormatProperties(context.getInstanceInterface(), context.getPhysicalDevice(), m_inputFormat);
-		context.requireDeviceFunctionality("VK_EXT_shader_image_atomic_int64");
-
-		if ((formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) != VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
-			TCU_THROW(NotSupportedError, "VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT not supported");
-	}
-
 
 	const VkVertexInputAttributeDescription attributes[] =
 	{
@@ -786,8 +761,7 @@ bool VertexAccessInstance::verifyResult (void)
 	const deUint32				numChannels				= getNumUsedChannels(mapVkFormat(m_inputFormat).order);
 	const deUint32				numScalarsPerVertex		= numChannels * 3; // Use 3 identical attributes
 	void*						outDataPtr				= m_outBufferAlloc->getHostPtr();
-	const deUint32				outValueSize			= static_cast<deUint32>((m_inputFormat == VK_FORMAT_R64_UINT || m_inputFormat == VK_FORMAT_R64_SINT)
-										? sizeof(deUint64) : sizeof(deUint32));
+	const deUint32				outValueSize			= sizeof(deUint32);
 	bool						allOk					= true;
 
 	const VkMappedMemoryRange	outBufferRange			=
@@ -809,11 +783,7 @@ bool VertexAccessInstance::verifyResult (void)
 		deUint32			inBufferValueIndex;
 		bool				isOutOfBoundsAccess		= false;
 		const deUint32		attributeIndex			= (valueNdx / numChannels) % 3;
-		deUint32*			ptr32					= (deUint32*)outDataPtr;
-		deUint64*			ptr64					= (deUint64*)outDataPtr;
-		const void*			outValuePtr				= ((m_inputFormat == VK_FORMAT_R64_UINT || m_inputFormat == VK_FORMAT_R64_SINT) ?
-														(void*)(ptr64 + valueNdx) :
-														(void*)(ptr32 + valueNdx));
+		const deUint32*		outValuePtr				= (deUint32*)outDataPtr + valueNdx;
 
 		if (attributeIndex == 2)
 		{
@@ -894,7 +864,7 @@ bool VertexAccessInstance::verifyResult (void)
 					if (m_inputFormat == VK_FORMAT_A2B10G10R10_UNORM_PACK32)
 						matchesVec4Pattern	=  verifyOutOfBoundsVec4(outValuePtr, m_inputFormat);
 					else
-						matchesVec4Pattern	=  verifyOutOfBoundsVec4(((deUint32*)outValuePtr) - 3, m_inputFormat);
+						matchesVec4Pattern	=  verifyOutOfBoundsVec4(outValuePtr - 3, m_inputFormat);
 				}
 
 				if (!canMatchVec4Pattern || !matchesVec4Pattern)
@@ -962,29 +932,15 @@ bool VertexAccessInstance::isExpectedValueFromVertexBuffer (const void* vertexBu
 {
 	if (isUintFormat(vertexFormat))
 	{
-		if (vertexFormat == VK_FORMAT_R64_UINT || vertexFormat == VK_FORMAT_R64_SINT)
-		{
-			const deUint64* bufferPtr = reinterpret_cast<const deUint64*>(vertexBuffer);
-			return bufferPtr[vertexIndex] == *reinterpret_cast<const deUint64 *>(value);
-		}
-		else
-		{
-			const deUint32* bufferPtr = reinterpret_cast<const deUint32*>(vertexBuffer);
-			return bufferPtr[vertexIndex] == *reinterpret_cast<const deUint32 *>(value);
-		}
+		const deUint32* bufferPtr = reinterpret_cast<const deUint32*>(vertexBuffer);
+
+		return bufferPtr[vertexIndex] == *reinterpret_cast<const deUint32 *>(value);
 	}
 	else if (isIntFormat(vertexFormat))
 	{
-		if (vertexFormat == VK_FORMAT_R64_UINT || vertexFormat == VK_FORMAT_R64_SINT)
-		{
-			const deInt64* bufferPtr = reinterpret_cast<const deInt64*>(vertexBuffer);
-			return bufferPtr[vertexIndex] == *reinterpret_cast<const deInt64 *>(value);
-		}
-		else
-		{
-			const deInt32* bufferPtr = reinterpret_cast<const deInt32*>(vertexBuffer);
-			return bufferPtr[vertexIndex] == *reinterpret_cast<const deInt32 *>(value);
-		}
+		const deInt32* bufferPtr = reinterpret_cast<const deInt32*>(vertexBuffer);
+
+		return bufferPtr[vertexIndex] == *reinterpret_cast<const deInt32 *>(value);
 	}
 	else if (isFloatFormat(vertexFormat))
 	{
@@ -1015,7 +971,7 @@ VkDeviceSize VertexAccessInstance::getBufferSizeInBytes (deUint32 numScalars, Vk
 {
 	if (isUintFormat(format) || isIntFormat(format) || isFloatFormat(format))
 	{
-		return numScalars * ((format == VK_FORMAT_R64_UINT || format == VK_FORMAT_R64_SINT) ? 8 : 4);
+		return numScalars * 4;
 	}
 	else if (format == VK_FORMAT_A2B10G10R10_UNORM_PACK32)
 	{
@@ -1184,8 +1140,6 @@ static void addVertexFormatTests (tcu::TestContext& testCtx, tcu::TestCaseGroup*
 		VK_FORMAT_R32G32B32A32_UINT,
 		VK_FORMAT_R32G32B32A32_SINT,
 		VK_FORMAT_R32G32B32A32_SFLOAT,
-		VK_FORMAT_R64_UINT,
-		VK_FORMAT_R64_SINT,
 
 		VK_FORMAT_A2B10G10R10_UNORM_PACK32
 	};

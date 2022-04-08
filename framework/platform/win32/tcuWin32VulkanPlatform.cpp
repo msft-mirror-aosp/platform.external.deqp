@@ -55,16 +55,6 @@ public:
 	{
 	}
 
-	void setVisible(bool visible)
-	{
-		m_window->setVisible(visible);
-	}
-
-	void setForeground(void)
-	{
-		m_window->setForeground();
-	}
-
 	void resize (const UVec2& newSize)
 	{
 		m_window->setSize((int)newSize.x(), (int)newSize.y());

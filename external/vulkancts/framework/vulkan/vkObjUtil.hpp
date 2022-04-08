@@ -29,13 +29,6 @@
 
 namespace vk
 {
-Move<VkPipeline> makeComputePipeline (const DeviceInterface&					vk,
-									  const VkDevice							device,
-									  const VkPipelineLayout					pipelineLayout,
-									  const VkPipelineCreateFlags				pipelineFlags,
-									  const VkShaderModule						shaderModule,
-									  const VkPipelineShaderStageCreateFlags	shaderFlags,
-									  const VkSpecializationInfo*				specializationInfo);
 
 Move<VkPipeline> makeGraphicsPipeline (const DeviceInterface&							vk,
 									   const VkDevice									device,
@@ -95,7 +88,7 @@ Move<VkImageView> makeImageView (const DeviceInterface&					vk,
 								 const VkImageViewType					imageViewType,
 								 const VkFormat							format,
 								 const VkImageSubresourceRange			subresourceRange,
-								 const vk::VkImageViewUsageCreateInfo*	imageUsageCreateInfo = DE_NULL);
+								 const vk::VkImageViewUsageCreateInfo*	imageUsageCreateInfoKHR = DE_NULL);
 
 Move<VkBufferView> makeBufferView (const DeviceInterface&	vk,
 								   const VkDevice			vkDevice,
@@ -113,29 +106,14 @@ Move<VkDescriptorSet> makeDescriptorSet (const DeviceInterface&			vk,
 VkBufferCreateInfo makeBufferCreateInfo (const VkDeviceSize			size,
 										 const VkBufferUsageFlags	usage);
 
-VkBufferCreateInfo makeBufferCreateInfo (const VkDeviceSize				size,
-										 const VkBufferUsageFlags		usage,
-										 const std::vector<deUint32>&	queueFamilyIndices);
-
 Move<VkPipelineLayout> makePipelineLayout (const DeviceInterface&		vk,
 										   const VkDevice				device,
 										   const VkDescriptorSetLayout	descriptorSetLayout = DE_NULL);
-
-Move<VkPipelineLayout> makePipelineLayout (const DeviceInterface&								vk,
-										   const VkDevice										device,
-										   const std::vector<vk::Move<VkDescriptorSetLayout>>	&descriptorSetLayouts);
 
 Move<VkPipelineLayout> makePipelineLayout (const DeviceInterface&		vk,
 										   const VkDevice				device,
 										   const deUint32				setLayoutCount,
 										   const VkDescriptorSetLayout*	descriptorSetLayout);
-
-Move<VkPipelineLayout> makePipelineLayout (const DeviceInterface&		vk,
-										   const VkDevice				device,
-										   const deUint32				setLayoutCount,
-										   const VkDescriptorSetLayout*	descriptorSetLayout,
-										   const deUint32               pushConstantRangeCount,
-										   const VkPushConstantRange*   pPushConstantRanges);
 
 Move<VkFramebuffer> makeFramebuffer (const DeviceInterface&	vk,
 									 const VkDevice			device,
@@ -149,7 +127,7 @@ Move<VkFramebuffer> makeFramebuffer (const DeviceInterface&	vk,
 									 const VkDevice			device,
 									 const VkRenderPass		renderPass,
 									 const deUint32			attachmentCount,
-									 const VkImageView*		attachmentsArray,
+									 const VkImageView*		colorAttachments,
 									 const deUint32			width,
 									 const deUint32			height,
 									 const deUint32			layers = 1u);

@@ -554,9 +554,17 @@ tcu::TestStatus renderTriangleTest (Context& context)
 	// Read results, render reference, compare
 	{
 		const tcu::TextureFormat			tcuFormat		= vk::mapVkFormat(colorFormat);
+		const VkMappedMemoryRange			range			=
+		{
+			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,	// sType
+			DE_NULL,								// pNext
+			readImageBufferMemory->getMemory(),		// memory
+			0,										// offset
+			imageSizeBytes,							// size
+		};
 		const tcu::ConstPixelBufferAccess	resultAccess	(tcuFormat, renderSize.x(), renderSize.y(), 1, readImageBufferMemory->getHostPtr());
 
-		invalidateAlloc(vk, vkDevice, *readImageBufferMemory);
+		VK_CHECK(vk.invalidateMappedMemoryRanges(vkDevice, 1u, &range));
 
 		{
 			tcu::TextureLevel	refImage		(tcuFormat, renderSize.x(), renderSize.y());
@@ -1157,9 +1165,17 @@ tcu::TestStatus renderTriangleDummyExtStructTest (Context& context)
 	// Read results, render reference, compare
 	{
 		const tcu::TextureFormat					tcuFormat							= vk::mapVkFormat(colorFormat);
+		const VkMappedMemoryRange					range								=
+		{
+			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,	// sType
+			&dummyExtStruct,						// pNext
+			readImageBufferMemory->getMemory(),		// memory
+			0,										// offset
+			imageSizeBytes,							// size
+		};
 		const tcu::ConstPixelBufferAccess			resultAccess						(tcuFormat, renderSize.x(), renderSize.y(), 1, readImageBufferMemory->getHostPtr());
 
-		invalidateAlloc(vk, vkDevice, *readImageBufferMemory);
+		VK_CHECK(vk.invalidateMappedMemoryRanges(vkDevice, 1u, &range));
 
 		{
 			tcu::TextureLevel						refImage							(tcuFormat, renderSize.x(), renderSize.y());
@@ -1459,9 +1475,17 @@ tcu::TestStatus renderTriangleUnusedResolveAttachmentTest (Context& context)
 	// Read results, render reference, compare
 	{
 		const tcu::TextureFormat			tcuFormat		= vk::mapVkFormat(colorFormat);
+		const VkMappedMemoryRange			range			=
+		{
+			VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE,	// sType
+			DE_NULL,								// pNext
+			readImageBufferMemory->getMemory(),		// memory
+			0,										// offset
+			imageSizeBytes,							// size
+		};
 		const tcu::ConstPixelBufferAccess	resultAccess	(tcuFormat, renderSize.x(), renderSize.y(), 1, readImageBufferMemory->getHostPtr());
 
-		invalidateAlloc(vk, vkDevice, *readImageBufferMemory);
+		VK_CHECK(vk.invalidateMappedMemoryRanges(vkDevice, 1u, &range));
 
 		{
 			tcu::TextureLevel	refImage		(tcuFormat, renderSize.x(), renderSize.y());

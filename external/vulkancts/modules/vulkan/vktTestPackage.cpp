@@ -27,7 +27,6 @@
 #include "tcuTestCase.hpp"
 #include "tcuTestLog.hpp"
 #include "tcuCommandLine.hpp"
-#include "tcuWaiverUtil.hpp"
 
 #include "vkPlatform.hpp"
 #include "vkPrograms.hpp"
@@ -52,7 +51,6 @@
 #include "vktShaderRenderDerivateTests.hpp"
 #include "vktShaderRenderDiscardTests.hpp"
 #include "vktShaderRenderIndexingTests.hpp"
-#include "vktShaderRenderInvarianceTests.hpp"
 #include "vktShaderRenderLimitTests.hpp"
 #include "vktShaderRenderLoopTests.hpp"
 #include "vktShaderRenderMatrixTests.hpp"
@@ -90,19 +88,14 @@
 #include "vktProtectedMemTests.hpp"
 #include "vktDeviceGroupTests.hpp"
 #include "vktMemoryModelTests.hpp"
+#include "vktAmberExampleTests.hpp"
 #include "vktAmberGraphicsFuzzTests.hpp"
-#include "vktAmberGlslTests.hpp"
 #include "vktImagelessFramebufferTests.hpp"
 #include "vktTransformFeedbackTests.hpp"
 #include "vktDescriptorIndexingTests.hpp"
 #include "vktImagelessFramebufferTests.hpp"
 #include "vktFragmentShaderInterlockTests.hpp"
 #include "vktShaderClockTests.hpp"
-#include "vktModifiersTests.hpp"
-#include "vktRayTracingTests.hpp"
-#include "vktRayQueryTests.hpp"
-#include "vktPostmortemTests.hpp"
-#include "vktFragmentShadingRateTests.hpp"
 
 #include <vector>
 #include <sstream>
@@ -180,6 +173,19 @@ using de::UniquePtr;
 using de::MovePtr;
 using tcu::TestLog;
 
+namespace
+{
+
+MovePtr<vk::DebugReportRecorder> createDebugReportRecorder (const vk::PlatformInterface& vkp, const vk::InstanceInterface& vki, vk::VkInstance instance)
+{
+	if (isDebugReportSupported(vkp))
+		return MovePtr<vk::DebugReportRecorder>(new vk::DebugReportRecorder(vki, instance));
+	else
+		TCU_THROW(NotSupportedError, "VK_EXT_debug_report is not supported");
+}
+
+} // anonymous
+
 // TestCaseExecutor
 
 class TestCaseExecutor : public tcu::TestCaseExecutor
@@ -194,8 +200,6 @@ public:
 	virtual tcu::TestNode::IterateResult		iterate				(tcu::TestCase* testCase);
 
 private:
-	void										logUnusedShaders	(tcu::TestCase* testCase);
-
 	bool										spirvVersionSupported(vk::SpirvVersion);
 	vk::BinaryCollection						m_progCollection;
 	vk::BinaryRegistryReader					m_prebuiltBinRegistry;
@@ -203,9 +207,8 @@ private:
 	const UniquePtr<vk::Library>				m_library;
 	Context										m_context;
 
+	const UniquePtr<vk::DebugReportRecorder>	m_debugReportRecorder;
 	const UniquePtr<vk::RenderDocUtil>			m_renderDoc;
-	vk::VkPhysicalDeviceProperties				m_deviceProperties;
-	tcu::WaiverUtil								m_waiverMechanism;
 
 	TestInstance*								m_instance;			//!< Current test case instance
 };
@@ -215,35 +218,20 @@ static MovePtr<vk::Library> createLibrary (tcu::TestContext& testCtx)
 	return MovePtr<vk::Library>(testCtx.getPlatform().getVulkanPlatform().createLibrary());
 }
 
-static vk::VkPhysicalDeviceProperties getPhysicalDeviceProperties(vkt::Context& context)
-{
-	const vk::InstanceInterface&	vki				= context.getInstanceInterface();
-	const vk::VkPhysicalDevice		physicalDevice	= context.getPhysicalDevice();
-
-	vk::VkPhysicalDeviceProperties	properties;
-	vki.getPhysicalDeviceProperties(physicalDevice, &properties);
-	return properties;
-}
-
 TestCaseExecutor::TestCaseExecutor (tcu::TestContext& testCtx)
 	: m_prebuiltBinRegistry	(testCtx.getArchive(), "vulkan/prebuilt")
 	, m_library				(createLibrary(testCtx))
 	, m_context				(testCtx, m_library->getPlatformInterface(), m_progCollection)
+	, m_debugReportRecorder	(testCtx.getCommandLine().isValidationEnabled()
+							 ? createDebugReportRecorder(m_library->getPlatformInterface(),
+														 m_context.getInstanceInterface(),
+														 m_context.getInstance())
+							 : MovePtr<vk::DebugReportRecorder>(DE_NULL))
 	, m_renderDoc			(testCtx.getCommandLine().isRenderDocEnabled()
 							 ? MovePtr<vk::RenderDocUtil>(new vk::RenderDocUtil())
 							 : MovePtr<vk::RenderDocUtil>(DE_NULL))
-	, m_deviceProperties	(getPhysicalDeviceProperties(m_context))
 	, m_instance			(DE_NULL)
 {
-	tcu::SessionInfo sessionInfo(m_deviceProperties.vendorID,
-								 m_deviceProperties.deviceID,
-								 testCtx.getCommandLine().getInitialCmdLine());
-	m_waiverMechanism.setup(testCtx.getCommandLine().getWaiverFileName(),
-							"dEQP-VK",
-							m_deviceProperties.vendorID,
-							m_deviceProperties.deviceID,
-							sessionInfo);
-	testCtx.getLog().writeSessionInfo(sessionInfo.get());
 }
 
 TestCaseExecutor::~TestCaseExecutor (void)
@@ -268,9 +256,6 @@ void TestCaseExecutor::init (tcu::TestCase* testCase, const std::string& casePat
 
 	if (!vktCase)
 		TCU_THROW(InternalError, "Test node not an instance of vkt::TestCase");
-
-	if (m_waiverMechanism.isOnWaiverList(casePath))
-		throw tcu::TestException("Waived test", QP_TEST_RESULT_WAIVER);
 
 	vktCase->checkSupport(m_context);
 
@@ -342,7 +327,7 @@ void TestCaseExecutor::init (tcu::TestCase* testCase, const std::string& casePat
 	m_context.resultSetOnValidation(false);
 }
 
-void TestCaseExecutor::deinit (tcu::TestCase* testCase)
+void TestCaseExecutor::deinit (tcu::TestCase*)
 {
 	delete m_instance;
 	m_instance = DE_NULL;
@@ -350,48 +335,8 @@ void TestCaseExecutor::deinit (tcu::TestCase* testCase)
 	if (m_renderDoc) m_renderDoc->endFrame(m_context.getInstance());
 
 	// Collect and report any debug messages
-	if (m_context.hasDebugReportRecorder())
-		collectAndReportDebugMessages(m_context.getDebugReportRecorder(), m_context);
-
-	if (testCase != DE_NULL)
-		logUnusedShaders(testCase);
-}
-
-void TestCaseExecutor::logUnusedShaders (tcu::TestCase* testCase)
-{
-	const qpTestResult	testResult	= testCase->getTestContext().getTestResult();
-
-	if (testResult == QP_TEST_RESULT_PASS || testResult == QP_TEST_RESULT_QUALITY_WARNING || testResult == QP_TEST_RESULT_COMPATIBILITY_WARNING)
-	{
-		bool	unusedShaders	= false;
-
-		for (vk::BinaryCollection::Iterator it = m_progCollection.begin(); it != m_progCollection.end(); ++it)
-		{
-			if (!it.getProgram().getUsed())
-			{
-				unusedShaders = true;
-
-				break;
-			}
-		}
-
-		if (unusedShaders)
-		{
-			std::string message;
-
-			for (vk::BinaryCollection::Iterator it = m_progCollection.begin(); it != m_progCollection.end(); ++it)
-			{
-				if (!it.getProgram().getUsed())
-					message += it.getName() + ",";
-			}
-
-			message.resize(message.size() - 1);
-
-			message = std::string("Unused shaders: ") + message;
-
-			m_context.getTestContext().getLog() << TestLog::Message << message << TestLog::EndMessage;
-		}
-	}
+	if (m_debugReportRecorder)
+		collectAndReportDebugMessages(*m_debugReportRecorder, m_context);
 }
 
 tcu::TestNode::IterateResult TestCaseExecutor::iterate (tcu::TestCase*)
@@ -479,7 +424,6 @@ void createGlslTests (tcu::TestCaseGroup* glslTests)
 	glslTests->addChild(sr::createDiscardTests			(testCtx));
 	glslTests->addChild(sr::createDemoteTests			(testCtx));
 	glslTests->addChild(sr::createIndexingTests			(testCtx));
-	glslTests->addChild(sr::createShaderInvarianceTests	(testCtx));
 	glslTests->addChild(sr::createLimitTests			(testCtx));
 	glslTests->addChild(sr::createLoopTests				(testCtx));
 	glslTests->addChild(sr::createMatrixTests			(testCtx));
@@ -496,24 +440,12 @@ void createGlslTests (tcu::TestCaseGroup* glslTests)
 	glslTests->addChild(shaderexecutor::createOpaqueTypeIndexingTests	(testCtx));
 	glslTests->addChild(shaderexecutor::createAtomicOperationTests		(testCtx));
 	glslTests->addChild(shaderexecutor::createShaderClockTests			(testCtx));
-
-	// Amber GLSL tests.
-	glslTests->addChild(cts_amber::createCombinedOperationsGroup		(testCtx));
 }
 
 // TestPackage
 
-BaseTestPackage::BaseTestPackage (tcu::TestContext& testCtx, const char* name, const char* desc)
-	: tcu::TestPackage(testCtx, name, desc)
-{
-}
-
-BaseTestPackage::~BaseTestPackage (void)
-{
-}
-
 TestPackage::TestPackage (tcu::TestContext& testCtx)
-	: BaseTestPackage(testCtx, "dEQP-VK", "dEQP Vulkan Tests")
+	: tcu::TestPackage(testCtx, "dEQP-VK", "dEQP Vulkan Tests")
 {
 }
 
@@ -521,16 +453,7 @@ TestPackage::~TestPackage (void)
 {
 }
 
-ExperimentalTestPackage::ExperimentalTestPackage (tcu::TestContext& testCtx)
-	: BaseTestPackage(testCtx, "dEQP-VK-experimental", "dEQP Vulkan Experimental Tests")
-{
-}
-
-ExperimentalTestPackage::~ExperimentalTestPackage (void)
-{
-}
-
-tcu::TestCaseExecutor* BaseTestPackage::createExecutor (void) const
+tcu::TestCaseExecutor* TestPackage::createExecutor (void) const
 {
 	return new TestCaseExecutor(m_testCtx);
 }
@@ -554,8 +477,7 @@ void TestPackage::init (void)
 	addChild(compute::createTests				(m_testCtx));
 	addChild(image::createTests					(m_testCtx));
 	addChild(wsi::createTests					(m_testCtx));
-	addChild(createSynchronizationTests			(m_testCtx));
-	addChild(createSynchronization2Tests		(m_testCtx));
+	addChild(synchronization::createTests		(m_testCtx));
 	addChild(sparse::createTests				(m_testCtx));
 	addChild(tessellation::createTests			(m_testCtx));
 	addChild(rasterization::createTests			(m_testCtx));
@@ -571,20 +493,12 @@ void TestPackage::init (void)
 	addChild(DeviceGroup::createTests			(m_testCtx));
 	addChild(MemoryModel::createTests			(m_testCtx));
 	addChild(conditional::createTests			(m_testCtx));
+	addChild(cts_amber::createExampleTests		(m_testCtx));
 	addChild(cts_amber::createGraphicsFuzzTests	(m_testCtx));
 	addChild(imageless::createTests				(m_testCtx));
 	addChild(TransformFeedback::createTests		(m_testCtx));
 	addChild(DescriptorIndexing::createTests	(m_testCtx));
 	addChild(FragmentShaderInterlock::createTests(m_testCtx));
-	addChild(modifiers::createTests				(m_testCtx));
-	addChild(RayTracing::createTests			(m_testCtx));
-	addChild(RayQuery::createTests				(m_testCtx));
-	addChild(FragmentShadingRate::createTests	(m_testCtx));
-}
-
-void ExperimentalTestPackage::init (void)
-{
-	addChild(postmortem::createTests			(m_testCtx));
 }
 
 } // vkt

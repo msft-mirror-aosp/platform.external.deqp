@@ -27,12 +27,6 @@
 #include "tcuTestPackage.hpp"
 #include "tes2Context.hpp"
 #include "tcuResource.hpp"
-#include "deSharedPtr.hpp"
-
-namespace tcu
-{
-	class WaiverUtil;
-};
 
 namespace deqp
 {
@@ -56,7 +50,6 @@ public:
 private:
 	tcu::ResourcePrefix				m_archive;
 	Context*						m_context;
-	de::SharedPtr<tcu::WaiverUtil>	m_waiverMechanism;
 };
 
 } // gles2

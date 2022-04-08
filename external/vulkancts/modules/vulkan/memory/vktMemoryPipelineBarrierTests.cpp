@@ -1262,7 +1262,7 @@ public:
 		const vk::DeviceInterface&	vkd		= context.getContext().getDeviceInterface();
 		const vk::VkDevice			device	= context.getContext().getDevice();
 
-		vk::invalidateMappedMemoryRange(vkd, device, m_memory, 0, VK_WHOLE_SIZE);
+		vk::invalidateMappedMemoryRange(vkd, device, m_memory, 0, m_size);
 	}
 
 private:
@@ -1293,7 +1293,7 @@ public:
 		const vk::DeviceInterface&	vkd		= context.getContext().getDeviceInterface();
 		const vk::VkDevice			device	= context.getContext().getDevice();
 
-		vk::flushMappedMemoryRange(vkd, device, m_memory, 0, VK_WHOLE_SIZE);
+		vk::flushMappedMemoryRange(vkd, device, m_memory, 0, m_size);
 	}
 
 private:
@@ -2341,7 +2341,7 @@ void BufferCopyToBuffer::verify (VerifyContext& context, size_t commandIndex)
 		void* const	ptr		= mapMemory(vkd, device, *m_memory, m_bufferSize);
 		bool		isOk	= true;
 
-		vk::invalidateMappedMemoryRange(vkd, device, *m_memory, 0, VK_WHOLE_SIZE);
+		vk::invalidateMappedMemoryRange(vkd, device, *m_memory, 0, m_bufferSize);
 
 		{
 			const deUint8* const data = (const deUint8*)ptr;
@@ -2421,7 +2421,7 @@ void BufferCopyFromBuffer::prepare (PrepareContext& context)
 				data[ndx] = rng.getUint8();
 		}
 
-		vk::flushMappedMemoryRange(vkd, device, *m_memory, 0, VK_WHOLE_SIZE);
+		vk::flushMappedMemoryRange(vkd, device, *m_memory, 0, m_bufferSize);
 		vkd.unmapMemory(device, *m_memory);
 	}
 }
@@ -2668,7 +2668,7 @@ void BufferCopyToImage::verify (VerifyContext& context, size_t commandIndex)
 	{
 		void* const	ptr		= mapMemory(vkd, device, *memory, 4 * m_imageWidth * m_imageHeight);
 
-		invalidateMappedMemoryRange(vkd, device, *memory, 0, VK_WHOLE_SIZE);
+		vk::invalidateMappedMemoryRange(vkd, device, *memory, 0,  4 * m_imageWidth * m_imageHeight);
 
 		{
 			const deUint8* const	data = (const deUint8*)ptr;
@@ -2847,7 +2847,7 @@ void BufferCopyFromImage::prepare (PrepareContext& context)
 					data[ndx] = rng.getUint8();
 			}
 
-			vk::flushMappedMemoryRange(vkd, device, *memory, 0, VK_WHOLE_SIZE);
+			vk::flushMappedMemoryRange(vkd, device, *memory, 0, 4 * m_imageWidth * m_imageHeight);
 			vkd.unmapMemory(device, *memory);
 		}
 
@@ -3008,7 +3008,7 @@ void ImageCopyToBuffer::verify (VerifyContext& context, size_t commandIndex)
 		const ConstPixelBufferAccess	referenceImage	(context.getReferenceImage().getAccess());
 		const ConstPixelBufferAccess	resultImage		(TextureFormat(TextureFormat::RGBA, TextureFormat::UNORM_INT8), m_imageWidth, m_imageHeight, 1, ptr);
 
-		vk::invalidateMappedMemoryRange(vkd, device, *m_memory, 0, VK_WHOLE_SIZE);
+		vk::invalidateMappedMemoryRange(vkd, device, *m_memory, 0, m_bufferSize);
 
 		if (!tcu::intThresholdCompare(context.getLog(), (de::toString(commandIndex) + ":" + getName()).c_str(), (de::toString(commandIndex) + ":" + getName()).c_str(), referenceImage, resultImage, UVec4(0), tcu::COMPARE_LOG_ON_ERROR))
 			resultCollector.fail(de::toString(commandIndex) + ":" + getName() + " Image comparison failed");
@@ -3072,7 +3072,7 @@ void ImageCopyFromBuffer::prepare (PrepareContext& context)
 				data[ndx] = rng.getUint8();
 		}
 
-		vk::flushMappedMemoryRange(vkd, device, *m_memory, 0, VK_WHOLE_SIZE);
+		vk::flushMappedMemoryRange(vkd, device, *m_memory, 0, m_bufferSize);
 		vkd.unmapMemory(device, *m_memory);
 	}
 }
@@ -3282,7 +3282,7 @@ void ImageCopyFromImage::prepare (PrepareContext& context)
 					data[ndx] = rng.getUint8();
 			}
 
-			vk::flushMappedMemoryRange(vkd, device, *memory, 0, VK_WHOLE_SIZE);
+			vk::flushMappedMemoryRange(vkd, device, *memory, 0, 4 * m_imageWidth * m_imageHeight);
 			vkd.unmapMemory(device, *memory);
 		}
 
@@ -3575,7 +3575,7 @@ void ImageCopyToImage::verify (VerifyContext& context, size_t commandIndex)
 	{
 		void* const	ptr		= mapMemory(vkd, device, *memory, 4 * m_imageWidth * m_imageHeight);
 
-		vk::invalidateMappedMemoryRange(vkd, device, *memory, 0, VK_WHOLE_SIZE);
+		vk::invalidateMappedMemoryRange(vkd, device, *memory, 0,  4 * m_imageWidth * m_imageHeight);
 
 		{
 			const deUint8* const			data		= (const deUint8*)ptr;
@@ -3764,7 +3764,7 @@ void ImageBlitFromImage::prepare (PrepareContext& context)
 					data[ndx] = rng.getUint8();
 			}
 
-			vk::flushMappedMemoryRange(vkd, device, *memory, 0, VK_WHOLE_SIZE);
+			vk::flushMappedMemoryRange(vkd, device, *memory, 0, 4 * m_srcImageWidth * m_srcImageHeight);
 			vkd.unmapMemory(device, *memory);
 		}
 
@@ -4119,7 +4119,7 @@ void ImageBlitToImage::verify (VerifyContext& context, size_t commandIndex)
 	{
 		void* const	ptr		= mapMemory(vkd, device, *memory, 4 * m_dstImageWidth * m_dstImageHeight);
 
-		vk::invalidateMappedMemoryRange(vkd, device, *memory, 0, VK_WHOLE_SIZE);
+		vk::invalidateMappedMemoryRange(vkd, device, *memory, 0,  4 * m_dstImageWidth * m_dstImageHeight);
 
 		if (m_scale == BLIT_SCALE_10)
 		{
@@ -4515,7 +4515,7 @@ void SubmitRenderPass::verify (VerifyContext& context, size_t commandIndex)
 		{
 			void* const	ptr		= mapMemory(vkd, device, *memory, 4 * m_targetWidth * m_targetHeight);
 
-			vk::invalidateMappedMemoryRange(vkd, device, *memory, 0, VK_WHOLE_SIZE);
+			vk::invalidateMappedMemoryRange(vkd, device, *memory, 0,  4 * m_targetWidth * m_targetHeight);
 
 			{
 				const deUint8* const			data		= (const deUint8*)ptr;
@@ -4901,10 +4901,6 @@ public:
 	void							submit						(SubmitContext& context);
 	void							verify						(VerifyRenderPassContext&, size_t);
 
-protected:
-
-	deUint32						calculateBufferPartSize		(size_t descriptorSetNdx) const;
-
 private:
 	PipelineResources				m_resources;
 	vk::Move<vk::VkDescriptorPool>	m_descriptorPool;
@@ -4937,9 +4933,7 @@ void RenderVertexUniformBuffer::prepare (PrepareRenderPassContext& context)
 	const vk::Unique<vk::VkShaderModule>		fragmentShaderModule	(vk::createShaderModule(vkd, device, context.getBinaryCollection().get("render-white.frag"), 0));
 	vector<vk::VkDescriptorSetLayoutBinding>	bindings;
 
-	// make sure buffer size is multiple of 16 (in glsl we use uvec4 to store 16 values)
 	m_bufferSize = context.getBufferSize();
-	m_bufferSize = static_cast<vk::VkDeviceSize>(m_bufferSize / 16u) * 16u;
 
 	{
 		const vk::VkDescriptorSetLayoutBinding binding =
@@ -4999,7 +4993,9 @@ void RenderVertexUniformBuffer::prepare (PrepareRenderPassContext& context)
 			{
 				context.getBuffer(),
 				(vk::VkDeviceSize)(descriptorSetNdx * (size_t)MAX_UNIFORM_BUFFER_SIZE),
-				calculateBufferPartSize(descriptorSetNdx)
+				m_bufferSize < (descriptorSetNdx + 1) * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+					? m_bufferSize - descriptorSetNdx * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+					: (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
 			};
 			const vk::VkWriteDescriptorSet			write		=
 			{
@@ -5029,7 +5025,9 @@ void RenderVertexUniformBuffer::submit (SubmitContext& context)
 
 	for (size_t descriptorSetNdx = 0; descriptorSetNdx < m_descriptorSets.size(); descriptorSetNdx++)
 	{
-		const size_t	size	= calculateBufferPartSize(descriptorSetNdx);
+		const size_t	size	= (size_t)(m_bufferSize < (descriptorSetNdx + 1) * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+								? m_bufferSize - descriptorSetNdx * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+								: (size_t)MAX_UNIFORM_BUFFER_SIZE);
 		const deUint32	count	= (deUint32)(size / 2);
 
 		vkd.cmdBindDescriptorSets(commandBuffer, vk::VK_PIPELINE_BIND_POINT_GRAPHICS, *m_resources.pipelineLayout, 0u, 1u, &m_descriptorSets[descriptorSetNdx], 0u, DE_NULL);
@@ -5042,7 +5040,9 @@ void RenderVertexUniformBuffer::verify (VerifyRenderPassContext& context, size_t
 	for (size_t descriptorSetNdx = 0; descriptorSetNdx < m_descriptorSets.size(); descriptorSetNdx++)
 	{
 		const size_t	offset	= descriptorSetNdx * MAX_UNIFORM_BUFFER_SIZE;
-		const size_t	size	= calculateBufferPartSize(descriptorSetNdx);
+		const size_t	size	= (size_t)(m_bufferSize < (descriptorSetNdx + 1) * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+								? m_bufferSize - descriptorSetNdx * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+								: (size_t)MAX_UNIFORM_BUFFER_SIZE);
 		const size_t	count	= size / 2;
 
 		for (size_t pos = 0; pos < count; pos++)
@@ -5053,14 +5053,6 @@ void RenderVertexUniformBuffer::verify (VerifyRenderPassContext& context, size_t
 			context.getReferenceTarget().getAccess().setPixel(Vec4(1.0f, 1.0f, 1.0f, 1.0f), x, y);
 		}
 	}
-}
-
-deUint32 RenderVertexUniformBuffer::calculateBufferPartSize(size_t descriptorSetNdx) const
-{
-	deUint32 size = static_cast<deUint32>(m_bufferSize) - static_cast<deUint32>(descriptorSetNdx) * MAX_UNIFORM_BUFFER_SIZE;
-	if (size < MAX_UNIFORM_BUFFER_SIZE)
-		return size;
-	return MAX_UNIFORM_BUFFER_SIZE;
 }
 
 class RenderVertexUniformTexelBuffer : public RenderPassCommand
@@ -5993,10 +5985,6 @@ public:
 	void							submit							(SubmitContext& context);
 	void							verify							(VerifyRenderPassContext&, size_t);
 
-protected:
-
-	deUint32						calculateBufferPartSize			(size_t descriptorSetNdx) const;
-
 private:
 	PipelineResources				m_resources;
 	vk::Move<vk::VkDescriptorPool>	m_descriptorPool;
@@ -6005,7 +5993,6 @@ private:
 	vk::VkDeviceSize				m_bufferSize;
 	size_t							m_targetWidth;
 	size_t							m_targetHeight;
-	deUint32						m_valuesPerPixel;
 };
 
 RenderFragmentUniformBuffer::~RenderFragmentUniformBuffer (void)
@@ -6032,9 +6019,7 @@ void RenderFragmentUniformBuffer::prepare (PrepareRenderPassContext& context)
 	const vk::Unique<vk::VkShaderModule>		fragmentShaderModule	(vk::createShaderModule(vkd, device, context.getBinaryCollection().get("uniform-buffer.frag"), 0));
 	vector<vk::VkDescriptorSetLayoutBinding>	bindings;
 
-	// make sure buffer is smaller then MAX_SIZE and is multiple of 16 (in glsl we use uvec4 to store 16 values)
 	m_bufferSize	= de::min(context.getBufferSize(), (vk::VkDeviceSize)MAX_SIZE);
-	m_bufferSize	= static_cast<vk::VkDeviceSize>(m_bufferSize / 16u) * 16u;
 	m_targetWidth	= context.getTargetWidth();
 	m_targetHeight	= context.getTargetHeight();
 
@@ -6054,7 +6039,7 @@ void RenderFragmentUniformBuffer::prepare (PrepareRenderPassContext& context)
 	{
 		vk::VK_SHADER_STAGE_FRAGMENT_BIT,
 		0u,
-		12u
+		8u
 	};
 
 	createPipelineWithResources(vkd, device, renderPass, subpass, *vertexShaderModule, *fragmentShaderModule, context.getTargetWidth(), context.getTargetHeight(),
@@ -6080,8 +6065,6 @@ void RenderFragmentUniformBuffer::prepare (PrepareRenderPassContext& context)
 
 		m_descriptorPool = vk::createDescriptorPool(vkd, device, &createInfo);
 		m_descriptorSets.resize(descriptorCount);
-
-		m_valuesPerPixel = (deUint32)divRoundUp<size_t>(descriptorCount * de::min<size_t>((size_t)m_bufferSize / 4, MAX_UNIFORM_BUFFER_SIZE / 4), m_targetWidth * m_targetHeight);
 	}
 
 	for (size_t descriptorSetNdx = 0; descriptorSetNdx < m_descriptorSets.size(); descriptorSetNdx++)
@@ -6104,7 +6087,9 @@ void RenderFragmentUniformBuffer::prepare (PrepareRenderPassContext& context)
 			{
 				context.getBuffer(),
 				(vk::VkDeviceSize)(descriptorSetNdx * (size_t)MAX_UNIFORM_BUFFER_SIZE),
-				calculateBufferPartSize(descriptorSetNdx)
+				m_bufferSize < (descriptorSetNdx + 1) * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+					? m_bufferSize - descriptorSetNdx * (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
+					: (vk::VkDeviceSize)MAX_UNIFORM_BUFFER_SIZE
 			};
 			const vk::VkWriteDescriptorSet			write		=
 			{
@@ -6138,12 +6123,10 @@ void RenderFragmentUniformBuffer::submit (SubmitContext& context)
 		{
 			const deUint32	callId;
 			const deUint32	valuesPerPixel;
-			const deUint32	bufferSize;
 		} callParams =
 		{
 			(deUint32)descriptorSetNdx,
-			m_valuesPerPixel,
-			calculateBufferPartSize(descriptorSetNdx) / 16u
+			(deUint32)divRoundUp<size_t>(m_descriptorSets.size() * (MAX_UNIFORM_BUFFER_SIZE / 4), m_targetWidth * m_targetHeight)
 		};
 
 		vkd.cmdBindDescriptorSets(commandBuffer, vk::VK_PIPELINE_BIND_POINT_GRAPHICS, *m_resources.pipelineLayout, 0u, 1u, &m_descriptorSets[descriptorSetNdx], 0u, DE_NULL);
@@ -6154,34 +6137,35 @@ void RenderFragmentUniformBuffer::submit (SubmitContext& context)
 
 void RenderFragmentUniformBuffer::verify (VerifyRenderPassContext& context, size_t)
 {
-	const size_t	arrayIntSize	= MAX_UNIFORM_BUFFER_SIZE / sizeof(deUint32);
+	const deUint32	valuesPerPixel	= (deUint32)divRoundUp<size_t>(m_descriptorSets.size() * (MAX_UNIFORM_BUFFER_SIZE / 4), m_targetWidth * m_targetHeight);
+	const size_t	arraySize		= MAX_UNIFORM_BUFFER_SIZE / (sizeof(deUint32) * 4);
+	const size_t	arrayIntSize	= arraySize * 4;
 
 	for (int y = 0; y < context.getReferenceTarget().getSize().y(); y++)
 	for (int x = 0; x < context.getReferenceTarget().getSize().x(); x++)
 	{
-		const deUint32	id						= (deUint32)y * 256u + (deUint32)x;
-		const size_t	firstDescriptorSetNdx	= de::min<size_t>(id / (arrayIntSize / m_valuesPerPixel), m_descriptorSets.size() - 1);
+		const size_t firstDescriptorSetNdx = de::min<size_t>((y * 256u + x) / (arrayIntSize / valuesPerPixel), m_descriptorSets.size() - 1);
 
 		for (size_t descriptorSetNdx = firstDescriptorSetNdx; descriptorSetNdx < m_descriptorSets.size(); descriptorSetNdx++)
 		{
 			const size_t	offset	= descriptorSetNdx * MAX_UNIFORM_BUFFER_SIZE;
 			const deUint32	callId	= (deUint32)descriptorSetNdx;
-			const deUint32	count	= calculateBufferPartSize(descriptorSetNdx) / 16u;
 
-			if (id < callId * (arrayIntSize / m_valuesPerPixel))
+			const deUint32	id		= callId * ((deUint32)arrayIntSize / valuesPerPixel) + (deUint32)y * 256u + (deUint32)x;
+
+			if (y * 256u + x < callId * (arrayIntSize / valuesPerPixel))
 				continue;
 			else
 			{
 				deUint32 value = id;
 
-				for (deUint32 i = 0; i < m_valuesPerPixel; i++)
+				for (deUint32 i = 0; i < valuesPerPixel; i++)
 				{
-					// in shader UBO has up to 64 items of uvec4, each uvec4 contains 16 values
-					size_t index = offset + size_t((value % count) * 16u) + size_t((value % 4u) * 4u);
-					value	= (((deUint32)context.getReference().get(index + 0)))
-							| (((deUint32)context.getReference().get(index + 1)) << 8u)
-							| (((deUint32)context.getReference().get(index + 2)) << 16u)
-							| (((deUint32)context.getReference().get(index + 3)) << 24u);
+					value	= ((deUint32)context.getReference().get(offset + (value % (MAX_UNIFORM_BUFFER_SIZE / sizeof(deUint32))) * 4 + 0))
+							| (((deUint32)context.getReference().get(offset + (value % (MAX_UNIFORM_BUFFER_SIZE / sizeof(deUint32))) * 4 + 1)) << 8u)
+							| (((deUint32)context.getReference().get(offset + (value % (MAX_UNIFORM_BUFFER_SIZE / sizeof(deUint32))) * 4 + 2)) << 16u)
+							| (((deUint32)context.getReference().get(offset + (value % (MAX_UNIFORM_BUFFER_SIZE / sizeof(deUint32))) * 4 + 3)) << 24u);
+
 				}
 				const UVec4	vec	((value >>  0u) & 0xFFu,
 								 (value >>  8u) & 0xFFu,
@@ -6192,14 +6176,6 @@ void RenderFragmentUniformBuffer::verify (VerifyRenderPassContext& context, size
 			}
 		}
 	}
-}
-
-deUint32 RenderFragmentUniformBuffer::calculateBufferPartSize(size_t descriptorSetNdx) const
-{
-	deUint32 size = static_cast<deUint32>(m_bufferSize) - static_cast<deUint32>(descriptorSetNdx) * MAX_UNIFORM_BUFFER_SIZE;
-	if (size < MAX_UNIFORM_BUFFER_SIZE)
-		return size;
-	return MAX_UNIFORM_BUFFER_SIZE;
 }
 
 class RenderFragmentStorageBuffer : public RenderPassCommand
@@ -6249,9 +6225,7 @@ void RenderFragmentStorageBuffer::prepare (PrepareRenderPassContext& context)
 	const vk::Unique<vk::VkShaderModule>		fragmentShaderModule	(vk::createShaderModule(vkd, device, context.getBinaryCollection().get("storage-buffer.frag"), 0));
 	vector<vk::VkDescriptorSetLayoutBinding>	bindings;
 
-	// make sure buffer size is multiple of 16 (in glsl we use uvec4 to store 16 values)
 	m_bufferSize	= context.getBufferSize();
-	m_bufferSize	= static_cast<vk::VkDeviceSize>(m_bufferSize / 16u) * 16u;
 	m_targetWidth	= context.getTargetWidth();
 	m_targetHeight	= context.getTargetHeight();
 
@@ -6609,7 +6583,7 @@ void RenderFragmentUniformTexelBuffer::verify (VerifyRenderPassContext& context,
 
 				for (deUint32 i = 0; i < valuesPerPixel; i++)
 				{
-					value	=  ((deUint32)context.getReference().get(offset + (value % count) * 4 + 0))
+					value	= ((deUint32)context.getReference().get( offset + (value % count) * 4 + 0))
 							| (((deUint32)context.getReference().get(offset + (value % count) * 4 + 1)) << 8u)
 							| (((deUint32)context.getReference().get(offset + (value % count) * 4 + 2)) << 16u)
 							| (((deUint32)context.getReference().get(offset + (value % count) * 4 + 3)) << 24u);
@@ -9698,16 +9672,15 @@ struct AddPrograms
 					"{\n"
 					"\tuint callId;\n"
 					"\tuint valuesPerPixel;\n"
-					"\tuint bufferSize;\n"
 					"} pushC;\n"
 					"void main (void) {\n"
-					"\thighp uint id = uint(gl_FragCoord.y) * 256u + uint(gl_FragCoord.x);\n"
+					"\thighp uint id = pushC.callId * (" << arrayIntSize << "u / pushC.valuesPerPixel) + uint(gl_FragCoord.y) * 256u + uint(gl_FragCoord.x);\n"
 					"\tif (uint(gl_FragCoord.y) * 256u + uint(gl_FragCoord.x) < pushC.callId * (" << arrayIntSize  << "u / pushC.valuesPerPixel))\n"
 					"\t\tdiscard;\n"
 					"\thighp uint value = id;\n"
 					"\tfor (uint i = 0u; i < pushC.valuesPerPixel; i++)\n"
 					"\t{\n"
-					"\t\thighp uvec4 vecVal = block.values[value % pushC.bufferSize];\n"
+					"\t\thighp uvec4 vecVal = block.values[(value / 4u) % " << arraySize << "u];\n"
 					"\t\tif ((value % 4u) == 0u)\n"
 					"\t\t\tvalue = vecVal.x;\n"
 					"\t\telse if ((value % 4u) == 1u)\n"

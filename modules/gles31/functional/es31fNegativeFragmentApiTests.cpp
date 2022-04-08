@@ -157,18 +157,11 @@ void blend_equation_separate (NegativeTestContext& ctx)
 	ctx.endSection();
 }
 
-static bool checkSupport(NegativeTestContext& ctx)
-{
-	return contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2)) ||
-		   contextSupports(ctx.getRenderContext().getType(), glu::ApiType::core(4, 5)) ||
-		   ctx.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed");
-}
-
 void blend_equationi (NegativeTestContext& ctx)
 {
 	glw::GLint maxDrawBuffers = -1;
 
-	if (!checkSupport(ctx))
+	if (!contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2)) && !ctx.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
 		throw tcu::NotSupportedError("GL_EXT_draw_buffers_indexed is not supported", DE_NULL, __FILE__, __LINE__);
 
 	ctx.glGetIntegerv(GL_MAX_DRAW_BUFFERS, &maxDrawBuffers);
@@ -188,7 +181,7 @@ void blend_equation_separatei (NegativeTestContext& ctx)
 {
 	glw::GLint maxDrawBuffers = -1;
 
-	if (!checkSupport(ctx))
+	if (!contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2)) && !ctx.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
 		throw tcu::NotSupportedError("GL_EXT_draw_buffers_indexed is not supported", DE_NULL, __FILE__, __LINE__);
 
 	ctx.glGetIntegerv(GL_MAX_DRAW_BUFFERS, &maxDrawBuffers);
@@ -236,7 +229,7 @@ void blend_funci (NegativeTestContext& ctx)
 {
 	glw::GLint maxDrawBuffers = -1;
 
-	if (!checkSupport(ctx))
+	if (!contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2)) && !ctx.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
 		throw tcu::NotSupportedError("GL_EXT_draw_buffers_indexed is not supported", DE_NULL, __FILE__, __LINE__);
 
 	ctx.glGetIntegerv(GL_MAX_DRAW_BUFFERS, &maxDrawBuffers);
@@ -258,7 +251,7 @@ void blend_func_separatei (NegativeTestContext& ctx)
 {
 	glw::GLint maxDrawBuffers = -1;
 
-	if (!checkSupport(ctx))
+	if (!glu::contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2)) && !ctx.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
 		throw tcu::NotSupportedError("GL_EXT_draw_buffers_indexed is not supported", DE_NULL, __FILE__, __LINE__);
 
 	ctx.glGetIntegerv(GL_MAX_DRAW_BUFFERS, &maxDrawBuffers);

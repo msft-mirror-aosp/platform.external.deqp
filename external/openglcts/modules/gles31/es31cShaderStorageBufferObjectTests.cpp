@@ -21,7 +21,6 @@
  * \brief
  */ /*-------------------------------------------------------------------*/
 
-#include "deInt32.h"
 #include "es31cShaderStorageBufferObjectTests.hpp"
 #include "glwEnums.hpp"
 #include "tcuMatrix.hpp"
@@ -734,9 +733,6 @@ class BasicBinding : public ShaderStorageBufferObjectBase
 		GLint maxShaderStorageBufferBindings = 0;
 		glGetIntegerv(GL_MAX_SHADER_STORAGE_BUFFER_BINDINGS, &maxShaderStorageBufferBindings);
 
-		GLint alignment;
-		glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &alignment);
-
 		// check default state
 		if (!Check(GL_SHADER_STORAGE_BUFFER_BINDING, 0))
 			return ERROR;
@@ -776,21 +772,20 @@ class BasicBinding : public ShaderStorageBufferObjectBase
 				return ERROR;
 		}
 
-		GLint offset = deRoundUp32(256, alignment);
 		for (GLint i = 0; i < maxShaderStorageBufferBindings; ++i)
 		{
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, i, m_buffer[0], offset, 512);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, i, m_buffer[0], 256, 512);
 
 			if (!Check(GL_SHADER_STORAGE_BUFFER_BINDING, m_buffer[0]))
 				return ERROR;
 			if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_BINDING, i, m_buffer[0]))
 				return ERROR;
-			if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_START, i, offset))
+			if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_START, i, 256))
 				return ERROR;
 			if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_SIZE, i, 512))
 				return ERROR;
 
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, i, 0, offset*2, 128);
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, i, 0, 512, 128);
 
 			if (!Check(GL_SHADER_STORAGE_BUFFER_BINDING, 0))
 				return ERROR;
@@ -833,12 +828,12 @@ class BasicBinding : public ShaderStorageBufferObjectBase
 		if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_SIZE, 5, 0))
 			return ERROR;
 
-		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 7, m_buffer[1], offset * 8, 1000);
+		glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 7, m_buffer[1], 2048, 1000);
 		if (!Check(GL_SHADER_STORAGE_BUFFER_BINDING, m_buffer[1]))
 			return ERROR;
 		if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_BINDING, 7, m_buffer[1]))
 			return ERROR;
-		if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_START, 7, offset * 8))
+		if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_START, 7, 2048))
 			return ERROR;
 		if (!CheckIndexed(GL_SHADER_STORAGE_BUFFER_SIZE, 7, 1000))
 			return ERROR;
@@ -5102,22 +5097,18 @@ class AdvancedSwitchBuffersVS : public ShaderStorageBufferObjectBase
 			glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(data), data, GL_STATIC_DRAW);
 		}
 
-		GLint alignment;
-		glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &alignment);
-		GLint offset = deRoundUp32(sizeof(float) * 32, alignment);
-
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_storage_buffer[4]);
-		glBufferData(GL_SHADER_STORAGE_BUFFER, offset * 4, NULL, GL_STATIC_DRAW);
+		glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(float) * 32 * 4, NULL, GL_STATIC_DRAW);
 
 		glBindBuffer(GL_COPY_READ_BUFFER, m_storage_buffer[0]);
 		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 0, sizeof(float) * 32);
 		glBindBuffer(GL_COPY_READ_BUFFER, m_storage_buffer[1]);
-		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, offset, sizeof(float) * 32);
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, sizeof(float) * 32, sizeof(float) * 32);
 		glBindBuffer(GL_COPY_READ_BUFFER, m_storage_buffer[2]);
-		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 2 * offset,
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 2 * sizeof(float) * 32,
 							sizeof(float) * 32);
 		glBindBuffer(GL_COPY_READ_BUFFER, m_storage_buffer[3]);
-		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 3 * offset,
+		glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_SHADER_STORAGE_BUFFER, 0, 3 * sizeof(float) * 32,
 							sizeof(float) * 32);
 
 		glBindTexture(GL_TEXTURE_2D, m_rt);
@@ -5148,7 +5139,7 @@ class AdvancedSwitchBuffersVS : public ShaderStorageBufferObjectBase
 		glClear(GL_COLOR_BUFFER_BIT);
 		for (int i = 0; i < 4; ++i)
 		{
-			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, m_storage_buffer[4], i * offset,
+			glBindBufferRange(GL_SHADER_STORAGE_BUFFER, 0, m_storage_buffer[4], i * sizeof(float) * 32,
 							  sizeof(float) * 32);
 			glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, 1);
 		}
@@ -5215,7 +5206,7 @@ class AdvancedSwitchBuffersCS : public ShaderStorageBufferObjectBase
 
 		GLint alignment;
 		glGetIntegerv(GL_SHADER_STORAGE_BUFFER_OFFSET_ALIGNMENT, &alignment);
-		GLint offset = deRoundUp32(sizeof(data0), alignment);
+		GLint offset = static_cast<GLint>(sizeof(data0) > (GLuint)alignment ? sizeof(data0) : alignment);
 		glBindBuffer(GL_SHADER_STORAGE_BUFFER, m_storage_buffer[4]);
 		glBufferData(GL_SHADER_STORAGE_BUFFER, offset * 4, NULL, GL_STATIC_DRAW);
 

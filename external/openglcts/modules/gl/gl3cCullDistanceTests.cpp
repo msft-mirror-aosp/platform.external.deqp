@@ -508,15 +508,12 @@ tcu::TestNode::IterateResult CullDistance::APICoverageTest::iterate()
 		GLU_EXPECT_NO_ERROR(gl.getError(), "glTexStorage2D() call failed.");
 	}
 
-	if (glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 3)) ||
-	    m_context.getContextInfo().isExtensionSupported("GL_ARB_compute_shader")) {
-		gl.bindImageTexture(0,			   /* unit */
-				    m_cs_to_id, 0, /* level */
-				    GL_FALSE,	  /* layered */
-				    0,			   /* layer */
-				    GL_WRITE_ONLY, GL_R32I);
-                GLU_EXPECT_NO_ERROR(gl.getError(), "glBindImageTexture() call failed.");
-	}
+	gl.bindImageTexture(0,			   /* unit */
+						m_cs_to_id, 0, /* level */
+						GL_FALSE,	  /* layered */
+						0,			   /* layer */
+						GL_WRITE_ONLY, GL_R32I);
+	GLU_EXPECT_NO_ERROR(gl.getError(), "glBindImageTexture() call failed.");
 
 	gl.bindFramebuffer(GL_DRAW_FRAMEBUFFER, m_fbo_draw_id);
 	GLU_EXPECT_NO_ERROR(gl.getError(), "glBindFramebuffer() call failed.");
@@ -746,10 +743,9 @@ tcu::TestNode::IterateResult CullDistance::APICoverageTest::iterate()
 			std::string gs_body = gs_body_template;
 
 			static const glw::GLchar* tc_body_template =
-				"#version 150\n"
+				"#version 400\n"
 				"\n"
 				"#extension GL_ARB_cull_distance : require\n"
-				"#extension GL_ARB_tessellation_shader : require\n"
 				"\n"
 				"layout(vertices = 1) out;\n"
 				"\n"
@@ -772,10 +768,9 @@ tcu::TestNode::IterateResult CullDistance::APICoverageTest::iterate()
 			std::string tc_body = tc_body_template;
 
 			static const glw::GLchar* te_body_template =
-				"#version 150\n"
+				"#version 400\n"
 				"\n"
 				"#extension GL_ARB_cull_distance : require\n"
-				"#extension GL_ARB_tessellation_shader : require\n"
 				"\n"
 				"flat in  int INPUT_TE_NAME[];\n"
 				"flat out int out_te;\n"
@@ -1143,10 +1138,9 @@ void CullDistance::FunctionalTest::buildPO(glw::GLuint clipdistances_array_size,
 
 	static const glw::GLchar* core_functionality = "#version 450\n";
 
-	static const glw::GLchar* extention_functionality = "#version 150\n"
+	static const glw::GLchar* extention_functionality = "#version 440\n"
 														"\n"
 														"#extension GL_ARB_cull_distance : require\n"
-														"TEMPLATE_EXTENSIONS\n"
 														"\n"
 														"#ifndef GL_ARB_cull_distance\n"
 														"    #error GL_ARB_cull_distance is undefined\n"
@@ -1473,10 +1467,6 @@ void CullDistance::FunctionalTest::buildPO(glw::GLuint clipdistances_array_size,
 					TCU_FAIL("Unknown primitive mode");
 				}
 
-				CullDistance::Utilities::replaceAll(
-						shader_source,
-						std::string("TEMPLATE_EXTENSIONS"),
-						std::string("#extension GL_ARB_tessellation_shader: require"));
 				break;
 			}
 
@@ -1542,10 +1532,6 @@ void CullDistance::FunctionalTest::buildPO(glw::GLuint clipdistances_array_size,
 					TCU_FAIL("Unknown primitive mode");
 				}
 
-				CullDistance::Utilities::replaceAll(
-						shader_source,
-						std::string("TEMPLATE_EXTENSIONS"),
-						std::string("#extension GL_ARB_tessellation_shader: require"));
 				break;
 			}
 
@@ -1572,12 +1558,6 @@ void CullDistance::FunctionalTest::buildPO(glw::GLuint clipdistances_array_size,
 			default:
 				TCU_FAIL("Unknown shader type");
 			}
-
-			/* Clear out in case no specific exts were needed */
-			CullDistance::Utilities::replaceAll(
-					shader_source,
-					std::string("TEMPLATE_EXTENSIONS"),
-					std::string(""));
 
 			/* Adjust clipdistances declaration */
 			if (redeclare_clipdistances && clipdistances_array_size > 0)

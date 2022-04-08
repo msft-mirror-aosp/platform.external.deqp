@@ -706,7 +706,7 @@ void uploadImage (ProtectedContext& ctx, vk::VkImage image, const tcu::Texture2D
 
 		tcu::copy(destAccess, access);
 
-		flushAlloc(vk, device, stagingBuffer->getAllocation());
+		vk::flushMappedMemoryRange(vk, device, stagingBuffer->getAllocation().getMemory(), stagingBuffer->getAllocation().getOffset(), stagingBufferSize);
 	}
 
 	const vk::VkImageSubresourceRange	subresourceRange	=

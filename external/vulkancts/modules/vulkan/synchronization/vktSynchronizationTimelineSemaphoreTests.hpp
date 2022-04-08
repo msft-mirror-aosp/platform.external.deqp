@@ -23,6 +23,7 @@
  * \brief Synchronization timeline semaphore tests
  *//*--------------------------------------------------------------------*/
 
+#include "tcuDefs.hpp"
 #include "tcuTestCase.hpp"
 
 namespace vkt
@@ -30,8 +31,7 @@ namespace vkt
 namespace synchronization
 {
 
-tcu::TestCaseGroup*		createTimelineSemaphoreTests					(tcu::TestContext& testCtx);
-tcu::TestCaseGroup*		createSynchronization2TimelineSemaphoreTests	(tcu::TestContext& testCtx);
+tcu::TestCaseGroup*		createTimelineSemaphoreTests	(tcu::TestContext& testCtx);
 
 } //synchronization
 } // vkt

@@ -88,11 +88,11 @@ vector<const char*> getValidationLayers (const vk::InstanceInterface& vki, vk::V
 	return getValidationLayers(enumerateDeviceLayerProperties(vki, physicalDevice));
 }
 
-CustomInstance::CustomInstance (Context& context, Move<VkInstance> instance, bool enableDebugReportRecorder, bool printValidationErrors)
+CustomInstance::CustomInstance (Context& context, Move<VkInstance> instance, bool enableDebugReportRecorder)
 	: m_context		(&context)
 	, m_instance	(instance)
 	, m_driver		(new InstanceDriver(context.getPlatformInterface(), *m_instance))
-	, m_recorder	(enableDebugReportRecorder ? (new DebugReportRecorder(*m_driver, *m_instance, printValidationErrors)) : nullptr)
+	, m_recorder	(enableDebugReportRecorder ? (new DebugReportRecorder(*m_driver, *m_instance)) : nullptr)
 {
 }
 
@@ -156,12 +156,12 @@ UncheckedInstance::UncheckedInstance ()
 {
 }
 
-UncheckedInstance::UncheckedInstance (Context& context, vk::VkInstance instance, const vk::VkAllocationCallbacks* pAllocator, bool enableDebugReportRecorder, bool printValidationErrors)
+UncheckedInstance::UncheckedInstance (Context& context, vk::VkInstance instance, const vk::VkAllocationCallbacks* pAllocator, bool enableDebugReportRecorder)
 	: m_context		(&context)
 	, m_allocator	(pAllocator)
 	, m_instance	(instance)
 	, m_driver		((m_instance != DE_NULL) ? new InstanceDriver(context.getPlatformInterface(), m_instance) : nullptr)
-	, m_recorder	((enableDebugReportRecorder && m_instance != DE_NULL) ? (new DebugReportRecorder(*m_driver, m_instance, printValidationErrors)) : nullptr)
+	, m_recorder	((enableDebugReportRecorder && m_instance != DE_NULL) ? (new DebugReportRecorder(*m_driver, m_instance)) : nullptr)
 {
 }
 
@@ -213,9 +213,7 @@ CustomInstance createCustomInstanceWithExtensions (Context& context, const std::
 {
 	vector<const char*>	enabledLayers;
 	vector<string>		enabledLayersStr;
-	const auto&			cmdLine					= context.getTestContext().getCommandLine();
-	const bool			validationEnabled		= (cmdLine.isValidationEnabled() && allowLayers);
-	const bool			printValidationErrors	= cmdLine.printValidationErrors();
+	const bool			validationEnabled = (context.getTestContext().getCommandLine().isValidationEnabled() && allowLayers);
 
 	if (validationEnabled)
 	{
@@ -243,7 +241,7 @@ CustomInstance createCustomInstanceWithExtensions (Context& context, const std::
 	}
 
 	Move<VkInstance> instance = vk::createDefaultInstance(vkp, apiVersion, enabledLayersStr, extensionPtrs, pAllocator);
-	return CustomInstance(context, instance, validationEnabled, printValidationErrors);
+	return CustomInstance(context, instance, validationEnabled);
 }
 
 CustomInstance createCustomInstanceWithExtension (Context& context, const std::string& extension, const vk::VkAllocationCallbacks* pAllocator, bool allowLayers)
@@ -283,11 +281,9 @@ CustomInstance createCustomInstanceFromInfo (Context& context, const vk::VkInsta
 {
 	vector<const char*>				enabledLayers;
 	vector<const char*>				enabledExtensions;
-	vk::VkInstanceCreateInfo		createInfo				= *instanceCreateInfo;
-	const auto&						cmdLine					= context.getTestContext().getCommandLine();
-	const bool						validationEnabled		= cmdLine.isValidationEnabled();
-	const bool						printValidationErrors	= cmdLine.printValidationErrors();
-	const vk::PlatformInterface&	vkp						= context.getPlatformInterface();
+	vk::VkInstanceCreateInfo		createInfo			= *instanceCreateInfo;
+	const bool						validationEnabled	= context.getTestContext().getCommandLine().isValidationEnabled();
+	const vk::PlatformInterface&	vkp					= context.getPlatformInterface();
 
 	if (validationEnabled && allowLayers)
 	{
@@ -305,19 +301,17 @@ CustomInstance createCustomInstanceFromInfo (Context& context, const vk::VkInsta
 		createInfo.ppEnabledExtensionNames = enabledExtensions.data();
 	}
 
-	return CustomInstance(context, vk::createInstance(vkp, &createInfo, pAllocator), validationEnabled, printValidationErrors);
+	return CustomInstance(context, vk::createInstance(vkp, &createInfo, pAllocator), validationEnabled);
 }
 
 vk::VkResult createUncheckedInstance (Context& context, const vk::VkInstanceCreateInfo* instanceCreateInfo, const vk::VkAllocationCallbacks* pAllocator, UncheckedInstance* instance, bool allowLayers)
 {
 	vector<const char*>				enabledLayers;
 	vector<const char*>				enabledExtensions;
-	vk::VkInstanceCreateInfo		createInfo				= *instanceCreateInfo;
-	const auto&						cmdLine					= context.getTestContext().getCommandLine();
-	const bool						validationEnabled		= cmdLine.isValidationEnabled();
-	const bool						printValidationErrors	= cmdLine.printValidationErrors();
-	const vk::PlatformInterface&	vkp						= context.getPlatformInterface();
-	const bool						addLayers				= (validationEnabled && allowLayers);
+	vk::VkInstanceCreateInfo		createInfo			= *instanceCreateInfo;
+	const bool						validationEnabled	= context.getTestContext().getCommandLine().isValidationEnabled();
+	const vk::PlatformInterface&	vkp					= context.getPlatformInterface();
+	const bool						addLayers			= (validationEnabled && allowLayers);
 
 	if (addLayers)
 	{
@@ -337,9 +331,7 @@ vk::VkResult createUncheckedInstance (Context& context, const vk::VkInstanceCrea
 
 	vk::VkInstance	raw_instance = DE_NULL;
 	vk::VkResult	result = vkp.createInstance(&createInfo, pAllocator, &raw_instance);
-
-	*instance = UncheckedInstance(context, raw_instance, pAllocator, addLayers, printValidationErrors);
-
+	*instance = UncheckedInstance(context, raw_instance, pAllocator, addLayers);
 	return result;
 }
 

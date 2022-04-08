@@ -254,7 +254,7 @@ EGLDisplay getDisplay (NativeDisplay& nativeDisplay)
 				de::contains(platformExts.begin(), platformExts.end(), string(nativeDisplay.getPlatformExtensionName()));
 
 		}
-		catch (const tcu::NotSupportedError&)
+		catch (const tcu::NotSupportedError& error)
 		{
 			// If we can't get the client extension string we must not have EGL 1.5 support or the appropriate extensions.
 			maySupportPlatformGetDisplay = false;
@@ -332,7 +332,7 @@ EGLSurface createWindowSurface (NativeDisplay& nativeDisplay, NativeWindow& wind
 				de::contains(platformExts.begin(), platformExts.end(), string(nativeDisplay.getPlatformExtensionName()));
 
 		}
-		catch (const tcu::NotSupportedError&)
+		catch (const tcu::NotSupportedError& error)
 		{
 			maySupportPlatformCreate = false;
 			maySupportPlatformCreateExtension = false;
@@ -390,7 +390,7 @@ EGLSurface createPixmapSurface (NativeDisplay& nativeDisplay, NativePixmap& pixm
 				de::contains(platformExts.begin(), platformExts.end(), string(nativeDisplay.getPlatformExtensionName()));
 
 		}
-		catch (const tcu::NotSupportedError&)
+		catch (const tcu::NotSupportedError& error)
 		{
 			maySupportPlatformCreate = false;
 			maySupportPlatformCreateExtension = false;

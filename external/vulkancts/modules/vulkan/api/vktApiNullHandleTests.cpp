@@ -265,12 +265,6 @@ tcu::TestStatus test<VkDescriptorSet> (Context& context)
 	}
 }
 
-void checkEventSupport (Context& context)
-{
-	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") && !context.getPortabilitySubsetFeatures().events)
-		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: Events are not supported by this implementation");
-}
-
 void addTestsToGroup (tcu::TestCaseGroup* group)
 {
 	addFunctionCase(group,	"destroy_buffer",					"",		test<VkBuffer>);
@@ -279,7 +273,7 @@ void addTestsToGroup (tcu::TestCaseGroup* group)
 	addFunctionCase(group,	"destroy_descriptor_pool",			"",		test<VkDescriptorPool>);
 	addFunctionCase(group,	"destroy_descriptor_set_layout",	"",		test<VkDescriptorSetLayout>);
 	addFunctionCase(group,	"destroy_device",					"",		test<VkDevice>);
-	addFunctionCase(group,	"destroy_event",					"",		checkEventSupport, test<VkEvent>);
+	addFunctionCase(group,	"destroy_event",					"",		test<VkEvent>);
 	addFunctionCase(group,	"destroy_fence",					"",		test<VkFence>);
 	addFunctionCase(group,	"destroy_framebuffer",				"",		test<VkFramebuffer>);
 	addFunctionCase(group,	"destroy_image",					"",		test<VkImage>);

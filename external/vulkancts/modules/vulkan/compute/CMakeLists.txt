@@ -1,7 +1,4 @@
-include_directories(
-        ..
-        ../amber
-        )
+include_directories(..)
 
 set(DEQP_VK_COMPUTE_SRCS
 	vktComputeTests.cpp
@@ -16,10 +13,6 @@ set(DEQP_VK_COMPUTE_SRCS
 	vktComputeShaderBuiltinVarTests.hpp
 	vktComputeTestsUtil.cpp
 	vktComputeTestsUtil.hpp
-	vktComputeZeroInitializeWorkgroupMemoryTests.cpp
-	vktComputeZeroInitializeWorkgroupMemoryTests.hpp
-	vktComputeWorkgroupMemoryExplicitLayoutTests.cpp
-	vktComputeWorkgroupMemoryExplicitLayoutTests.hpp
 	)
 
 set(DEQP_VK_COMPUTE_LIBS

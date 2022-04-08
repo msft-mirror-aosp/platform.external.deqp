@@ -117,10 +117,8 @@ Move<VkImage> createSparseImageAndMemory (const DeviceInterface&				vk,
 		VK_IMAGE_LAYOUT_UNDEFINED
 	};
 
-	if (!checkSparseImageFormatSupport(physicalDevice, instance, imageCreateInfo))
-		TCU_THROW(NotSupportedError, "The image format does not support sparse operations");
+	Move<VkImage>			destImage			= createImage(vk, device, &imageCreateInfo);
 
-	Move<VkImage> destImage = createImage(vk, device, &imageCreateInfo);
 	allocateAndBindSparseImage(vk, device, physicalDevice, instance, imageCreateInfo, bindSemaphore, sparseQueue, allocator, allocations, mapVkFormat(format), *destImage);
 
 	return destImage;

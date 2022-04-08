@@ -25,7 +25,6 @@
 
 #include "tcuDefs.hpp"
 #include "tcuTestContext.hpp"
-#include "gluRenderContext.hpp"
 
 namespace glu
 {
@@ -46,7 +45,7 @@ namespace gles31
 class Context
 {
 public:
-									Context					(tcu::TestContext& testCtx, glu::ApiType apiType = glu::ApiType::es(3,2));
+									Context					(tcu::TestContext& testCtx);
 									~Context				(void);
 
 	tcu::TestContext&				getTestContext			(void)			{ return m_testCtx;			}
@@ -64,7 +63,6 @@ private:
 	tcu::TestContext&				m_testCtx;
 	glu::RenderContext*				m_renderCtx;
 	glu::ContextInfo*				m_contextInfo;
-	glu::ApiType					m_apiType;
 };
 
 } // gles31

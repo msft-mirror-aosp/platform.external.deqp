@@ -1353,18 +1353,15 @@ FboSRGBTestCase::~FboSRGBTestCase (void)
 
 void FboSRGBTestCase::init (void)
 {
-	if (glu::isContextTypeES(m_context.getRenderContext().getType()))
-	{
-		// extensions requirements for test
-		if (!glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2)))
-			TCU_THROW(NotSupportedError, "Test requires a context version equal or higher than 3.2");
+	// extensions requirements for test
+	if (!glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2)))
+		TCU_THROW(NotSupportedError, "Test requires a context version equal or higher than 3.2");
 
-		if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_sRGB_write_control"))
-			TCU_THROW(NotSupportedError, "Test requires extension GL_EXT_sRGB_write_control");
+	if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_sRGB_write_control"))
+		TCU_THROW(NotSupportedError, "Test requires extension GL_EXT_sRGB_write_control");
 
-		if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_sRGB_decode"))
-			TCU_THROW(NotSupportedError, "Test requires GL_EXT_texture_sRGB_decode extension");
-	}
+	if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_sRGB_decode"))
+		TCU_THROW(NotSupportedError, "Test requires GL_EXT_texture_sRGB_decode extension");
 }
 
 void FboSRGBTestCase::deinit (void)
@@ -1773,9 +1770,6 @@ FboSRGBUnsupportedEnumCase::~FboSRGBUnsupportedEnumCase (void)
 
 void FboSRGBUnsupportedEnumCase::init (void)
 {
-	if(!glu::isContextTypeES(m_context.getRenderContext().getType()))
-		TCU_THROW(NotSupportedError, "The test is not supported in a non-GLES context");
-
 	// extension requirements for test
 	if (m_context.getContextInfo().isExtensionSupported("GL_EXT_sRGB_write_control"))
 		TCU_THROW(NotSupportedError, "Test requires extension GL_EXT_sRGB_write_control to be unsupported");

@@ -182,13 +182,6 @@ struct BlendState
 	Maybe<BVec4>									colorMask;
 };
 
-static bool checkES32orGL45Support(Context& ctx)
-{
-	auto ctxType = ctx.getRenderContext().getType();
-	return contextSupports(ctxType, glu::ApiType::es(3, 2)) ||
-		   contextSupports(ctxType, glu::ApiType::core(4, 5));
-}
-
 void setCommonBlendState (const glw::Functions& gl, const BlendState& blend)
 {
 	if (blend.enableBlend)
@@ -1201,9 +1194,9 @@ DrawBuffersIndexedTest::DrawBuffersIndexedTest (Context&						context,
 
 void DrawBuffersIndexedTest::init (void)
 {
-	const bool supportsES32orGL45 = checkES32orGL45Support(m_context);
+	const bool supportsES32 = glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
-	if (!supportsES32orGL45)
+	if (!supportsES32)
 	{
 		if (requiresAdvancedBlendEq(m_preCommonBlendState, m_postCommonBlendState, m_drawBuffers) && !m_context.getContextInfo().isExtensionSupported("GL_KHR_blend_equation_advanced"))
 			TCU_THROW(NotSupportedError, "Extension GL_KHR_blend_equation_advanced not supported");
@@ -1310,7 +1303,7 @@ void genRandomBlendState (de::Random& rng, BlendState& blendState)
 
 TextureFormat getRandomFormat (de::Random& rng, Context& context)
 {
-	const bool supportsES32orGL45 = checkES32orGL45Support(context);
+	const bool supportsES32 = glu::contextSupports(context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
 	const deUint32 glFormats[] =
 	{
@@ -1348,7 +1341,7 @@ TextureFormat getRandomFormat (de::Random& rng, Context& context)
 		GL_R11F_G11F_B10F
 	};
 
-	if (supportsES32orGL45)
+	if (supportsES32)
 		return glu::mapGLInternalFormat(de::getArrayElement(glFormats, rng.getUint32() % DE_LENGTH_OF_ARRAY(glFormats)));
 	else
 	{
@@ -1420,9 +1413,9 @@ MaxDrawBuffersIndexedTest::MaxDrawBuffersIndexedTest (Context& context, int seed
 
 void MaxDrawBuffersIndexedTest::init (void)
 {
-	const bool supportsES32orGL45 = checkES32orGL45Support(m_context);
+	const bool supportsES32 = glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
-	if (!supportsES32orGL45 && !m_context.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
+	if (!supportsES32 && !m_context.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
 		TCU_THROW(NotSupportedError, "Extension GL_EXT_draw_buffers_indexed not supported");
 }
 
@@ -1464,9 +1457,9 @@ ImplMaxDrawBuffersIndexedTest::ImplMaxDrawBuffersIndexedTest (Context& context, 
 
 void ImplMaxDrawBuffersIndexedTest::init (void)
 {
-	const bool supportsES32orGL45 = checkES32orGL45Support(m_context);
+	const bool supportsES32 = glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
-	if (!supportsES32orGL45 && !m_context.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
+	if (!supportsES32 && !m_context.getContextInfo().isExtensionSupported("GL_EXT_draw_buffers_indexed"))
 		TCU_THROW(NotSupportedError, "Extension GL_EXT_draw_buffers_indexed not supported");
 }
 

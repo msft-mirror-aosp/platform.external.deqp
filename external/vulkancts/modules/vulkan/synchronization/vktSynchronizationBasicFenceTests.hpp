@@ -23,6 +23,7 @@
  * \brief Synchronization fence basic tests
  *//*--------------------------------------------------------------------*/
 
+#include "tcuDefs.hpp"
 #include "tcuTestCase.hpp"
 
 namespace vkt

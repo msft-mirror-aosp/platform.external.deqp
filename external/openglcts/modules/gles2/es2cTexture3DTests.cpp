@@ -1021,21 +1021,6 @@ FramebufferTexture3DCase::IterateResult FramebufferTexture3DCase::iterate(void)
 	return STOP;
 }
 
-void checkFormatSupport(const glu::ContextInfo& info, deUint32 format)
-{
-	if (glu::isCompressedFormat(format))
-	{
-		if (isAstcFormat(glu::mapGLCompressedTexFormat(format)))
-		{
-			if (!info.isExtensionSupported("GL_KHR_texture_compression_astc_hdr") &&
-				!info.isExtensionSupported("GL_OES_texture_compression_astc"))
-			{
-				TCU_THROW(NotSupportedError, "requires HDR astc support.");
-			}
-		}
-	}
-}
-
 class CompressedTexture3DCase : public Texture3DBase
 {
 public:
@@ -1066,8 +1051,6 @@ CompressedTexture3DCase::IterateResult CompressedTexture3DCase::iterate(void)
 		m_testCtx.setTestResult(QP_TEST_RESULT_NOT_SUPPORTED, "Compressed format not supported by implementation");
 		return STOP;
 	}
-
-	checkFormatSupport(contextInfo, m_compressedFormat);
 
 	const deInt32 width		  = 64;
 	const deInt32 height	  = 64;
@@ -1639,7 +1622,6 @@ NegativeCompressedTexImage3DCase::IterateResult NegativeCompressedTexImage3DCase
 		return STOP;
 
 	const glw::Functions& gl = m_context.getRenderContext().getFunctions();
-	const glu::ContextInfo&  contextInfo = m_context.getContextInfo();
 
 	std::set<int> supportedFormats;
 	getSupportedCompressedFormats(supportedFormats);
@@ -1651,7 +1633,7 @@ NegativeCompressedTexImage3DCase::IterateResult NegativeCompressedTexImage3DCase
 	}
 
 	GLenum supportedCompressedFormat = static_cast<GLenum>(*(supportedFormats.begin()));
-	checkFormatSupport(contextInfo, supportedCompressedFormat);
+
 	m_testCtx.setTestResult(QP_TEST_RESULT_PASS, "Pass");
 
 	// negative usage
@@ -1771,7 +1753,6 @@ NegativeCompressedTexSubImage3DCase::IterateResult NegativeCompressedTexSubImage
 		return STOP;
 
 	const glw::Functions& gl = m_context.getRenderContext().getFunctions();
-	const glu::ContextInfo&  contextInfo = m_context.getContextInfo();
 
 	std::set<int> supportedFormats;
 	getSupportedCompressedFormats(supportedFormats);
@@ -1785,8 +1766,6 @@ NegativeCompressedTexSubImage3DCase::IterateResult NegativeCompressedTexSubImage
 	GLenum supportedCompressedFormat = static_cast<GLenum>(*(supportedFormats.begin()));
 	int	textureSize				 = 16;
 	int	dataSize					 = calculateDataSize(supportedCompressedFormat, textureSize, textureSize, 1);
-
-	checkFormatSupport(contextInfo, supportedCompressedFormat);
 
 	m_testCtx.setTestResult(QP_TEST_RESULT_PASS, "Pass");
 

@@ -351,22 +351,15 @@ static inline TextureType textureLayerType (TextureType entireTextureType)
 
 static const char* const s_texBufExtString = "GL_EXT_texture_buffer";
 
-static bool supportsES32orGL45(const RenderContext& renderContext)
-{
-	glu::ContextType contextType = renderContext.getType();
-	return glu::contextSupports(contextType, glu::ApiType::es(3, 2)) ||
-		   glu::contextSupports(contextType, glu::ApiType::core(4, 5));
-}
-
 static inline void checkTextureTypeExtensions (const glu::ContextInfo& contextInfo, TextureType type, const RenderContext& renderContext)
 {
-	if (type == TEXTURETYPE_BUFFER && !contextInfo.isExtensionSupported(s_texBufExtString) && !supportsES32orGL45(renderContext))
+	if (type == TEXTURETYPE_BUFFER && !contextInfo.isExtensionSupported(s_texBufExtString) && !glu::contextSupports(renderContext.getType(), glu::ApiType::es(3, 2)))
 		throw tcu::NotSupportedError("Test requires " + string(s_texBufExtString) + " extension");
 }
 
 static inline string textureTypeExtensionShaderRequires (TextureType type, const RenderContext& renderContext)
 {
-	if (!supportsES32orGL45(renderContext) && (type == TEXTURETYPE_BUFFER))
+	if (!glu::contextSupports(renderContext.getType(), glu::ApiType::es(3, 2)) && (type == TEXTURETYPE_BUFFER))
 		return "#extension " + string(s_texBufExtString) + " : require\n";
 	else
 		return "";
@@ -376,7 +369,7 @@ static const char* const s_imageAtomicExtString = "GL_OES_shader_image_atomic";
 
 static inline string imageAtomicExtensionShaderRequires (const RenderContext& renderContext)
 {
-	if (!supportsES32orGL45(renderContext))
+	if (!glu::contextSupports(renderContext.getType(), glu::ApiType::es(3, 2)))
 		return "#extension " + string(s_imageAtomicExtString) + " : require\n";
 	else
 		return "";
@@ -1924,11 +1917,10 @@ private:
 
 void BinaryAtomicOperationCase::init (void)
 {
-	const glu::RenderContext& renderContext = m_context.getRenderContext();
-	if (!m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic") && !supportsES32orGL45(renderContext))
+	if (!m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic") && !glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2)))
 		throw tcu::NotSupportedError("Test requires OES_shader_image_atomic extension");
 
-	checkTextureTypeExtensions(m_context.getContextInfo(), m_imageType, renderContext);
+	checkTextureTypeExtensions(m_context.getContextInfo(), m_imageType, m_context.getRenderContext());
 }
 
 BinaryAtomicOperationCase::IterateResult BinaryAtomicOperationCase::iterate (void)
@@ -2170,11 +2162,10 @@ string AtomicCompSwapCase::getAssignArgShaderStr (const string& x, const string&
 
 void AtomicCompSwapCase::init (void)
 {
-	const glu::RenderContext& renderContext = m_context.getRenderContext();
-	if (!m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic") && !supportsES32orGL45(renderContext))
+	if (!m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic") && !glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2)))
 		throw tcu::NotSupportedError("Test requires OES_shader_image_atomic extension");
 
-	checkTextureTypeExtensions(m_context.getContextInfo(), m_imageType, renderContext);
+	checkTextureTypeExtensions(m_context.getContextInfo(), m_imageType, m_context.getRenderContext());
 }
 
 class AtomicCompSwapCase::EndResultVerifier : public ImageLayerVerifier
@@ -2920,7 +2911,7 @@ public:
 		if (m_context.getContextInfo().getInt(GL_MAX_FRAGMENT_IMAGE_UNIFORMS) == 0)
 			throw tcu::NotSupportedError("GL_MAX_FRAGMENT_IMAGE_UNIFORMS is zero");
 
-		if (!m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic") && !supportsES32orGL45(m_context.getRenderContext()))
+		if (!m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic") && !glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2)))
 			throw tcu::NotSupportedError("Test requires OES_shader_image_atomic extension");
 
 		if (m_type == TESTTYPE_DEPTH				&&

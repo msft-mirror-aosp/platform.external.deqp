@@ -14,8 +14,6 @@ set(DEQP_VK_SHADERRENDER_SRCS
 	vktShaderRenderDiscardTests.hpp
 	vktShaderRenderIndexingTests.cpp
 	vktShaderRenderIndexingTests.hpp
-	vktShaderRenderInvarianceTests.hpp
-	vktShaderRenderInvarianceTests.cpp
 	vktShaderRenderLimitTests.cpp
 	vktShaderRenderLimitTests.hpp
 	vktShaderRenderLoopTests.cpp

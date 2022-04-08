@@ -1388,10 +1388,9 @@ public:
 class RandomCase : public TransformFeedbackCase
 {
 public:
-	RandomCase (Context& context, const char* name, const char* desc, deUint32 bufferType, deUint32 primitiveType, deUint32 seed, bool elementCapture)
+	RandomCase (Context& context, const char* name, const char* desc, deUint32 bufferType, deUint32 primitiveType, deUint32 seed)
 		: TransformFeedbackCase	(context, name, desc, bufferType, primitiveType)
 		, m_seed				(seed)
-		, m_elementCapture		(elementCapture)
 	{
 	}
 
@@ -1499,7 +1498,7 @@ public:
 
 			if (var.type.isArrayType())
 			{
-				const bool captureFull = m_elementCapture ? (rnd.getFloat() < captureFullArrayWeight) : true;
+				const bool captureFull = rnd.getFloat() < captureFullArrayWeight;
 
 				if (captureFull)
 					tfCandidates.push_back(var.name);
@@ -1526,8 +1525,7 @@ public:
 	}
 
 private:
-	deUint32	m_seed;
-	bool		m_elementCapture;
+	deUint32 m_seed;
 };
 
 } // TransformFeedback
@@ -1795,33 +1793,7 @@ void TransformFeedbackTests::init (void)
 				for (int ndx = 0; ndx < 10; ndx++)
 				{
 					deUint32 seed = deInt32Hash(bufferMode) ^ deInt32Hash(primitiveType) ^ deInt32Hash(ndx);
-					primitiveGroup->addChild(new RandomCase(m_context, de::toString(ndx+1).c_str(), "", bufferMode, primitiveType, seed, true));
-				}
-			}
-		}
-	}
-
-	// .random_full_array_capture
-	{
-		tcu::TestCaseGroup* randomNecGroup = new tcu::TestCaseGroup(m_testCtx, "random_full_array_capture", "Randomized transform feedback cases without array element capture");
-		addChild(randomNecGroup);
-
-		for (int bufferModeNdx = 0; bufferModeNdx < DE_LENGTH_OF_ARRAY(bufferModes); bufferModeNdx++)
-		{
-			tcu::TestCaseGroup* modeGroup	= new tcu::TestCaseGroup(m_testCtx, bufferModes[bufferModeNdx].name, "");
-			deUint32			bufferMode	= bufferModes[bufferModeNdx].mode;
-			randomNecGroup->addChild(modeGroup);
-
-			for (int primitiveTypeNdx = 0; primitiveTypeNdx < DE_LENGTH_OF_ARRAY(primitiveTypes); primitiveTypeNdx++)
-			{
-				tcu::TestCaseGroup* primitiveGroup	= new tcu::TestCaseGroup(m_testCtx, primitiveTypes[primitiveTypeNdx].name, "");
-				deUint32			primitiveType	= primitiveTypes[primitiveTypeNdx].type;
-				modeGroup->addChild(primitiveGroup);
-
-				for (int ndx = 0; ndx < 10; ndx++)
-				{
-					deUint32 seed = deInt32Hash(bufferMode) ^ deInt32Hash(primitiveType) ^ deInt32Hash(ndx);
-					primitiveGroup->addChild(new RandomCase(m_context, de::toString(ndx+1).c_str(), "", bufferMode, primitiveType, seed, false));
+					primitiveGroup->addChild(new RandomCase(m_context, de::toString(ndx+1).c_str(), "", bufferMode, primitiveType, seed));
 				}
 			}
 		}

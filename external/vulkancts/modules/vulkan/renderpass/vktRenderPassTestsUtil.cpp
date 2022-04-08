@@ -695,50 +695,24 @@ SubpassDesc createSubpassDescription (const Subpass&				subpass,
 	}
 }
 
-VkMemoryBarrier2KHR createMemoryBarrierFromSubpassDependency(const SubpassDependency& dependencyInfo)
-{
-	return
-	{
-		VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR,												// VkStructureType				sType
-		DE_NULL,																			// const void*					pNext
-		static_cast<VkPipelineStageFlags2KHR>	(dependencyInfo.getSrcStageMask()),			// VkPipelineStageFlags2KHR		srcStageMask
-		static_cast<VkAccessFlags2KHR>			(dependencyInfo.getSrcAccessMask()),		// VkAccessFlags2KHR			srcAccessMask
-		static_cast<VkPipelineStageFlags2KHR>	(dependencyInfo.getDstStageMask()),			// VkPipelineStageFlags2KHR		dstStageMask
-		static_cast<VkAccessFlags2KHR>			(dependencyInfo.getDstAccessMask())			// VkAccessFlags2KHR			dstAccessMask
-	};
-}
-
 template <typename SubpassDep>
-SubpassDep createSubpassDependency (const SubpassDependency& dependencyInfo, VkMemoryBarrier2KHR* memoryBarrierPtr = DE_NULL)
+SubpassDep createSubpassDependency (const SubpassDependency& dependencyInfo)
 {
-	VkPipelineStageFlags	srcStageMask	= dependencyInfo.getSrcStageMask();
-	VkPipelineStageFlags	dstStageMask	= dependencyInfo.getDstStageMask();
-	VkAccessFlags			srcAccessMask	= dependencyInfo.getSrcAccessMask();
-	VkAccessFlags			dstAccessMask	= dependencyInfo.getDstAccessMask();
-
-	// If an instance of VkMemoryBarrier2KHR is included in the pNext chain, srcStageMask,
-	// dstStageMask, srcAccessMask and dstAccessMask parameters are ignored. The synchronization
-	// and access scopes instead are defined by the parameters of VkMemoryBarrier2KHR.
-	if (memoryBarrierPtr)
-	{
-		srcStageMask	= 0;
-		dstStageMask	= 0;
-		srcAccessMask	= 0;
-		dstAccessMask	= 0;
-	}
-
-	return									//  VkSubpassDependency						||  VkSubpassDependency2
-	{
-		memoryBarrierPtr,					//											||	const void*					pNext
+	const SubpassDep dependency				//  VkSubpassDependency						||  VkSubpassDependency2
+	(
+											//											||	VkStructureType				sType
+		DE_NULL,							//											||	const void*					pNext
 		dependencyInfo.getSrcPass(),		//  deUint32				srcSubpass		||	deUint32					srcSubpass
 		dependencyInfo.getDstPass(),		//  deUint32				dstSubpass		||	deUint32					dstSubpass
-		srcStageMask,						//  VkPipelineStageFlags	srcStageMask	||	VkPipelineStageFlags		srcStageMask
-		dstStageMask,						//  VkPipelineStageFlags	dstStageMask	||	VkPipelineStageFlags		dstStageMask
-		srcAccessMask,						//  VkAccessFlags			srcAccessMask	||	VkAccessFlags				srcAccessMask
-		dstAccessMask,						//  VkAccessFlags			dstAccessMask	||	VkAccessFlags				dstAccessMask
+		dependencyInfo.getSrcStageMask(),	//  VkPipelineStageFlags	srcStageMask	||	VkPipelineStageFlags		srcStageMask
+		dependencyInfo.getDstStageMask(),	//  VkPipelineStageFlags	dstStageMask	||	VkPipelineStageFlags		dstStageMask
+		dependencyInfo.getSrcAccessMask(),	//  VkAccessFlags			srcAccessMask	||	VkAccessFlags				srcAccessMask
+		dependencyInfo.getDstAccessMask(),	//  VkAccessFlags			dstAccessMask	||	VkAccessFlags				dstAccessMask
 		dependencyInfo.getFlags(),			//  VkDependencyFlags		dependencyFlags	||	VkDependencyFlags			dependencyFlags
 		0u									//	deInt32					viewOffset		||	deInt32						viewOffset
-	};
+	);
+
+	return dependency;
 }
 
 de::MovePtr<VkRenderPassInputAttachmentAspectCreateInfo> createRenderPassInputAttachmentAspectCreateInfo (const RenderPass& renderPassInfo)
@@ -765,14 +739,12 @@ de::MovePtr<VkRenderPassInputAttachmentAspectCreateInfo> createRenderPassInputAt
 template<typename AttachmentDesc, typename AttachmentRef, typename SubpassDesc, typename SubpassDep, typename RenderPassCreateInfo>
 Move<VkRenderPass> createRenderPass (const DeviceInterface&	vk,
 									 VkDevice				device,
-									 const RenderPass&		renderPassInfo,
-									 SynchronizationType	synchronizationType)
+									 const RenderPass&		renderPassInfo)
 {
 	const size_t												perSubpassAttachmentReferenceLists = 4;
 	std::vector<AttachmentDesc>									attachments;
 	std::vector<SubpassDesc>									subpasses;
 	std::vector<SubpassDep>										dependencies;
-	std::vector<VkMemoryBarrier2KHR>							memoryBarriers;
 	std::vector<std::vector<AttachmentRef> >					attachmentReferenceLists(renderPassInfo.getSubpasses().size() * perSubpassAttachmentReferenceLists);
 	std::vector<std::vector<deUint32> >							preserveAttachments(renderPassInfo.getSubpasses().size());
 	de::MovePtr<VkRenderPassInputAttachmentAspectCreateInfo>	inputAspectCreateInfo(createRenderPassInputAttachmentAspectCreateInfo(renderPassInfo));
@@ -783,21 +755,8 @@ Move<VkRenderPass> createRenderPass (const DeviceInterface&	vk,
 	for (size_t subpassNdx = 0; subpassNdx < renderPassInfo.getSubpasses().size(); subpassNdx++)
 		subpasses.push_back(createSubpassDescription<SubpassDesc>(renderPassInfo.getSubpasses()[subpassNdx], &(attachmentReferenceLists[subpassNdx * perSubpassAttachmentReferenceLists]), &preserveAttachments[subpassNdx]));
 
-	if (synchronizationType == SYNCHRONIZATION_TYPE_SYNCHRONIZATION2)
-	{
-		// reserve space to avoid reallocation in vector that will invalidate pointers
-		memoryBarriers.reserve(renderPassInfo.getDependencies().size());
-		for (const auto& dependency : renderPassInfo.getDependencies())
-		{
-			memoryBarriers.push_back(createMemoryBarrierFromSubpassDependency(dependency));
-			dependencies.push_back(createSubpassDependency<SubpassDep>(dependency, &memoryBarriers.back()));
-		}
-	}
-	else
-	{
-		for (const auto& dependency : renderPassInfo.getDependencies())
-			dependencies.push_back(createSubpassDependency<SubpassDep>(dependency));
-	}
+	for (size_t depNdx = 0; depNdx < renderPassInfo.getDependencies().size(); depNdx++)
+		dependencies.push_back(createSubpassDependency<SubpassDep>(renderPassInfo.getDependencies()[depNdx]));
 
 	const RenderPassCreateInfo	renderPassCreator				//  VkRenderPassCreateInfo								||  VkRenderPassCreateInfo2
 	(
@@ -820,23 +779,14 @@ Move<VkRenderPass> createRenderPass (const DeviceInterface&	vk,
 Move<VkRenderPass> createRenderPass (const DeviceInterface&	vk,
 									 VkDevice				device,
 									 const RenderPass&		renderPassInfo,
-									 RenderPassType			renderPassType,
-									 SynchronizationType	synchronizationType)
+									 const RenderPassType	renderPassType)
 {
 	switch (renderPassType)
 	{
 		case RENDERPASS_TYPE_LEGACY:
-			return createRenderPass<AttachmentDescription1,
-									AttachmentReference1,
-									SubpassDescription1,
-									SubpassDependency1,
-									RenderPassCreateInfo1>(vk, device, renderPassInfo, SYNCHRONIZATION_TYPE_LEGACY);
+			return createRenderPass<AttachmentDescription1, AttachmentReference1, SubpassDescription1, SubpassDependency1, RenderPassCreateInfo1>(vk, device, renderPassInfo);
 		case RENDERPASS_TYPE_RENDERPASS2:
-			return createRenderPass<AttachmentDescription2,
-									AttachmentReference2,
-									SubpassDescription2,
-									SubpassDependency2,
-									RenderPassCreateInfo2>(vk, device, renderPassInfo, synchronizationType);
+			return createRenderPass<AttachmentDescription2, AttachmentReference2, SubpassDescription2, SubpassDependency2, RenderPassCreateInfo2>(vk, device, renderPassInfo);
 		default:
 			TCU_THROW(InternalError, "Impossible");
 	}

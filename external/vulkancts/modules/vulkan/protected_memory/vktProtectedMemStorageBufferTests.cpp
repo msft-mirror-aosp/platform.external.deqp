@@ -117,25 +117,24 @@ void static addBufferCopyCmd (const vk::DeviceInterface&	vk,
 							  deUint32						queueFamilyIndex,
 							  vk::VkBuffer					srcBuffer,
 							  vk::VkBuffer					dstBuffer,
-							  deUint32						copySize,
-							  bool							dstFragment)
+							  deUint32						copySize)
 {
 	const vk::VkBufferMemoryBarrier		dstWriteStartBarrier	=
 	{
 		vk::VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,		// VkStructureType		sType
 		DE_NULL,											// const void*			pNext
-		vk::VK_ACCESS_HOST_WRITE_BIT,						// VkAccessFlags		srcAccessMask
+		0,													// VkAccessFlags		srcAccessMask
 		vk::VK_ACCESS_SHADER_WRITE_BIT,						// VkAccessFlags		dstAccessMask
 		queueFamilyIndex,									// uint32_t				srcQueueFamilyIndex
 		queueFamilyIndex,									// uint32_t				dstQueueFamilyIndex
-		srcBuffer,											// VkBuffer				buffer
+		dstBuffer,											// VkBuffer				buffer
 		0u,													// VkDeviceSize			offset
 		VK_WHOLE_SIZE,										// VkDeviceSize			size
 	};
 
 	vk.cmdPipelineBarrier(cmdBuffer,
-						  vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, // srcStageMask
-						  vk::VK_PIPELINE_STAGE_TRANSFER_BIT,	 // dstStageMask
+						  vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,	// srcStageMask
+						  vk::VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,	// dstStageMask
 						  (vk::VkDependencyFlags)0,
 						  0, (const vk::VkMemoryBarrier*)DE_NULL,
 						  1, &dstWriteStartBarrier,
@@ -161,11 +160,9 @@ void static addBufferCopyCmd (const vk::DeviceInterface&	vk,
 		0u,													// VkDeviceSize			offset
 		VK_WHOLE_SIZE,										// VkDeviceSize			size
 	};
-
 	vk.cmdPipelineBarrier(cmdBuffer,
-						  vk::VK_PIPELINE_STAGE_TRANSFER_BIT,			// srcStageMask
-						  dstFragment ? vk::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT :
-						  vk::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,	// dstStageMask
+						  vk::VK_PIPELINE_STAGE_VERTEX_SHADER_BIT,		// srcStageMask
+						  vk::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,	// dstStageMask
 						  (vk::VkDependencyFlags)0,
 						  0, (const vk::VkMemoryBarrier*)DE_NULL,
 						  1, &dstWriteEndBarrier,
@@ -205,13 +202,12 @@ public:
 														 const char*				name,
 														 const tcu::UVec4			testInput,
 														 ValidationDataStorage<T>	validationData,
-														 vk::VkFormat				format,
 														 const std::string&			extraShader = "")
 									: TestCase		(testctx, name, getSSBOTestDescription(testType))
 									, m_testType	(testType)
 									, m_shaderType	(shaderType)
 									, m_testInput	(testInput)
-									, m_validator	(validationData, format)
+									, m_validator	(validationData)
 									, m_extraShader	(extraShader)
 								{
 								}
@@ -381,7 +377,7 @@ tcu::TestStatus StorageBufferTestInstance<T>::executeFragmentTest(void)
 	// Set the test input uniform data
 	{
 		deMemcpy(testUniform->getAllocation().getHostPtr(), &m_testInput, testUniformSize);
-		vk::flushAlloc(vk, device, testUniform->getAllocation());
+		vk::flushMappedMemoryRange(vk, device, testUniform->getAllocation().getMemory(), testUniform->getAllocation().getOffset(), testUniformSize);
 	}
 	const deUint32							testBufferSize		= sizeof(ValidationDataStorage<T>);
 	de::MovePtr<vk::BufferWithMemory>		testBuffer			(makeBuffer(ctx,
@@ -455,7 +451,7 @@ tcu::TestStatus StorageBufferTestInstance<T>::executeFragmentTest(void)
 	if (m_testType == SSBO_READ || m_testType == SSBO_ATOMIC)
 	{
 		vk::VkBuffer targetBuffer = (m_testType == SSBO_ATOMIC) ? **testBuffer : **testBufferSource;
-		addBufferCopyCmd(vk, *cmdBuffer, queueFamilyIndex, **testUniform, targetBuffer, testUniformSize, true);
+		addBufferCopyCmd(vk, *cmdBuffer, queueFamilyIndex, **testUniform, targetBuffer, testUniformSize);
 	}
 
 	// Start image barrier
@@ -568,7 +564,7 @@ tcu::TestStatus StorageBufferTestInstance<T>::executeComputeTest(void)
 	// Set the test input uniform data
 	{
 		deMemcpy(testUniform->getAllocation().getHostPtr(), &m_testInput, testUniformSize);
-		vk::flushAlloc(vk, device, testUniform->getAllocation());
+		vk::flushMappedMemoryRange(vk, device, testUniform->getAllocation().getMemory(), testUniform->getAllocation().getOffset(), testUniformSize);
 	}
 
 	const deUint32							testBufferSize		= sizeof(ValidationDataStorage<T>);
@@ -615,6 +611,7 @@ tcu::TestStatus StorageBufferTestInstance<T>::executeComputeTest(void)
 			.update(vk, device);
 	}
 
+
 	// Build and execute test
 	{
 		const vk::Unique<vk::VkFence>		fence				(vk::createFence(vk, device));
@@ -629,7 +626,7 @@ tcu::TestStatus StorageBufferTestInstance<T>::executeComputeTest(void)
 		if (m_testType == SSBO_READ || m_testType == SSBO_ATOMIC)
 		{
 			vk::VkBuffer targetBuffer = (m_testType == SSBO_ATOMIC) ? **testBuffer : **testBufferSource;
-			addBufferCopyCmd(vk, *cmdBuffer, queueFamilyIndex, **testUniform, targetBuffer, testUniformSize, false);
+			addBufferCopyCmd(vk, *cmdBuffer, queueFamilyIndex, **testUniform, targetBuffer, testUniformSize);
 		}
 
 		vk.cmdBindPipeline(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_COMPUTE, *SSBOPipeline);
@@ -679,7 +676,7 @@ tcu::TestCaseGroup* createSpecifiedStorageBufferTests (tcu::TestContext&						te
 	for (size_t ndx = 0; ndx < testCount; ++ndx)
 	{
 		const std::string name = testTypeStr + "_" + de::toString(ndx + 1);
-		testGroup->addChild(new StorageBufferTestCase<tcu::UVec4>(testCtx, testType, shaderType, name.c_str(), testData[ndx].values, testData[ndx], vk::VK_FORMAT_R32G32B32A32_UINT));
+		testGroup->addChild(new StorageBufferTestCase<tcu::UVec4>(testCtx, testType, shaderType, name.c_str(), testData[ndx].values, testData[ndx]));
 	}
 
 	return testGroup.release();
@@ -874,7 +871,7 @@ tcu::TestCaseGroup* createAtomicStorageBufferTests (tcu::TestContext& testctx)
 				calculateAtomicOpData(atomicType, inputValue, atomicArg, atomicCall, refValue, testData[ndx].swapNdx);
 
 				ValidationDataStorage<tcu::UVec4>	validationData	= { refValue };
-				staticTests->addChild(new StorageBufferTestCase<tcu::UVec4>(testctx, SSBO_ATOMIC, shaderType, name.c_str(), inputValue, validationData, vk::VK_FORMAT_R32G32B32A32_UINT, atomicCall));
+				staticTests->addChild(new StorageBufferTestCase<tcu::UVec4>(testctx, SSBO_ATOMIC, shaderType, name.c_str(), inputValue, validationData, atomicCall));
 			}
 
 			de::MovePtr<tcu::TestCaseGroup>	randomTests		(new tcu::TestCaseGroup(testctx, "random", (atomicDesc + " with random input").c_str()));
@@ -892,7 +889,7 @@ tcu::TestCaseGroup* createAtomicStorageBufferTests (tcu::TestContext& testctx)
 				calculateAtomicOpData(atomicType, inputValue, atomicArg, atomicCall, refValue, ndx);
 
 				ValidationDataStorage<tcu::UVec4>	validationData	= { refValue };
-				randomTests->addChild(new StorageBufferTestCase<tcu::UVec4>(testctx, SSBO_ATOMIC, shaderType, name.c_str(), inputValue, validationData, vk::VK_FORMAT_R32G32B32A32_UINT, atomicCall));
+				randomTests->addChild(new StorageBufferTestCase<tcu::UVec4>(testctx, SSBO_ATOMIC, shaderType, name.c_str(), inputValue, validationData, atomicCall));
 
 			}
 

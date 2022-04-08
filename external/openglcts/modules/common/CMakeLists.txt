@@ -40,8 +40,6 @@ set(GLCTS_COMMON_SRCS
 	glcKHRDebugTests.hpp
 	glcMultipleContextsTests.cpp
 	glcMultipleContextsTests.hpp
-	glcNearestEdgeTests.cpp
-	glcNearestEdgeTests.hpp
 	glcNoErrorTests.cpp
 	glcNoErrorTests.hpp
 	glcRobustnessTests.cpp
@@ -54,8 +52,6 @@ set(GLCTS_COMMON_SRCS
 	glcPackedDepthStencilTests.hpp
 	glcParallelShaderCompileTests.cpp
 	glcParallelShaderCompileTests.hpp
-	glcPixelStorageModesTests.cpp
-	glcPixelStorageModesTests.hpp
 	glcRobustBufferAccessBehaviorTests.cpp
 	glcRobustBufferAccessBehaviorTests.hpp
 	glcSeparableProgramsTransformFeedbackTests.cpp
@@ -115,10 +111,6 @@ set(GLCTS_COMMON_SRCS
 	glcLimitTest.inl
 	glcLimitTest.hpp
 	glcWaiver.hpp
-	glcGLSLVectorConstructorTests.cpp
-	glcGLSLVectorConstructorTests.hpp
-	glcFramebufferCompleteness.cpp
-	glcFramebufferCompleteness.hpp
 	)
 
 set(GLCTS_COMMON_LIBS

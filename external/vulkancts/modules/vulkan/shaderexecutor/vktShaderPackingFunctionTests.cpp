@@ -75,7 +75,6 @@ public:
 										ShaderPackingFunctionCase			(tcu::TestContext& testCtx, const char* name, const char* description, glu::ShaderType shaderType);
 										~ShaderPackingFunctionCase			(void);
 
-			void						checkSupport						(Context& context) const;
 	virtual	void						initPrograms						(vk::SourceCollections& programCollection) const
 										{
 											generateSources(m_shaderType, m_spec, programCollection);
@@ -98,11 +97,6 @@ ShaderPackingFunctionCase::ShaderPackingFunctionCase (tcu::TestContext& testCtx,
 
 ShaderPackingFunctionCase::~ShaderPackingFunctionCase (void)
 {
-}
-
-void ShaderPackingFunctionCase::checkSupport (Context& context) const
-{
-	checkSupportShader(context, m_shaderType);
 }
 
 // ShaderPackingFunctionTestInstance

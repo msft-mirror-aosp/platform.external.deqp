@@ -36,7 +36,7 @@ namespace Functional
 class ProgramInterfaceQueryTests : public TestCaseGroup
 {
 public:
-								ProgramInterfaceQueryTests	(Context& context, bool is_GL45);
+								ProgramInterfaceQueryTests	(Context& context);
 								~ProgramInterfaceQueryTests	(void);
 
 	void						init						(void);
@@ -44,8 +44,6 @@ public:
 private:
 								ProgramInterfaceQueryTests	(const ProgramInterfaceQueryTests& other);
 	ProgramInterfaceQueryTests&	operator=					(const ProgramInterfaceQueryTests& other);
-
-	bool m_isGL45;
 };
 
 } // Functional

@@ -585,7 +585,7 @@ tcu::TestCaseGroup* createMiscDrawTests (tcu::TestContext& testCtx)
 		const SpacingMode spacingMode = static_cast<SpacingMode>(spacingModeNdx);
 		const std::string caseName    = std::string() + "isolines_" + getSpacingModeShaderName(spacingMode);
 
-		addFunctionCaseWithPrograms(group.get(), caseName, "Basic isolines render test", checkSupportCase,
+		addFunctionCaseWithPrograms(group.get(), caseName, "Basic isolines render test",
 									initProgramsIsolinesCase, runTest, makeCaseDefinition(TESSPRIMITIVETYPE_ISOLINES, spacingMode, getReferenceImagePathPrefix(caseName)));
 	}
 

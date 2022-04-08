@@ -47,7 +47,6 @@ public:
 		numFailed		= 0;
 		numNotSupported	= 0;
 		numWarnings		= 0;
-		numWaived		= 0;
 		isComplete		= false;
 	}
 
@@ -56,7 +55,6 @@ public:
 	int		numFailed;			//!< Number of cases failed.
 	int		numNotSupported;	//!< Number of cases not supported.
 	int		numWarnings;		//!< Number of QualityWarning / CompatibilityWarning results.
-	int		numWaived;			//!< Number of waived tests.
 	bool	isComplete;			//!< Is run complete.
 };
 

@@ -93,15 +93,12 @@ set(TCUTIL_SRCS
 	tcuAstcUtil.hpp
 	tcuRasterizationVerifier.cpp
 	tcuRasterizationVerifier.hpp
-	tcuWaiverUtil.cpp
-	tcuWaiverUtil.hpp
 	)
 
 set(TCUTIL_LIBS
 	decpp
 	qphelper
 	dethread
-	xexml
 	${PNG_LIBRARY}
 	)
 

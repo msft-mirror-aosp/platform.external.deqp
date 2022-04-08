@@ -169,14 +169,13 @@ class Environment:
 		self.ndk		= ndk
 
 class Configuration:
-	def __init__(self, env, buildPath, abis, nativeApi, minApi, nativeBuildType, gtfTarget, verbose, layers, angle):
+	def __init__(self, env, buildPath, abis, nativeApi, nativeBuildType, gtfTarget, verbose, layers, angle):
 		self.env				= env
 		self.sourcePath			= DEQP_DIR
 		self.buildPath			= buildPath
 		self.abis				= abis
 		self.nativeApi			= nativeApi
-		self.javaApi			= 28
-		self.minApi				= minApi
+		self.javaApi			= 22
 		self.nativeBuildType	= nativeBuildType
 		self.gtfTarget			= gtfTarget
 		self.verbose			= verbose
@@ -197,16 +196,13 @@ class Configuration:
 		if self.env.ndk.version[0] < 15:
 			raise Exception("Android NDK version %d is not supported; build requires NDK version >= 15" % (self.env.ndk.version[0]))
 
-		if not (self.minApi <= self.javaApi <= self.nativeApi):
-			raise Exception("Requires: min-api (%d) <= java-api (%d) <= native-api (%d)" % (self.minApi, self.javaApi, self.nativeApi))
-
 		if self.env.sdk.buildToolsVersion == (0,0,0):
 			raise Exception("No build tools directory found at %s" % os.path.join(self.env.sdk.path, "build-tools"))
 
 		androidBuildTools = ["aapt", "zipalign", "dx"]
 		for tool in androidBuildTools:
 			if which(tool, [self.env.sdk.getBuildToolsPath()]) == None:
-				raise Exception("Missing Android build tool: %s" % tool)
+				raise Exception("Missing Android build tool: %s" % toolPath)
 
 		requiredToolsInPath = ["javac", "jar", "jarsigner", "keytool"]
 		for tool in requiredToolsInPath:
@@ -618,8 +614,6 @@ class BuildBaseAPK (BuildStep):
 			aaptPath,
 			"package",
 			"-f",
-			"--min-sdk-version", str(config.minApi),
-			"--target-sdk-version", str(config.javaApi),
 			"-M", resolvePath(config, self.package.getManifestPath()),
 			"-I", config.env.sdk.getPlatformLibrary(config.javaApi),
 			"-F", dstPath,
@@ -918,11 +912,6 @@ def parseArgs ():
 		dest='nativeApi',
 		default=28,
 		help="Android API level to target in native code")
-	parser.add_argument('--min-api',
-		type=int,
-		dest='minApi',
-		default=22,
-		help="Minimum Android API level for which the APK can be installed")
 	parser.add_argument('--sdk',
 		dest='sdkPath',
 		default=defaultSDKPath,
@@ -990,8 +979,8 @@ if __name__ == "__main__":
 	sdk			= SDKEnv(os.path.realpath(args.sdkPath))
 	buildPath	= os.path.realpath(args.buildRoot)
 	env			= Environment(sdk, ndk)
-	config		= Configuration(env, buildPath, abis=args.abis, nativeApi=args.nativeApi, minApi=args.minApi, nativeBuildType=args.nativeBuildType, gtfTarget=args.gtfTarget,
-						 verbose=args.verbose, layers=args.layers, angle=args.angle)
+	config		= Configuration(env, buildPath, abis=args.abis, nativeApi=args.nativeApi, nativeBuildType=args.nativeBuildType, gtfTarget=args.gtfTarget, verbose=args.verbose,
+						 layers=args.layers, angle=args.angle)
 
 	try:
 		config.check()

@@ -1316,23 +1316,12 @@ void SeparateShaderTest::drawSurface (Surface& dst, deUint32 seed)
 	Random					rnd			(seed > 0 ? seed : m_rnd.getUint32());
 	Rectangle				viewport	= randomViewport(renderCtx, rnd,
 														 VIEWPORT_SIZE, VIEWPORT_SIZE);
-	deUint32				vao			= 0;
-
-	if (!glu::isContextTypeES(renderCtx.getType()))
-	{
-		glGenVertexArrays(1, &vao);
-		glBindVertexArray(vao);
-	}
-
 	glClearColor(0.125f, 0.25f, 0.5f, 1.f);
 	setViewport(renderCtx, viewport);
 	glClear(GL_COLOR_BUFFER_BIT);
 	GLU_CHECK_CALL(glDrawArrays(GL_TRIANGLES, 0, 3));
 	readRectangle(renderCtx, viewport, dst);
 	log().writeMessage("// Drew a triangle");
-
-	if (vao)
-		glDeleteVertexArrays(1, &vao);
 }
 
 void SeparateShaderTest::testPipelineRendering (MovePtr<Pipeline>& pipeOut)
@@ -1633,7 +1622,7 @@ void describeInterpolation (const string& stage, VaryingInterpolation qual,
 
 } // anonymous
 
-TestCaseGroup* createCommonSeparateShaderTests (Context& ctx)
+TestCaseGroup* createSeparateShaderTests (Context& ctx)
 {
 	TestParams		defaultParams;
 	int				numIterations	= 4;
@@ -1842,17 +1831,9 @@ TestCaseGroup* createCommonSeparateShaderTests (Context& ctx)
 								 1, params, &SeparateShaderTest::testPipelineQueryActive));
 	}
 
-	return group;
-}
-
-TestCaseGroup* createGLESSeparateShaderTests (Context& ctx)
-{
-	TestCaseGroup*	group = createCommonSeparateShaderTests(ctx);
-
 	TestCaseGroup* interfaceMismatchGroup =
 		new TestCaseGroup(ctx, "validation", "Negative program pipeline interface matching");
 	group->addChild(interfaceMismatchGroup);
-
 
 	{
 		TestCaseGroup*						es31Group		= new TestCaseGroup(ctx, "es31", "GLSL ES 3.1 pipeline interface matching");
@@ -1877,8 +1858,8 @@ TestCaseGroup* createGLESSeparateShaderTests (Context& ctx)
 	}
 
 	return group;
-
 }
+
 } // Functional
 } // gles31
 } // deqp

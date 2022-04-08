@@ -171,29 +171,12 @@ private:
 	vk::VkComponentMapping							m_componentMapping;
 };
 
-void checkTextureSupport (Context& context, const vk::VkFormat imageFormat, const vk::VkComponentMapping& imageComponents,
-											const vk::VkFormat viewFormat,  const vk::VkComponentMapping& viewComponents);
-
 typedef de::SharedPtr<TextureBinding>	TextureBindingSp;
 
 class TextureRenderer
 {
 public:
-										TextureRenderer				(Context& context,
-																	 vk::VkSampleCountFlagBits sampleCount,
-																	 deUint32 renderWidth,
-																	 deUint32 renderHeight,
-																	 vk::VkComponentMapping componentMapping = vk::makeComponentMappingRGBA());
-
-										TextureRenderer				(Context& context,
-																	 vk::VkSampleCountFlagBits sampleCount,
-																	 deUint32 renderWidth,
-																	 deUint32 renderHeight,
-																	 deUint32 renderDepth,
-																	 vk::VkComponentMapping componentMapping = vk::makeComponentMappingRGBA(),
-																	 vk::VkImageType imageType = vk::VK_IMAGE_TYPE_2D,
-																	 vk::VkImageViewType imageViewType = vk::VK_IMAGE_VIEW_TYPE_2D);
-
+										TextureRenderer				(Context& context, vk::VkSampleCountFlagBits sampleCount, deUint32 renderWidth, deUint32 renderHeight, vk::VkComponentMapping componentMapping = vk::makeComponentMappingRGBA());
 										~TextureRenderer			(void);
 
 	void								renderQuad					(tcu::Surface& result, int texUnit, const float* texCoord, glu::TextureTestUtil::TextureType texType);
@@ -242,7 +225,6 @@ protected:
 
 	const deUint32						m_renderWidth;
 	const deUint32						m_renderHeight;
-	const deUint32						m_renderDepth;
 	const vk::VkSampleCountFlagBits		m_sampleCount;
 	const deBool						m_multisampling;
 
@@ -298,14 +280,6 @@ tcu::Sampler createSampler (tcu::Sampler::WrapMode wrapU, tcu::Sampler::FilterMo
 TestTexture2DSp loadTexture2D (const tcu::Archive& archive, const std::vector<std::string>& filenames);
 TestTextureCubeSp loadTextureCube (const tcu::Archive& archive, const std::vector<std::string>& filenames);
 
-// Add checkTextureSupport() function specialization for your test parameters class/struct if you need to use checkSupport() functionality
-template <typename T>
-void checkTextureSupport (Context& context, const T& testParameters)
-{
-	DE_UNREF(context);
-	DE_UNREF(testParameters);
-}
-
 template <typename INSTANCE_TYPE>
 class TextureTestCase : public TestCase
 {
@@ -324,12 +298,6 @@ public:
 										{
 											initializePrograms(programCollection, m_testsParameters.texCoordPrecision, m_testsParameters.programs);
 										}
-
-	virtual void						checkSupport				(Context& context) const
-										{
-											checkTextureSupport(context, m_testsParameters);
-										}
-
 
 protected:
 	const typename INSTANCE_TYPE::ParameterType m_testsParameters;

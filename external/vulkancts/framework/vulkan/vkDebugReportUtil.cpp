@@ -25,7 +25,6 @@
 #include "vkRefUtil.hpp"
 #include "vkQueryUtil.hpp"
 #include "deArrayUtil.hpp"
-#include "tcuDefs.hpp"
 
 namespace vk
 {
@@ -120,14 +119,9 @@ VKAPI_ATTR VkBool32	VKAPI_CALL debugReportCallback (VkDebugReportFlagsEXT		flags
 													const char*					pMessage,
 													void*						pUserData)
 {
-	auto						recorder	= reinterpret_cast<DebugReportRecorder*>(pUserData);
-	auto&						messageList	= recorder->getMessages();
-	const DebugReportMessage	message		(flags, objectType, object, location, messageCode, pLayerPrefix, pMessage);
+	DebugReportRecorder::MessageList* const	messageList	= reinterpret_cast<DebugReportRecorder::MessageList*>(pUserData);
 
-	messageList.append(message);
-
-	if (recorder->errorPrinting() && message.isError())
-		tcu::printError("%s\n", pMessage);
+	messageList->append(DebugReportMessage(flags, objectType, object, location, messageCode, pLayerPrefix, pMessage));
 
 	// Return false to indicate that the call should not return error and should
 	// continue execution normally.
@@ -136,7 +130,7 @@ VKAPI_ATTR VkBool32	VKAPI_CALL debugReportCallback (VkDebugReportFlagsEXT		flags
 
 Move<VkDebugReportCallbackEXT> createCallback (const InstanceInterface&				vki,
 											   VkInstance							instance,
-											   DebugReportRecorder*					recorder)
+											   DebugReportRecorder::MessageList*	messageList)
 {
 	const VkDebugReportFlagsEXT					allFlags	= VK_DEBUG_REPORT_INFORMATION_BIT_EXT
 															| VK_DEBUG_REPORT_WARNING_BIT_EXT
@@ -150,7 +144,7 @@ Move<VkDebugReportCallbackEXT> createCallback (const InstanceInterface&				vki,
 		DE_NULL,
 		allFlags,
 		debugReportCallback,
-		recorder,
+		messageList
 	};
 
 	return createDebugReportCallbackEXT(vki, instance, &createInfo);
@@ -158,10 +152,9 @@ Move<VkDebugReportCallbackEXT> createCallback (const InstanceInterface&				vki,
 
 } // anonymous
 
-DebugReportRecorder::DebugReportRecorder (const InstanceInterface& vki, VkInstance instance, bool printValidationErrors)
-	: m_messages		(1024)
-	, m_callback		(createCallback(vki, instance, this))
-	, m_print_errors	(printValidationErrors)
+DebugReportRecorder::DebugReportRecorder (const InstanceInterface& vki, VkInstance instance)
+	: m_messages	(1024)
+	, m_callback	(createCallback(vki, instance, &m_messages))
 {
 }
 

@@ -1230,8 +1230,6 @@ void TextureBufferOperationsViaTransformFeedback::initializeBufferObjectData()
 
 	gl.useProgram(0);
 
-	gl.memoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
 	m_position_location = -1;
 }
 

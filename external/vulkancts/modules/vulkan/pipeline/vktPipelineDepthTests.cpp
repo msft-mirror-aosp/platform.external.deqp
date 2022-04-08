@@ -287,6 +287,12 @@ void DepthTest::initPrograms (SourceCollections& programCollection) const
 			"{\n"
 			"	gl_Position = position;\n"
 			"}\n");
+
+		programCollection.glslSources.add("color_frag") << glu::FragmentSource(
+			"#version 310 es\n"
+			"void main (void)\n"
+			"{\n"
+			"}\n");
 	}
 
 }
@@ -464,9 +470,8 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 	}
 
 	// Shader modules
-	m_vertexShaderModule		= createShaderModule(vk, vkDevice, m_context.getBinaryCollection().get("color_vert"), 0);
-	if (m_colorAttachmentEnable)
-		m_fragmentShaderModule	= createShaderModule(vk, vkDevice, m_context.getBinaryCollection().get("color_frag"), 0);
+	m_vertexShaderModule	= createShaderModule(vk, vkDevice, m_context.getBinaryCollection().get("color_vert"), 0);
+	m_fragmentShaderModule	= createShaderModule(vk, vkDevice, m_context.getBinaryCollection().get("color_frag"), 0);
 
 	// Create pipeline
 	{
@@ -541,24 +546,6 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 			m_depthBoundsMax,			// float			maxDepthBounds;
 		};
 
-		// Make sure rasterization is not disabled when the fragment shader is missing.
-		const vk::VkPipelineRasterizationStateCreateInfo rasterizationStateParams =
-		{
-			vk::VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,	//	VkStructureType							sType;
-			nullptr,														//	const void*								pNext;
-			0u,																//	VkPipelineRasterizationStateCreateFlags	flags;
-			VK_FALSE,														//	VkBool32								depthClampEnable;
-			VK_FALSE,														//	VkBool32								rasterizerDiscardEnable;
-			vk::VK_POLYGON_MODE_FILL,										//	VkPolygonMode							polygonMode;
-			vk::VK_CULL_MODE_NONE,											//	VkCullModeFlags							cullMode;
-			vk::VK_FRONT_FACE_COUNTER_CLOCKWISE,							//	VkFrontFace								frontFace;
-			VK_FALSE,														//	VkBool32								depthBiasEnable;
-			0.0f,															//	float									depthBiasConstantFactor;
-			0.0f,															//	float									depthBiasClamp;
-			0.0f,															//	float									depthBiasSlopeFactor;
-			1.0f,															//	float									lineWidth;
-		};
-
 		for (int quadNdx = 0; quadNdx < DepthTest::QUAD_COUNT; quadNdx++)
 		{
 			depthStencilStateParams.depthCompareOp	= depthCompareOps[quadNdx];
@@ -577,7 +564,7 @@ DepthTestInstance::DepthTestInstance (Context&				context,
 																		   0u,									// const deUint32                                subpass
 																		   0u,									// const deUint32                                patchControlPoints
 																		   &vertexInputStateParams,				// const VkPipelineVertexInputStateCreateInfo*   vertexInputStateCreateInfo
-																		   &rasterizationStateParams,			// const VkPipelineRasterizationStateCreateInfo* rasterizationStateCreateInfo
+																		   DE_NULL,								// const VkPipelineRasterizationStateCreateInfo* rasterizationStateCreateInfo
 																		   DE_NULL,								// const VkPipelineMultisampleStateCreateInfo*   multisampleStateCreateInfo
 																		   &depthStencilStateParams);			// const VkPipelineDepthStencilStateCreateInfo*  depthStencilStateCreateInfo
 		}

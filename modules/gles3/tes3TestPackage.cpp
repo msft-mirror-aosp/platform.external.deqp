@@ -28,9 +28,6 @@
 #include "es3sStressTests.hpp"
 #include "es3pPerformanceTests.hpp"
 #include "tcuTestLog.hpp"
-#include "tcuWaiverUtil.hpp"
-#include "tcuCommandLine.hpp"
-#include "gluContextInfo.hpp"
 #include "gluRenderContext.hpp"
 #include "gluStateReset.hpp"
 #include "glwFunctions.hpp"
@@ -44,7 +41,7 @@ namespace gles3
 class TestCaseWrapper : public tcu::TestCaseExecutor
 {
 public:
-									TestCaseWrapper		(TestPackage& package, de::SharedPtr<tcu::WaiverUtil> waiverMechanism);
+									TestCaseWrapper		(TestPackage& package);
 									~TestCaseWrapper	(void);
 
 	void							init				(tcu::TestCase* testCase, const std::string& path);
@@ -53,12 +50,10 @@ public:
 
 private:
 	TestPackage&					m_testPackage;
-	de::SharedPtr<tcu::WaiverUtil>	m_waiverMechanism;
 };
 
-TestCaseWrapper::TestCaseWrapper (TestPackage& package, de::SharedPtr<tcu::WaiverUtil> waiverMechanism)
+TestCaseWrapper::TestCaseWrapper (TestPackage& package)
 	: m_testPackage(package)
-	, m_waiverMechanism(waiverMechanism)
 {
 }
 
@@ -66,11 +61,8 @@ TestCaseWrapper::~TestCaseWrapper (void)
 {
 }
 
-void TestCaseWrapper::init (tcu::TestCase* testCase, const std::string& path)
+void TestCaseWrapper::init (tcu::TestCase* testCase, const std::string&)
 {
-	if (m_waiverMechanism->isOnWaiverList(path))
-		throw tcu::TestException("Waived test", QP_TEST_RESULT_WAIVER);
-
 	testCase->init();
 }
 
@@ -122,7 +114,6 @@ TestPackage::TestPackage (tcu::TestContext& testCtx)
 	: tcu::TestPackage	(testCtx, "dEQP-GLES3", "dEQP OpenGL ES 3.0 Tests")
 	, m_archive			(testCtx.getRootArchive(), "gles3/")
 	, m_context			(DE_NULL)
-	, m_waiverMechanism	(new tcu::WaiverUtil)
 {
 }
 
@@ -139,18 +130,6 @@ void TestPackage::init (void)
 	{
 		// Create context
 		m_context = new Context(m_testCtx);
-
-		// Setup waiver mechanism
-		if (m_testCtx.getCommandLine().getRunMode() == tcu::RUNMODE_EXECUTE)
-		{
-			const glu::ContextInfo&	contextInfo = m_context->getContextInfo();
-			std::string				vendor		= contextInfo.getString(GL_VENDOR);
-			std::string				renderer	= contextInfo.getString(GL_RENDERER);
-			const tcu::CommandLine&	commandLine	= m_context->getTestContext().getCommandLine();
-			tcu::SessionInfo		sessionInfo	(vendor, renderer, commandLine.getInitialCmdLine());
-			m_waiverMechanism->setup(commandLine.getWaiverFileName(), m_name, vendor, renderer, sessionInfo);
-			m_context->getTestContext().getLog().writeSessionInfo(sessionInfo.get());
-		}
 
 		// Add main test groups
 		addChild(new InfoTests						(*m_context));
@@ -177,7 +156,7 @@ void TestPackage::deinit (void)
 
 tcu::TestCaseExecutor* TestPackage::createExecutor (void) const
 {
-	return new TestCaseWrapper(const_cast<TestPackage&>(*this), m_waiverMechanism);
+	return new TestCaseWrapper(const_cast<TestPackage&>(*this));
 }
 
 } // gles3

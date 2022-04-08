@@ -31,7 +31,6 @@
 #include "deMemory.h"
 
 #include <set>
-#include <limits>
 
 namespace rr
 {
@@ -46,7 +45,6 @@ struct RasterizationInternalBuffers
 {
 	std::vector<FragmentPacket>		fragmentPackets;
 	std::vector<GenericVec4>		shaderOutputs;
-	std::vector<GenericVec4>		shaderOutputsSrc1;
 	std::vector<Fragment>			shadedFragments;
 	float*							fragmentDepthBuffer;
 };
@@ -164,9 +162,7 @@ ClipFloat getSegmentVolumeEdgeClip (const ClipFloat v0,
 									const ClipFloat w1,
 									const ClipFloat plane)
 {
-	// The +epsilon avoids division by zero without causing a meaningful change in the calculation.
-	// Fixes divide by zero in builds when using the gcc toolset.
-	return (plane*w0 - v0) / ((v1 - v0) - plane*(w1 - w0) + std::numeric_limits<ClipFloat>::epsilon());
+	return (plane*w0 - v0) / ((v1 - v0) - plane*(w1 - w0));
 }
 
 /*--------------------------------------------------------------------*//*!
@@ -1033,7 +1029,6 @@ void writeFragmentPackets (const RenderState&					state,
 						   int									numRasterizedPackets,
 						   rr::FaceType							facetype,
 						   const std::vector<rr::GenericVec4>&	fragmentOutputArray,
-						   const std::vector<rr::GenericVec4>&	fragmentOutputArraySrc1,
 						   const float*							depthValues,
 						   std::vector<Fragment>&				fragmentBuffer)
 {
@@ -1091,7 +1086,6 @@ void writeFragmentPackets (const RenderState&					state,
 				{
 					Fragment& fragment		= fragmentBuffer[fragCount++];
 					fragment.value			= fragmentOutputArray[(packetNdx*4 + fragNdx) * numOutputs + outputNdx];
-					fragment.value1			= fragmentOutputArraySrc1[(packetNdx*4 + fragNdx) * numOutputs + outputNdx];
 				}
 			}
 
@@ -1123,7 +1117,7 @@ void rasterizePrimitive (const RenderState&					state,
 		return;
 
 	// Shading context
-	FragmentShadingContext shadingContext(triangle.v0->outputs, triangle.v1->outputs, triangle.v2->outputs, &buffers.shaderOutputs[0], &buffers.shaderOutputsSrc1[0], buffers.fragmentDepthBuffer, triangle.v2->primitiveID, (int)program.fragmentShader->getOutputs().size(), numSamples, rasterizer.getVisibleFace());
+	FragmentShadingContext shadingContext(triangle.v0->outputs, triangle.v1->outputs, triangle.v2->outputs, &buffers.shaderOutputs[0], buffers.fragmentDepthBuffer, triangle.v2->primitiveID, (int)program.fragmentShader->getOutputs().size(), numSamples, rasterizer.getVisibleFace());
 
 	// Polygon offset
 	if (buffers.fragmentDepthBuffer && state.fragOps.polygonOffsetEnabled)
@@ -1165,7 +1159,7 @@ void rasterizePrimitive (const RenderState&					state,
 
 		// Handle fragment shader outputs
 
-		writeFragmentPackets(state, renderTarget, program, &buffers.fragmentPackets[0], numRasterizedPackets, visibleFace, buffers.shaderOutputs, buffers.shaderOutputsSrc1, buffers.fragmentDepthBuffer, buffers.shadedFragments);
+		writeFragmentPackets(state, renderTarget, program, &buffers.fragmentPackets[0], numRasterizedPackets, visibleFace, buffers.shaderOutputs, buffers.fragmentDepthBuffer, buffers.shadedFragments);
 	}
 }
 
@@ -1180,7 +1174,7 @@ void rasterizePrimitive (const RenderState&					state,
 	const float					depthClampMin		= de::min(state.viewport.zn, state.viewport.zf);
 	const float					depthClampMax		= de::max(state.viewport.zn, state.viewport.zf);
 	const bool					msaa				= numSamples > 1;
-	FragmentShadingContext		shadingContext		(line.v0->outputs, line.v1->outputs, DE_NULL, &buffers.shaderOutputs[0], &buffers.shaderOutputsSrc1[0], buffers.fragmentDepthBuffer, line.v1->primitiveID, (int)program.fragmentShader->getOutputs().size(), numSamples, FACETYPE_FRONT);
+	FragmentShadingContext		shadingContext		(line.v0->outputs, line.v1->outputs, DE_NULL, &buffers.shaderOutputs[0], buffers.fragmentDepthBuffer, line.v1->primitiveID, (int)program.fragmentShader->getOutputs().size(), numSamples, FACETYPE_FRONT);
 	SingleSampleLineRasterizer	aliasedRasterizer	(renderTargetRect, state.subpixelBits);
 	MultiSampleLineRasterizer	msaaRasterizer		(numSamples, renderTargetRect, state.subpixelBits);
 
@@ -1218,7 +1212,7 @@ void rasterizePrimitive (const RenderState&					state,
 
 		// Handle fragment shader outputs
 
-		writeFragmentPackets(state, renderTarget, program, &buffers.fragmentPackets[0], numRasterizedPackets, rr::FACETYPE_FRONT, buffers.shaderOutputs, buffers.shaderOutputsSrc1, buffers.fragmentDepthBuffer, buffers.shadedFragments);
+		writeFragmentPackets(state, renderTarget, program, &buffers.fragmentPackets[0], numRasterizedPackets, rr::FACETYPE_FRONT, buffers.shaderOutputs, buffers.fragmentDepthBuffer, buffers.shadedFragments);
 	}
 }
 
@@ -1246,7 +1240,7 @@ void rasterizePrimitive (const RenderState&					state,
 	rasterizer2.init(w0, w2, w3);
 
 	// Shading context
-	FragmentShadingContext shadingContext(point.v0->outputs, DE_NULL, DE_NULL, &buffers.shaderOutputs[0], &buffers.shaderOutputsSrc1[0], buffers.fragmentDepthBuffer, point.v0->primitiveID, (int)program.fragmentShader->getOutputs().size(), numSamples, FACETYPE_FRONT);
+	FragmentShadingContext shadingContext(point.v0->outputs, DE_NULL, DE_NULL, &buffers.shaderOutputs[0], buffers.fragmentDepthBuffer, point.v0->primitiveID, (int)program.fragmentShader->getOutputs().size(), numSamples, FACETYPE_FRONT);
 
 	// Execute rasterize - shade - write loop
 	for (;;)
@@ -1283,7 +1277,7 @@ void rasterizePrimitive (const RenderState&					state,
 
 		// Handle fragment shader outputs
 
-		writeFragmentPackets(state, renderTarget, program, &buffers.fragmentPackets[0], numRasterizedPackets, rr::FACETYPE_FRONT, buffers.shaderOutputs, buffers.shaderOutputsSrc1, buffers.fragmentDepthBuffer, buffers.shadedFragments);
+		writeFragmentPackets(state, renderTarget, program, &buffers.fragmentPackets[0], numRasterizedPackets, rr::FACETYPE_FRONT, buffers.shaderOutputs, buffers.fragmentDepthBuffer, buffers.shadedFragments);
 	}
 }
 
@@ -1304,7 +1298,6 @@ void rasterize (const RenderState&					state,
 	// shared buffers for all primitives
 	std::vector<FragmentPacket>		fragmentPackets		(maxFragmentPackets);
 	std::vector<GenericVec4>		shaderOutputs		(maxFragmentPackets*4*numFragmentOutputs);
-	std::vector<GenericVec4>		shaderOutputsSrc1	(maxFragmentPackets*4*numFragmentOutputs);
 	std::vector<Fragment>			shadedFragments		(maxFragmentPackets*4);
 	std::vector<float>				depthValues			(0);
 	float*							depthBufferPointer	= DE_NULL;
@@ -1321,7 +1314,6 @@ void rasterize (const RenderState&					state,
 	// set buffers
 	buffers.fragmentPackets.swap(fragmentPackets);
 	buffers.shaderOutputs.swap(shaderOutputs);
-	buffers.shaderOutputsSrc1.swap(shaderOutputsSrc1);
 	buffers.shadedFragments.swap(shadedFragments);
 	buffers.fragmentDepthBuffer = depthBufferPointer;
 

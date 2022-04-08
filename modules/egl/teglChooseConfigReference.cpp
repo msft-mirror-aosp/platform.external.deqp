@@ -244,8 +244,8 @@ public:
 		static const SurfaceConfig::CompareFunc compareFuncs[] =
 		{
 			SurfaceConfig::compareCaveat,
-			SurfaceConfig::compareColorComponentType,
 			SurfaceConfig::compareColorBufferType,
+			SurfaceConfig::compareColorComponentType,
 			DE_NULL, // SurfaceConfig::compareColorBufferBits,
 			SurfaceConfig::compareAttributeSmaller<EGL_BUFFER_SIZE>,
 			SurfaceConfig::compareAttributeSmaller<EGL_SAMPLE_BUFFERS>,

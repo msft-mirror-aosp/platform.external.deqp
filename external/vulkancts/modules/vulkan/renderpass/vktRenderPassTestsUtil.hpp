@@ -44,12 +44,6 @@ enum RenderPassType
 	RENDERPASS_TYPE_RENDERPASS2,
 };
 
-enum SynchronizationType
-{
-	SYNCHRONIZATION_TYPE_LEGACY = 0,
-	SYNCHRONIZATION_TYPE_SYNCHRONIZATION2,
-};
-
 class AttachmentDescription1 : public vk::VkAttachmentDescription
 {
 public:
@@ -421,8 +415,7 @@ private:
 Move<VkRenderPass> createRenderPass (const DeviceInterface&	vk,
 									 VkDevice				device,
 									 const RenderPass&		renderPassInfo,
-									 RenderPassType			renderPassType,
-									 SynchronizationType	synchronizationType = SYNCHRONIZATION_TYPE_LEGACY);
+									 const RenderPassType	renderPassType);
 
 } // renderpass
 

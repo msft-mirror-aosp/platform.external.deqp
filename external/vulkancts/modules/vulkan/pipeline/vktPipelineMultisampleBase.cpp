@@ -130,7 +130,8 @@ void MultisampleInstanceBase::validateImageInfo	(const InstanceInterface&	instan
 							<< imageFormatProps.maxExtent.width <<  ", "
 							<< imageFormatProps.maxExtent.height << ", "
 							<< imageFormatProps.maxExtent.depth
-							<< ")";
+							<< ")"
+							<< std::endl;
 
 		const std::string notSupportedString = notSupportedStream.str();
 
@@ -141,7 +142,7 @@ void MultisampleInstanceBase::validateImageInfo	(const InstanceInterface&	instan
 	{
 		std::ostringstream	notSupportedStream;
 
-		notSupportedStream << "Image layers count of " << imageInfo.arrayLayers << " exceeds allowed maximum which is " << imageFormatProps.maxArrayLayers;
+		notSupportedStream << "Image layers count of " << imageInfo.arrayLayers << " exceeds allowed maximum which is " << imageFormatProps.maxArrayLayers << std::endl;
 
 		const std::string notSupportedString = notSupportedStream.str();
 
@@ -152,7 +153,7 @@ void MultisampleInstanceBase::validateImageInfo	(const InstanceInterface&	instan
 	{
 		std::ostringstream	notSupportedStream;
 
-		notSupportedStream << "Samples count of " << imageInfo.samples << " not supported for image";
+		notSupportedStream << "Samples count of " << imageInfo.samples << " not supported for image" << std::endl;
 
 		const std::string notSupportedString = notSupportedStream.str();
 

@@ -813,8 +813,6 @@ tcu::TestStatus Texture2DArrayShadowTestInstance::iterate (void)
 	return m_caseNdx < (int)m_cases.size() ? tcu::TestStatus::incomplete() : tcu::TestStatus::pass("Pass");
 }
 
-} // anonymous
-
 void populateTextureShadowTests (tcu::TestCaseGroup* textureShadowTests)
 {
 	tcu::TestContext&				testCtx				= textureShadowTests->getTestContext();
@@ -996,6 +994,8 @@ void populateTextureShadowTests (tcu::TestCaseGroup* textureShadowTests)
 		textureShadowTests->addChild(group2DArray.release());
 	}
 }
+
+} // anonymous
 
 tcu::TestCaseGroup* createTextureShadowTests (tcu::TestContext& testCtx)
 {

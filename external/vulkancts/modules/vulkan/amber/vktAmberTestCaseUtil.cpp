@@ -59,18 +59,6 @@ class AmberIndexFileParser
 			m_idx++;
 	}
 
-	bool skipCommentLine (void)
-	{
-		skipWhitespace();
-		if (m_str[m_idx] == '#')
-		{
-			while (m_idx < m_len && m_str[m_idx] != '\n')
-				m_idx++;
-			return true;
-		}
-		return false;
-	}
-
 	void accept (char c)
 	{
 		if (m_str[m_idx] == c)
@@ -122,12 +110,8 @@ public:
 		// {"filename","test name","description"[,requirement[,requirement[,requirement..]]]}[,]
 		// Things inside [] are optional. Whitespace is allowed everywhere.
 		//
-		// Comments are allowed starting with "#" character.
-		//
 		// For example, test without requirements might be:
 		// {"testname.amber","test name","test description"},
-
-		while (skipCommentLine());
 
 		if (m_idx < m_len)
 		{
@@ -189,15 +173,12 @@ void createAmberTestsFromIndexFile (tcu::TestContext& testCtx, tcu::TestCaseGrou
 	} while (testCase);
 }
 
-AmberTestCase* createAmberTestCase (tcu::TestContext&							testCtx,
-									const char*									name,
-									const char*									description,
-									const char*									category,
-									const std::string&							filename,
-									const std::vector<std::string>				requirements,
-									const std::vector<vk::VkImageCreateInfo>	imageRequirements,
-									const std::vector<BufferRequirement>		bufferRequirements)
-
+AmberTestCase* createAmberTestCase (tcu::TestContext&				testCtx,
+									const char*						name,
+									const char*						description,
+									const char*						category,
+									const std::string&				filename,
+									const std::vector<std::string>	requirements)
 {
 	// shader_test files are saved in <path>/external/vulkancts/data/vulkan/amber/<categoryname>/
 	std::string readFilename("vulkan/amber/");
@@ -209,12 +190,6 @@ AmberTestCase* createAmberTestCase (tcu::TestContext&							testCtx,
 
 	for (auto req : requirements)
 		testCase->addRequirement(req);
-
-	for (auto req : imageRequirements)
-		testCase->addImageRequirement(req);
-
-	for (auto req : bufferRequirements)
-		testCase->addBufferRequirement(req);
 
 	return testCase;
 }

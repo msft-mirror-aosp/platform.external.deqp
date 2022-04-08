@@ -24,8 +24,6 @@
 #include "tcuStringTemplate.hpp"
 #include "tcuDefs.hpp"
 
-#include "deStringUtil.hpp"
-
 #include <sstream>
 
 using std::string;
@@ -53,10 +51,6 @@ void StringTemplate::setString (const std::string& str)
 	m_template = str;
 }
 
-const string kSingleLineFlag = "single-line";
-const string kOptFlag = "opt";
-const string kDefaultFlag = "default=";
-
 string StringTemplate::specialize (const map<string, string>& params) const
 {
 	ostringstream res;
@@ -79,26 +73,19 @@ string StringTemplate::specialize (const map<string, string>& params) const
 			string	paramStr		= m_template.substr(paramNdx+2, paramEndNdx-2-paramNdx);
 			bool	paramSingleLine	= false;
 			bool	paramOptional	= false;
-			bool	paramDefault	= false;
 			string	paramName;
-			string	defaultValue;
 			size_t colonNdx = paramStr.find(":");
 			if (colonNdx != string::npos)
 			{
 				paramName = paramStr.substr(0, colonNdx);
 				string flagsStr = paramStr.substr(colonNdx+1);
-				if (flagsStr == kSingleLineFlag)
+				if (flagsStr == "single-line")
 				{
 					paramSingleLine = true;
 				}
-				else if (flagsStr == kOptFlag)
+				else if (flagsStr == "opt")
 				{
 					paramOptional = true;
-				}
-				else if (de::beginsWith(flagsStr, kDefaultFlag))
-				{
-					paramDefault = true;
-					defaultValue = flagsStr.substr(kDefaultFlag.size());
 				}
 				else
 				{
@@ -122,8 +109,6 @@ string StringTemplate::specialize (const map<string, string>& params) const
 				else
 					res << val;
 			}
-			else if (paramDefault)
-				res << defaultValue;
 			else if (!paramOptional)
 				TCU_THROW(InternalError, (string("Value for parameter '") + paramName + "' not found in map").c_str());
 

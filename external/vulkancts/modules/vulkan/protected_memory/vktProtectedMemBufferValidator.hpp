@@ -82,19 +82,17 @@ template<typename T>
 class BufferValidator
 {
 public:
-									BufferValidator			(const ValidationData<T> data, vk::VkFormat format)
+									BufferValidator			(const ValidationData<T> data)
 										: m_refData			(data)
 										, m_refDataStorage	(*reinterpret_cast<ValidationDataStorage<T>*>( &std::vector<char>(sizeof(ValidationDataStorage<T>), '\0').front()))
 										, m_bufferType		(SAMPLER_BUFFER)
-										, m_format			(format)
 									{
 									}
 
-									BufferValidator			(const ValidationDataStorage<T> data, vk::VkFormat format)
+									BufferValidator			(const ValidationDataStorage<T> data)
 										: m_refData			(*reinterpret_cast<ValidationData<T>*>( &std::vector<char>(sizeof(ValidationData<T>), '\0').front()))
 										, m_refDataStorage	(data)
 										, m_bufferType		(STORAGE_BUFFER)
-										, m_format			(format)
 									{
 									}
 
@@ -112,7 +110,6 @@ private:
 	const ValidationDataStorage<T>	m_refDataStorage;
 
 	BufferType						m_bufferType;
-	vk::VkFormat					m_format;
 };
 
 template<>
@@ -199,7 +196,7 @@ bool BufferValidator<T>::validateBuffer (ProtectedContext&		ctx,
 	// Set the reference uniform data
 	{
 		deMemcpy(refUniform->getAllocation().getHostPtr(), getReferenceDataSrc(), refDataSize);
-		flushAlloc(vk, device, refUniform->getAllocation());
+		vk::flushMappedMemoryRange(vk, device, refUniform->getAllocation().getMemory(), refUniform->getAllocation().getOffset(), refDataSize);
 	}
 
 	const deUint32							helperBufferSize	= (deUint32)(2 * sizeof(deUint32));
@@ -242,7 +239,7 @@ bool BufferValidator<T>::validateBuffer (ProtectedContext&		ctx,
 						DE_NULL,										// const void*				pNext
 						0u,												// VkBufferViewCreateFlags	flags
 						buffer,											// VkBuffer					buffer
-						m_format,										// VkFormat					format
+						vk::VK_FORMAT_R32G32B32A32_UINT,				// VkFormat					format
 						0u,												// VkDeviceSize				offset
 						VK_WHOLE_SIZE									// VkDeviceSize				range
 					};

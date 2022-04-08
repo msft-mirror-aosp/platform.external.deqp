@@ -97,11 +97,9 @@ BaseTypeCase::IterateResult BaseTypeCase::iterate (void)
 
 	tcu::ResultCollector		result			(m_testCtx.getLog());
 	std::vector<TestTypeInfo>	samplerTypes	= getInfos();
-	auto						ctxType			= m_context.getRenderContext().getType();
-	const bool					isES32orGL45	= glu::contextSupports(ctxType, glu::ApiType::es(3, 2)) ||
-												  glu::contextSupports(ctxType, glu::ApiType::core(4, 5));
+	const bool					supportsES32	= glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
-	if (m_extension && !isES32orGL45 && !m_context.getContextInfo().isExtensionSupported(m_extension))
+	if (m_extension && !m_context.getContextInfo().isExtensionSupported(m_extension) && !supportsES32)
 		throw tcu::NotSupportedError("Test requires " + std::string(m_extension));
 	checkRequirements();
 
@@ -114,8 +112,8 @@ BaseTypeCase::IterateResult BaseTypeCase::iterate (void)
 		std::map<std::string, std::string>	shaderArgs;
 		shaderArgs["DECLARATIONSTR"]		= samplerTypes[typeNdx].declarationStr;
 		shaderArgs["ACCESSSTR"]				= samplerTypes[typeNdx].accessStr;
-		shaderArgs["EXTENSIONSTATEMENT"]	= (m_extension && !isES32orGL45) ? (std::string() + "#extension " + m_extension + " : require\n") : ("");
-		shaderArgs["VERSIONDECL"]			= glu::getGLSLVersionDeclaration(glu::getContextTypeGLSLVersion(ctxType));
+		shaderArgs["EXTENSIONSTATEMENT"]	= (m_extension && !supportsES32) ? (std::string() + "#extension " + m_extension + " : require\n") : ("");
+		shaderArgs["VERSIONDECL"]			= glu::getGLSLVersionDeclaration(glu::getContextTypeGLSLVersion(m_context.getRenderContext().getType()));
 
 		const std::string					fragmentSource	= tcu::StringTemplate(fragmentSourceTemplate).specialize(shaderArgs);
 		const std::string					vertexSource	= tcu::StringTemplate(vertexSourceTemplate).specialize(shaderArgs);
@@ -381,9 +379,7 @@ ShaderLogCase::ShaderLogCase (Context& ctx, const char* name, const char* desc, 
 
 void ShaderLogCase::init (void)
 {
-	auto		ctxType			= m_context.getRenderContext().getType();
-	const bool	isES32orGL45	= glu::contextSupports(ctxType, glu::ApiType::es(3, 2)) ||
-								  glu::contextSupports(ctxType, glu::ApiType::core(4, 5));
+	const bool supportsES32 = glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
 	switch (m_shaderType)
 	{
@@ -393,13 +389,13 @@ void ShaderLogCase::init (void)
 			break;
 
 		case glu::SHADERTYPE_GEOMETRY:
-			if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_geometry_shader") && !isES32orGL45)
+			if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_geometry_shader") && !supportsES32)
 				throw tcu::NotSupportedError("Test requires GL_EXT_geometry_shader extension or an OpenGL ES 3.2 or higher context.");
 			break;
 
 		case glu::SHADERTYPE_TESSELLATION_CONTROL:
 		case glu::SHADERTYPE_TESSELLATION_EVALUATION:
-			if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_tessellation_shader") && !isES32orGL45)
+			if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_tessellation_shader") && !supportsES32)
 				throw tcu::NotSupportedError("Test requires GL_EXT_tessellation_shader extension or an OpenGL ES 3.2 or higher context.");
 			break;
 

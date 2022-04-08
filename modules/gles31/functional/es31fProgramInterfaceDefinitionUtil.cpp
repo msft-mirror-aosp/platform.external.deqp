@@ -218,9 +218,6 @@ using ProgramInterfaceDefinition::VariableSearchFilter;
 
 static std::string getShaderExtensionDeclarations (const ProgramInterfaceDefinition::Shader* shader)
 {
-	if (shader->getVersion() > glu::GLSL_VERSION_440)
-		return "";
-
 	std::vector<std::string>	extensions;
 	std::ostringstream			buf;
 
@@ -242,16 +239,11 @@ static std::string getShaderExtensionDeclarations (const ProgramInterfaceDefinit
 	return buf.str();
 }
 
-static std::string getShaderTypeDeclarations (const ProgramInterfaceDefinition::Program* program, const ProgramInterfaceDefinition::Shader* shader)
+static std::string getShaderTypeDeclarations (const ProgramInterfaceDefinition::Program* program, glu::ShaderType type)
 {
-	glu::ShaderType type = shader->getType();
-	auto isCoreGL = (shader->getVersion() > glu::GLSL_VERSION_440);
-
 	switch (type)
 	{
 		case glu::SHADERTYPE_VERTEX:
-			if (isCoreGL)
-				return "out gl_PerVertex { vec4 gl_Position; };\n";
 			return "";
 
 		case glu::SHADERTYPE_FRAGMENT:
@@ -262,11 +254,6 @@ static std::string getShaderTypeDeclarations (const ProgramInterfaceDefinition::
 			std::ostringstream buf;
 			buf <<	"layout(points) in;\n"
 					"layout(points, max_vertices=" << program->getGeometryNumOutputVertices() << ") out;\n";
-			if (isCoreGL)
-			{
-				buf << "in gl_PerVertex { vec4 gl_Position; } gl_in[];\n"
-					   "out gl_PerVertex { vec4 gl_Position; };\n";
-			}
 			return buf.str();
 		}
 
@@ -274,25 +261,11 @@ static std::string getShaderTypeDeclarations (const ProgramInterfaceDefinition::
 		{
 			std::ostringstream buf;
 			buf << "layout(vertices=" << program->getTessellationNumOutputPatchVertices() << ") out;\n";
-			if (isCoreGL)
-			{
-				buf << "in gl_PerVertex { vec4 gl_Position; } gl_in[];\n"
-					   "out gl_PerVertex { vec4 gl_Position; } gl_out[];\n";
-			}
 			return buf.str();
 		}
 
 		case glu::SHADERTYPE_TESSELLATION_EVALUATION:
-		{
-			std::ostringstream buf;
-			if (isCoreGL)
-			{
-				buf << "in gl_PerVertex { vec4 gl_Position; } gl_in[];\n"
-					   "out gl_PerVertex { vec4 gl_Position; };\n";
-			}
-			buf << "layout(triangles, point_mode) in;\n";
-			return buf.str();
-		}
+			return "layout(triangles, point_mode) in;\n";
 
 		case glu::SHADERTYPE_COMPUTE:
 			return "layout(local_size_x=1) in;\n";
@@ -1533,7 +1506,7 @@ glu::ProgramSources generateProgramInterfaceProgramSources (const ProgramInterfa
 
 		sourceBuf	<< glu::getGLSLVersionDeclaration(shader->getVersion()) << "\n"
 					<< getShaderExtensionDeclarations(shader)
-					<< getShaderTypeDeclarations(program, shader)
+					<< getShaderTypeDeclarations(program, shader->getType())
 					<< "\n";
 
 		// Struct definitions

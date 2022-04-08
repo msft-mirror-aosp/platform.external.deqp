@@ -41,13 +41,7 @@ using namespace vk;
 #define SHORT_FENCE_WAIT	1000ull
 #define LONG_FENCE_WAIT		~0ull
 
-struct TestConfig
-{
-	SynchronizationType		type;
-	VkEventCreateFlags		flags;
-};
-
-tcu::TestStatus hostResetSetEventCase (Context& context, TestConfig config)
+tcu::TestStatus hostResetSetEventCase (Context& context)
 {
 	const DeviceInterface&		vk			= context.getDeviceInterface();
 	const VkDevice				device		= context.getDevice();
@@ -59,8 +53,6 @@ tcu::TestStatus hostResetSetEventCase (Context& context, TestConfig config)
 											};
 	VkEvent						event;
 	Move<VkEvent>				ptrEvent;
-
-	DE_UNREF(config);
 
 	if (VK_SUCCESS != vk.createEvent(device, &eventInfo, DE_NULL, &event))
 		return tcu::TestStatus::fail("Couldn't create event");
@@ -85,70 +77,43 @@ tcu::TestStatus hostResetSetEventCase (Context& context, TestConfig config)
 	return tcu::TestStatus::pass("Tests set and reset event on host pass");
 }
 
-tcu::TestStatus deviceResetSetEventCase (Context& context, TestConfig config)
+tcu::TestStatus deviceResetSetEventCase (Context& context)
 {
-	const DeviceInterface&				vk						= context.getDeviceInterface();
-	const VkDevice						device					= context.getDevice();
-	const VkQueue						queue					= context.getUniversalQueue();
-	const deUint32						queueFamilyIndex		= context.getUniversalQueueFamilyIndex();
-	const Unique<VkCommandPool>			cmdPool					(createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queueFamilyIndex));
-	const Unique<VkCommandBuffer>		cmdBuffer				(makeCommandBuffer(vk, device, *cmdPool));
-	const Unique<VkEvent>				event					(createEvent(vk, device));
-	const VkCommandBufferSubmitInfoKHR	commandBufferSubmitInfo = makeCommonCommandBufferSubmitInfo(cmdBuffer.get());
-	const VkMemoryBarrier2KHR			memoryBarrier2			=
-	{
-		VK_STRUCTURE_TYPE_MEMORY_BARRIER_2_KHR,				// VkStructureType					sType
-		DE_NULL,											// const void*						pNext
-		VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT_KHR,			// VkPipelineStageFlags2KHR			srcStageMask
-		VK_ACCESS_2_NONE_KHR,								// VkAccessFlags2KHR				srcAccessMask
-		VK_PIPELINE_STAGE_2_HOST_BIT_KHR,					// VkPipelineStageFlags2KHR			dstStageMask
-		VK_ACCESS_2_HOST_READ_BIT_KHR						// VkAccessFlags2KHR				dstAccessMask
-	};
-	VkDependencyInfoKHR					dependencyInfo			= makeCommonDependencyInfo(&memoryBarrier2);
+	const DeviceInterface&			vk					= context.getDeviceInterface();
+	const VkDevice					device				= context.getDevice();
+	const VkQueue					queue				= context.getUniversalQueue();
+	const deUint32					queueFamilyIndex	= context.getUniversalQueueFamilyIndex();
+	const Unique<VkCommandPool>		cmdPool				(createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queueFamilyIndex));
+	const Unique<VkCommandBuffer>	cmdBuffer			(makeCommandBuffer(vk, device, *cmdPool));
+	const VkSubmitInfo				submitInfo			=
+														{
+															VK_STRUCTURE_TYPE_SUBMIT_INFO,	// VkStructureType				sType;
+															DE_NULL,						// const void*					pNext;
+															0u,								// deUint32						waitSemaphoreCount;
+															DE_NULL,						// const VkSemaphore*			pWaitSemaphores;
+															DE_NULL,						// const VkPipelineStageFlags*	pWaitDstStageMask;
+															1u,								// deUint32						commandBufferCount;
+															&cmdBuffer.get(),				// const VkCommandBuffer*		pCommandBuffers;
+															0u,								// deUint32						signalSemaphoreCount;
+															DE_NULL,						// const VkSemaphore*			pSignalSemaphores;
+														};
+	const Unique<VkEvent>			event				(createEvent(vk, device));
 
-	{
-		SynchronizationWrapperPtr synchronizationWrapper = getSynchronizationWrapper(config.type, vk, DE_FALSE);
+	beginCommandBuffer(vk, *cmdBuffer);
+	vk.cmdSetEvent(*cmdBuffer, *event, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+	endCommandBuffer(vk, *cmdBuffer);
 
-		beginCommandBuffer(vk, *cmdBuffer);
-		synchronizationWrapper->cmdSetEvent(*cmdBuffer, *event, &dependencyInfo);
-		endCommandBuffer(vk, *cmdBuffer);
-
-		synchronizationWrapper->addSubmitInfo(
-			0u,										// deUint32								waitSemaphoreInfoCount
-			DE_NULL,								// const VkSemaphoreSubmitInfoKHR*		pWaitSemaphoreInfos
-			1u,										// deUint32								commandBufferInfoCount
-			&commandBufferSubmitInfo,				// const VkCommandBufferSubmitInfoKHR*	pCommandBufferInfos
-			0u,										// deUint32								signalSemaphoreInfoCount
-			DE_NULL									// const VkSemaphoreSubmitInfoKHR*		pSignalSemaphoreInfos
-		);
-
-		VK_CHECK(synchronizationWrapper->queueSubmit(queue, DE_NULL));
-	}
-
+	VK_CHECK(vk.queueSubmit(queue, 1u, &submitInfo, DE_NULL));
 	VK_CHECK(vk.queueWaitIdle(queue));
 
 	if (VK_EVENT_SET != vk.getEventStatus(device, *event))
 		return tcu::TestStatus::fail("Event should be in signaled state after set");
 
-	{
-		SynchronizationWrapperPtr synchronizationWrapper = getSynchronizationWrapper(config.type, vk, DE_FALSE);
+	beginCommandBuffer(vk, *cmdBuffer);
+	vk.cmdResetEvent(*cmdBuffer, *event, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
+	endCommandBuffer(vk, *cmdBuffer);
 
-		beginCommandBuffer(vk, *cmdBuffer);
-		synchronizationWrapper->cmdResetEvent(*cmdBuffer, *event, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT_KHR);
-		endCommandBuffer(vk, *cmdBuffer);
-
-		synchronizationWrapper->addSubmitInfo(
-			0u,										// deUint32								waitSemaphoreInfoCount
-			DE_NULL,								// const VkSemaphoreSubmitInfoKHR*		pWaitSemaphoreInfos
-			1u,										// deUint32								commandBufferInfoCount
-			&commandBufferSubmitInfo,				// const VkCommandBufferSubmitInfoKHR*	pCommandBufferInfos
-			0u,										// deUint32								signalSemaphoreInfoCount
-			DE_NULL									// const VkSemaphoreSubmitInfoKHR*		pSignalSemaphoreInfos
-		);
-
-		VK_CHECK(synchronizationWrapper->queueSubmit(queue, DE_NULL));
-	}
-
+	VK_CHECK(vk.queueSubmit(queue, 1u, &submitInfo, DE_NULL));
 	VK_CHECK(vk.queueWaitIdle(queue));
 
 	if (VK_EVENT_RESET != vk.getEventStatus(device, *event))
@@ -157,107 +122,99 @@ tcu::TestStatus deviceResetSetEventCase (Context& context, TestConfig config)
 	return tcu::TestStatus::pass("Device set and reset event tests pass");
 }
 
-tcu::TestStatus singleSubmissionCase (Context& context, TestConfig config)
+tcu::TestStatus singleSubmissionCase (Context& context)
 {
 	enum {SET=0, WAIT, COUNT};
-	const DeviceInterface&			vk							= context.getDeviceInterface();
-	const VkDevice					device						= context.getDevice();
-	const VkQueue					queue						= context.getUniversalQueue();
-	const deUint32					queueFamilyIndex			= context.getUniversalQueueFamilyIndex();
-	const Unique<VkFence>			fence						(createFence(vk, device));
-	const Unique<VkCommandPool>		cmdPool						(createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queueFamilyIndex));
-	const Move<VkCommandBuffer>		ptrCmdBuffer[COUNT]			= { makeCommandBuffer(vk, device, *cmdPool), makeCommandBuffer(vk, device, *cmdPool) };
-	VkCommandBuffer					cmdBuffers[COUNT]			= {*ptrCmdBuffer[SET], *ptrCmdBuffer[WAIT]};
-	const Unique<VkEvent>			event						(createEvent(vk, device, config.flags));
-	VkCommandBufferSubmitInfoKHR	commandBufferSubmitInfo[]	{
-																	makeCommonCommandBufferSubmitInfo(cmdBuffers[SET]),
-																	makeCommonCommandBufferSubmitInfo(cmdBuffers[WAIT])
-																};
-	VkDependencyInfoKHR				dependencyInfo				= makeCommonDependencyInfo();
-	SynchronizationWrapperPtr		synchronizationWrapper		= getSynchronizationWrapper(config.type, vk, DE_FALSE);
-
-	synchronizationWrapper->addSubmitInfo(
-		0u,										// deUint32								waitSemaphoreInfoCount
-		DE_NULL,								// const VkSemaphoreSubmitInfoKHR*		pWaitSemaphoreInfos
-		2u,										// deUint32								commandBufferInfoCount
-		commandBufferSubmitInfo,				// const VkCommandBufferSubmitInfoKHR*	pCommandBufferInfos
-		0u,										// deUint32								signalSemaphoreInfoCount
-		DE_NULL									// const VkSemaphoreSubmitInfoKHR*		pSignalSemaphoreInfos
-	);
+	const DeviceInterface&			vk					= context.getDeviceInterface();
+	const VkDevice					device				= context.getDevice();
+	const VkQueue					queue				= context.getUniversalQueue();
+	const deUint32					queueFamilyIndex	= context.getUniversalQueueFamilyIndex();
+	const Unique<VkFence>			fence				(createFence(vk, device));
+	const Unique<VkCommandPool>		cmdPool				(createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queueFamilyIndex));
+	const Move<VkCommandBuffer>		ptrCmdBuffer[COUNT]	= {makeCommandBuffer(vk, device, *cmdPool), makeCommandBuffer(vk, device, *cmdPool)};
+	VkCommandBuffer					cmdBuffers[COUNT]	= {*ptrCmdBuffer[SET], *ptrCmdBuffer[WAIT]};
+	const VkSubmitInfo				submitInfo			=
+														{
+															VK_STRUCTURE_TYPE_SUBMIT_INFO,	// VkStructureType				sType;
+															DE_NULL,						// const void*					pNext;
+															0u,								// deUint32						waitSemaphoreCount;
+															DE_NULL,						// const VkSemaphore*			pWaitSemaphores;
+															DE_NULL,						// const VkPipelineStageFlags*	pWaitDstStageMask;
+															2u,								// deUint32						commandBufferCount;
+															cmdBuffers,						// const VkCommandBuffer*		pCommandBuffers;
+															0u,								// deUint32						signalSemaphoreCount;
+															DE_NULL,						// const VkSemaphore*			pSignalSemaphores;
+														};
+	const Unique<VkEvent>			event				(createEvent(vk, device));
 
 	beginCommandBuffer(vk, cmdBuffers[SET]);
-	synchronizationWrapper->cmdSetEvent(cmdBuffers[SET], *event, &dependencyInfo);
+	vk.cmdSetEvent(cmdBuffers[SET], *event, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 	endCommandBuffer(vk, cmdBuffers[SET]);
 
 	beginCommandBuffer(vk, cmdBuffers[WAIT]);
-	synchronizationWrapper->cmdWaitEvents(cmdBuffers[WAIT], 1u, &event.get(), &dependencyInfo);
+	vk.cmdWaitEvents(cmdBuffers[WAIT], 1u, &event.get(),VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0u, DE_NULL, 0u, DE_NULL, 0u, DE_NULL);
 	endCommandBuffer(vk, cmdBuffers[WAIT]);
 
-	VK_CHECK(synchronizationWrapper->queueSubmit(queue, *fence));
-
+	VK_CHECK(vk.queueSubmit(queue, 1u, &submitInfo, *fence));
 	if (VK_SUCCESS != vk.waitForFences(device, 1u, &fence.get(), DE_TRUE, LONG_FENCE_WAIT))
 		return tcu::TestStatus::fail("Queue should end execution");
 
 	return tcu::TestStatus::pass("Wait and set even on device single submission tests pass");
 }
 
-tcu::TestStatus multiSubmissionCase(Context& context, TestConfig config)
+tcu::TestStatus multiSubmissionCase (Context& context)
 {
-	enum { SET = 0, WAIT, COUNT };
+	enum {SET=0, WAIT, COUNT};
 	const DeviceInterface&			vk					= context.getDeviceInterface();
 	const VkDevice					device				= context.getDevice();
 	const VkQueue					queue				= context.getUniversalQueue();
 	const deUint32					queueFamilyIndex	= context.getUniversalQueueFamilyIndex();
-	const Move<VkFence>				ptrFence[COUNT]		= { createFence(vk, device), createFence(vk, device) };
-	VkFence							fence[COUNT]		= { *ptrFence[SET], *ptrFence[WAIT] };
+	const Move<VkFence>				ptrFence[COUNT]		=
+	{
+		createFence(vk, device),
+		createFence(vk, device)
+	};
+	VkFence							fence[COUNT]		= {*ptrFence[SET], *ptrFence[WAIT]};
 	const Unique<VkCommandPool>		cmdPool				(createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queueFamilyIndex));
-	const Move<VkCommandBuffer>		ptrCmdBuffer[COUNT] = { makeCommandBuffer(vk, device, *cmdPool), makeCommandBuffer(vk, device, *cmdPool) };
-	VkCommandBuffer					cmdBuffers[COUNT]	= { *ptrCmdBuffer[SET], *ptrCmdBuffer[WAIT] };
-	const Unique<VkEvent>			event				(createEvent(vk, device, config.flags));
-	VkCommandBufferSubmitInfoKHR	commandBufferSubmitInfo[] =
-	{
-		makeCommonCommandBufferSubmitInfo(cmdBuffers[SET]),
-		makeCommonCommandBufferSubmitInfo(cmdBuffers[WAIT])
-	};
-	SynchronizationWrapperPtr		synchronizationWrapper[] =
-	{
-		getSynchronizationWrapper(config.type, vk, DE_FALSE),
-		getSynchronizationWrapper(config.type, vk, DE_FALSE)
-	};
-	VkDependencyInfoKHR				dependencyInfos[] =
-	{
-		makeCommonDependencyInfo(),
-		makeCommonDependencyInfo()
-	};
-
-	synchronizationWrapper[SET]->addSubmitInfo(
-		0u,										// deUint32								waitSemaphoreInfoCount
-		DE_NULL,								// const VkSemaphoreSubmitInfoKHR*		pWaitSemaphoreInfos
-		1u,										// deUint32								commandBufferInfoCount
-		&commandBufferSubmitInfo[SET],			// const VkCommandBufferSubmitInfoKHR*	pCommandBufferInfos
-		0u,										// deUint32								signalSemaphoreInfoCount
-		DE_NULL									// const VkSemaphoreSubmitInfoKHR*		pSignalSemaphoreInfos
-	);
-
-	synchronizationWrapper[WAIT]->addSubmitInfo(
-		0u,										// deUint32								waitSemaphoreInfoCount
-		DE_NULL,								// const VkSemaphoreSubmitInfoKHR*		pWaitSemaphoreInfos
-		1u,										// deUint32								commandBufferInfoCount
-		&commandBufferSubmitInfo[WAIT],			// const VkCommandBufferSubmitInfoKHR*	pCommandBufferInfos
-		0u,										// deUint32								signalSemaphoreInfoCount
-		DE_NULL									// const VkSemaphoreSubmitInfoKHR*		pSignalSemaphoreInfos
-	);
+	const Move<VkCommandBuffer>		ptrCmdBuffer[COUNT]	= {makeCommandBuffer(vk, device, *cmdPool), makeCommandBuffer(vk, device, *cmdPool)};
+	VkCommandBuffer					cmdBuffers[COUNT]	= {*ptrCmdBuffer[SET], *ptrCmdBuffer[WAIT]};
+	const VkSubmitInfo				submitInfo[COUNT]	=
+														{
+															{
+																VK_STRUCTURE_TYPE_SUBMIT_INFO,	// VkStructureType				sType;
+																DE_NULL,						// const void*					pNext;
+																0u,								// deUint32						waitSemaphoreCount;
+																DE_NULL,						// const VkSemaphore*			pWaitSemaphores;
+																DE_NULL,						// const VkPipelineStageFlags*	pWaitDstStageMask;
+																1u,								// deUint32						commandBufferCount;
+																&cmdBuffers[SET],				// const VkCommandBuffer*		pCommandBuffers;
+																0u,								// deUint32						signalSemaphoreCount;
+																DE_NULL,						// const VkSemaphore*			pSignalSemaphores;
+															},
+															{
+																VK_STRUCTURE_TYPE_SUBMIT_INFO,	// VkStructureType				sType;
+																DE_NULL,						// const void*					pNext;
+																0u,								// deUint32						waitSemaphoreCount;
+																DE_NULL,						// const VkSemaphore*			pWaitSemaphores;
+																DE_NULL,						// const VkPipelineStageFlags*	pWaitDstStageMask;
+																1u,								// deUint32						commandBufferCount;
+																&cmdBuffers[WAIT],				// const VkCommandBuffer*		pCommandBuffers;
+																0u,								// deUint32						signalSemaphoreCount;
+																DE_NULL,						// const VkSemaphore*			pSignalSemaphores;
+															}
+														};
+	const Unique<VkEvent>			event				(createEvent(vk, device));
 
 	beginCommandBuffer(vk, cmdBuffers[SET]);
-	synchronizationWrapper[SET]->cmdSetEvent(cmdBuffers[SET], *event, &dependencyInfos[SET]);
+	vk.cmdSetEvent(cmdBuffers[SET], *event, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 	endCommandBuffer(vk, cmdBuffers[SET]);
 
 	beginCommandBuffer(vk, cmdBuffers[WAIT]);
-	synchronizationWrapper[WAIT]->cmdWaitEvents(cmdBuffers[WAIT], 1u, &event.get(), &dependencyInfos[WAIT]);
+	vk.cmdWaitEvents(cmdBuffers[WAIT], 1u, &event.get(), VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0u, DE_NULL, 0u, DE_NULL, 0u, DE_NULL);
 	endCommandBuffer(vk, cmdBuffers[WAIT]);
 
-	VK_CHECK(synchronizationWrapper[SET]->queueSubmit(queue, fence[SET]));
-	VK_CHECK(synchronizationWrapper[WAIT]->queueSubmit(queue, fence[WAIT]));
+	VK_CHECK(vk.queueSubmit(queue, 1u, &submitInfo[SET], fence[SET]));
+	VK_CHECK(vk.queueSubmit(queue, 1u, &submitInfo[WAIT], fence[WAIT]));
 
 	if (VK_SUCCESS != vk.waitForFences(device, 2u, fence, DE_TRUE, LONG_FENCE_WAIT))
 		return tcu::TestStatus::fail("Queue should end execution");
@@ -265,7 +222,7 @@ tcu::TestStatus multiSubmissionCase(Context& context, TestConfig config)
 	return tcu::TestStatus::pass("Wait and set even on device multi submission tests pass");
 }
 
-tcu::TestStatus secondaryCommandBufferCase (Context& context, TestConfig config)
+tcu::TestStatus secondaryCommandBufferCase (Context& context)
 {
 	enum {SET=0, WAIT, COUNT};
 	const DeviceInterface&					vk						= context.getDeviceInterface();
@@ -285,7 +242,19 @@ tcu::TestStatus secondaryCommandBufferCase (Context& context, TestConfig config)
 																	};
 	const Move<VkCommandBuffer>				prtCmdBuffers[COUNT]	= {allocateCommandBuffer (vk, device, &cmdBufferInfo), allocateCommandBuffer (vk, device, &cmdBufferInfo)};
 	VkCommandBuffer							secondaryCmdBuffers[]	= {*prtCmdBuffers[SET], *prtCmdBuffers[WAIT]};
-	const Unique<VkEvent>					event					(createEvent(vk, device, config.flags));
+	const VkSubmitInfo						submitInfo				=
+																	{
+																		VK_STRUCTURE_TYPE_SUBMIT_INFO,	// VkStructureType				sType;
+																		DE_NULL,						// const void*					pNext;
+																		0u,								// deUint32						waitSemaphoreCount;
+																		DE_NULL,						// const VkSemaphore*			pWaitSemaphores;
+																		DE_NULL,						// const VkPipelineStageFlags*	pWaitDstStageMask;
+																		1u,								// deUint32						commandBufferCount;
+																		&primaryCmdBuffer.get(),		// const VkCommandBuffer*		pCommandBuffers;
+																		0u,								// deUint32						signalSemaphoreCount;
+																		DE_NULL,						// const VkSemaphore*			pSignalSemaphores;
+																	};
+	const Unique<VkEvent>					event					(createEvent(vk, device));
 
 	const VkCommandBufferInheritanceInfo	secCmdBufInheritInfo	=
 																	{
@@ -305,95 +274,38 @@ tcu::TestStatus secondaryCommandBufferCase (Context& context, TestConfig config)
 																		VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,	// VkCommandBufferUsageFlags                flags;
 																		&secCmdBufInheritInfo,							// const VkCommandBufferInheritanceInfo*    pInheritanceInfo;
 																	};
-	VkCommandBufferSubmitInfoKHR			commandBufferSubmitInfo	= makeCommonCommandBufferSubmitInfo(*primaryCmdBuffer);
-	VkDependencyInfoKHR						dependencyInfos[]		=
-																	{
-																		makeCommonDependencyInfo(),
-																		makeCommonDependencyInfo()
-																	};
-	SynchronizationWrapperPtr				synchronizationWrapper	= getSynchronizationWrapper(config.type, vk, DE_FALSE);
-
-	synchronizationWrapper->addSubmitInfo(
-		0u,										// deUint32								waitSemaphoreInfoCount
-		DE_NULL,								// const VkSemaphoreSubmitInfoKHR*		pWaitSemaphoreInfos
-		1u,										// deUint32								commandBufferInfoCount
-		&commandBufferSubmitInfo,				// const VkCommandBufferSubmitInfoKHR*	pCommandBufferInfos
-		0u,										// deUint32								signalSemaphoreInfoCount
-		DE_NULL									// const VkSemaphoreSubmitInfoKHR*		pSignalSemaphoreInfos
-	);
 
 	VK_CHECK(vk.beginCommandBuffer(secondaryCmdBuffers[SET], &cmdBufferBeginInfo));
-	synchronizationWrapper->cmdSetEvent(secondaryCmdBuffers[SET], *event, &dependencyInfos[SET]);
+	vk.cmdSetEvent(secondaryCmdBuffers[SET], *event, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT);
 	endCommandBuffer(vk, secondaryCmdBuffers[SET]);
 
 	VK_CHECK(vk.beginCommandBuffer(secondaryCmdBuffers[WAIT], &cmdBufferBeginInfo));
-	synchronizationWrapper->cmdWaitEvents(secondaryCmdBuffers[WAIT], 1u, &event.get(), &dependencyInfos[WAIT]);
+	vk.cmdWaitEvents(secondaryCmdBuffers[WAIT], 1u, &event.get(),VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0u, DE_NULL, 0u, DE_NULL, 0u, DE_NULL);
 	endCommandBuffer(vk, secondaryCmdBuffers[WAIT]);
 
 	beginCommandBuffer(vk, *primaryCmdBuffer);
 	vk.cmdExecuteCommands(*primaryCmdBuffer, 2u, secondaryCmdBuffers);
 	endCommandBuffer(vk, *primaryCmdBuffer);
 
-	VK_CHECK(synchronizationWrapper->queueSubmit(queue, *fence));
-
+	VK_CHECK(vk.queueSubmit(queue, 1u, &submitInfo, *fence));
 	if (VK_SUCCESS != vk.waitForFences(device, 1u, &fence.get(), DE_TRUE, LONG_FENCE_WAIT))
 		return tcu::TestStatus::fail("Queue should end execution");
 
 	return tcu::TestStatus::pass("Wait and set even on device using secondary command buffers tests pass");
 }
 
-void checkSupport(Context& context, TestConfig config)
-{
-	if (config.type == SynchronizationType::SYNCHRONIZATION2)
-		context.requireDeviceFunctionality("VK_KHR_synchronization2");
-
-	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") && !context.getPortabilitySubsetFeatures().events)
-		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: Events are not supported by this implementation");
-}
-
 } // anonymous
 
 tcu::TestCaseGroup* createBasicEventTests (tcu::TestContext& testCtx)
 {
-	TestConfig config
-	{
-		SynchronizationType::LEGACY,
-		0U
-	};
-
-	de::MovePtr<tcu::TestCaseGroup> basicTests (new tcu::TestCaseGroup(testCtx, "event", "Basic event tests"));
-
-	addFunctionCase(basicTests.get(), "host_set_reset", "Basic event tests set and reset on host", checkSupport, hostResetSetEventCase, config);
-	addFunctionCase(basicTests.get(), "device_set_reset", "Basic event tests set and reset on device", checkSupport, deviceResetSetEventCase, config);
-	addFunctionCase(basicTests.get(), "single_submit_multi_command_buffer", "Wait and set event single submission on device", checkSupport, singleSubmissionCase, config);
-	addFunctionCase(basicTests.get(), "multi_submit_multi_command_buffer", "Wait and set event mutli submission on device", checkSupport, multiSubmissionCase, config);
-	addFunctionCase(basicTests.get(), "multi_secondary_command_buffer", "Event used on secondary command buffer ", checkSupport, secondaryCommandBufferCase, config);
+	de::MovePtr<tcu::TestCaseGroup> basicTests(new tcu::TestCaseGroup(testCtx, "event", "Basic event tests"));
+	addFunctionCase(basicTests.get(), "host_set_reset",   "Basic event tests set and reset on host", hostResetSetEventCase);
+	addFunctionCase(basicTests.get(), "device_set_reset", "Basic event tests set and reset on device", deviceResetSetEventCase);
+	addFunctionCase(basicTests.get(), "single_submit_multi_command_buffer", "Wait and set event single submission on device", singleSubmissionCase);
+	addFunctionCase(basicTests.get(), "multi_submit_multi_command_buffer", "Wait and set event mutli submission on device", multiSubmissionCase);
+	addFunctionCase(basicTests.get(), "multi_secondary_command_buffer", "Event used on secondary command buffer ", secondaryCommandBufferCase);
 
 	return basicTests.release();
-}
-
-tcu::TestCaseGroup* createSynchronization2BasicEventTests (tcu::TestContext& testCtx)
-{
-	TestConfig config
-	{
-		SynchronizationType::SYNCHRONIZATION2,
-		0U
-	};
-
-	de::MovePtr<tcu::TestCaseGroup> basicTests (new tcu::TestCaseGroup(testCtx, "event", "Basic event tests"));
-
-	addFunctionCase(basicTests.get(), "device_set_reset", "Basic event tests set and reset on device", checkSupport, deviceResetSetEventCase, config);
-	addFunctionCase(basicTests.get(), "single_submit_multi_command_buffer", "Wait and set event single submission on device", checkSupport, singleSubmissionCase, config);
-	addFunctionCase(basicTests.get(), "multi_submit_multi_command_buffer", "Wait and set event mutli submission on device", checkSupport, multiSubmissionCase, config);
-	addFunctionCase(basicTests.get(), "multi_secondary_command_buffer", "Event used on secondary command buffer ", checkSupport, secondaryCommandBufferCase, config);
-
-	config.flags = VK_EVENT_CREATE_DEVICE_ONLY_BIT_KHR;
-	addFunctionCase(basicTests.get(), "single_submit_multi_command_buffer_device_only", "Wait and set GPU-only event single submission", checkSupport, singleSubmissionCase, config);
-	addFunctionCase(basicTests.get(), "multi_submit_multi_command_buffer_device_only", "Wait and set GPU-only event mutli submission", checkSupport, multiSubmissionCase, config);
-	addFunctionCase(basicTests.get(), "multi_secondary_command_buffer_device_only", "GPU-only event used on secondary command buffer ", checkSupport, secondaryCommandBufferCase, config);
-
-	return basicTests.release();
-
 }
 
 } // synchronization

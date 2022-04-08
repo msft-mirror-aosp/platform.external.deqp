@@ -110,9 +110,6 @@ public:
 	bool										resultSetOnValidation			() const		{ return m_resultSetOnValidation;	}
 	void										resultSetOnValidation			(bool value)	{ m_resultSetOnValidation = value;	}
 
-	bool										hasDebugReportRecorder			() const;
-	vk::DebugReportRecorder&					getDebugReportRecorder			() const;
-
 protected:
 	tcu::TestContext&							m_testCtx;
 	const vk::PlatformInterface&				m_platformInterface;

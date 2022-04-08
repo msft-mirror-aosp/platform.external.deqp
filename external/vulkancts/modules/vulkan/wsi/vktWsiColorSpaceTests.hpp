@@ -32,8 +32,7 @@ namespace vkt
 namespace wsi
 {
 
-void	createColorSpaceTests			(tcu::TestCaseGroup* testGroup, vk::wsi::Type wsiType);
-void	createColorspaceCompareTests	(tcu::TestCaseGroup* testGroup, vk::wsi::Type wsiType);
+void	createColorSpaceTests	(tcu::TestCaseGroup* testGroup, vk::wsi::Type wsiType);
 
 } // wsi
 } // vkt

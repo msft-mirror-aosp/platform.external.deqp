@@ -30,14 +30,6 @@
 #ifndef _GLCTESTPACKAGE_HPP
 #include "glcTestPackage.hpp"
 #endif
-#ifndef _DESHAREDPTR_HPP
-#include "deSharedPtr.hpp"
-#endif
-
-namespace tcu
-{
-	class WaiverUtil;
-};
 
 namespace es2cts
 {

@@ -2476,9 +2476,9 @@ private:
 		{
 			bool		 passed = true;
 			StringStream s;
-			s << buildAccess(getDefaultUniformName()) << "\n";
-			s << "+" << buildAccess(getDefaultUniformName(1)) << "\n";
-			s << "+" << buildAccess(getDefaultUniformName(2)) << "\n";
+			s << buildAccess(getDefaultUniformName()) << ";\n";
+			s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
+			s << "+" << buildAccess(getDefaultUniformName(2)) << ";\n";
 			s << "+" << buildAccess(getDefaultUniformName(3)) << ";\n";
 			setTemplateParam("UNIFORM_ACCESS", s.str());
 
@@ -2571,16 +2571,10 @@ private:
 				bool passed = true;
 
 				StringStream s;
-				s << buildAccess(getDefaultUniformName()) << "\n";
+				s << buildAccess(getDefaultUniformName()) << ";\n";
+				s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
 				if (pass)
-				{
-					s << "+" << buildAccess(getDefaultUniformName(1)) << "\n";
 					s << "+" << buildAccess(getDefaultUniformName(2)) << ";\n";
-				}
-				else
-				{
-					s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
-				}
 				setTemplateParam("UNIFORM_ACCESS", s.str());
 
 				s.reset();
@@ -2619,16 +2613,10 @@ private:
 				bool passed = true;
 
 				StringStream s;
-				s << buildAccess(getDefaultUniformName()) << "\n";
+				s << buildAccess(getDefaultUniformName()) << ";\n";
+				s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
 				if (pass)
-				{
-					s << "+" << buildAccess(getDefaultUniformName(1)) << "\n";
 					s << "+" << buildAccess(getDefaultUniformName(2)) << ";\n";
-				}
-				else
-				{
-					s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
-				}
 				setTemplateParam("UNIFORM_ACCESS", s.str());
 
 				s.reset();
@@ -2699,9 +2687,9 @@ private:
 		{
 			bool		 passed = true;
 			StringStream s;
-			s << buildAccess(getDefaultUniformName()) << "\n";
-			s << "+" << buildAccess(getDefaultUniformName(1)) << "\n";
-			s << "+" << buildAccess(getDefaultUniformName(2)) << "\n";
+			s << buildAccess(getDefaultUniformName()) << ";\n";
+			s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
+			s << "+" << buildAccess(getDefaultUniformName(2)) << ";\n";
 			s << "+" << buildAccess(getDefaultUniformName(3)) << ";\n";
 			setTemplateParam("UNIFORM_ACCESS", s.str());
 
@@ -2792,16 +2780,9 @@ private:
 			bool passed = true;
 
 			StringStream s;
-
+			s << buildAccess(getDefaultUniformName()) << ";\n";
 			if (pass)
-			{
-				s << buildAccess(getDefaultUniformName()) << "\n";
 				s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
-			}
-			else
-			{
-				s << buildAccess(getDefaultUniformName()) << ";\n";
-			}
 			setTemplateParam("UNIFORM_ACCESS", s.str());
 
 			s.reset();
@@ -2836,15 +2817,9 @@ private:
 			bool passed = true;
 
 			StringStream s;
+			s << buildAccess(getDefaultUniformName()) << ";\n";
 			if (pass)
-			{
-				s << buildAccess(getDefaultUniformName()) << "\n";
 				s << "+" << buildAccess(getDefaultUniformName(1)) << ";\n";
-			}
-			else
-			{
-				s << buildAccess(getDefaultUniformName()) << ";\n";
-			}
 			setTemplateParam("UNIFORM_ACCESS", s.str());
 
 			s.reset();

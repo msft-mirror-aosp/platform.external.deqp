@@ -51,13 +51,6 @@ enum TestNodeClass
 	NODECLASS_LAST
 };
 
-enum TestRunnerType
-{
-	RUNNERTYPE_ANY		= 0u,
-	RUNNERTYPE_NONE		= (1u << 0),
-	RUNNERTYPE_AMBER	= (1u << 1)
-};
-
 inline TestNodeClass getTestNodeTypeClass (TestNodeType type)
 {
 	switch (type)
@@ -125,7 +118,6 @@ public:
 	virtual void			init			(void);
 	virtual void			deinit			(void);
 	virtual IterateResult	iterate			(void) = 0;
-	virtual TestRunnerType	getRunnerType	(void) const	{ return RUNNERTYPE_NONE;		}
 
 protected:
 	TestContext&			m_testCtx;

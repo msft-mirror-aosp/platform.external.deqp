@@ -761,7 +761,6 @@ void invalid_layout_qualifiers (NegativeTestContext& ctx)
 		ctx.endSection();
 	}
 
-	if (glu::isContextTypeES(ctx.getRenderContext().getType())) // for GL4.5 program will compile and link
 	{
 		std::ostringstream compShaderSource;
 		compShaderSource	<<	shaderVersion << "\n"
@@ -801,11 +800,10 @@ void invalid_layout_qualifiers (NegativeTestContext& ctx)
 
 void invalid_write_built_in_constants (NegativeTestContext& ctx)
 {
-	if (glu::isContextTypeES(ctx.getRenderContext().getType()))
+	if ((!ctx.isExtensionSupported("GL_EXT_tessellation_shader") && !ctx.isExtensionSupported("GL_OES_tessellation_shader")) ||
+	    (!ctx.isExtensionSupported("GL_EXT_geometry_shader") && !ctx.isExtensionSupported("GL_OES_geometry_shader")))
 	{
-		if((!ctx.isExtensionSupported("GL_EXT_tessellation_shader") && !ctx.isExtensionSupported("GL_OES_tessellation_shader")) ||
-		   (!ctx.isExtensionSupported("GL_EXT_geometry_shader") && !ctx.isExtensionSupported("GL_OES_geometry_shader")))
-			TCU_THROW(NotSupportedError, "tessellation and geometry shader extensions not supported");
+		TCU_THROW(NotSupportedError, "tessellation and geometry shader extensions not supported");
 	}
 
 	const bool					isES32			= glu::contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2));

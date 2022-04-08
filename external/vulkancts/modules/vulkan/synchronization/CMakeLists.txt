@@ -29,8 +29,6 @@ set(DEQP_VK_SYNCHRONIZATION_SRCS
 	vktSynchronizationCrossInstanceSharingTests.hpp
 	vktSynchronizationTimelineSemaphoreTests.cpp
 	vktSynchronizationTimelineSemaphoreTests.hpp
-	vktSynchronizationNoneStageTests.cpp
-	vktSynchronizationNoneStageTests.hpp
 	vktSynchronizationSignalOrderTests.cpp
 	vktSynchronizationSignalOrderTests.hpp
 	vktSynchronizationWin32KeyedMutexTests.cpp

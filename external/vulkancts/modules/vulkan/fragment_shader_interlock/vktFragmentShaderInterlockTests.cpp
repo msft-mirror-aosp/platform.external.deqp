@@ -34,25 +34,18 @@ namespace FragmentShaderInterlock
 namespace
 {
 
-static void createChildren (tcu::TestCaseGroup* group)
+void createChildren (tcu::TestCaseGroup* group)
 {
 	tcu::TestContext&	testCtx		= group->getTestContext();
 
 	group->addChild(createBasicTests(testCtx));
 }
 
-static void cleanupGroup (tcu::TestCaseGroup* group)
-{
-	DE_UNREF(group);
-	// Destroy singleton objects.
-	cleanupDevice();
-}
-
 } // anonymous
 
 tcu::TestCaseGroup* createTests (tcu::TestContext& testCtx)
 {
-	return createTestGroup(testCtx, "fragment_shader_interlock", "Fragment shader interlock tests", createChildren, cleanupGroup);
+	return createTestGroup(testCtx, "fragment_shader_interlock", "Fragment shader interlock tests", createChildren);
 }
 
 } // FragmentShaderInterlock

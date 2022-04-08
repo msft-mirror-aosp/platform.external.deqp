@@ -26,13 +26,9 @@ package com.drawelements.deqp.execserver;
 import android.app.Service;
 import android.app.Notification;
 import android.app.Notification.Builder;
-import android.app.NotificationChannel;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.Context;
 import android.content.Intent;
 import android.os.Binder;
-import android.os.Build;
 import android.os.IBinder;
 
 import com.drawelements.deqp.execserver.ExecServerActivity;
@@ -87,18 +83,7 @@ public class ExecService extends Service {
 		PendingIntent pm = PendingIntent.getActivity(this, 0, launchIntent, 0);
 
 		// Start as foreground service.
-		String channel = "";
-
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-		{
-			channel = "com.drawelements.deqp.execserver";
-
-			NotificationChannel noteChan = new NotificationChannel(channel, "dEQP ExecServer", NotificationManager.IMPORTANCE_LOW);
-			NotificationManager manager  = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-			manager.createNotificationChannel(noteChan);
-		}
-
-		Notification.Builder builder = new Notification.Builder(this, channel);
+		Notification.Builder builder = new Notification.Builder(this);
 		Notification notification = builder.setContentIntent(pm)
 			.setSmallIcon(R.drawable.deqp_app_small).setTicker("ExecServer is running in the background.")
 			.setWhen(System.currentTimeMillis()).setAutoCancel(true).setContentTitle("dEQP ExecServer")

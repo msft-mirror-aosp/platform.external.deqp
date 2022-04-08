@@ -435,13 +435,6 @@ std::string getTestCaseDescription (const Flags flags)
 	return buf.str();
 }
 
-void checkSupportTess (Context& context, const Flags flags)
-{
-	if (isTessellationStage(flags))
-		if (const vk::VkPhysicalDevicePortabilitySubsetFeaturesKHR* const features = getPortability(context))
-			checkPointMode(*features);
-}
-
 } // anonymous
 
 //! Ported from dEQP-GLES31.functional.tessellation_geometry_interaction.point_size.*
@@ -466,7 +459,7 @@ tcu::TestCaseGroup* createGeometryPointSizeTests (tcu::TestContext& testCtx)
 		const std::string name = getTestCaseName       (caseFlags[ndx]);
 		const std::string desc = getTestCaseDescription(caseFlags[ndx]);
 
-		addFunctionCaseWithPrograms(group.get(), name, desc, checkSupportTess, initPrograms, test, caseFlags[ndx]);
+		addFunctionCaseWithPrograms(group.get(), name, desc, initPrograms, test, caseFlags[ndx]);
 	}
 
 	return group.release();

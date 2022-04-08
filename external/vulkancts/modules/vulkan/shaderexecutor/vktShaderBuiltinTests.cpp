@@ -51,7 +51,6 @@ tcu::TestCaseGroup* createBuiltinTests (tcu::TestContext& testCtx)
 	builtinTests->addChild(new BuiltinPrecisionTests(testCtx));
 	builtinTests->addChild(new BuiltinPrecision16BitTests(testCtx));
 	builtinTests->addChild(new BuiltinPrecision16Storage32BitTests(testCtx));
-	builtinTests->addChild(new BuiltinPrecisionDoubleTests(testCtx));
 	builtinTests->addChild(createPrecisionFconvertGroup(testCtx));
 
 	return builtinTests.release();

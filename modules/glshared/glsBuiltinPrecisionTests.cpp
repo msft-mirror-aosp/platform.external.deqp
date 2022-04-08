@@ -5063,8 +5063,7 @@ IterateResult FuncCaseBase::iterate (void)
 {
 	MovePtr<ContextInfo>	info	(ContextInfo::create(getRenderContext()));
 
-	if (!m_extension.empty() && !info->isExtensionSupported(m_extension.c_str()) &&
-		!glu::contextSupports(getRenderContext().getType(), glu::ApiType::core(4, 5)))
+	if (!m_extension.empty() && !info->isExtensionSupported(m_extension.c_str()))
 		throw NotSupportedError("Unsupported extension: " + m_extension);
 
 	runTest();

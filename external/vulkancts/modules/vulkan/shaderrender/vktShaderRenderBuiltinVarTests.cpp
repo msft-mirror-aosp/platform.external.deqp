@@ -131,12 +131,12 @@ BuiltinGlFrontFacingCaseInstance::BuiltinGlFrontFacingCaseInstance (Context& con
 
 TestStatus BuiltinGlFrontFacingCaseInstance::iterate (void)
 {
-	TestLog&							log				= m_context.getTestContext().getLog();
-	std::vector<Vec4>					vertices;
-	std::vector<VulkanShader>			shaders;
-	std::shared_ptr<rr::VertexShader>	vertexShader	= std::make_shared<FrontFacingVertexShader>();
-	std::shared_ptr<rr::FragmentShader>	fragmentShader	= std::make_shared<FrontFacingFragmentShader>();
-	std::string							testDesc;
+	TestLog&					log				= m_context.getTestContext().getLog();
+	std::vector<Vec4>			vertices;
+	std::vector<VulkanShader>	shaders;
+	FrontFacingVertexShader		vertexShader;
+	FrontFacingFragmentShader	fragmentShader;
+	std::string					testDesc;
 
 	vertices.push_back(Vec4( -0.75f,	-0.75f,	0.0f,	1.0f));
 	vertices.push_back(Vec4(  0.0f,		-0.75f,	0.0f,	1.0f));
@@ -150,16 +150,14 @@ TestStatus BuiltinGlFrontFacingCaseInstance::iterate (void)
 
 	testDesc = "gl_FrontFacing " + getPrimitiveTopologyShortName(m_topology) + " ";
 
-	FrameBufferState			frameBufferState	(FRONTFACE_RENDERWIDTH, FRONTFACE_RENDERHEIGHT);
-	PipelineState				pipelineState		(m_context.getDeviceProperties().limits.subPixelPrecisionBits);
-	DrawCallData				drawCallData		(m_topology, vertices);
-	VulkanProgram				vulkanProgram		(shaders);
-	VulkanDrawContext			dc					(m_context, frameBufferState);
-	dc.registerDrawObject(pipelineState, vulkanProgram, drawCallData);
+	DrawState					drawState		(m_topology, FRONTFACE_RENDERWIDTH, FRONTFACE_RENDERHEIGHT, m_context.getDeviceProperties().limits.subPixelPrecisionBits);
+	DrawCallData				drawCallData	(vertices);
+	VulkanProgram				vulkanProgram	(shaders);
+
+	VulkanDrawContext			dc(m_context, drawState, drawCallData, vulkanProgram);
 	dc.draw();
 
-	ReferenceDrawContext		refDrawContext(frameBufferState);
-	refDrawContext.registerDrawObject(pipelineState, vertexShader, fragmentShader, drawCallData);
+	ReferenceDrawContext		refDrawContext(drawState, drawCallData, vertexShader, fragmentShader);
 	refDrawContext.draw();
 
 	log << TestLog::Image( "reference",
@@ -207,7 +205,6 @@ public:
 	virtual						~BuiltinGlFrontFacingCase	(void);
 
 	void						initPrograms				(SourceCollections& dst) const;
-	void						checkSupport				(Context& context) const;
 	TestInstance*				createInstance				(Context& context) const;
 
 private:
@@ -255,16 +252,6 @@ void BuiltinGlFrontFacingCase::initPrograms (SourceCollections& programCollectio
 			<< "	color = vec4(0.0, 1.0, 0.0, 1.0);\n"
 			<< "}\n";
 		programCollection.glslSources.add("frag") << glu::FragmentSource(fragmentSource.str());
-	}
-}
-
-void BuiltinGlFrontFacingCase::checkSupport (Context& context) const
-{
-	if (m_topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN &&
-		context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") &&
-		!context.getPortabilitySubsetFeatures().triangleFans)
-	{
-		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: Triangle fans are not supported by this implementation");
 	}
 }
 
@@ -766,24 +753,22 @@ TestStatus BuiltinFragDepthCaseInstance::iterate (void)
 		shaders.push_back(VulkanShader(VK_SHADER_STAGE_VERTEX_BIT, m_context.getBinaryCollection().get("FragDepthVert")));
 		shaders.push_back(VulkanShader(VK_SHADER_STAGE_FRAGMENT_BIT, m_context.getBinaryCollection().get("FragDepthFrag")));
 
-		FrameBufferState			frameBufferState(m_renderSize.x(), m_renderSize.y());
-		PipelineState				pipelineState(m_context.getDeviceProperties().limits.subPixelPrecisionBits);
-		DrawCallData				drawCallData(m_topology, vertices);
-		VulkanProgram				vulkanProgram(shaders);
+		DrawState				drawState(m_topology, m_renderSize.x(), m_renderSize.y(), m_context.getDeviceProperties().limits.subPixelPrecisionBits);
+		DrawCallData			drawCallData(vertices);
+		VulkanProgram			vulkanProgram(shaders);
 
-		frameBufferState.depthFormat		= m_format;
-		frameBufferState.numSamples			= m_samples;
-		frameBufferState.depthImageView		= *depthImageView;
-		pipelineState.depthClampEnable		= m_depthClampEnable;
-		pipelineState.compareOp				= rr::TESTFUNC_ALWAYS;
-		pipelineState.depthTestEnable		= true;
-		pipelineState.depthWriteEnable		= true;
-		pipelineState.sampleShadingEnable	= true;
+		drawState.depthClampEnable			= m_depthClampEnable;
+		drawState.depthFormat				= m_format;
+		drawState.numSamples				= m_samples;
+		drawState.compareOp					= rr::TESTFUNC_ALWAYS;
+		drawState.depthTestEnable			= true;
+		drawState.depthWriteEnable			= true;
+		drawState.sampleShadingEnable		= true;
+		vulkanProgram.depthImageView		= *depthImageView;
 		vulkanProgram.descriptorSetLayout	= *descriptorSetLayout;
 		vulkanProgram.descriptorSet			= *descriptorSet;
 
-		VulkanDrawContext			vulkanDrawContext(m_context, frameBufferState);
-		vulkanDrawContext.registerDrawObject(pipelineState, vulkanProgram, drawCallData);
+		VulkanDrawContext		vulkanDrawContext(m_context, drawState, drawCallData, vulkanProgram);
 		vulkanDrawContext.draw();
 
 		log << TestLog::Image(	"resultColor",
@@ -912,18 +897,16 @@ TestStatus BuiltinFragDepthCaseInstance::iterate (void)
 		shaders.push_back(VulkanShader(VK_SHADER_STAGE_VERTEX_BIT, m_context.getBinaryCollection().get("FragDepthVertPass2")));
 		shaders.push_back(VulkanShader(VK_SHADER_STAGE_FRAGMENT_BIT, m_context.getBinaryCollection().get("FragDepthFragPass2")));
 
-		FrameBufferState			frameBufferState(m_renderSize.x(), m_renderSize.y());
-		PipelineState				pipelineState(m_context.getDeviceProperties().limits.subPixelPrecisionBits);
-		DrawCallData				drawCallData(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, vertices);
-		VulkanProgram				vulkanProgram(shaders);
+		DrawState				drawState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, m_renderSize.x(), m_renderSize.y(), m_context.getDeviceProperties().limits.subPixelPrecisionBits);
+		DrawCallData			drawCallData(vertices);
+		VulkanProgram			vulkanProgram(shaders);
 
-		frameBufferState.numSamples				= m_samples;
-		pipelineState.sampleShadingEnable		= true;
-		vulkanProgram.descriptorSetLayout		= *descriptorSetLayout;
-		vulkanProgram.descriptorSet				= *descriptorSet;
+		drawState.numSamples				= m_samples;
+		drawState.sampleShadingEnable		= true;
+		vulkanProgram.descriptorSetLayout	= *descriptorSetLayout;
+		vulkanProgram.descriptorSet			= *descriptorSet;
 
-		VulkanDrawContext		vulkanDrawContext(m_context, frameBufferState);
-		vulkanDrawContext.registerDrawObject(pipelineState, vulkanProgram, drawCallData);
+		VulkanDrawContext		vulkanDrawContext(m_context, drawState, drawCallData, vulkanProgram);
 		vulkanDrawContext.draw();
 	}
 
@@ -1017,21 +1000,19 @@ public:
 		RENDERWIDTH		= 16,
 		RENDERHEIGHT	= 16
 	};
-				BuiltinFragCoordMsaaCaseInstance	(Context& context, VkSampleCountFlagBits sampleCount, bool useEnable);
+				BuiltinFragCoordMsaaCaseInstance	(Context& context, VkSampleCountFlagBits sampleCount);
 	TestStatus	iterate								(void);
 private:
 	bool		validateSampleLocations				(const ConstPixelBufferAccess& sampleLocationBuffer) const;
 
 	const tcu::UVec2				m_renderSize;
 	const VkSampleCountFlagBits		m_sampleCount;
-	const bool						m_useEnable;
 };
 
-BuiltinFragCoordMsaaCaseInstance::BuiltinFragCoordMsaaCaseInstance (Context& context, VkSampleCountFlagBits sampleCount, bool useEnable)
+BuiltinFragCoordMsaaCaseInstance::BuiltinFragCoordMsaaCaseInstance (Context& context, VkSampleCountFlagBits sampleCount)
 	: TestInstance		(context)
 	, m_renderSize		(RENDERWIDTH, RENDERHEIGHT)
 	, m_sampleCount		(sampleCount)
-	, m_useEnable		(useEnable)
 {
 	const InstanceInterface&	vki					= m_context.getInstanceInterface();
 	const VkPhysicalDevice		physicalDevice		= m_context.getPhysicalDevice();
@@ -1258,18 +1239,16 @@ TestStatus BuiltinFragCoordMsaaCaseInstance::iterate (void)
 		shaders.push_back(VulkanShader(VK_SHADER_STAGE_VERTEX_BIT, m_context.getBinaryCollection().get("FragCoordMsaaVert")));
 		shaders.push_back(VulkanShader(VK_SHADER_STAGE_FRAGMENT_BIT, m_context.getBinaryCollection().get("FragCoordMsaaFrag")));
 
-		FrameBufferState			frameBufferState(m_renderSize.x(), m_renderSize.y());
-		PipelineState				pipelineState(m_context.getDeviceProperties().limits.subPixelPrecisionBits);
-		DrawCallData				drawCallData(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, vertices);
-		VulkanProgram				vulkanProgram(shaders);
+		DrawState			drawState(VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, m_renderSize.x(), m_renderSize.y(), m_context.getDeviceProperties().limits.subPixelPrecisionBits);
+		DrawCallData		drawCallData(vertices);
+		VulkanProgram		vulkanProgram(shaders);
 
-		frameBufferState.numSamples				= m_sampleCount;
-		pipelineState.sampleShadingEnable		= m_useEnable; // When m_useEnable is false, we rely on the gl_SampleID input to enable sample shading
+		drawState.numSamples				= m_sampleCount;
+		drawState.sampleShadingEnable		= true;
 		vulkanProgram.descriptorSetLayout	= *descriptorSetLayout;
 		vulkanProgram.descriptorSet			= *descriptorSet;
 
-		VulkanDrawContext			vulkanDrawContext(m_context, frameBufferState);
-		vulkanDrawContext.registerDrawObject(pipelineState, vulkanProgram, drawCallData);
+		VulkanDrawContext	vulkanDrawContext(m_context, drawState, drawCallData, vulkanProgram);
 		vulkanDrawContext.draw();
 
 		log << TestLog::Image(	"result",
@@ -1372,18 +1351,6 @@ bool BuiltinFragCoordMsaaCaseInstance::validateSampleLocations (const ConstPixel
 				const UVec2 pixelAddress	= UVec2(sampleNdx + m_sampleCount * colNdx, rowNdx);
 				const Vec4  pixelData		= sampleLocationBuffer.getPixel(pixelAddress.x(), pixelAddress.y());
 
-				if (pixelData.z() != 0.0f)
-				{
-					log << TestLog::Message << "Pixel (" << colNdx << "," << rowNdx << "): has unexpected .z component, expected: 0.0, got: " << pixelData.z() << TestLog::EndMessage;
-					return false;
-				}
-
-				if (pixelData.w() != 1.0f)
-				{
-					log << TestLog::Message << "Pixel (" << colNdx << "," << rowNdx << "): has unexpected .w component, expected: 1.0, got: " << pixelData.w() << TestLog::EndMessage;
-					return false;
-				}
-
 				locations.push_back(Vec2(pixelData.x(), pixelData.y()));
 			}
 
@@ -1431,19 +1398,17 @@ bool BuiltinFragCoordMsaaCaseInstance::validateSampleLocations (const ConstPixel
 class BuiltinFragCoordMsaaTestCase : public TestCase
 {
 public:
-					BuiltinFragCoordMsaaTestCase	(TestContext& testCtx, const char* name, const char* description, VkSampleCountFlagBits sampleCount, bool useEnable);
+					BuiltinFragCoordMsaaTestCase	(TestContext& testCtx, const char* name, const char* description, VkSampleCountFlagBits sampleCount);
 	virtual			~BuiltinFragCoordMsaaTestCase	(void);
 	void			initPrograms					(SourceCollections& sourceCollections) const;
 	TestInstance*	createInstance					(Context& context) const;
 private:
 	const VkSampleCountFlagBits			m_sampleCount;
-	const bool							m_useEnable;
 };
 
-BuiltinFragCoordMsaaTestCase::BuiltinFragCoordMsaaTestCase (TestContext& testCtx, const char* name, const char* description, VkSampleCountFlagBits sampleCount, bool useEnable)
+BuiltinFragCoordMsaaTestCase::BuiltinFragCoordMsaaTestCase (TestContext& testCtx, const char* name, const char* description, VkSampleCountFlagBits sampleCount)
 	: TestCase			(testCtx, name, description)
 	, m_sampleCount		(sampleCount)
-	, m_useEnable		(useEnable)
 {
 }
 
@@ -1475,7 +1440,7 @@ void BuiltinFragCoordMsaaTestCase::initPrograms (SourceCollections& programColle
 			<< "{\n"
 			<< "	const int sampleNdx = int(gl_SampleID);\n"
 			<< "	ivec2 imageCoord = ivec2(sampleNdx + int(gl_FragCoord.x) * " << m_sampleCount << ", int(gl_FragCoord.y));\n"
-			<< "	imageStore(storageImage, imageCoord, gl_FragCoord);\n"
+			<< "	imageStore(storageImage, imageCoord, vec4(gl_FragCoord.xy,vec2(0)));\n"
 			<< "	color = vec4(1.0, 0.0, 0.0, 1.0);\n"
 			<< "}\n";
 		programCollection.glslSources.add("FragCoordMsaaFrag") << glu::FragmentSource(fragmentSource.str());
@@ -1484,7 +1449,7 @@ void BuiltinFragCoordMsaaTestCase::initPrograms (SourceCollections& programColle
 
 TestInstance* BuiltinFragCoordMsaaTestCase::createInstance (Context& context) const
 {
-	return new BuiltinFragCoordMsaaCaseInstance(context, m_sampleCount, m_useEnable);
+	return new BuiltinFragCoordMsaaCaseInstance(context, m_sampleCount);
 }
 
 class BuiltinFragDepthCase : public TestCase
@@ -2336,7 +2301,6 @@ TestCaseGroup* createBuiltinVarTests (TestContext& testCtx)
 	de::MovePtr<TestCaseGroup> frontFacingGroup		(new TestCaseGroup(testCtx, "frontfacing", "Test gl_Frontfacing keyword."));
 	de::MovePtr<TestCaseGroup> fragDepthGroup		(new TestCaseGroup(testCtx, "fragdepth", "Test gl_FragDepth keyword."));
 	de::MovePtr<TestCaseGroup> fragCoordMsaaGroup	(new TestCaseGroup(testCtx, "fragcoord_msaa", "Test interation between gl_FragCoord and msaa"));
-	de::MovePtr<TestCaseGroup> fragCoordMsaaInputGroup	(new TestCaseGroup(testCtx, "fragcoord_msaa_input", "Test interation between gl_FragCoord and msaa"));
 
 	simpleGroup->addChild(new BuiltinGlFragCoordXYZCase(testCtx, "fragcoord_xyz", "FragCoord xyz test"));
 	simpleGroup->addChild(new BuiltinGlFragCoordWCase(testCtx, "fragcoord_w", "FragCoord w test"));
@@ -2363,10 +2327,7 @@ TestCaseGroup* createBuiltinVarTests (TestContext& testCtx)
 		};
 
 		for (deUint32 caseNdx = 0; caseNdx < DE_LENGTH_OF_ARRAY(fragCoordMsaaCaseList); caseNdx++)
-		{
-			fragCoordMsaaGroup->addChild(new BuiltinFragCoordMsaaTestCase(testCtx, fragCoordMsaaCaseList[caseNdx].name, fragCoordMsaaCaseList[caseNdx].description, fragCoordMsaaCaseList[caseNdx].sampleCount, true));
-			fragCoordMsaaInputGroup->addChild(new BuiltinFragCoordMsaaTestCase(testCtx, fragCoordMsaaCaseList[caseNdx].name, fragCoordMsaaCaseList[caseNdx].description, fragCoordMsaaCaseList[caseNdx].sampleCount, false));
-		}
+			fragCoordMsaaGroup->addChild(new BuiltinFragCoordMsaaTestCase(testCtx, fragCoordMsaaCaseList[caseNdx].name, fragCoordMsaaCaseList[caseNdx].description, fragCoordMsaaCaseList[caseNdx].sampleCount));
 	}
 
 	// gl_FrontFacing tests
@@ -2441,7 +2402,6 @@ TestCaseGroup* createBuiltinVarTests (TestContext& testCtx)
 	builtinGroup->addChild(frontFacingGroup.release());
 	builtinGroup->addChild(fragDepthGroup.release());
 	builtinGroup->addChild(fragCoordMsaaGroup.release());
-	builtinGroup->addChild(fragCoordMsaaInputGroup.release());
 	builtinGroup->addChild(simpleGroup.release());
 
 	for (deUint16 shaderType = 0; shaderType <= (SHADER_INPUT_BUILTIN_BIT | SHADER_INPUT_VARYING_BIT | SHADER_INPUT_CONSTANT_BIT); ++shaderType)

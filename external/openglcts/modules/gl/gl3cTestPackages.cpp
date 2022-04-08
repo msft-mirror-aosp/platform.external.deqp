@@ -33,7 +33,6 @@
 #include "gl3cTransformFeedbackOverflowQueryTests.hpp"
 #include "gl3cTransformFeedbackTests.hpp"
 #include "gl4cPipelineStatisticsQueryTests.hpp"
-#include "glcPixelStorageModesTests.hpp"
 #include "glcFragDepthTests.hpp"
 #include "glcInfoTests.hpp"
 #include "glcPackedDepthStencilTests.hpp"
@@ -47,11 +46,8 @@
 #include "glcShaderSwitchTests.hpp"
 #include "glcTextureRepeatModeTests.hpp"
 #include "glcUniformBlockTests.hpp"
-#include "glcNearestEdgeTests.hpp"
-#include "glcGLSLVectorConstructorTests.hpp"
 #include "gluStateReset.hpp"
 #include "tcuTestLog.hpp"
-#include "tcuWaiverUtil.hpp"
 
 #include "../glesext/texture_shadow_lod/esextcTextureShadowLodFunctionsTest.hpp"
 
@@ -61,7 +57,7 @@ namespace gl3cts
 class TestCaseWrapper : public tcu::TestCaseExecutor
 {
 public:
-	TestCaseWrapper(GL30TestPackage& package, de::SharedPtr<tcu::WaiverUtil> waiverMechanism);
+	TestCaseWrapper(GL30TestPackage& package);
 	~TestCaseWrapper(void);
 
 	void init(tcu::TestCase* testCase, const std::string& path);
@@ -69,13 +65,10 @@ public:
 	tcu::TestNode::IterateResult iterate(tcu::TestCase* testCase);
 
 private:
-	GL30TestPackage&				m_testPackage;
-	de::SharedPtr<tcu::WaiverUtil>	m_waiverMechanism;
+	GL30TestPackage& m_testPackage;
 };
 
-TestCaseWrapper::TestCaseWrapper(GL30TestPackage& package, de::SharedPtr<tcu::WaiverUtil> waiverMechanism)
-	: m_testPackage			(package)
-	, m_waiverMechanism		(waiverMechanism)
+TestCaseWrapper::TestCaseWrapper(GL30TestPackage& package) : m_testPackage(package)
 {
 }
 
@@ -83,11 +76,8 @@ TestCaseWrapper::~TestCaseWrapper(void)
 {
 }
 
-void TestCaseWrapper::init(tcu::TestCase* testCase, const std::string& path)
+void TestCaseWrapper::init(tcu::TestCase* testCase, const std::string&)
 {
-	if (m_waiverMechanism->isOnWaiverList(path))
-		throw tcu::TestException("Waived test", QP_TEST_RESULT_WAIVER);
-
 	testCase->init();
 }
 
@@ -145,7 +135,6 @@ public:
 	void init(void)
 	{
 		addChild(new deqp::ShaderLibraryGroup(m_context, "declarations", "Declaration Tests", "gl30/declarations.test"));
-		addChild(new deqp::GLSLVectorConstructorTests(m_context, glu::GLSL_VERSION_330));
 	}
 };
 
@@ -185,7 +174,7 @@ void GL30TestPackage::init(void)
 
 tcu::TestCaseExecutor* GL30TestPackage::createExecutor(void) const
 {
-	return new TestCaseWrapper(const_cast<GL30TestPackage&>(*this), m_waiverMechanism);
+	return new TestCaseWrapper(const_cast<GL30TestPackage&>(*this));
 }
 
 // GL31TestPackage
@@ -304,8 +293,6 @@ void GL33TestPackage::init(void)
 		addChild(new glcts::PipelineStatisticsQueryTests(getContext()));
 		addChild(new glcts::CullDistance::Tests(getContext()));
 		addChild(new gl3cts::TextureSwizzleTests(getContext()));
-		addChild(new glcts::NearestEdgeCases(getContext()));
-		addChild(new glcts::PixelStorageModesTests(getContext(), glu::GLSL_VERSION_330));
 	}
 	catch (...)
 	{

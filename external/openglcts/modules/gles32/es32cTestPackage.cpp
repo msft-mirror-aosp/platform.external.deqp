@@ -40,13 +40,10 @@
 #include "glcShaderStructTests.hpp"
 #include "glcShaderSwitchTests.hpp"
 #include "glcUniformBlockTests.hpp"
-#include "glcNearestEdgeTests.hpp"
-#include "glcFramebufferCompleteness.hpp"
 #include "gluStateReset.hpp"
 #include "glwEnums.hpp"
 #include "glwFunctions.hpp"
 #include "tcuTestLog.hpp"
-#include "tcuWaiverUtil.hpp"
 
 #include "../glesext/draw_buffers_indexed/esextcDrawBuffersIndexedTests.hpp"
 #include "../glesext/geometry_shader/esextcGeometryShaderTests.hpp"
@@ -63,7 +60,7 @@ namespace es32cts
 class TestCaseWrapper : public tcu::TestCaseExecutor
 {
 public:
-	TestCaseWrapper(ES32TestPackage& package, de::SharedPtr<tcu::WaiverUtil> waiverMechanism);
+	TestCaseWrapper(ES32TestPackage& package);
 	~TestCaseWrapper(void);
 
 	void init(tcu::TestCase* testCase, const std::string& path);
@@ -71,13 +68,10 @@ public:
 	tcu::TestNode::IterateResult iterate(tcu::TestCase* testCase);
 
 private:
-	ES32TestPackage&				m_testPackage;
-	de::SharedPtr<tcu::WaiverUtil>	m_waiverMechanism;
+	ES32TestPackage& m_testPackage;
 };
 
-TestCaseWrapper::TestCaseWrapper(ES32TestPackage& package, de::SharedPtr<tcu::WaiverUtil> waiverMechanism)
-	: m_testPackage		(package)
-	, m_waiverMechanism	(waiverMechanism)
+TestCaseWrapper::TestCaseWrapper(ES32TestPackage& package) : m_testPackage(package)
 {
 }
 
@@ -85,11 +79,8 @@ TestCaseWrapper::~TestCaseWrapper(void)
 {
 }
 
-void TestCaseWrapper::init(tcu::TestCase* testCase, const std::string& path)
+void TestCaseWrapper::init(tcu::TestCase* testCase, const std::string&)
 {
-	if (m_waiverMechanism->isOnWaiverList(path))
-		throw tcu::TestException("Waived test", QP_TEST_RESULT_WAIVER);
-
 	testCase->init();
 }
 
@@ -176,8 +167,6 @@ void ES32TestPackage::init(void)
 		coreGroup->addChild(new glcts::CopyImageTests(getContext()));
 		coreGroup->addChild(new glcts::InternalformatTests(getContext()));
 		coreGroup->addChild(new deqp::Functional::TextureShadowLodTest(getContext()));
-		coreGroup->addChild(new glcts::NearestEdgeCases(getContext()));
-		coreGroup->addChild(new glcts::FramebufferCompletenessTests(getContext()));
 		addChild(coreGroup);
 	}
 	catch (...)
@@ -190,7 +179,7 @@ void ES32TestPackage::init(void)
 
 tcu::TestCaseExecutor* ES32TestPackage::createExecutor(void) const
 {
-	return new TestCaseWrapper(const_cast<ES32TestPackage&>(*this), m_waiverMechanism);
+	return new TestCaseWrapper(const_cast<ES32TestPackage&>(*this));
 }
 
 } // es32cts

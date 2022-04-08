@@ -49,10 +49,6 @@ public:
 	{
 	}
 
-	void setVisible(bool visible)
-	{
-	}
-
 	void resize (const UVec2& newSize) {
 		m_view->setSize(newSize.x(), newSize.y());
 	}

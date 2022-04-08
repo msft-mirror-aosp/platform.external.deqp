@@ -92,10 +92,9 @@ std::string getVersionAndExtension (NegativeTestContext& ctx)
 
 void checkSupported (NegativeTestContext& ctx)
 {
-	const bool isES32orGL45 = contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2)) ||
-							  contextSupports(ctx.getRenderContext().getType(), glu::ApiType::core(4, 5));
+	const bool isES32 = contextSupports(ctx.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
-	if (!isES32orGL45 && !ctx.isExtensionSupported("GL_OES_sample_variables"))
+	if (!isES32 && !ctx.isExtensionSupported("GL_OES_sample_variables"))
 		TCU_THROW(NotSupportedError, "GL_OES_sample_variables is not supported.");
 }
 
@@ -138,11 +137,10 @@ void access_built_in_types_inside_other_shaders (NegativeTestContext& ctx)
 {
 	checkSupported(ctx);
 
-	if (glu::isContextTypeES(ctx.getRenderContext().getType()))
+	if ((!ctx.isExtensionSupported("GL_EXT_tessellation_shader") && !ctx.isExtensionSupported("GL_OES_tessellation_shader")) ||
+		(!ctx.isExtensionSupported("GL_EXT_geometry_shader") && !ctx.isExtensionSupported("GL_OES_geometry_shader")))
 	{
-		if ((!ctx.isExtensionSupported("GL_EXT_tessellation_shader") && !ctx.isExtensionSupported("GL_OES_tessellation_shader")) ||
-			(!ctx.isExtensionSupported("GL_EXT_geometry_shader") && !ctx.isExtensionSupported("GL_OES_geometry_shader")))
-			TCU_THROW(NotSupportedError, "tessellation and geometry shader extensions not supported");
+		TCU_THROW(NotSupportedError, "tessellation and geometry shader extensions not supported");
 	}
 
 	std::ostringstream	shader;
@@ -227,10 +225,6 @@ void access_built_in_types_inside_other_shaders (NegativeTestContext& ctx)
 
 void index_outside_sample_mask_range (NegativeTestContext& ctx)
 {
-	// Skip this test for GL4.5 - shader will compile
-	if (!glu::isContextTypeES(ctx.getRenderContext().getType()))
-		return;
-
 	checkSupported(ctx);
 
 	std::ostringstream	shader;
@@ -313,10 +307,6 @@ void access_built_in_types_without_extension (NegativeTestContext& ctx)
 
 void redeclare_built_in_types (NegativeTestContext& ctx)
 {
-	// skip this test for core GL
-	if (glu::isContextTypeGLCore(ctx.getRenderContext().getType()))
-		return;
-
 	checkSupported(ctx);
 
 	std::ostringstream	shader;

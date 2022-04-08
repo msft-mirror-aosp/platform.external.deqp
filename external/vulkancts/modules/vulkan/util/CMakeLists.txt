@@ -7,7 +7,6 @@ set(DEQP_VK_UTIL_SRCS
 	vktDrawUtil.hpp
 	vktExternalMemoryUtil.cpp
 	vktExternalMemoryUtil.hpp
-	vktConstexprVectorUtil.hpp
 )
 
 set(DEQP_VK_UTIL_LIBS

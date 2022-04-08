@@ -14,6 +14,8 @@ set(XECORE_SRCS
 	xeCommLink.hpp
 	xeContainerFormatParser.cpp
 	xeContainerFormatParser.hpp
+	xeDefs.cpp
+	xeDefs.hpp
 	xeLocalTcpIpLink.cpp
 	xeLocalTcpIpLink.hpp
 	xeTcpIpLink.cpp
@@ -30,12 +32,13 @@ set(XECORE_SRCS
 	xeTestLogWriter.hpp
 	xeTestResultParser.cpp
 	xeTestResultParser.hpp
+	xeXMLParser.cpp
+	xeXMLParser.hpp
 	xeXMLWriter.cpp
 	xeXMLWriter.hpp
 	)
 
 set(XECORE_LIBS
-	xexml
 	xscore
 	decpp
 	deutil
@@ -47,7 +50,6 @@ add_library(xecore STATIC ${XECORE_SRCS})
 target_link_libraries(xecore ${XECORE_LIBS})
 
 include_directories(.)
-include_directories(../framework/xexml)
 
 if (DE_OS_IS_WIN32 OR DE_OS_IS_UNIX OR DE_OS_IS_OSX OR DE_OS_IS_ANDROID)
 	add_executable(executor tools/xeCommandLineExecutor.cpp)

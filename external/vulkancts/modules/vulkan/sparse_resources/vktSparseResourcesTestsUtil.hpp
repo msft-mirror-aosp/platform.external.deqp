@@ -82,8 +82,6 @@ struct TestImageParameters
 	std::vector<TestFormat>	formats;
 };
 
-bool							formatIsR64							(const vk::VkFormat& format);
-
 std::vector<TestFormat>			getTestFormats						(const ImageType& imageType);
 
 vk::VkImageType					mapImageType						(const ImageType					imageType);
@@ -246,10 +244,6 @@ deUint32						getSparseAspectRequirementsIndex	(const std::vector<vk::VkSparseIm
 
 vk::VkFormat					getPlaneCompatibleFormatForWriting	(const vk::PlanarFormatDescription&	formatInfo,
 																	 deUint32							planeNdx);
-
-bool							areLsb6BitsDontCare(vk::VkFormat format);
-
-bool							areLsb4BitsDontCare(vk::VkFormat format);
 
 template<typename T>
 inline de::SharedPtr<vk::Unique<T> > makeVkSharedPtr (vk::Move<T> vkMove)

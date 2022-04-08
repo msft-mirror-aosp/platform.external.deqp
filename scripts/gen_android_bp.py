@@ -38,7 +38,6 @@ SRC_ROOTS = [
 	"framework/qphelper",
 	"framework/randomshaders",
 	"framework/referencerenderer",
-	"framework/xexml",
 	"modules",
 ]
 

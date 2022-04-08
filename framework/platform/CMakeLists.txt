@@ -19,7 +19,7 @@ if (NOT DEFINED TCUTIL_PLATFORM_SRCS)
 			win32/tcuWin32VulkanPlatform.cpp
 			)
 
-	elseif ((DE_OS_IS_UNIX OR DE_OS_IS_OSX) AND (DEQP_USE_X11 OR DEQP_USE_WAYLAND OR DEQP_USE_HEADLESS))
+	elseif ((DE_OS_IS_UNIX OR DE_OS_IS_OSX) AND (DEQP_USE_X11 OR DEQP_USE_WAYLAND))
 
 		set(TCUTIL_PLATFORM_SRCS
 			lnx/tcuLnx.cpp
@@ -83,10 +83,6 @@ if (NOT DEFINED TCUTIL_PLATFORM_SRCS)
 			include_directories(wayland)
 		endif()
 
-		if (DEQP_USE_HEADLESS)
-			add_definitions(-DDEQP_SUPPORT_HEADLESS=1)
-		endif()
-
 	elseif (DE_OS_IS_UNIX AND DEQP_USE_SURFACELESS)
 		set(TCUTIL_PLATFORM_SRCS
 			surfaceless/tcuSurfacelessPlatform.hpp
@@ -105,6 +101,8 @@ if (NOT DEFINED TCUTIL_PLATFORM_SRCS)
 				${TCUTIL_PLATFORM_SRCS}
 				android/tcuAndroidAssets.cpp
 				android/tcuAndroidAssets.hpp
+				android/tcuAndroidInternals.cpp
+				android/tcuAndroidInternals.hpp
 				android/tcuAndroidNativeActivity.cpp
 				android/tcuAndroidNativeActivity.hpp
 				android/tcuAndroidPlatform.cpp

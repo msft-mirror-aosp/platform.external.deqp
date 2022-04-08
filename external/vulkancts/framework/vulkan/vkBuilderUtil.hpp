@@ -163,8 +163,7 @@ public:
 																	 VkDescriptorType				descriptorType,
 																	 const VkDescriptorImageInfo*	pImageInfo,
 																	 const VkDescriptorBufferInfo*	pBufferInfo,
-																	 const VkBufferView*			pTexelBufferView,
-																	 const void*					pNext = DE_NULL);
+																	 const VkBufferView*			pTexelBufferView);
 
 	DescriptorSetUpdateBuilder&			copy						(VkDescriptorSet	srcSet,
 																	 deUint32			srcBinding,
@@ -204,14 +203,6 @@ public:
 		return write(destSet, destLocation.m_binding, destLocation.m_arrayElement, 1u, descriptorType, DE_NULL, DE_NULL, pTexelBufferView);
 	}
 
-	inline DescriptorSetUpdateBuilder&	writeSingle					(VkDescriptorSet										destSet,
-																	 const Location&										destLocation,
-																	 VkDescriptorType										descriptorType,
-																	 const VkWriteDescriptorSetAccelerationStructureKHR*	pAccelerationStructure)
-	{
-		return write(destSet, destLocation.m_binding, destLocation.m_arrayElement, 1u, descriptorType, DE_NULL, DE_NULL, DE_NULL, pAccelerationStructure);
-	}
-
 	inline DescriptorSetUpdateBuilder&	writeArray					(VkDescriptorSet				destSet,
 																	 const Location&				destLocation,
 																	 VkDescriptorType				descriptorType,
@@ -237,15 +228,6 @@ public:
 																	 const VkBufferView*			pTexelBufferView)
 	{
 		return write(destSet, destLocation.m_binding, destLocation.m_arrayElement, numDescriptors, descriptorType, DE_NULL, DE_NULL, pTexelBufferView);
-	}
-
-	inline DescriptorSetUpdateBuilder&	writeArray					(VkDescriptorSet										destSet,
-																	 const Location&										destLocation,
-																	 VkDescriptorType										descriptorType,
-																	 deUint32												numDescriptors,
-																	 const VkWriteDescriptorSetAccelerationStructureKHR*	pAccelerationStructure)
-	{
-		return write(destSet, destLocation.m_binding, destLocation.m_arrayElement, numDescriptors, descriptorType, DE_NULL, DE_NULL, DE_NULL, pAccelerationStructure);
 	}
 
 	inline DescriptorSetUpdateBuilder&	copySingle					(VkDescriptorSet	srcSet,

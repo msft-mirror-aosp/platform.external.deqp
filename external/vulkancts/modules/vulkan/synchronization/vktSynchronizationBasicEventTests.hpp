@@ -23,6 +23,7 @@
  * \brief Synchronization event basic tests
  *//*--------------------------------------------------------------------*/
 
+#include "tcuDefs.hpp"
 #include "tcuTestCase.hpp"
 
 namespace vkt
@@ -30,8 +31,7 @@ namespace vkt
 namespace synchronization
 {
 
-tcu::TestCaseGroup*		createBasicEventTests					(tcu::TestContext& testCtx);
-tcu::TestCaseGroup*		createSynchronization2BasicEventTests	(tcu::TestContext& testCtx);
+tcu::TestCaseGroup*		createBasicEventTests	(tcu::TestContext& testCtx);
 
 } //synchronization
 } // vkt

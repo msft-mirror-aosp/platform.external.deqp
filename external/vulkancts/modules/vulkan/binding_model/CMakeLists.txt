@@ -1,9 +1,6 @@
 # dEQP-VK.binding_model
 
-include_directories(
-        ..
-        ../amber
-        )
+include_directories(..)
 
 set(DEQP_VK_BINDING_MODEL_SRCS
 	vktBindingModelTests.cpp
@@ -16,8 +13,6 @@ set(DEQP_VK_BINDING_MODEL_SRCS
 	vktBindingDescriptorSetRandomTests.hpp
 	vktBindingDescriptorCopyTests.cpp
 	vktBindingDescriptorCopyTests.hpp
-	vktBindingDynamicOffsetTests.cpp
-	vktBindingDynamicOffsetTests.hpp
 	vktBindingBufferDeviceAddressTests.cpp
 	vktBindingBufferDeviceAddressTests.hpp
 	)

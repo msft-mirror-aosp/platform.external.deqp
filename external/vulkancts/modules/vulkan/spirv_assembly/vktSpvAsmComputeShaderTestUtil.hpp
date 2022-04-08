@@ -353,6 +353,7 @@ struct ComputeShaderSpec
 	SpirvVersion							spirvVersion;
 	bool									coherentMemory;
 	bool									usesPhysStorageBuffer;
+	bool									spirvVersion14;
 
 											ComputeShaderSpec (void)
 												: entryPoint					("main")
@@ -365,6 +366,7 @@ struct ComputeShaderSpec
 												, spirvVersion					(SPIRV_VERSION_1_0)
 												, coherentMemory				(false)
 												, usesPhysStorageBuffer			(false)
+												, spirvVersion14				(false)
 											{}
 };
 

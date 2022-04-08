@@ -26,7 +26,6 @@
 
 #include "tcuTexture.hpp"
 #include "tcuSurface.hpp"
-#include "tcuMaybe.hpp"
 
 #include "deMemory.h"
 #include "deSharedPtr.hpp"
@@ -91,32 +90,21 @@ public:
 		INIT_LAST
 	};
 
-	struct MinMaxLod
-	{
-		float minLod;
-		float maxLod;
-
-		MinMaxLod (float min, float max) : minLod(min), maxLod(max) {}
-	};
-
 	struct Parameters
 	{
 		deUint32					baseMipLevel;
 		vk::VkComponentMapping		componentMapping;
 		vk::VkSampleCountFlagBits	samples;
 		Init						initialization;
-		tcu::Maybe<MinMaxLod>		minMaxLod;
 
-		Parameters (deUint32						baseMipLevel_		= 0,
-					vk::VkComponentMapping			componentMapping_	= vk::makeComponentMappingRGBA(),
-					vk::VkSampleCountFlagBits		samples_			= vk::VK_SAMPLE_COUNT_1_BIT,
-					Init							initialization_		= INIT_UPLOAD_DATA,
-					const tcu::Maybe<MinMaxLod>&	minMaxLod_			= tcu::nothing<MinMaxLod>())
+		Parameters (deUint32					baseMipLevel_		= 0,
+					vk::VkComponentMapping		componentMapping_	= vk::makeComponentMappingRGBA(),
+					vk::VkSampleCountFlagBits	samples_			= vk::VK_SAMPLE_COUNT_1_BIT,
+					Init						initialization_		= INIT_UPLOAD_DATA)
 			: baseMipLevel		(baseMipLevel_)
 			, componentMapping	(componentMapping_)
 			, samples			(samples_)
 			, initialization	(initialization_)
-			, minMaxLod			(minMaxLod_)
 		{
 		}
 	};
@@ -687,11 +675,6 @@ void ShaderRenderCaseInstance::addUniform (deUint32 bindingLocation, vk::VkDescr
 {
 	addUniform(bindingLocation, descriptorType, sizeof(T), &data);
 }
-
-vk::VkImageViewType		textureTypeToImageViewType	(TextureBinding::Type type);
-vk::VkImageType			viewTypeToImageType			(vk::VkImageViewType type);
-vk::VkImageUsageFlags	textureUsageFlags			(void);
-vk::VkImageCreateFlags	textureCreateFlags			(vk::VkImageViewType viewType, ShaderRenderCaseInstance::ImageBackingMode backingMode);
 
 } // sr
 } // vkt

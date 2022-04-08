@@ -49,14 +49,6 @@ namespace Functional
 namespace
 {
 
-static bool checkSupport(Context& ctx)
-{
-	auto ctxType = ctx.getRenderContext().getType();
-	return contextSupports(ctxType, glu::ApiType::es(3, 2)) ||
-		   contextSupports(ctxType, glu::ApiType::core(4, 5)) ||
-		   ctx.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic");
-}
-
 static bool validateSortedAtomicRampAdditionValueChain (const std::vector<deUint32>& valueChain, deUint32 sumValue, int& invalidOperationNdx, deUint32& errorDelta, deUint32& errorExpected)
 {
 	std::vector<deUint32> chainDelta(valueChain.size());
@@ -122,14 +114,15 @@ void generateShuffledRamp (int numElements, std::vector<int>& ramp)
 
 static std::string specializeShader(Context& context, const char* code)
 {
-	auto					ctxType			= context.getRenderContext().getType();
-	const bool				isES32orGL45	= glu::contextSupports(ctxType, glu::ApiType::es(3, 2)) ||
-											  glu::contextSupports(ctxType, glu::ApiType::core(4, 5));
-	const glu::GLSLVersion	glslVersion		= glu::getContextTypeGLSLVersion(ctxType);
+	const glu::GLSLVersion				glslVersion			= glu::getContextTypeGLSLVersion(context.getRenderContext().getType());
+	std::map<std::string, std::string>	specializationMap;
 
-	std::map<std::string, std::string> specializationMap;
-	specializationMap["GLSL_VERSION_DECL"]				= glu::getGLSLVersionDeclaration(glslVersion);
-	specializationMap["SHADER_IMAGE_ATOMIC_REQUIRE"]	= isES32orGL45 ? "" : "#extension GL_OES_shader_image_atomic : require";
+	specializationMap["GLSL_VERSION_DECL"] = glu::getGLSLVersionDeclaration(glslVersion);
+
+	if (glu::contextSupports(context.getRenderContext().getType(), glu::ApiType::es(3, 2)))
+		specializationMap["SHADER_IMAGE_ATOMIC_REQUIRE"] = "";
+	else
+		specializationMap["SHADER_IMAGE_ATOMIC_REQUIRE"] = "#extension GL_OES_shader_image_atomic : require";
 
 	return tcu::StringTemplate(code).specialize(specializationMap);
 }
@@ -211,10 +204,11 @@ InterInvocationTestCase::~InterInvocationTestCase (void)
 void InterInvocationTestCase::init (void)
 {
 	const glw::Functions&	gl				= m_context.getRenderContext().getFunctions();
+	const bool				supportsES32	= glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
 	// requirements
 
-	if (m_useAtomic && m_storage == STORAGE_IMAGE && !checkSupport(m_context))
+	if (m_useAtomic && m_storage == STORAGE_IMAGE && !supportsES32 && !m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic"))
 		throw tcu::NotSupportedError("Test requires GL_OES_shader_image_atomic extension");
 
 	// program
@@ -1161,10 +1155,11 @@ InterCallTestCase::~InterCallTestCase (void)
 void InterCallTestCase::init (void)
 {
 	int			programFriendlyName = 0;
+	const bool	supportsES32		= glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
 	// requirements
 
-	if (m_useAtomic && m_storage == STORAGE_IMAGE && !checkSupport(m_context))
+	if (m_useAtomic && m_storage == STORAGE_IMAGE && !supportsES32 && !m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic"))
 		throw tcu::NotSupportedError("Test requires GL_OES_shader_image_atomic extension");
 
 	// generate resources and validate command list
@@ -2643,8 +2638,9 @@ void ConcurrentImageAtomicCase::init (void)
 {
 	const glw::Functions&	gl					= m_context.getRenderContext().getFunctions();
 	std::vector<deUint32>	zeroData			(m_workSize * m_workSize, 0);
+	const bool				supportsES32		= glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
-	if (!checkSupport(m_context))
+	if (!supportsES32 && !m_context.getContextInfo().isExtensionSupported("GL_OES_shader_image_atomic"))
 		throw tcu::NotSupportedError("Test requires GL_OES_shader_image_atomic");
 
 	// gen image

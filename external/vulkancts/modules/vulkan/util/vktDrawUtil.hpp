@@ -34,53 +34,45 @@
 #include "vktTestCase.hpp"
 #include "vkTypeUtil.hpp"
 #include "rrRenderer.hpp"
-#include <memory>
 
 namespace vkt
 {
 namespace drawutil
 {
 
-struct FrameBufferState
+struct DrawState
 {
-	FrameBufferState()										= delete;
-	FrameBufferState(deUint32 renderWidth_, deUint32 renderHeight_);
-
-	vk::VkFormat					colorFormat				= vk::VK_FORMAT_R8G8B8A8_UNORM;
-	vk::VkFormat					depthFormat				= vk::VK_FORMAT_UNDEFINED;
+	vk::VkPrimitiveTopology			topology;
+	vk::VkFormat					colorFormat;
+	vk::VkFormat					depthFormat;
 	tcu::UVec2						renderSize;
-	deUint32						numSamples				= vk::VK_SAMPLE_COUNT_1_BIT;
-	vk::VkImageView					depthImageView			= 0;
-};
-
-struct PipelineState
-{
-	PipelineState()											= delete;
-	PipelineState(const int subpixelBits);
-
-	bool							depthClampEnable		= false;
-	bool							depthTestEnable			= false;
-	bool							depthWriteEnable		= false;
-	rr::TestFunc					compareOp				= rr::TESTFUNC_LESS;
-	bool							depthBoundsTestEnable	= false;
-	bool							blendEnable				= false;
-	float							lineWidth				= 1.0;
-	deUint32						numPatchControlPoints	= 0;
-	bool							sampleShadingEnable		= false;
+	bool							depthClampEnable;
+	bool							depthTestEnable;
+	bool							depthWriteEnable;
+	rr::TestFunc					compareOp;
+	bool							depthBoundsTestEnable;
+	bool							blendEnable;
+	float							lineWidth;
+	deUint32						numPatchControlPoints;
+	deUint32						numSamples;
+	bool							sampleShadingEnable;
 	int								subpixelBits;
 
 	// VK_EXT_depth_clip_enable
-	bool							explicitDepthClipEnable	= false;
-	bool							depthClipEnable			= false;
+	bool							explicitDepthClipEnable;
+	bool							depthClipEnable;
+
+	DrawState (const vk::VkPrimitiveTopology topology_, deUint32 renderWidth_, deUint32 renderHeight_, const int subpixelBits);
 };
 
 struct DrawCallData
 {
-	DrawCallData()											= delete;
-	DrawCallData(const vk::VkPrimitiveTopology topology_, const std::vector<tcu::Vec4>&	vertices_);
-
-	vk::VkPrimitiveTopology			topology;
 	const std::vector<tcu::Vec4>&	vertices;
+
+	DrawCallData		(const std::vector<tcu::Vec4>&	vertices_)
+		: vertices		(vertices_)
+	{
+	}
 };
 
 //! Sets up a graphics pipeline and enables simple draw calls to predefined attachments.
@@ -89,8 +81,10 @@ struct DrawCallData
 class DrawContext
 {
 public:
-											DrawContext				(const FrameBufferState&		framebufferState)
-		: m_framebufferState					(framebufferState)
+											DrawContext				(const DrawState&		drawState,
+																	 const DrawCallData&	drawCallData)
+		: m_drawState						(drawState)
+		, m_drawCallData					(drawCallData)
 	{
 	}
 	virtual									~DrawContext			(void)
@@ -100,96 +94,98 @@ public:
 	virtual void							draw					(void) = 0;
 	virtual tcu::ConstPixelBufferAccess		getColorPixels			(void) const = 0;
 protected:
-	const FrameBufferState&					m_framebufferState;
-	std::vector<PipelineState>				m_pipelineStates;
-	std::vector<DrawCallData>				m_drawCallData;
+	const DrawState&						m_drawState;
+	const DrawCallData&						m_drawCallData;
 };
 
 class ReferenceDrawContext : public DrawContext
 {
 public:
-	ReferenceDrawContext											(const FrameBufferState&		framebufferState );
+											ReferenceDrawContext	(const DrawState&			drawState,
+																	 const DrawCallData&		drawCallData,
+																	 const rr::VertexShader&	vertexShader,
+																	 const rr::FragmentShader&	fragmentShader)
+		: DrawContext						(drawState, drawCallData)
+		, m_vertexShader					(vertexShader)
+		, m_fragmentShader					(fragmentShader)
+	{
+	}
 	virtual									~ReferenceDrawContext	(void);
-
-	void									registerDrawObject		(const PipelineState&					pipelineState,
-																	 std::shared_ptr<rr::VertexShader>&		vertexShader,
-																	 std::shared_ptr<rr::FragmentShader>&	fragmentShader,
-																	 const DrawCallData&					drawCallData);
 	virtual void							draw					(void);
 	virtual tcu::ConstPixelBufferAccess		getColorPixels			(void) const;
 private:
-	std::vector<std::shared_ptr<rr::VertexShader>>		m_vertexShaders;
-	std::vector< std::shared_ptr<rr::FragmentShader>>	m_fragmentShaders;
-	tcu::TextureLevel									m_refImage;
+	const rr::VertexShader&					m_vertexShader;
+	const rr::FragmentShader&				m_fragmentShader;
+	tcu::TextureLevel						m_refImage;
 };
 
 struct VulkanShader
 {
-	VulkanShader	() = delete;
-	VulkanShader	(const vk::VkShaderStageFlagBits stage_, const vk::ProgramBinary& binary_);
-
 	vk::VkShaderStageFlagBits	stage;
 	const vk::ProgramBinary*	binary;
+
+	VulkanShader (const vk::VkShaderStageFlagBits stage_, const vk::ProgramBinary& binary_)
+		: stage		(stage_)
+		, binary	(&binary_)
+	{
+	}
 };
 
 struct VulkanProgram
 {
-	VulkanProgram	(const std::vector<VulkanShader>& shaders_);
-
 	std::vector<VulkanShader>	shaders;
-	vk::VkDescriptorSetLayout	descriptorSetLayout	= 0;
-	vk::VkDescriptorSet			descriptorSet		= 0;
-};
+	vk::VkImageView				depthImageView;		// \todo [2017-06-06 pyry] This shouldn't be here? Doesn't logically belong to program
+	vk::VkDescriptorSetLayout	descriptorSetLayout;
+	vk::VkDescriptorSet			descriptorSet;
 
-struct RenderObject
-{
-	enum VulkanContants
-	{
-		MAX_NUM_SHADER_MODULES = 5,
-	};
+	VulkanProgram (const std::vector<VulkanShader>& shaders_)
+		: shaders				(shaders_)
+		, depthImageView		(0)
+		, descriptorSetLayout	(0)
+		, descriptorSet			(0)
+	{}
 
-	vk::refdetails::Move<vk::VkPipelineLayout>	pipelineLayout;
-	vk::refdetails::Move<vk::VkPipeline>		pipeline;
-	vk::refdetails::Move<vk::VkShaderModule>	shaderModules[MAX_NUM_SHADER_MODULES];
-	de::MovePtr<vk::BufferWithMemory>			vertexBuffer;
-	deUint32									vertexCount;
-	vk::VkDescriptorSetLayout					descriptorSetLayout = 0;
-	vk::VkDescriptorSet							descriptorSet = 0;
-
+	VulkanProgram (void)
+		: depthImageView		(0)
+		, descriptorSetLayout	(0)
+		, descriptorSet			(0)
+	{}
 };
 
 class VulkanDrawContext : public DrawContext
 {
 public:
-	VulkanDrawContext											(Context&					context,
-																 const FrameBufferState&	frameBufferState);
+											VulkanDrawContext	(Context&				context,
+																 const DrawState&		drawState,
+																 const DrawCallData&	drawCallData,
+																 const VulkanProgram&	vulkanProgram);
 	virtual									~VulkanDrawContext	(void);
-
-	void									registerDrawObject	(const PipelineState&		pipelineState,
-																 const VulkanProgram&		vulkanProgram,
-																 const DrawCallData&		drawCallData);
-
 	virtual void							draw				(void);
 	virtual tcu::ConstPixelBufferAccess		getColorPixels		(void) const;
 private:
+	enum VulkanContants
+	{
+		MAX_NUM_SHADER_MODULES					= 5,
+	};
 	Context&									m_context;
+	const VulkanProgram&						m_program;
 	de::MovePtr<vk::ImageWithMemory>			m_colorImage;
 	de::MovePtr<vk::ImageWithMemory>			m_resolveImage;
-	de::MovePtr<vk::ImageWithMemory>			m_depthImage;
 	de::MovePtr<vk::BufferWithMemory>			m_colorAttachmentBuffer;
 	vk::refdetails::Move<vk::VkImageView>		m_colorImageView;
-	vk::refdetails::Move<vk::VkImageView>		m_depthImageView;
 	vk::refdetails::Move<vk::VkRenderPass>		m_renderPass;
 	vk::refdetails::Move<vk::VkFramebuffer>		m_framebuffer;
+	vk::refdetails::Move<vk::VkPipelineLayout>	m_pipelineLayout;
+	vk::refdetails::Move<vk::VkPipeline>		m_pipeline;
 	vk::refdetails::Move<vk::VkCommandPool>		m_cmdPool;
 	vk::refdetails::Move<vk::VkCommandBuffer>	m_cmdBuffer;
-
-	std::vector<std::shared_ptr<RenderObject>>	m_renderObjects;
+	vk::refdetails::Move<vk::VkShaderModule>	m_shaderModules[MAX_NUM_SHADER_MODULES];
+	de::MovePtr<vk::BufferWithMemory>			m_vertexBuffer;
 };
 
 std::string getPrimitiveTopologyShortName (const vk::VkPrimitiveTopology topology);
 
-} // drawutil
+} // drwwutil
 } // vkt
 
 #endif // _VKTDRAWUTIL_HPP

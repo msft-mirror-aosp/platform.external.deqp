@@ -5,8 +5,6 @@ set(GLCTS_ES3_SRCS
 	es3cTestPackage.hpp
 	es3cCopyTexImageConversionsTests.cpp
 	es3cCopyTexImageConversionsTests.hpp
-	es3cNumberParsingTests.cpp
-	es3cNumberParsingTests.hpp
 	)
 
 set(GLCTS_ES3_LIBS

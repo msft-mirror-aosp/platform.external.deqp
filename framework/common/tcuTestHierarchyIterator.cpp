@@ -64,9 +64,6 @@ void DefaultHierarchyInflater::enterTestPackage (TestPackage* testPackage, vecto
 
 	testPackage->init();
 	testPackage->getChildren(children);
-
-	// write default session info if it was not done by package
-	m_testCtx.writeSessionInfo();
 }
 
 void DefaultHierarchyInflater::leaveTestPackage (TestPackage* testPackage)
@@ -175,9 +172,8 @@ void TestHierarchyIterator::next (void)
 			{
 				const std::string nodePath = buildNodePath(m_sessionStack);
 
-				// Return to parent if name or runner type doesn't match filter.
-				if (!(isLeaf ? (m_caseListFilter.checkRunnerType(node->getRunnerType()) && m_caseListFilter.checkTestCaseName(nodePath.c_str()))
-							 : m_caseListFilter.checkTestGroupName(nodePath.c_str())))
+				// Return to parent if name doesn't match filter.
+				if (!(isLeaf ? m_caseListFilter.checkTestCaseName(nodePath.c_str()) : m_caseListFilter.checkTestGroupName(nodePath.c_str())))
 				{
 					m_sessionStack.pop_back();
 					break;

@@ -80,14 +80,6 @@ using std::vector;
 #	define DEQP_OPENGL_LIBRARY_PATH "libGL.so"
 #endif
 
-#if !defined(DEQP_VULKAN_LIBRARY_PATH)
-#	if (DE_OS == DE_OS_ANDROID)
-#		define DEQP_VULKAN_LIBRARY_PATH "libvulkan.so"
-#	else
-#		define DEQP_VULKAN_LIBRARY_PATH "libvulkan.so.1"
-#	endif
-#endif
-
 namespace tcu
 {
 namespace surfaceless
@@ -97,7 +89,7 @@ class VulkanLibrary : public vk::Library
 {
 public:
 	VulkanLibrary (void)
-		: m_library	(DEQP_VULKAN_LIBRARY_PATH)
+		: m_library	("libvulkan.so.1")
 		, m_driver	(m_library)
 	{
 	}
@@ -272,7 +264,7 @@ EglRenderContext::EglRenderContext(const glu::RenderConfig& config, const tcu::C
 	eglw::EGLint		eglMinorVersion;
 	eglw::EGLint		flags = 0;
 	eglw::EGLint		num_configs;
-	eglw::EGLConfig		egl_config = NULL;
+	eglw::EGLConfig		egl_config;
 	eglw::EGLSurface	egl_surface;
 
 	(void) cmdLine;
@@ -337,44 +329,13 @@ EglRenderContext::EglRenderContext(const glu::RenderConfig& config, const tcu::C
 	frame_buffer_attribs.push_back(EGL_STENCIL_SIZE);
 	frame_buffer_attribs.push_back(config.stencilBits);
 
-	frame_buffer_attribs.push_back(EGL_SAMPLES);
-	frame_buffer_attribs.push_back(config.numSamples);
-
 	frame_buffer_attribs.push_back(EGL_NONE);
 
 	if (!eglChooseConfig(m_eglDisplay, &frame_buffer_attribs[0], NULL, 0, &num_configs))
 		throw tcu::ResourceError("surfaceless couldn't find any config");
 
-	eglw::EGLConfig		all_configs[num_configs];
-
-	if (!eglChooseConfig(m_eglDisplay, &frame_buffer_attribs[0], all_configs, num_configs, &num_configs))
+	if (!eglChooseConfig(m_eglDisplay, &frame_buffer_attribs[0], &egl_config, 1, &num_configs))
 		throw tcu::ResourceError("surfaceless couldn't find any config");
-
-	for (int i = 0; i < num_configs; i++) {
-		EGLint red, green, blue, alpha, depth, stencil, samples;
-		eglGetConfigAttrib(m_eglDisplay, all_configs[i], EGL_RED_SIZE, &red);
-		eglGetConfigAttrib(m_eglDisplay, all_configs[i], EGL_GREEN_SIZE, &green);
-		eglGetConfigAttrib(m_eglDisplay, all_configs[i], EGL_BLUE_SIZE, &blue);
-		eglGetConfigAttrib(m_eglDisplay, all_configs[i], EGL_ALPHA_SIZE, &alpha);
-		eglGetConfigAttrib(m_eglDisplay, all_configs[i], EGL_DEPTH_SIZE, &depth);
-		eglGetConfigAttrib(m_eglDisplay, all_configs[i], EGL_STENCIL_SIZE, &stencil);
-		eglGetConfigAttrib(m_eglDisplay, all_configs[i], EGL_SAMPLES, &samples);
-
-		if (
-				(glu::RenderConfig::DONT_CARE == config.redBits		|| red		== config.redBits)		&&
-				(glu::RenderConfig::DONT_CARE == config.greenBits	|| green	== config.greenBits)	&&
-				(glu::RenderConfig::DONT_CARE == config.blueBits	|| blue		== config.blueBits)		&&
-				(glu::RenderConfig::DONT_CARE == config.alphaBits	|| alpha	== config.alphaBits)	&&
-				(glu::RenderConfig::DONT_CARE == config.depthBits	|| depth	== config.depthBits)	&&
-				(glu::RenderConfig::DONT_CARE == config.stencilBits	|| stencil	== config.stencilBits)	&&
-				(glu::RenderConfig::DONT_CARE == config.numSamples	|| samples	== config.numSamples)) {
-			egl_config = all_configs[i];
-			break;
-		}
-	}
-
-	if (!egl_config)
-		throw tcu::ResourceError("surfaceless couldn't find a matching config");
 
 	switch (config.surfaceType)
 	{

@@ -75,7 +75,7 @@ public:
 						VarType			(const VarType& other);
 						VarType			(glu::DataType basicType, deUint32 flags);
 						VarType			(const VarType& elementType, int arraySize);
-	explicit			VarType			(const StructType* structPtr, deUint32 flags = 0u);
+	explicit			VarType			(const StructType* structPtr);
 						~VarType		(void);
 
 	bool				isBasicType		(void) const	{ return m_type == TYPE_BASIC;	}

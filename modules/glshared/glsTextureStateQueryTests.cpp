@@ -547,60 +547,9 @@ static RequiredExtensions getTesterExtension (TesterType tester)
 
 } // es32
 
-namespace gl45
-{
-
-static bool isCoreTextureTarget (glw::GLenum target)
-{
-	return es31::isCoreTextureTarget(target);
-}
-
-static RequiredExtensions getTextureTargetExtension (glw::GLenum target)
-{
-	DE_UNREF(target);
-	return RequiredExtensions();
-}
-
-static bool isCoreTextureParam (glw::GLenum pname)
-{
-	return es31::isCoreTextureParam(pname);
-}
-
-static RequiredExtensions getTextureParamExtension (glw::GLenum pname)
-{
-	DE_UNREF(pname);
-	return RequiredExtensions();
-}
-
-static bool isCoreQuery (QueryType query)
-{
-	return es31::isCoreQuery(query);
-}
-
-static RequiredExtensions getQueryExtension (QueryType query)
-{
-	DE_UNREF(query);
-	return RequiredExtensions();
-}
-
-static bool isCoreTester (TesterType tester)
-{
-	return es31::isCoreTester(tester);
-}
-
-static RequiredExtensions getTesterExtension (TesterType tester)
-{
-	DE_UNREF(tester);
-	return RequiredExtensions();
-}
-
-} // gl45
-
 static bool isCoreTextureTarget (const glu::ContextType& contextType, glw::GLenum target)
 {
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::isCoreTextureTarget(target);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::isCoreTextureTarget(target);
 	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::isCoreTextureTarget(target);
@@ -615,9 +564,7 @@ static bool isCoreTextureTarget (const glu::ContextType& contextType, glw::GLenu
 
 static bool isCoreTextureParam (const glu::ContextType& contextType, glw::GLenum pname)
 {
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::isCoreTextureParam(pname);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::isCoreTextureParam(pname);
 	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::isCoreTextureParam(pname);
@@ -632,9 +579,7 @@ static bool isCoreTextureParam (const glu::ContextType& contextType, glw::GLenum
 
 static bool isCoreQuery (const glu::ContextType& contextType, QueryType query)
 {
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::isCoreQuery(query);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::isCoreQuery(query);
 	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::isCoreQuery(query);
@@ -649,9 +594,7 @@ static bool isCoreQuery (const glu::ContextType& contextType, QueryType query)
 
 static bool isCoreTester (const glu::ContextType& contextType, TesterType tester)
 {
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::isCoreTester(tester);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::isCoreTester(tester);
 	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::isCoreTester(tester);
@@ -668,11 +611,9 @@ static RequiredExtensions getTextureTargetExtension (const glu::ContextType& con
 {
 	DE_ASSERT(!isCoreTextureTarget(contextType, target));
 
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::getTextureTargetExtension(target);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::getTextureTargetExtension(target);
-	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
+	if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::getTextureTargetExtension(target);
 	else if (contextSupports(contextType, glu::ApiType::es(3,0)))
 		return es30::getTextureTargetExtension(target);
@@ -687,9 +628,7 @@ static RequiredExtensions getTextureParamExtension (const glu::ContextType& cont
 {
 	DE_ASSERT(!isCoreTextureParam(contextType, pname));
 
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::getTextureParamExtension(pname);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::getTextureParamExtension(pname);
 	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::getTextureParamExtension(pname);
@@ -706,9 +645,7 @@ static RequiredExtensions getQueryExtension (const glu::ContextType& contextType
 {
 	DE_ASSERT(!isCoreQuery(contextType, query));
 
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::getQueryExtension(query);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::getQueryExtension(query);
 	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::getQueryExtension(query);
@@ -725,9 +662,7 @@ static RequiredExtensions getTesterExtension (const glu::ContextType& contextTyp
 {
 	DE_ASSERT(!isCoreTester(contextType, tester));
 
-	if (contextSupports(contextType, glu::ApiType::core(4,5)))
-		return gl45::getTesterExtension(tester);
-	else if (contextSupports(contextType, glu::ApiType::es(3,2)))
+	if (contextSupports(contextType, glu::ApiType::es(3,2)))
 		return es32::getTesterExtension(tester);
 	else if (contextSupports(contextType, glu::ApiType::es(3,1)))
 		return es31::getTesterExtension(tester);

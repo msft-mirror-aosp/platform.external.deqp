@@ -125,9 +125,9 @@ static void addTestIterations (gls::DrawTest* test, gls::DrawTestSpec& spec, Tes
 		DE_ASSERT(false);
 }
 
-static void genBasicSpec (gls::DrawTestSpec& spec, glu::ContextType& contextType, gls::DrawTestSpec::DrawMethod method)
+static void genBasicSpec (gls::DrawTestSpec& spec, gls::DrawTestSpec::DrawMethod method)
 {
-	spec.apiType							= glu::isContextTypeES(contextType) ? glu::ApiType::es(3,1) : contextType.getAPI();
+	spec.apiType							= glu::ApiType::es(3,1);
 	spec.primitive							= gls::DrawTestSpec::PRIMITIVE_TRIANGLES;
 	spec.primitiveCount						= 5;
 	spec.drawMethod							= method;
@@ -183,7 +183,6 @@ public:
 private:
 	const glw::Functions&			m_gl;
 	glu::ShaderProgram*				m_program;
-	GLuint							m_vao;
 	GLuint							m_coordinatesBuffer;
 	GLuint							m_elementsBuffer;
 	int								m_iterNdx;
@@ -205,7 +204,6 @@ VertexIDCase::VertexIDCase (Context& context,  gls::DrawTestSpec::DrawMethod dra
 	: TestCase				(context, "vertex_id", "gl_VertexID Test")
 	, m_gl					(m_context.getRenderContext().getFunctions())
 	, m_program				(DE_NULL)
-	, m_vao					(0)
 	, m_coordinatesBuffer	(0)
 	, m_elementsBuffer		(0)
 	, m_iterNdx				(0)
@@ -220,13 +218,12 @@ VertexIDCase::~VertexIDCase (void)
 
 void VertexIDCase::init (void)
 {
-	auto ctxType = m_context.getRenderContext().getType();
 	if (m_method == deqp::gls::DrawTestSpec::DRAWMETHOD_DRAWELEMENTS_BASEVERTEX ||
 		m_method == gls::DrawTestSpec::DRAWMETHOD_DRAWELEMENTS_RANGED_BASEVERTEX ||
 		m_method == gls::DrawTestSpec::DRAWMETHOD_DRAWELEMENTS_INSTANCED_BASEVERTEX)
 	{
-		const bool supportsES32orGL45 = contextSupports(ctxType, glu::ApiType::es(3, 2)) || contextSupports(ctxType, glu::ApiType::core(4, 5));
-		TCU_CHECK_AND_THROW(NotSupportedError, supportsES32orGL45 || m_context.getContextInfo().isExtensionSupported("GL_EXT_draw_elements_base_vertex"), "GL_EXT_draw_elements_base_vertex is not supported.");
+		const bool supportsES32 = contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
+		TCU_CHECK_AND_THROW(NotSupportedError, supportsES32 || m_context.getContextInfo().isExtensionSupported("GL_EXT_draw_elements_base_vertex"), "GL_EXT_draw_elements_base_vertex is not supported.");
 	}
 
 	m_testCtx.getLog()	<< TestLog::Message
@@ -266,9 +263,6 @@ void VertexIDCase::init (void)
 
 	GLU_CHECK_GLW_CALL(m_gl, genBuffers(1, &m_coordinatesBuffer));
 	GLU_CHECK_GLW_CALL(m_gl, genBuffers(1, &m_elementsBuffer));
-
-	if (!glu::isContextTypeES(ctxType))
-		GLU_CHECK_GLW_CALL(m_gl, genVertexArrays(1, &m_vao));
 }
 
 void VertexIDCase::deinit (void)
@@ -286,12 +280,6 @@ void VertexIDCase::deinit (void)
 	{
 		GLU_CHECK_GLW_CALL(m_gl, deleteBuffers(1, &m_coordinatesBuffer));
 		m_coordinatesBuffer = 0;
-	}
-
-	if (m_vao)
-	{
-		GLU_CHECK_GLW_CALL(m_gl, deleteVertexArrays(1, &m_vao));
-		m_vao = 0;
 	}
 }
 
@@ -418,9 +406,6 @@ VertexIDCase::IterateResult VertexIDCase::iterate (void)
 
 	GLU_CHECK_GLW_CALL(m_gl, bindBuffer(GL_ARRAY_BUFFER, m_coordinatesBuffer));
 	GLU_CHECK_GLW_CALL(m_gl, bufferData(GL_ARRAY_BUFFER, (GLsizeiptr)sizeof(coords), coords, GL_STATIC_DRAW));
-
-	if (m_vao)
-		GLU_CHECK_GLW_CALL(m_gl, bindVertexArray(m_vao));
 	GLU_CHECK_GLW_CALL(m_gl, enableVertexAttribArray(coordLocation));
 	GLU_CHECK_GLW_CALL(m_gl, vertexAttribPointer(coordLocation, 2, GL_FLOAT, GL_FALSE, 0, DE_NULL));
 
@@ -511,8 +496,7 @@ void IndexGroup::init (void)
 	};
 
 	gls::DrawTestSpec spec;
-	glu::ContextType contextType = m_context.getRenderContext().getType();
-	genBasicSpec(spec, contextType, m_method);
+	genBasicSpec(spec, m_method);
 
 	spec.indexStorage = gls::DrawTestSpec::STORAGE_BUFFER;
 
@@ -579,8 +563,7 @@ void BaseVertexGroup::init (void)
 	};
 
 	gls::DrawTestSpec spec;
-	glu::ContextType contextType = m_context.getRenderContext().getType();
-	genBasicSpec(spec, contextType, m_method);
+	genBasicSpec(spec, m_method);
 
 	spec.indexStorage = gls::DrawTestSpec::STORAGE_BUFFER;
 
@@ -645,9 +628,8 @@ void AttributeGroup::init (void)
 	{
 		gls::DrawTest*		test				= new gls::DrawTest(m_testCtx, m_context.getRenderContext(), "single_attribute", "Single attribute array.");
 		gls::DrawTestSpec	spec;
-		glu::ContextType	contextType			= m_context.getRenderContext().getType();
 
-		spec.apiType							= glu::isContextTypeES(contextType) ? glu::ApiType::es(3,1) : contextType.getAPI();
+		spec.apiType							= glu::ApiType::es(3,1);
 		spec.primitive							= m_primitive;
 		spec.primitiveCount						= 5;
 		spec.drawMethod							= m_method;
@@ -682,9 +664,8 @@ void AttributeGroup::init (void)
 	{
 		gls::DrawTest*		test				= new gls::DrawTest(m_testCtx, m_context.getRenderContext(), "multiple_attributes", "Multiple attribute arrays.");
 		gls::DrawTestSpec	spec;
-		glu::ContextType	contextType			= m_context.getRenderContext().getType();
 
-		spec.apiType							= glu::isContextTypeES(contextType) ? glu::ApiType::es(3,1) : contextType.getAPI();
+		spec.apiType							= glu::ApiType::es(3,1);
 		spec.primitive							= m_primitive;
 		spec.primitiveCount						= 5;
 		spec.drawMethod							= m_method;
@@ -730,9 +711,8 @@ void AttributeGroup::init (void)
 	{
 		gls::DrawTest*		test					= new gls::DrawTest(m_testCtx, m_context.getRenderContext(), "instanced_attributes", "Instanced attribute array.");
 		gls::DrawTestSpec	spec;
-		glu::ContextType	contextType				= m_context.getRenderContext().getType();
 
-		spec.apiType								= glu::isContextTypeES(contextType) ? glu::ApiType::es(3,1) : contextType.getAPI();
+		spec.apiType								= glu::ApiType::es(3,1);
 		spec.primitive								= m_primitive;
 		spec.primitiveCount							= 5;
 		spec.drawMethod								= m_method;
@@ -792,9 +772,8 @@ void AttributeGroup::init (void)
 	{
 		gls::DrawTest*		test				= new gls::DrawTest(m_testCtx, m_context.getRenderContext(), "default_attribute", "Attribute specified with glVertexAttrib*.");
 		gls::DrawTestSpec	spec;
-		glu::ContextType	contextType			= m_context.getRenderContext().getType();
 
-		spec.apiType							= glu::isContextTypeES(contextType) ? glu::ApiType::es(3,1) : contextType.getAPI();
+		spec.apiType							= glu::ApiType::es(3,1);
 		spec.primitive							= m_primitive;
 		spec.primitiveCount						= 5;
 		spec.drawMethod							= m_method;

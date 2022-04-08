@@ -203,14 +203,7 @@ void writeTxtCaselistsToFiles (TestPackageRoot& root, TestContext& testCtx, cons
 
 		print("Writing test cases from '%s' to file '%s'..\n", pkgName, filename.c_str());
 
-		try
-		{
-			iter.next();
-		}
-		catch (const tcu::NotSupportedError&)
-		{
-			return;
-		}
+		iter.next();
 
 		while (iter.getNode()->getNodeType() != NODETYPE_PACKAGE)
 		{

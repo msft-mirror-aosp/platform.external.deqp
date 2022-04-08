@@ -144,10 +144,6 @@
 		<pre class="ShaderSource"><xsl:value-of select="."/></pre>
 	</xsl:template>
 
-	<xsl:template match="SpirVAssemblySource">
-		<pre class="SpirVAssemblySource"><xsl:value-of select="."/></pre>
-	</xsl:template>
-
 	<xsl:template match="InfoLog">
 		<pre class="InfoLog"><xsl:value-of select="."/></pre>
 	</xsl:template>

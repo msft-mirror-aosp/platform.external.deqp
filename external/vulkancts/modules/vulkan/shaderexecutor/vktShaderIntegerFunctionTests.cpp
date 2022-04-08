@@ -296,8 +296,6 @@ public:
 											generateSources(m_shaderType, m_spec, programCollection);
 										}
 
-			void						checkSupport			(Context& context) const;
-
 	virtual TestInstance*				createInstance			(Context& context) const = 0;
 
 protected:
@@ -320,11 +318,6 @@ IntegerFunctionCase::IntegerFunctionCase (tcu::TestContext& testCtx, const char*
 
 IntegerFunctionCase::~IntegerFunctionCase (void)
 {
-}
-
-void IntegerFunctionCase::checkSupport (Context& context) const
-{
-	checkSupportShader(context, m_shaderType);
 }
 
 // IntegerFunctionTestInstance
