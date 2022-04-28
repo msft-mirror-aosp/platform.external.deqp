@@ -4465,6 +4465,3 @@ dEQP-VK.compute.workgroup_memory_explicit_layout.size.65536
 dEQP-VK.compute.workgroup_memory_explicit_layout.copy_memory.basic
 dEQP-VK.compute.workgroup_memory_explicit_layout.copy_memory.two_invocations
 dEQP-VK.compute.workgroup_memory_explicit_layout.copy_memory.variable_pointers
-dEQP-VK.compute.workgroup_memory_explicit_layout.zero_ext.block
-dEQP-VK.compute.workgroup_memory_explicit_layout.zero_ext.other_block
-dEQP-VK.compute.workgroup_memory_explicit_layout.zero_ext.block_with_offset

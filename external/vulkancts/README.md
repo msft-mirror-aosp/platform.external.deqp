@@ -53,14 +53,18 @@ Building CTS
 ------------
 
 To build dEQP, you need first to download sources for zlib, libpng, glslang,
-spirv-headers, and spirv-tools.
+vulkan-docs, spirv-headers, and spirv-tools.
 
 To download sources, run:
 
 	python external/fetch_sources.py
 
-You may need to re-run `fetch_sources.py` to update to the latest glslang and
-spirv-tools revisions occasionally.
+You may need to re-run `fetch_sources.py` to update to the latest glslang,
+vulkan-docs and spirv-tools revisions occasionally.
+
+You also need to install lxml python module by running:
+
+	python -m pip install lxml
 
 With CMake out-of-source builds are always recommended. Create a build directory
 of your choosing, and in that directory generate Makefiles or IDE project
@@ -144,7 +148,10 @@ Following command line options MUST be used when running CTS:
 	--deqp-log-images=disable
 	--deqp-log-shader-sources=disable
 
-In addition on multi-device systems the device for which conformance is claimed
+If an implementation ships with [implicit layers](https://github.com/KhronosGroup/Vulkan-Loader/blob/master/loader/LoaderAndLayerInterface.md#implicit-vs-explicit-layers) enabled, then such layers must be enabled
+when running CTS.
+
+In addition, on multi-device systems the device for which conformance is claimed
 can be selected with:
 
 	--deqp-vk-device-id=<value>
