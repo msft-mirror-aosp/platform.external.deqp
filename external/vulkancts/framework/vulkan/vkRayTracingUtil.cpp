@@ -1382,7 +1382,10 @@ void BottomLevelAccelerationStructureKHR::prepareGeometries (const DeviceInterfa
 			if (m_vertexBuffer.get() != DE_NULL)
 			{
 				vertexData			= makeDeviceOrHostAddressConstKHR(vk, device, m_vertexBuffer->get(), vertexBufferOffset);
-				vertexBufferOffset	+= deAlignSize(geometryData->getVertexByteSize(), 8);
+				if (m_indirectBuffer == DE_NULL )
+				{
+					vertexBufferOffset	+= deAlignSize(geometryData->getVertexByteSize(), 8);
+				}
 			}
 			else
 				vertexData			= makeDeviceOrHostAddressConstKHR(DE_NULL);
@@ -2699,7 +2702,6 @@ Move<VkPipeline> RayTracingPipeline::createPipelineKHR (const DeviceInterface&		
 	};
 	VkPipeline											object							= DE_NULL;
 	VkResult											result							= vk.createRayTracingPipelinesKHR(device, deferredOperation.get(), DE_NULL, 1u, &pipelineCreateInfo, DE_NULL, &object);
-	Move<VkPipeline>									pipeline						(check<VkPipeline>(object), Deleter<VkPipeline>(vk, device, DE_NULL));
 
 	if (m_deferredOperation)
 	{
@@ -2708,6 +2710,7 @@ Move<VkPipeline> RayTracingPipeline::createPipelineKHR (const DeviceInterface&		
 		finishDeferredOperation(vk, device, deferredOperation.get(), m_workerThreadCount, result == VK_OPERATION_NOT_DEFERRED_KHR);
 	}
 
+	Move<VkPipeline> pipeline (check<VkPipeline>(object), Deleter<VkPipeline>(vk, device, DE_NULL));
 	return pipeline;
 }
 
