@@ -1704,10 +1704,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     }
 
     /**
-     * Check whether the device's claimed Vulkan/OpenGL ES dEQP level is high enough that it should
+     * Check whether the device's claimed dEQP level is high enough that it should
      * pass the tests in the caselist.
-     *
-     * Precondition: the package must be a Vulkan or OpenGL ES package.
      */
     private boolean claimedDeqpLevelIsRecentEnough() throws CapabilityQueryFailureException,
             DeviceNotAvailableException {
@@ -1715,11 +1713,12 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         final String featureName;
         if (isVulkanPackage()) {
             featureName = FEATURE_VULKAN_DEQP_LEVEL;
-        } else if (isOpenGlEsPackage()) {
+        } else if (isOpenGlEsPackage() || isEglPackage()) {
+            // The OpenGL ES feature flag is used for EGL as well.
             featureName = FEATURE_OPENGLES_DEQP_LEVEL;
         } else {
             throw new AssertionError(
-                "Claims about dEQP support should only be checked for Vulkan or OpenGL ES "
+                "Claims about dEQP support should only be checked for Vulkan, OpenGL ES, or EGL "
                     + "packages");
         }
 
@@ -1727,7 +1726,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             featureName);
 
         // A Vulkan/OpenGL ES caselist filename has the form:
-        //     {gles2,gles3,gles31,vk}-master-YYYY-MM-DD.txt
+        //     {gles2,gles3,gles31,vk,egl}-master-YYYY-MM-DD.txt
         final Pattern caseListFilenamePattern = Pattern
             .compile("-master-(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)\\.txt$");
         final Matcher matcher = caseListFilenamePattern.matcher(mCaselistFile);
@@ -1750,6 +1749,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         CLog.d("    2019-03-01 -> 132317953");
         CLog.d("    2020-03-01 -> 132383489");
         CLog.d("    2021-03-01 -> 132449025");
+        CLog.d("    2022-03-01 -> 132514561");
 
         CLog.d("Minimum level required to run this caselist is %d", minimumLevel);
 
@@ -1916,33 +1916,41 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                 BatchRunConfiguration.ROTATION_REVERSE_LANDSCAPE.equals(rotation);
     }
 
+    private void checkRecognizedPackage() {
+        if (!isRecognizedPackage()) {
+            throw new IllegalStateException("dEQP runner was created with illegal package name");
+        }
+    }
+
+    private boolean isRecognizedPackage() {
+        return "dEQP-EGL".equals(mDeqpPackage) || "dEQP-GLES2".equals(mDeqpPackage)
+                || "dEQP-GLES3".equals(mDeqpPackage) || "dEQP-GLES31".equals(mDeqpPackage)
+                || "dEQP-VK".equals(mDeqpPackage);
+    }
+
+    /**
+     * Parse EGL nature from package name
+     */
+    private boolean isEglPackage() {
+        checkRecognizedPackage();
+        return "dEQP-EGL".equals(mDeqpPackage);
+    }
+
     /**
      * Parse gl nature from package name
      */
     private boolean isOpenGlEsPackage() {
-        if ("dEQP-GLES2".equals(mDeqpPackage) || "dEQP-GLES3".equals(mDeqpPackage) ||
-                "dEQP-GLES31".equals(mDeqpPackage)) {
-            return true;
-        } else if ("dEQP-EGL".equals(mDeqpPackage) ||
-                "dEQP-VK".equals(mDeqpPackage)) {
-            return false;
-        } else {
-            throw new IllegalStateException("dEQP runner was created with illegal name");
-        }
+        checkRecognizedPackage();
+        return "dEQP-GLES2".equals(mDeqpPackage) || "dEQP-GLES3".equals(mDeqpPackage)
+                || "dEQP-GLES31".equals(mDeqpPackage);
     }
 
     /**
      * Parse vulkan nature from package name
      */
     private boolean isVulkanPackage() {
-        if ("dEQP-GLES2".equals(mDeqpPackage) || "dEQP-GLES3".equals(mDeqpPackage) ||
-                "dEQP-GLES31".equals(mDeqpPackage) || "dEQP-EGL".equals(mDeqpPackage)) {
-            return false;
-        } else if ("dEQP-VK".equals(mDeqpPackage)) {
-            return true;
-        } else {
-            throw new IllegalStateException("dEQP runner was created with illegal name");
-        }
+        checkRecognizedPackage();
+        return "dEQP-VK".equals(mDeqpPackage);
     }
 
     /**
@@ -2263,7 +2271,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                                             || (!isOpenGlEsPackage() && !isVulkanPackage());
             if (mCollectTestsOnly
                 || !isSupportedApi
-                || ((isVulkanPackage() || isOpenGlEsPackage()) && !claimedDeqpLevelIsRecentEnough())) {
+                || !claimedDeqpLevelIsRecentEnough()) {
                 // Pass all tests trivially if:
                 // - we are collecting the names of the tests only, or
                 // - the relevant API is not supported, or
