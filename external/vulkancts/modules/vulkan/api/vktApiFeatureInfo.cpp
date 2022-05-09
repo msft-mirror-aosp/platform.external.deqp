@@ -1627,7 +1627,6 @@ tcu::TestStatus validateRoadmap2022(Context& context)
 		ROADMAP_FEATURE_ITEM(vk12Features, shaderStorageImageArrayNonUniformIndexing),
 		ROADMAP_FEATURE_ITEM(vk12Features, shaderUniformTexelBufferArrayNonUniformIndexing),
 		ROADMAP_FEATURE_ITEM(vk12Features, shaderStorageTexelBufferArrayNonUniformIndexing),
-		ROADMAP_FEATURE_ITEM(vk12Features, descriptorBindingUniformBufferUpdateAfterBind),
 		ROADMAP_FEATURE_ITEM(vk12Features, descriptorBindingSampledImageUpdateAfterBind),
 		ROADMAP_FEATURE_ITEM(vk12Features, descriptorBindingStorageImageUpdateAfterBind),
 		ROADMAP_FEATURE_ITEM(vk12Features, descriptorBindingStorageBufferUpdateAfterBind),
@@ -4284,9 +4283,9 @@ bool checkExtension (vector<VkExtensionProperties>& properties, const char* exte
 
 tcu::TestStatus deviceFeatures2 (Context& context)
 {
-	const VkPhysicalDevice		physicalDevice	= context.getPhysicalDevice();
 	const CustomInstance		instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&		vki				(instance.getDriver());
+	const VkPhysicalDevice		physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 	const int					count			= 2u;
 	TestLog&					log				= context.getTestContext().getLog();
 	VkPhysicalDeviceFeatures	coreFeatures;
@@ -4319,9 +4318,9 @@ tcu::TestStatus deviceFeatures2 (Context& context)
 
 tcu::TestStatus deviceProperties2 (Context& context)
 {
-	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
 	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&			vki				(instance.getDriver());
+	const VkPhysicalDevice			physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 	TestLog&						log				= context.getTestContext().getLog();
 	VkPhysicalDeviceProperties		coreProperties;
 	VkPhysicalDeviceProperties2		extProperties;
@@ -4877,9 +4876,9 @@ string toString (const VkFormatProperties2& value)
 
 tcu::TestStatus deviceFormatProperties2 (Context& context)
 {
-	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
 	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&			vki				(instance.getDriver());
+	const VkPhysicalDevice			physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 	TestLog&						log				= context.getTestContext().getLog();
 
 	for (int formatNdx = 0; formatNdx < VK_CORE_FORMAT_LAST; ++formatNdx)
@@ -4900,10 +4899,10 @@ tcu::TestStatus deviceFormatProperties2 (Context& context)
 		TCU_CHECK(extProperties.sType == VK_STRUCTURE_TYPE_FORMAT_PROPERTIES_2);
 		TCU_CHECK(extProperties.pNext == DE_NULL);
 
-	if (deMemCmp(&coreProperties, &extProperties.formatProperties, sizeof(VkFormatProperties)) != 0)
-		TCU_FAIL("Mismatch between format properties reported by vkGetPhysicalDeviceFormatProperties and vkGetPhysicalDeviceFormatProperties2");
+		if (deMemCmp(&coreProperties, &extProperties.formatProperties, sizeof(VkFormatProperties)) != 0)
+			TCU_FAIL("Mismatch between format properties reported by vkGetPhysicalDeviceFormatProperties and vkGetPhysicalDeviceFormatProperties2");
 
-	log << TestLog::Message << toString (extProperties) << TestLog::EndMessage;
+		log << TestLog::Message << toString (extProperties) << TestLog::EndMessage;
 	}
 
 	return tcu::TestStatus::pass("Querying device format properties succeeded");
@@ -4911,9 +4910,9 @@ tcu::TestStatus deviceFormatProperties2 (Context& context)
 
 tcu::TestStatus deviceQueueFamilyProperties2 (Context& context)
 {
-	const VkPhysicalDevice			physicalDevice			= context.getPhysicalDevice();
 	const CustomInstance			instance				(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&			vki						(instance.getDriver());
+	const VkPhysicalDevice			physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 	TestLog&						log						= context.getTestContext().getLog();
 	deUint32						numCoreQueueFamilies	= ~0u;
 	deUint32						numExtQueueFamilies		= ~0u;
@@ -4962,9 +4961,9 @@ tcu::TestStatus deviceQueueFamilyProperties2 (Context& context)
 
 tcu::TestStatus deviceMemoryProperties2 (Context& context)
 {
-	const VkPhysicalDevice				physicalDevice	= context.getPhysicalDevice();
 	const CustomInstance				instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&				vki				(instance.getDriver());
+	const VkPhysicalDevice				physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 	TestLog&							log				= context.getTestContext().getLog();
 	VkPhysicalDeviceMemoryProperties	coreProperties;
 	VkPhysicalDeviceMemoryProperties2	extProperties;
@@ -4981,8 +4980,16 @@ tcu::TestStatus deviceMemoryProperties2 (Context& context)
 	TCU_CHECK(extProperties.sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PROPERTIES_2);
 	TCU_CHECK(extProperties.pNext == DE_NULL);
 
-	if (deMemCmp(&coreProperties, &extProperties.memoryProperties, sizeof(VkPhysicalDeviceMemoryProperties)) != 0)
-		TCU_FAIL("Mismatch between properties reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
+	if (coreProperties.memoryTypeCount != extProperties.memoryProperties.memoryTypeCount)
+		TCU_FAIL("Mismatch between memoryTypeCount reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
+	if (coreProperties.memoryHeapCount != extProperties.memoryProperties.memoryHeapCount)
+		TCU_FAIL("Mismatch between memoryHeapCount reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
+	for (deUint32 i = 0; i < coreProperties.memoryTypeCount; i++)
+		if (deMemCmp(&coreProperties.memoryTypes[i], &extProperties.memoryProperties.memoryTypes[i], sizeof(VkMemoryType)) != 0)
+			TCU_FAIL("Mismatch between memoryTypes reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
+	for (deUint32 i = 0; i < coreProperties.memoryHeapCount; i++)
+		if (deMemCmp(&coreProperties.memoryHeaps[i], &extProperties.memoryProperties.memoryHeaps[i], sizeof(VkMemoryHeap)) != 0)
+			TCU_FAIL("Mismatch between memoryHeaps reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
 
 	log << TestLog::Message << extProperties << TestLog::EndMessage;
 
@@ -5103,9 +5110,9 @@ tcu::TestStatus deviceFeaturesVulkan12 (Context& context)
 		{ 0, 0 }
 	};
 	TestLog&											log										= context.getTestContext().getLog();
-	const VkPhysicalDevice								physicalDevice							= context.getPhysicalDevice();
 	const CustomInstance								instance								(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&								vki										= instance.getDriver();
+	const VkPhysicalDevice								physicalDevice							(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 	const deUint32										vulkan11FeaturesBufferSize				= sizeof(VkPhysicalDeviceVulkan11Features) + GUARD_SIZE;
 	const deUint32										vulkan12FeaturesBufferSize				= sizeof(VkPhysicalDeviceVulkan12Features) + GUARD_SIZE;
 	VkPhysicalDeviceFeatures2							extFeatures;
@@ -5356,9 +5363,9 @@ tcu::TestStatus devicePropertiesVulkan12 (Context& context)
 		{ 0, 0 }
 	};
 	TestLog&										log											= context.getTestContext().getLog();
-	const VkPhysicalDevice							physicalDevice								= context.getPhysicalDevice();
 	const CustomInstance							instance									(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&							vki											= instance.getDriver();
+	const VkPhysicalDevice							physicalDevice								(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 	const deUint32									vulkan11PropertiesBufferSize				= sizeof(VkPhysicalDeviceVulkan11Properties) + GUARD_SIZE;
 	const deUint32									vulkan12PropertiesBufferSize				= sizeof(VkPhysicalDeviceVulkan12Properties) + GUARD_SIZE;
 	VkPhysicalDeviceProperties2						extProperties;
@@ -5527,9 +5534,9 @@ tcu::TestStatus devicePropertiesVulkan13 (Context& context)
 tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan12(Context& context)
 {
 	TestLog&											log										= context.getTestContext().getLog();
-	const VkPhysicalDevice								physicalDevice							= context.getPhysicalDevice();
 	const CustomInstance								instance								(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&								vki										= instance.getDriver();
+	const VkPhysicalDevice								physicalDevice							(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 
 	if (!context.contextSupports(vk::ApiVersion(1, 2, 0)))
 		TCU_THROW(NotSupportedError, "At least Vulkan 1.2 required to run test");
@@ -5759,7 +5766,6 @@ tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan13(Context& context)
 	{
 		{ { "VkPhysicalDeviceVulkan13Features.robustImageAccess" },										vulkan13Features.robustImageAccess },
 		{ { "VkPhysicalDeviceVulkan13Features.inlineUniformBlock" },									vulkan13Features.inlineUniformBlock },
-		{ { "VkPhysicalDeviceVulkan13Features.descriptorBindingInlineUniformBlockUpdateAfterBind" },	vulkan13Features.descriptorBindingInlineUniformBlockUpdateAfterBind },
 		{ { "VkPhysicalDeviceVulkan13Features.pipelineCreationCacheControl" },							vulkan13Features.pipelineCreationCacheControl },
 		{ { "VkPhysicalDeviceVulkan13Features.privateData" },											vulkan13Features.privateData },
 		{ { "VkPhysicalDeviceVulkan13Features.shaderDemoteToHelperInvocation" },						vulkan13Features.shaderDemoteToHelperInvocation },
@@ -5872,9 +5878,9 @@ tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan13(Context& context)
 tcu::TestStatus devicePropertyExtensionsConsistencyVulkan12(Context& context)
 {
 	TestLog&										log											= context.getTestContext().getLog();
-	const VkPhysicalDevice							physicalDevice								= context.getPhysicalDevice();
 	const CustomInstance							instance									(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&							vki											= instance.getDriver();
+	const VkPhysicalDevice							physicalDevice								(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 
 	if (!context.contextSupports(vk::ApiVersion(1, 2, 0)))
 		TCU_THROW(NotSupportedError, "At least Vulkan 1.2 required to run test");
@@ -6139,9 +6145,9 @@ tcu::TestStatus imageFormatProperties2 (Context& context, const VkFormat format,
 
 	TestLog&						log				= context.getTestContext().getLog();
 
-	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
 	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&			vki				(instance.getDriver());
+	const VkPhysicalDevice			physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 
 	const VkImageCreateFlags		ycbcrFlags		= isYCbCrFormat(format) ? (VkImageCreateFlags)VK_IMAGE_CREATE_DISJOINT_BIT_KHR : (VkImageCreateFlags)0u;
 	const VkImageUsageFlags			allUsageFlags	= VK_IMAGE_USAGE_TRANSFER_SRC_BIT
@@ -6212,9 +6218,9 @@ tcu::TestStatus sparseImageFormatProperties2 (Context& context, const VkFormat f
 {
 	TestLog&						log				= context.getTestContext().getLog();
 
-	const VkPhysicalDevice			physicalDevice	= context.getPhysicalDevice();
 	const CustomInstance			instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&			vki				(instance.getDriver());
+	const VkPhysicalDevice			physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
 
 	const VkImageUsageFlags			allUsageFlags	= VK_IMAGE_USAGE_TRANSFER_SRC_BIT
 													| VK_IMAGE_USAGE_TRANSFER_DST_BIT
@@ -6406,6 +6412,7 @@ tcu::TestStatus testNoUnknownExtensions (Context& context)
 	allowedDeviceExtensions.insert("VK_GOOGLE_display_timing");
 	allowedDeviceExtensions.insert("VK_GOOGLE_decorate_string");
 	allowedDeviceExtensions.insert("VK_GOOGLE_hlsl_functionality1");
+	allowedInstanceExtensions.insert("VK_GOOGLE_surfaceless_query");
 
 	// Instance extensions
 	checkExtensions(results,
