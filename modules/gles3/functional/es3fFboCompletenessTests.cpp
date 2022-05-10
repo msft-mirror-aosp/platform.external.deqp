@@ -24,6 +24,7 @@
 #include "es3fFboCompletenessTests.hpp"
 
 #include "glsFboCompletenessTests.hpp"
+#include "deUniquePtr.hpp"
 #include <sstream>
 
 using namespace glw;
@@ -130,6 +131,11 @@ static const FormatKey s_extColorBufferFloatFormats[] =
 	GL_RGBA32F, GL_RGBA16F, GL_R11F_G11F_B10F, GL_RG32F, GL_RG16F, GL_R32F, GL_R16F,
 };
 
+// GL_QCOM_render_shared_exponent
+static const FormatKey s_qcomRenderSharedExponent[] =
+{
+	GL_RGB9_E5,
+};
 // GL_OES_texture_stencil8
 static const FormatKey s_extOESTextureStencil8[] =
 {
@@ -168,6 +174,14 @@ static const FormatExtEntry s_es3ExtFormats[] =
 		"DEQP_gles31_core_compatible GL_EXT_render_snorm",
 		(deUint32)(REQUIRED_RENDERABLE | COLOR_RENDERABLE | TEXTURE_VALID | RENDERBUFFER_VALID),
 		GLS_ARRAY_RANGE(s_extRenderSnorm)
+		},
+
+	{
+		"GL_QCOM_render_shared_exponent",
+		// This is already texture-valid in ES3, the extension just adds RBO
+		// support to RGB9_E5 and make it color-renderable.
+		(deUint32)(REQUIRED_RENDERABLE | COLOR_RENDERABLE | RENDERBUFFER_VALID | TEXTURE_VALID),
+		GLS_ARRAY_RANGE(s_qcomRenderSharedExponent)
 	},
 };
 
@@ -176,12 +190,15 @@ class ES3Checker : public Checker
 public:
 				ES3Checker	(const glu::RenderContext& ctx)
 					: Checker				(ctx)
+					, m_ctxInfo				(glu::ContextInfo::create(ctx))
 					, m_numSamples			(-1)
 					, m_depthStencilImage	(0)
 					, m_depthStencilType	(GL_NONE) {}
 	void		check		(GLenum attPoint, const Attachment& att, const Image* image);
 
 private:
+	de::UniquePtr<glu::ContextInfo> m_ctxInfo;
+
 	//! The common number of samples of images.
 	GLsizei		m_numSamples;
 
@@ -225,7 +242,8 @@ void ES3Checker::check (GLenum attPoint, const Attachment& att, const Image* ima
 	}
 
 	// "Depth and stencil attachments, if present, are the same image."
-	if (attPoint == GL_DEPTH_ATTACHMENT || attPoint == GL_STENCIL_ATTACHMENT)
+	if (!m_ctxInfo->isExtensionSupported("GL_EXT_separate_depth_stencil")
+			&& (attPoint == GL_DEPTH_ATTACHMENT || attPoint == GL_STENCIL_ATTACHMENT))
 	{
 		if (m_depthStencilImage == 0)
 		{

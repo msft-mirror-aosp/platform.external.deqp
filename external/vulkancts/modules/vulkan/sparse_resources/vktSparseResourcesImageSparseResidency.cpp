@@ -767,7 +767,7 @@ tcu::TestStatus ImageSparseResidencyInstance::iterate (void)
 			tcu::ConstPixelBufferAccess	pixelBuffer					= vk::getChannelAccess(compatibleFormatDescription, compatibleShaderGridSize, planeRowPitches, (const void* const*)planePointers, channelNdx);
 			std::ostringstream str;
 			str << "image" << channelNdx;
-			m_context.getTestContext().getLog() << tcu::LogImage(str.str(), str.str(), pixelBuffer);;
+			m_context.getTestContext().getLog() << tcu::LogImage(str.str(), str.str(), pixelBuffer);
 		}
 
 		// Validate results
@@ -795,7 +795,6 @@ tcu::TestStatus ImageSparseResidencyInstance::iterate (void)
 			tcu::ConstPixelBufferAccess		pixelBuffer					= vk::getChannelAccess(compatibleFormatDescription, compatibleShaderGridSize, planeRowPitches, (const void* const*)planePointers, channelNdx);
 			VkExtent3D						planeExtent					= getPlaneExtent(compatibleFormatDescription, compatibleImageSize, planeNdx, 0u);
 			tcu::IVec3						pixelDivider				= pixelBuffer.getDivider();
-			float							fixedPointError				= tcu::TexVerifierUtil::computeFixedPointError(formatDescription.channels[channelNdx].sizeBits);
 
 			if( aspectRequirements.imageMipTailFirstLod > 0u )
 			{
@@ -869,6 +868,7 @@ tcu::TestStatus ImageSparseResidencyInstance::iterate (void)
 									case tcu::TEXTURECHANNELCLASS_UNSIGNED_FIXED_POINT:
 									case tcu::TEXTURECHANNELCLASS_SIGNED_FIXED_POINT:
 									{
+                                        float fixedPointError = tcu::TexVerifierUtil::computeFixedPointError(formatDescription.channels[channelNdx].sizeBits);
 										acceptableError += fixedPointError;
 										const tcu::Vec4 outputValue = pixelBuffer.getPixel(offsetX * pixelDivider.x(), offsetY * pixelDivider.y(), offsetZ * pixelDivider.z());
 
@@ -913,6 +913,7 @@ tcu::TestStatus ImageSparseResidencyInstance::iterate (void)
 									case tcu::TEXTURECHANNELCLASS_UNSIGNED_FIXED_POINT:
 									case tcu::TEXTURECHANNELCLASS_SIGNED_FIXED_POINT:
 									{
+										float fixedPointError = tcu::TexVerifierUtil::computeFixedPointError(formatDescription.channels[channelNdx].sizeBits);
 										acceptableError += fixedPointError;
 										const tcu::Vec4 outputValue = pixelBuffer.getPixel(offsetX * pixelDivider.x(), offsetY * pixelDivider.y(), offsetZ * pixelDivider.z());
 
@@ -982,6 +983,7 @@ tcu::TestStatus ImageSparseResidencyInstance::iterate (void)
 						case tcu::TEXTURECHANNELCLASS_UNSIGNED_FIXED_POINT:
 						case tcu::TEXTURECHANNELCLASS_SIGNED_FIXED_POINT:
 						{
+							float fixedPointError = tcu::TexVerifierUtil::computeFixedPointError(formatDescription.channels[channelNdx].sizeBits);
 							acceptableError += fixedPointError;
 							const tcu::Vec4 outputValue = pixelBuffer.getPixel(offsetX * pixelDivider.x(), offsetY * pixelDivider.y(), offsetZ * pixelDivider.z());
 
@@ -1018,7 +1020,7 @@ TestInstance* ImageSparseResidencyCase::createInstance (Context& context) const
 
 tcu::TestCaseGroup* createImageSparseResidencyTestsCommon (tcu::TestContext& testCtx, de::MovePtr<tcu::TestCaseGroup> testGroup, const bool useDeviceGroup = false)
 {
-	const std::vector<TestImageParameters> imageParameters =
+	const std::vector<TestImageParameters> imageParameters
 	{
 		{ IMAGE_TYPE_2D,			{ tcu::UVec3(512u, 256u,  1u),	tcu::UVec3(1024u, 128u, 1u),	tcu::UVec3(11u,  137u, 1u) },	getTestFormats(IMAGE_TYPE_2D) },
 		{ IMAGE_TYPE_2D_ARRAY,		{ tcu::UVec3(512u, 256u,  6u),	tcu::UVec3(1024u, 128u, 8u),	tcu::UVec3(11u,  137u, 3u) },	getTestFormats(IMAGE_TYPE_2D_ARRAY) },
