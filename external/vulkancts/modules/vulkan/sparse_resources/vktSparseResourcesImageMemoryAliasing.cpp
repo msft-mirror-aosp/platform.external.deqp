@@ -739,8 +739,7 @@ tcu::TestStatus ImageSparseMemoryAliasingInstance::iterate (void)
 			if (aspectIndex == NO_MATCH_FOUND)
 				TCU_THROW(NotSupportedError, "Not supported image aspect");
 
-			VkSparseImageMemoryRequirements		aspectRequirements	= sparseMemoryRequirements[aspectIndex];
-			float								fixedPointError		= tcu::TexVerifierUtil::computeFixedPointError(formatDescription.channels[channelNdx].sizeBits);;
+			VkSparseImageMemoryRequirements aspectRequirements	= sparseMemoryRequirements[aspectIndex];
 
 			for (deUint32 mipmapNdx = 0; mipmapNdx < aspectRequirements.imageMipTailFirstLod; ++mipmapNdx)
 			{
@@ -787,6 +786,7 @@ tcu::TestStatus ImageSparseMemoryAliasingInstance::iterate (void)
 						case tcu::TEXTURECHANNELCLASS_UNSIGNED_FIXED_POINT:
 						case tcu::TEXTURECHANNELCLASS_SIGNED_FIXED_POINT:
 						{
+							float fixedPointError = tcu::TexVerifierUtil::computeFixedPointError(formatDescription.channels[channelNdx].sizeBits);
 							acceptableError += fixedPointError;
 							const tcu::Vec4 outputValue = pixelBuffer.getPixel(offsetX * pixelDivider.x(), offsetY * pixelDivider.y(), offsetZ * pixelDivider.z());
 
@@ -899,7 +899,7 @@ TestInstance* ImageSparseMemoryAliasingCase::createInstance (Context& context) c
 tcu::TestCaseGroup* createImageSparseMemoryAliasingTestsCommon(tcu::TestContext& testCtx, de::MovePtr<tcu::TestCaseGroup> testGroup, const bool useDeviceGroup = false)
 {
 
-	const std::vector<TestImageParameters> imageParameters =
+	const std::vector<TestImageParameters> imageParameters
 	{
 		{ IMAGE_TYPE_2D,		{ tcu::UVec3(512u, 256u, 1u),	tcu::UVec3(128u, 128u, 1u),	tcu::UVec3(503u, 137u, 1u),	tcu::UVec3(11u, 37u, 1u) },	getTestFormats(IMAGE_TYPE_2D) },
 		{ IMAGE_TYPE_2D_ARRAY,	{ tcu::UVec3(512u, 256u, 6u),	tcu::UVec3(128u, 128u, 8u),	tcu::UVec3(503u, 137u, 3u),	tcu::UVec3(11u, 37u, 3u) },	getTestFormats(IMAGE_TYPE_2D_ARRAY) },

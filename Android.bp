@@ -97,9 +97,11 @@ cc_defaults {
         "-DDE_ANDROID_API=28",
         "-DDE_ASSERT_FAILURE_CALLBACK",
         "-DDE_COMPILER=DE_COMPILER_CLANG",
+        "-DDE_MINGW=0",
         "-DDE_OS=DE_OS_ANDROID",
         "-DDEQP_GLES2_DIRECT_LINK=1",
-        "-DDEQP_HAVE_RENDERDOC_HEADER=1",
+        "-DDEQP_HAVE_RENDERDOC_HEADER=0", // Needs to be 0.
+        "-DDEQP_SUPPORT_DRM=0",
         "-DDEQP_SUPPORT_GLES1=1",
         "-DDEQP_TARGET_NAME=\"Android\"",
         "-DQP_SUPPORT_PNG",
@@ -120,6 +122,11 @@ cc_defaults {
 
 cc_library_shared {
     name: "libdeqp",
+    defaults: ["libdeqp_defaults"]
+}
+
+cc_defaults {
+    name: "libdeqp_defaults",
     defaults: ["libdeqp_gen", "deqp_and_deps_defaults"],
 
     tidy_checks: [
@@ -209,4 +216,82 @@ android_test {
 
     // We could go down all the way to API-13 for 32bit. 22 is required for 64bit ARM.
     sdk_version: "test_current",
+}
+
+cc_test {
+    name: "deqp-binary",
+    defaults: ["libdeqp_defaults"],
+
+    cflags: [
+        "-DDEQP_GLES3_RUNTIME_LOAD=1",
+    ],
+
+    cppflags: [
+        "-Wno-macro-redefined",
+    ],
+
+    srcs: [
+        "framework/platform/tcuMain.cpp",
+        "framework/platform/surfaceless/tcuSurfacelessPlatform.cpp",
+    ],
+
+    local_include_dirs: [
+       "framework/platform/surfaceless",
+    ],
+
+    multilib: {
+        lib64: {
+            suffix: "64",
+        },
+    },
+
+    compile_multilib: "both",
+
+    version_script: "deqp_binary.lds",
+
+    host_supported: false,
+    gtest: false,
+    auto_gen_config: false,
+    test_options: {
+        unit_test: false,
+    },
+    data: [
+        ":deqp_binary_incremental_test_lists",
+        ":deqp_binary_data",
+        ":deqp_binary_data_vulkancts",
+        ":deqp_binary_data_graphicsfuzz",
+    ],
+}
+
+filegroup {
+    name: "deqp_binary_incremental_test_lists",
+    srcs: [
+        "android/cts/master/gles3-incremental-deqp.txt",
+        "android/cts/master/vk-incremental-deqp.txt",
+    ],
+    path: "android/cts/master",
+}
+
+filegroup {
+    name: "deqp_binary_data",
+    srcs: [
+        "data/**/*",
+    ],
+    path: "data",
+}
+
+filegroup {
+    name: "deqp_binary_data_vulkancts",
+    srcs: [
+        "external/vulkancts/data/**/*",
+    ],
+    path: "external/vulkancts/data",
+}
+
+filegroup {
+    name: "deqp_binary_data_graphicsfuzz",
+    srcs: [
+        "external/graphicsfuzz/data/**/*",
+    ],
+    path: "external/graphicsfuzz/data",
 }
