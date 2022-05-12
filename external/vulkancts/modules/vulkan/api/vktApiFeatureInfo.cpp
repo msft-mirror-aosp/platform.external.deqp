@@ -4281,12 +4281,13 @@ bool checkExtension (vector<VkExtensionProperties>& properties, const char* exte
 	return false;
 }
 
+#include "vkDeviceFeatures2.inl"
+
 tcu::TestStatus deviceFeatures2 (Context& context)
 {
+	const VkPhysicalDevice      physicalDevice = context.getPhysicalDevice();
 	const CustomInstance		instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
 	const InstanceDriver&		vki				(instance.getDriver());
-	const VkPhysicalDevice		physicalDevice	(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
-	const int					count			= 2u;
 	TestLog&					log				= context.getTestContext().getLog();
 	VkPhysicalDeviceFeatures	coreFeatures;
 	VkPhysicalDeviceFeatures2	extFeatures;
@@ -4308,10 +4309,6 @@ tcu::TestStatus deviceFeatures2 (Context& context)
 		TCU_FAIL("Mismatch between features reported by vkGetPhysicalDeviceFeatures and vkGetPhysicalDeviceFeatures2");
 
 	log << TestLog::Message << extFeatures << TestLog::EndMessage;
-
-	vector<VkExtensionProperties> properties	= enumerateDeviceExtensionProperties(vki, physicalDevice, DE_NULL);
-
-#include "vkDeviceFeatures2.inl"
 
 	return tcu::TestStatus::pass("Querying device features succeeded");
 }
@@ -6513,6 +6510,18 @@ tcu::TestStatus testMandatoryExtensions (Context& context)
 
 } // anonymous
 
+static inline void addFunctionCaseInNewSubgroup (
+	tcu::TestContext&			testCtx,
+	tcu::TestCaseGroup*			group,
+	const std::string&			subgroupName,
+	const std::string&			subgroupDescription,
+	FunctionInstance0::Function	testFunc)
+{
+	de::MovePtr<tcu::TestCaseGroup>	subgroup(new tcu::TestCaseGroup(testCtx, subgroupName.c_str(), subgroupDescription.c_str()));
+	addFunctionCase(subgroup.get(), "basic", "", testFunc);
+	group->addChild(subgroup.release());
+}
+
 tcu::TestCaseGroup* createFeatureInfoTests (tcu::TestContext& testCtx)
 {
 	de::MovePtr<tcu::TestCaseGroup>	infoTests	(new tcu::TestCaseGroup(testCtx, "info", "Platform Information Tests"));
@@ -6531,11 +6540,16 @@ tcu::TestCaseGroup* createFeatureInfoTests (tcu::TestContext& testCtx)
 	{
 		de::MovePtr<tcu::TestCaseGroup> extendedPropertiesTests (new tcu::TestCaseGroup(testCtx, "get_physical_device_properties2", "VK_KHR_get_physical_device_properties2"));
 
-		addFunctionCase(extendedPropertiesTests.get(), "features",					"Extended Device Features",					deviceFeatures2);
-		addFunctionCase(extendedPropertiesTests.get(), "properties",				"Extended Device Properties",				deviceProperties2);
-		addFunctionCase(extendedPropertiesTests.get(), "format_properties",			"Extended Device Format Properties",		deviceFormatProperties2);
-		addFunctionCase(extendedPropertiesTests.get(), "queue_family_properties",	"Extended Device Queue Family Properties",	deviceQueueFamilyProperties2);
-		addFunctionCase(extendedPropertiesTests.get(), "memory_properties",			"Extended Device Memory Properties",		deviceMemoryProperties2);
+		{
+			de::MovePtr<tcu::TestCaseGroup>	subgroup(new tcu::TestCaseGroup(testCtx, "features", ""));
+			addFunctionCase(subgroup.get(), "core", "Extended Device Features", deviceFeatures2);
+			addSeparateFeatureTests(subgroup.get());
+			extendedPropertiesTests->addChild(subgroup.release());
+		}
+		addFunctionCaseInNewSubgroup(testCtx, extendedPropertiesTests.get(), "properties",				"Extended Device Properties",				deviceProperties2);
+		addFunctionCaseInNewSubgroup(testCtx, extendedPropertiesTests.get(), "format_properties",			"Extended Device Format Properties",		deviceFormatProperties2);
+		addFunctionCaseInNewSubgroup(testCtx, extendedPropertiesTests.get(), "queue_family_properties",	"Extended Device Queue Family Properties",	deviceQueueFamilyProperties2);
+		addFunctionCaseInNewSubgroup(testCtx, extendedPropertiesTests.get(), "memory_properties",			"Extended Device Memory Properties",		deviceMemoryProperties2);
 
 		infoTests->addChild(extendedPropertiesTests.release());
 	}
