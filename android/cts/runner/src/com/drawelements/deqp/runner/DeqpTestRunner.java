@@ -17,6 +17,7 @@ package com.drawelements.deqp.runner;
 
 import com.android.compatibility.common.tradefed.build.CompatibilityBuildHelper;
 import com.android.compatibility.common.tradefed.targetprep.IncrementalDeqpPreparer;
+import com.android.compatibility.common.util.PropertyUtil;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IShellOutputReceiver;
 import com.android.ddmlib.MultiLineReceiver;
@@ -100,6 +101,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int TESTCASE_BATCH_LIMIT_LARGE = 10000;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS = 10 * 60 * 1000; // 10min
+    private static final int R_API_LEVEL = 30;
+    private static final int DEQP_LEVEL_R_2020 = 132383489;
 
     private static final String ANGLE_NONE = "none";
     private static final String ANGLE_VULKAN = "vulkan";
@@ -1771,8 +1774,24 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             }
         }
 
-        CLog.d("Could not find dEQP level feature flag \"%s\". Running caselist unconditionally.",
-            featureName);
+        CLog.d("Could not find dEQP level feature flag \"%s\".",
+                featureName);
+
+        // A Vulkan dEQP level has been required since R.
+        // A GLES/EGL dEQP level has only been required since S.
+        // Thus, if the VSR level is <= R and there is no GLES dEQP level, then we can assume
+        // a GLES dEQP level of R (2020).
+        if (PropertyUtil.getVsrApiLevel(mDevice) <= R_API_LEVEL
+                && FEATURE_OPENGLES_DEQP_LEVEL.equals(featureName)) {
+            final int claimedDeqpLevel = DEQP_LEVEL_R_2020;
+            CLog.d("Device level is %d due to VSR R", claimedDeqpLevel);
+            final boolean shouldRunCaselist = claimedDeqpLevel >= minimumLevel;
+            CLog.d("Running caselist? %b", shouldRunCaselist);
+            return shouldRunCaselist;
+        }
+
+        CLog.d("Running caselist unconditionally");
+
         return true;
     }
 
