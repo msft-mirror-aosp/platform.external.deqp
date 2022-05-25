@@ -66,7 +66,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
+import java.util.TreeSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -171,7 +171,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     "Disable the native testrunner's per-test watchdog.")
     private boolean mDisableWatchdog = false;
 
-    private Collection<TestDescription> mRemainingTests = null;
+	private Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
     private final TestInstanceResultListener mInstanceListerner = new TestInstanceResultListener();
     private final Map<TestDescription, Integer> mTestInstabilityRatings = new HashMap<>();
@@ -2276,7 +2276,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             loadTests();
         }
 
-        mRemainingTests = new LinkedList<>(mTestInstances.keySet());
+        mRemainingTests = new TreeSet<>(mTestInstances.keySet());
         long startTime = System.currentTimeMillis();
         listener.testRunStarted(getId(), mRemainingTests.size());
 
