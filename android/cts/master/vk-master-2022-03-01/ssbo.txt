@@ -1934,6 +1934,7 @@ dEQP-VK.ssbo.phys.layout.random.all_shared_buffer.47
 dEQP-VK.ssbo.phys.layout.random.scalar.3
 dEQP-VK.ssbo.phys.layout.random.scalar.6
 dEQP-VK.ssbo.phys.layout.random.scalar.26
+dEQP-VK.ssbo.phys.layout.random.scalar.30
 dEQP-VK.ssbo.phys.layout.random.scalar.62
 dEQP-VK.ssbo.phys.layout.random.scalar.81
 dEQP-VK.ssbo.phys.layout.random.scalar.84
