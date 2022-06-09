@@ -1770,6 +1770,10 @@ def writeCoreFunctionalities(api, filename):
 	lines = lines + ["}", ""] + removeVersionDefines(api.versions)
 	writeInlFile(filename, INL_HEADER, lines)
 
+def camelToSnake(name):
+    name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
+
 def writeDeviceFeatures2(api, filename):
 	# list of structures that should be tested with getPhysicalDeviceFeatures2
 	# this is not posible to determine from vulkan_core.h, if new feature structures
@@ -1934,7 +1938,7 @@ def writeDeviceFeatures2(api, filename):
 	verifyStructures = []
 	for index, structureDetail in enumerate(testedStructureDetail):
 		# create two instances of each structure
-		nameSpacing = '\t' * int((67 - len(structureDetail.name)) / 4)
+		nameSpacing = '\t'
 		structureDefinitions.append(structureDetail.name + nameSpacing + structureDetail.instanceName + '[count];')
 		# create flags that check if proper extension or vulkan version is available
 		condition	= ''
@@ -1944,49 +1948,87 @@ def writeDeviceFeatures2(api, filename):
 			condition = ' checkExtension(properties, "' + extension + '")'
 		if major is not None:
 			if condition != '':
-				condition += '\t' * int((47 - len(extension)) / 4) + '|| '
+				condition += ' || '
 			else:
-				condition += '\t' * 19 + '   '
+				condition += ' '
 			condition += 'context.contextSupports(vk::ApiVersion(' + str(major) + ', ' + str(structureDetail.minor) + ', 0))'
+		if condition == '':
+			condition = 'true'
 		condition += ';'
-		nameSpacing = '\t' * int((48 - len(structureDetail.flagName)) / 4)
-		featureEnabledFlags.append('const bool ' + structureDetail.flagName + nameSpacing + '=' + condition)
+		nameSpacing = '\t' * int((len(structureDetail.name) - 4) / 4)
+		featureEnabledFlags.append('const bool' + nameSpacing + structureDetail.flagName + ' =' + condition)
 		# clear memory of each structure
-		nameSpacing = '\t' * int((51 - len(structureDetail.instanceName)) / 4)
-		clearStructures.append('\tdeMemset(&' + structureDetail.instanceName + '[ndx],' + nameSpacing + '0xFF * ndx, sizeof(' + structureDetail.name + '));')
+		clearStructures.append('\tdeMemset(&' + structureDetail.instanceName + '[ndx], 0xFF * ndx, sizeof(' + structureDetail.name + '));')
 		# construct structure chain
 		nextInstanceName = 'DE_NULL';
 		if index < len(testedStructureDetail)-1:
 			nextInstanceName = '&' + testedStructureDetail[index+1].instanceName + '[ndx]'
-		structureChain.append('\t' + structureDetail.instanceName + '[ndx].sType = ' + structureDetail.flagName + ' ? ' + structureDetail.sType + ' : VK_STRUCTURE_TYPE_MAX_ENUM;')
-		structureChain.append('\t' + structureDetail.instanceName + '[ndx].pNext = ' + nextInstanceName + ';\n')
+		structureChain.append([
+			'\t\t' + structureDetail.instanceName + '[ndx].sType = ' + structureDetail.flagName + ' ? ' + structureDetail.sType + ' : VK_STRUCTURE_TYPE_MAX_ENUM;',
+			'\t\t' + structureDetail.instanceName + '[ndx].pNext = DE_NULL;'])
 		# construct log section
-		logStructures.append('if (' + structureDetail.flagName + ')')
-		logStructures.append('\tlog << TestLog::Message << ' + structureDetail.instanceName + '[0] << TestLog::EndMessage;')
+		logStructures.append([
+			'\tif (' + structureDetail.flagName + ')',
+			'\t\tlog << TestLog::Message << ' + structureDetail.instanceName + '[0] << TestLog::EndMessage;'
+			])
 		#construct verification section
-		verifyStructures.append('if (' + structureDetail.flagName + ' &&')
+		verifyStructure = []
+		verifyStructure.append('\tif (' + structureDetail.flagName + ' &&')
 		for index, m in enumerate(structureDetail.members):
-			prefix = '\t(' if index == 0 else '\t '
+			prefix = '\t\t(' if index == 0 else '\t\t '
 			postfix = '))' if index == len(structureDetail.members)-1 else ' ||'
-			verifyStructures.append(prefix + structureDetail.instanceName + '[0].' + m + ' != ' + structureDetail.instanceName + '[1].' + m + postfix)
-		verifyStructures.append('{\n\t\tTCU_FAIL("Mismatch between ' + structureDetail.name + '");\n}')
+			verifyStructure.append(prefix + structureDetail.instanceName + '[0].' + m + ' != ' + structureDetail.instanceName + '[1].' + m + postfix)
+		if len(structureDetail.members) == 0:
+			verifyStructure.append('\t\tfalse)')
+		verifyStructure.append('\t{\n\t\tTCU_FAIL("Mismatch between ' + structureDetail.name + '");\n\t}')
+		verifyStructures.append(verifyStructure)
+
 	# construct file content
 	stream = []
-	stream.extend(structureDefinitions)
-	stream.append('')
-	stream.extend(featureEnabledFlags)
-	stream.append('\nfor (int ndx = 0; ndx < count; ++ndx)\n{')
-	stream.extend(clearStructures)
-	stream.append('')
-	stream.extend(structureChain)
-	stream.append('\tdeMemset(&extFeatures.features, 0xcd, sizeof(extFeatures.features));\n'
-				  '\textFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;\n'
-				  '\textFeatures.pNext = &' + testedStructureDetail[0].instanceName + '[ndx];\n'
-				  '\tvki.getPhysicalDeviceFeatures2(physicalDevice, &extFeatures);\n}\n')
-	stream.extend(logStructures)
-	stream.append('')
-	stream.extend(verifyStructures)
+
+	# individual test functions
+	for n, x in enumerate(testedStructureDetail):
+		stream.append("tcu::TestStatus testPhysicalDeviceFeature" + x.instanceName[len('device'):]+" (Context& context)")
+		stream.append("""{
+	const VkPhysicalDevice		physicalDevice	= context.getPhysicalDevice();
+	const CustomInstance		instance		(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
+	const InstanceDriver&		vki				(instance.getDriver());
+	const int					count			= 2u;
+	TestLog&					log				= context.getTestContext().getLog();
+	VkPhysicalDeviceFeatures2	extFeatures;
+	vector<VkExtensionProperties> properties	= enumerateDeviceExtensionProperties(vki, physicalDevice, DE_NULL);
+""")
+		stream.append("\t"+structureDefinitions[n])
+		stream.append("\t"+featureEnabledFlags[n])
+		stream.append('')
+		stream.append('\tfor (int ndx = 0; ndx < count; ++ndx)\n\t{')
+		stream.append("\t" + clearStructures[n])
+		stream.extend(structureChain[n])
+		stream.append('')
+		stream.append(
+				'\t\tdeMemset(&extFeatures.features, 0xcd, sizeof(extFeatures.features));\n'
+				'\t\textFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;\n'
+				'\t\textFeatures.pNext = &' + testedStructureDetail[n].instanceName + '[ndx];\n\n'
+				'\t\tvki.getPhysicalDeviceFeatures2(physicalDevice, &extFeatures);')
+		stream.append('\t}\n')
+		stream.extend(logStructures[n])
+		stream.append('')
+		stream.extend(verifyStructures[n])
+		stream.append('\treturn tcu::TestStatus::pass("Querying succeeded");')
+		stream.append("}\n")
+
+	# function to create tests
+	stream.append("""
+void addSeparateFeatureTests (tcu::TestCaseGroup* testGroup)
+{
+""")
+	for x in testedStructureDetail:
+		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x.instanceName[len('device'):]) + '", "' + x.name + '", testPhysicalDeviceFeature' + x.instanceName[len('device'):] + ');')
+	stream.append('}\n')
+
+	# write out
 	writeInlFile(filename, INL_HEADER, stream)
+
 
 def generateDeviceFeaturesDefs(src):
 	# look for definitions
@@ -2223,6 +2265,7 @@ def writeDeviceFeatureTest(api, filename):
 
 	coreFeaturesPattern = re.compile("^VkPhysicalDeviceVulkan([1-9][0-9])Features[0-9]*$")
 	featureItems = []
+	testFunctions = []
 	# iterate over all feature structures
 	allFeaturesPattern = re.compile("^VkPhysicalDevice\w+Features[1-9]*")
 	for structureType in api.compositeTypes:
@@ -2239,20 +2282,65 @@ def writeDeviceFeatureTest(api, filename):
 		for member in structureMembers:
 			items.append("		FEATURE_ITEM ({0}, {1}),".format(structureType.name, member.name))
 
-		testBlock = \
-			"if (const void* featuresStruct = findStructureInChain(const_cast<const void*>(deviceFeatures2.pNext), getStructureType<{0}>()))\n" \
-			"{{\n" \
-			"	static const Feature features[] =\n" \
-			"	{{\n" \
-			"{1}\n" \
-			"	}};\n" \
-			"	auto* supportedFeatures = reinterpret_cast<const {0}*>(featuresStruct);\n" \
-			"	checkFeatures(vkp, instance, instanceDriver, physicalDevice, {2}, features, supportedFeatures, queueFamilyIndex, queueCount, queuePriority, numErrors, resultCollector, {3}, emptyDeviceFeatures);\n" \
-			"}}\n"
-		featureItems.append(testBlock.format(structureType.name, "\n".join(items), len(items), ("DE_NULL" if coreFeaturesPattern.match(structureType.name) else "&extensionNames")))
+		testBlock = """
+tcu::TestStatus createDeviceWithUnsupportedFeaturesTest{4} (Context& context)
+{{
+	const PlatformInterface&				vkp						= context.getPlatformInterface();
+	tcu::TestLog&							log						= context.getTestContext().getLog();
+	tcu::ResultCollector					resultCollector			(log);
+	const CustomInstance					instance				(createCustomInstanceWithExtensions(context, context.getInstanceExtensions(), DE_NULL, true));
+	const InstanceDriver&					instanceDriver			(instance.getDriver());
+	const VkPhysicalDevice					physicalDevice			= chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
+	const deUint32							queueFamilyIndex		= 0;
+	const deUint32							queueCount				= 1;
+	const float								queuePriority			= 1.0f;
+	const DeviceFeatures					deviceFeaturesAll		(context.getInstanceInterface(), context.getUsedApiVersion(), physicalDevice, context.getInstanceExtensions(), context.getDeviceExtensions(), DE_TRUE);
+	const VkPhysicalDeviceFeatures2			deviceFeatures2			= deviceFeaturesAll.getCoreFeatures2();
+	int										numErrors				= 0;
+
+	VkPhysicalDeviceFeatures emptyDeviceFeatures;
+	deMemset(&emptyDeviceFeatures, 0, sizeof(emptyDeviceFeatures));
+
+	// Only non-core extensions will be used when creating the device.
+	vector<const char*>	coreExtensions;
+	getCoreDeviceExtensions(context.getUsedApiVersion(), coreExtensions);
+	vector<string> nonCoreExtensions(removeExtensions(context.getDeviceExtensions(), coreExtensions));
+
+	vector<const char*> extensionNames;
+	extensionNames.reserve(nonCoreExtensions.size());
+	for (const string& extension : nonCoreExtensions)
+		extensionNames.push_back(extension.c_str());
+
+	if (const void* featuresStruct = findStructureInChain(const_cast<const void*>(deviceFeatures2.pNext), getStructureType<{0}>()))
+	{{
+		static const Feature features[] =
+		{{
+{1}
+		}};
+		auto* supportedFeatures = reinterpret_cast<const {0}*>(featuresStruct);
+		checkFeatures(vkp, instance, instanceDriver, physicalDevice, {2}, features, supportedFeatures, queueFamilyIndex, queueCount, queuePriority, numErrors, resultCollector, {3}, emptyDeviceFeatures);
+	}}
+
+	if (numErrors > 0)
+		return tcu::TestStatus(resultCollector.getResult(), "Enabling unsupported features didn't return VK_ERROR_FEATURE_NOT_PRESENT.");
+	else
+		return tcu::TestStatus(resultCollector.getResult(), resultCollector.getMessage());
+}}
+"""
+		featureItems.append(testBlock.format(structureType.name, "\n".join(items), len(items), ("DE_NULL" if coreFeaturesPattern.match(structureType.name) else "&extensionNames"), structureType.name[len('VkPhysicalDevice'):]))
+
+		testFunctions.append("createDeviceWithUnsupportedFeaturesTest" + structureType.name[len('VkPhysicalDevice'):])
 
 	stream = ['']
 	stream.extend(featureItems)
+	stream.append("""
+void addSeparateUnsupportedFeatureTests (tcu::TestCaseGroup* testGroup)
+{
+""")
+	for x in testFunctions:
+		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x[len('createDeviceWithUnsupportedFeaturesTest'):]) + '", "' + x + '", ' + x + ');')
+	stream.append('}\n')
+
 	writeInlFile(filename, INL_HEADER, stream)
 
 def writeDeviceProperties(api, dpDefs, filename):
