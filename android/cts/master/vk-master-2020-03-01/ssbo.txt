@@ -2660,7 +2660,6 @@ dEQP-VK.ssbo.phys.layout.random.scalar.25
 dEQP-VK.ssbo.phys.layout.random.scalar.27
 dEQP-VK.ssbo.phys.layout.random.scalar.28
 dEQP-VK.ssbo.phys.layout.random.scalar.29
-dEQP-VK.ssbo.phys.layout.random.scalar.30
 dEQP-VK.ssbo.phys.layout.random.scalar.31
 dEQP-VK.ssbo.phys.layout.random.scalar.32
 dEQP-VK.ssbo.phys.layout.random.scalar.33
