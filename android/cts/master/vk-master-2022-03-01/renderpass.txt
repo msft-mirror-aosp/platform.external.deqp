@@ -1,3 +1,8 @@
+dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.15
+dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.45
+dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.51
+dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.67
+dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.94
 dEQP-VK.renderpass.suballocation.multisample.r10x6g10x6b10x6a10x6_unorm_4pack16.samples_2
 dEQP-VK.renderpass.suballocation.multisample.r10x6g10x6b10x6a10x6_unorm_4pack16.samples_4
 dEQP-VK.renderpass.suballocation.multisample.r10x6g10x6b10x6a10x6_unorm_4pack16.samples_8
