@@ -255,7 +255,7 @@ static string removeExtraIndentation(const string& source)
 {
 	// Detect indentation from first line.
 	int numIndentChars = 0;
-	for (int ndx = 0; ndx < (int)source.length() && isWhitespace(source[ndx]); ndx++)
+	for (int ndx = 0; isWhitespace(source[ndx]) && ndx < (int)source.length(); ndx++)
 		numIndentChars += source[ndx] == '\t' ? 4 : 1;
 
 	// Process all lines and remove preceding indentation.
@@ -968,20 +968,14 @@ void ShaderParser::parseShaderCase(vector<tcu::TestNode*>& shaderNodeList)
 			assumeToken(TOKEN_SHADER_SOURCE);
 			string source = parseShaderSource(m_curTokenStr.c_str());
 			advanceToken();
-			switch (token)
-			{
-			case TOKEN_BOTH:
+			if (token == TOKEN_BOTH)
 				bothSource = source;
-				break;
-			case TOKEN_VERTEX:
+			else if (token == TOKEN_VERTEX)
 				vertexSource = source;
-				break;
-			case TOKEN_FRAGMENT:
+			else if (token == TOKEN_FRAGMENT)
 				fragmentSource = source;
-				break;
-			default:
+			else
 				DE_ASSERT(DE_FALSE);
-			}
 		}
 		else if (m_curToken == TOKEN_VERSION)
 		{

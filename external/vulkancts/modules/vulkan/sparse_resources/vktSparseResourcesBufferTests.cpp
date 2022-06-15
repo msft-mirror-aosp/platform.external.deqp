@@ -1129,8 +1129,6 @@ public:
 		: SparseBufferTestInstance	(context, flags)
 		, m_bufferUsage				(usage)
 		, m_minChunkSize			(minChunkSize)
-		, m_perDrawBufferOffset		(0)
-		, m_stagingBufferSize		(0)
 	{
 	}
 

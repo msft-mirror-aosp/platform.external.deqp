@@ -45,9 +45,9 @@
 #	define NOMINMAX
 #	include <windows.h>
 #	include <aclapi.h>
-#	include <versionhelpers.h>
-#	include <d3d11_2.h>
-#	include <d3dcompiler.h>
+#	include "VersionHelpers.h"
+#	include "d3d11_2.h"
+#	include "d3dcompiler.h"
 
 typedef HRESULT				(WINAPI * LPD3DX11COMPILEFROMMEMORY)(LPCSTR,
 																 SIZE_T,
@@ -418,7 +418,6 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 			DE_NULL,
 			(vk::VkExternalMemoryHandleTypeFlags)externalType
 		};
-		const vk::VkImageTiling								tiling					= VK_IMAGE_TILING_OPTIMAL;
 		const vk::VkImageCreateInfo							createInfo				=
 		{
 			vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -431,7 +430,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 			1u,
 			1u,
 			resourceDesc.imageSamples,
-			tiling,
+			vk::VK_IMAGE_TILING_OPTIMAL,
 			readOp.getInResourceUsageFlags() | writeOp.getOutResourceUsageFlags(),
 			vk::VK_SHARING_MODE_EXCLUSIVE,
 
@@ -443,7 +442,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 		vk::Move<vk::VkImage>								image					= vk::createImage(vkd, device, &createInfo);
 		de::MovePtr<vk::Allocation>							allocation				= importAndBindMemory(vkd, device, *image, nativeHandle, externalType);
 
-		return de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers, tiling));
+		return de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers));
 	}
 	else
 	{
@@ -1124,8 +1123,7 @@ private:
 			PSID*	ppEveryoneSID	= (PSID*)((PBYTE)pSD + SECURITY_DESCRIPTOR_MIN_LENGTH);
 			PACL*	ppACL			= (PACL*)((PBYTE)ppEveryoneSID + sizeof(PSID*));
 
-			bool res = InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION);
-			DE_ASSERT(res);
+			InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION);
 
 			SID_IDENTIFIER_AUTHORITY	SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
 			AllocateAndInitializeSid(&SIDAuthWorld, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, ppEveryoneSID);
@@ -1140,8 +1138,7 @@ private:
 
 			SetEntriesInAcl(1, &ea, NULL, ppACL);
 
-			res = SetSecurityDescriptorDacl(pSD, TRUE, *ppACL, FALSE);
-			DE_ASSERT(res);
+			SetSecurityDescriptorDacl(pSD, TRUE, *ppACL, FALSE);
 		}
 
 		return pSD;

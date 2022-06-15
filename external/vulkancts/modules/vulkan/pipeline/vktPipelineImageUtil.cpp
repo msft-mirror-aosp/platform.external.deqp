@@ -211,8 +211,7 @@ de::MovePtr<tcu::TextureLevel> readColorAttachment (const vk::DeviceInterface&	v
 													vk::Allocator&				allocator,
 													vk::VkImage					image,
 													vk::VkFormat				format,
-													const tcu::UVec2&			renderSize,
-													vk::VkImageLayout			oldLayout)
+													const tcu::UVec2&			renderSize)
 {
 	Move<VkBuffer>					buffer;
 	de::MovePtr<Allocation>			bufferAlloc;
@@ -250,7 +249,7 @@ de::MovePtr<tcu::TextureLevel> readColorAttachment (const vk::DeviceInterface&	v
 	fence = createFence(vk, device);
 
 	beginCommandBuffer(vk, *cmdBuffer);
-	copyImageToBuffer(vk, *cmdBuffer, image, *buffer, tcu::IVec2(renderSize.x(), renderSize.y()), VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, oldLayout);
+	copyImageToBuffer(vk, *cmdBuffer, image, *buffer, tcu::IVec2(renderSize.x(), renderSize.y()));
 	endCommandBuffer(vk, *cmdBuffer);
 
 	submitCommandsAndWait(vk, device, queue, cmdBuffer.get());
@@ -976,16 +975,6 @@ void TestTexture::populateCompressedLevels (tcu::CompressedTexFormat format, con
 			if (format != tcu::COMPRESSEDTEXFORMAT_ETC1_RGB8)
 				for (int byteNdx = 0; byteNdx < compressedLevel->getDataSize(); byteNdx++)
 					compressedData[byteNdx] = 0xFF & random.getUint32();
-
-			// BC7 mode 8 (LSB==0x00) should not be tested as it is underspecified
-			if (format == tcu::COMPRESSEDTEXFORMAT_BC7_UNORM_BLOCK || format == tcu::COMPRESSEDTEXFORMAT_BC7_SRGB_BLOCK)
-			{
-				const int blockSize = tcu::getBlockSize(format);
-
-				for (int byteNdx = 0; byteNdx < compressedLevel->getDataSize(); byteNdx += blockSize)
-					while (compressedData[byteNdx] == 0x00)
-						compressedData[byteNdx] = 0xFF & random.getUint32();
-			}
 		}
 
 		m_compressedLevels.push_back(compressedLevel);
@@ -1066,7 +1055,7 @@ de::MovePtr<TestTexture> TestTexture1D::copy(const tcu::TextureFormat format) co
 // TestTexture1DArray
 
 TestTexture1DArray::TestTexture1DArray (const tcu::TextureFormat& format, int width, int arraySize)
-	: TestTexture	(format, width, arraySize, 1)
+	: TestTexture	(format, width, 1, arraySize)
 	, m_texture		(format, width, arraySize)
 {
 	allocateLevels(m_texture);
@@ -1074,7 +1063,7 @@ TestTexture1DArray::TestTexture1DArray (const tcu::TextureFormat& format, int wi
 }
 
 TestTexture1DArray::TestTexture1DArray (const tcu::CompressedTexFormat& format, int width, int arraySize)
-	: TestTexture	(format, width, arraySize, 1)
+	: TestTexture	(format, width, 1, arraySize)
 	, m_texture		(tcu::getUncompressedFormat(format), width, arraySize)
 {
 	allocateLevels(m_texture);
