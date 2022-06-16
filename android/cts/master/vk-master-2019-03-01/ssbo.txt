@@ -3293,7 +3293,6 @@ dEQP-VK.ssbo.layout.random.16bit.scalar.89
 dEQP-VK.ssbo.layout.random.16bit.scalar.90
 dEQP-VK.ssbo.layout.random.16bit.scalar.91
 dEQP-VK.ssbo.layout.random.16bit.scalar.92
-dEQP-VK.ssbo.layout.random.16bit.scalar.93
 dEQP-VK.ssbo.layout.random.16bit.scalar.94
 dEQP-VK.ssbo.layout.random.16bit.scalar.95
 dEQP-VK.ssbo.layout.random.16bit.scalar.96
