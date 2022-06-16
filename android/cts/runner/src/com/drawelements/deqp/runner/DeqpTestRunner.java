@@ -66,7 +66,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -171,7 +170,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     "Disable the native testrunner's per-test watchdog.")
     private boolean mDisableWatchdog = false;
 
-    private Collection<TestDescription> mRemainingTests = null;
+    private Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
     private final TestInstanceResultListener mInstanceListerner = new TestInstanceResultListener();
     private final Map<TestDescription, Integer> mTestInstabilityRatings = new HashMap<>();
@@ -183,6 +182,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
     private IRunUtil mRunUtil = RunUtil.getDefault();
     private Set<String> mIncrementalDeqpIncludeTests = new HashSet<>();
+    private long mTimeOfLastRun = 0;
 
     private IRecovery mDeviceRecovery = new Recovery(); {
         mDeviceRecovery.setSleepProvider(new SleepProvider());
@@ -1292,7 +1292,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private void runTests() throws DeviceNotAvailableException, CapabilityQueryFailureException {
         for (;;) {
-            TestBatch batch = selectRunBatch(mRemainingTests, null);
+            TestBatch batch = selectRunBatch(mTestInstances.keySet(), null);
 
             if (batch == null) {
                 break;
@@ -1514,11 +1514,19 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         final InstrumentationParser parser = new InstrumentationParser(mInstanceListerner);
         Throwable interruptingError = null;
 
+        //Fix the requirement of sleep() between batches
+        long duration = System.currentTimeMillis() - mTimeOfLastRun;
+        if (duration < 5000) {
+            CLog.i("Sleeping for %dms", 5000 - duration);
+            mRunUtil.sleep(5000 - duration);
+        }
+
         try {
             executeShellCommandAndReadOutput(command, parser);
         } catch (Throwable ex) {
             interruptingError = ex;
         } finally {
+            mTimeOfLastRun = System.currentTimeMillis();
             parser.flush();
         }
 
@@ -1680,7 +1688,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private void fakePassTests(ITestInvocationListener listener) {
         HashMap<String, Metric> emptyMap = new HashMap<>();
-        for (TestDescription test : mRemainingTests) {
+        for (TestDescription test : mTestInstances.keySet()) {
             listener.testStarted(test);
             listener.testEnded(test, emptyMap);
         }
@@ -2276,7 +2284,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             loadTests();
         }
 
-        mRemainingTests = new LinkedList<>(mTestInstances.keySet());
+        mRemainingTests = new HashSet<>(mTestInstances.keySet());
         long startTime = System.currentTimeMillis();
         listener.testRunStarted(getId(), mRemainingTests.size());
 
