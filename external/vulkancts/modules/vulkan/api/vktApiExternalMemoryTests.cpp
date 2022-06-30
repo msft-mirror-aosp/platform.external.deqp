@@ -800,6 +800,8 @@ tcu::TestStatus testSemaphoreQueries (Context& context, const TestSemaphoreQueri
 
 	if (params.semaphoreType == vk::VK_SEMAPHORE_TYPE_TIMELINE)
 	{
+		context.requireDeviceFunctionality("VK_KHR_timeline_semaphore");
+
 		if (properties.compatibleHandleTypes & vk::VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT)
 			return tcu::TestStatus::fail("Timeline semaphores are not compatible with SYNC_FD");
 
@@ -1212,6 +1214,7 @@ tcu::TestStatus testSemaphoreImportSyncFdSignaled (Context&						context,
 		const vk::Unique<vk::VkSemaphore>	semaphore	(createAndImportSemaphore(vkd, *device, config.externalType, handle, flags));
 
 		submitEmptyWait(vkd, queue, *semaphore);
+		VK_CHECK(vkd.queueWaitIdle(queue));
 
 		return tcu::TestStatus::pass("Pass");
 	}

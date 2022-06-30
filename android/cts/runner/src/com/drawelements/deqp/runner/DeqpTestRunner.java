@@ -17,6 +17,7 @@ package com.drawelements.deqp.runner;
 
 import com.android.compatibility.common.tradefed.build.CompatibilityBuildHelper;
 import com.android.compatibility.common.tradefed.targetprep.IncrementalDeqpPreparer;
+import com.android.compatibility.common.util.PropertyUtil;
 import com.android.ddmlib.AdbCommandRejectedException;
 import com.android.ddmlib.IShellOutputReceiver;
 import com.android.ddmlib.MultiLineReceiver;
@@ -65,7 +66,6 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -100,6 +100,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int TESTCASE_BATCH_LIMIT_LARGE = 10000;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS = 10 * 60 * 1000; // 10min
+    private static final int R_API_LEVEL = 30;
+    private static final int DEQP_LEVEL_R_2020 = 132383489;
 
     private static final String ANGLE_NONE = "none";
     private static final String ANGLE_VULKAN = "vulkan";
@@ -168,7 +170,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     "Disable the native testrunner's per-test watchdog.")
     private boolean mDisableWatchdog = false;
 
-    private Collection<TestDescription> mRemainingTests = null;
+    private Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
     private final TestInstanceResultListener mInstanceListerner = new TestInstanceResultListener();
     private final Map<TestDescription, Integer> mTestInstabilityRatings = new HashMap<>();
@@ -180,6 +182,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
     private IRunUtil mRunUtil = RunUtil.getDefault();
     private Set<String> mIncrementalDeqpIncludeTests = new HashSet<>();
+    private long mTimeOfLastRun = 0;
 
     private IRecovery mDeviceRecovery = new Recovery(); {
         mDeviceRecovery.setSleepProvider(new SleepProvider());
@@ -1289,7 +1292,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private void runTests() throws DeviceNotAvailableException, CapabilityQueryFailureException {
         for (;;) {
-            TestBatch batch = selectRunBatch(mRemainingTests, null);
+            TestBatch batch = selectRunBatch(mTestInstances.keySet(), null);
 
             if (batch == null) {
                 break;
@@ -1511,11 +1514,19 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         final InstrumentationParser parser = new InstrumentationParser(mInstanceListerner);
         Throwable interruptingError = null;
 
+        //Fix the requirement of sleep() between batches
+        long duration = System.currentTimeMillis() - mTimeOfLastRun;
+        if (duration < 5000) {
+            CLog.i("Sleeping for %dms", 5000 - duration);
+            mRunUtil.sleep(5000 - duration);
+        }
+
         try {
             executeShellCommandAndReadOutput(command, parser);
         } catch (Throwable ex) {
             interruptingError = ex;
         } finally {
+            mTimeOfLastRun = System.currentTimeMillis();
             parser.flush();
         }
 
@@ -1677,7 +1688,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private void fakePassTests(ITestInvocationListener listener) {
         HashMap<String, Metric> emptyMap = new HashMap<>();
-        for (TestDescription test : mRemainingTests) {
+        for (TestDescription test : mTestInstances.keySet()) {
             listener.testStarted(test);
             listener.testEnded(test, emptyMap);
         }
@@ -1704,10 +1715,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     }
 
     /**
-     * Check whether the device's claimed Vulkan/OpenGL ES dEQP level is high enough that it should
+     * Check whether the device's claimed dEQP level is high enough that it should
      * pass the tests in the caselist.
-     *
-     * Precondition: the package must be a Vulkan or OpenGL ES package.
      */
     private boolean claimedDeqpLevelIsRecentEnough() throws CapabilityQueryFailureException,
             DeviceNotAvailableException {
@@ -1715,11 +1724,12 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         final String featureName;
         if (isVulkanPackage()) {
             featureName = FEATURE_VULKAN_DEQP_LEVEL;
-        } else if (isOpenGlEsPackage()) {
+        } else if (isOpenGlEsPackage() || isEglPackage()) {
+            // The OpenGL ES feature flag is used for EGL as well.
             featureName = FEATURE_OPENGLES_DEQP_LEVEL;
         } else {
             throw new AssertionError(
-                "Claims about dEQP support should only be checked for Vulkan or OpenGL ES "
+                "Claims about dEQP support should only be checked for Vulkan, OpenGL ES, or EGL "
                     + "packages");
         }
 
@@ -1727,7 +1737,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             featureName);
 
         // A Vulkan/OpenGL ES caselist filename has the form:
-        //     {gles2,gles3,gles31,vk}-master-YYYY-MM-DD.txt
+        //     {gles2,gles3,gles31,vk,egl}-master-YYYY-MM-DD.txt
         final Pattern caseListFilenamePattern = Pattern
             .compile("-master-(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)\\.txt$");
         final Matcher matcher = caseListFilenamePattern.matcher(mCaselistFile);
@@ -1750,6 +1760,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         CLog.d("    2019-03-01 -> 132317953");
         CLog.d("    2020-03-01 -> 132383489");
         CLog.d("    2021-03-01 -> 132449025");
+        CLog.d("    2022-03-01 -> 132514561");
 
         CLog.d("Minimum level required to run this caselist is %d", minimumLevel);
 
@@ -1771,8 +1782,24 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             }
         }
 
-        CLog.d("Could not find dEQP level feature flag \"%s\". Running caselist unconditionally.",
-            featureName);
+        CLog.d("Could not find dEQP level feature flag \"%s\".",
+                featureName);
+
+        // A Vulkan dEQP level has been required since R.
+        // A GLES/EGL dEQP level has only been required since S.
+        // Thus, if the VSR level is <= R and there is no GLES dEQP level, then we can assume
+        // a GLES dEQP level of R (2020).
+        if (PropertyUtil.getVsrApiLevel(mDevice) <= R_API_LEVEL
+                && FEATURE_OPENGLES_DEQP_LEVEL.equals(featureName)) {
+            final int claimedDeqpLevel = DEQP_LEVEL_R_2020;
+            CLog.d("Device level is %d due to VSR R", claimedDeqpLevel);
+            final boolean shouldRunCaselist = claimedDeqpLevel >= minimumLevel;
+            CLog.d("Running caselist? %b", shouldRunCaselist);
+            return shouldRunCaselist;
+        }
+
+        CLog.d("Running caselist unconditionally");
+
         return true;
     }
 
@@ -1916,33 +1943,41 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                 BatchRunConfiguration.ROTATION_REVERSE_LANDSCAPE.equals(rotation);
     }
 
+    private void checkRecognizedPackage() {
+        if (!isRecognizedPackage()) {
+            throw new IllegalStateException("dEQP runner was created with illegal package name");
+        }
+    }
+
+    private boolean isRecognizedPackage() {
+        return "dEQP-EGL".equals(mDeqpPackage) || "dEQP-GLES2".equals(mDeqpPackage)
+                || "dEQP-GLES3".equals(mDeqpPackage) || "dEQP-GLES31".equals(mDeqpPackage)
+                || "dEQP-VK".equals(mDeqpPackage);
+    }
+
+    /**
+     * Parse EGL nature from package name
+     */
+    private boolean isEglPackage() {
+        checkRecognizedPackage();
+        return "dEQP-EGL".equals(mDeqpPackage);
+    }
+
     /**
      * Parse gl nature from package name
      */
     private boolean isOpenGlEsPackage() {
-        if ("dEQP-GLES2".equals(mDeqpPackage) || "dEQP-GLES3".equals(mDeqpPackage) ||
-                "dEQP-GLES31".equals(mDeqpPackage)) {
-            return true;
-        } else if ("dEQP-EGL".equals(mDeqpPackage) ||
-                "dEQP-VK".equals(mDeqpPackage)) {
-            return false;
-        } else {
-            throw new IllegalStateException("dEQP runner was created with illegal name");
-        }
+        checkRecognizedPackage();
+        return "dEQP-GLES2".equals(mDeqpPackage) || "dEQP-GLES3".equals(mDeqpPackage)
+                || "dEQP-GLES31".equals(mDeqpPackage);
     }
 
     /**
      * Parse vulkan nature from package name
      */
     private boolean isVulkanPackage() {
-        if ("dEQP-GLES2".equals(mDeqpPackage) || "dEQP-GLES3".equals(mDeqpPackage) ||
-                "dEQP-GLES31".equals(mDeqpPackage) || "dEQP-EGL".equals(mDeqpPackage)) {
-            return false;
-        } else if ("dEQP-VK".equals(mDeqpPackage)) {
-            return true;
-        } else {
-            throw new IllegalStateException("dEQP runner was created with illegal name");
-        }
+        checkRecognizedPackage();
+        return "dEQP-VK".equals(mDeqpPackage);
     }
 
     /**
@@ -2249,7 +2284,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             loadTests();
         }
 
-        mRemainingTests = new LinkedList<>(mTestInstances.keySet());
+        mRemainingTests = new HashSet<>(mTestInstances.keySet());
         long startTime = System.currentTimeMillis();
         listener.testRunStarted(getId(), mRemainingTests.size());
 
@@ -2263,7 +2298,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                                             || (!isOpenGlEsPackage() && !isVulkanPackage());
             if (mCollectTestsOnly
                 || !isSupportedApi
-                || ((isVulkanPackage() || isOpenGlEsPackage()) && !claimedDeqpLevelIsRecentEnough())) {
+                || !claimedDeqpLevelIsRecentEnough()) {
                 // Pass all tests trivially if:
                 // - we are collecting the names of the tests only, or
                 // - the relevant API is not supported, or
