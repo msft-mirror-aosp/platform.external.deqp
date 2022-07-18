@@ -3665,15 +3665,23 @@ VkImageCreateFlags getValidImageCreateFlags (const VkPhysicalDeviceFeatures& dev
 			flags |= VK_IMAGE_CREATE_SPARSE_BINDING_BIT|VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT;
 
 		if (deviceFeatures.sparseResidencyAliased)
-			flags |= VK_IMAGE_CREATE_SPARSE_ALIASED_BIT;
+			flags |= VK_IMAGE_CREATE_SPARSE_BINDING_BIT|VK_IMAGE_CREATE_SPARSE_ALIASED_BIT;
 	}
 
 	return flags;
 }
 
-bool isValidImageCreateFlagCombination (VkImageCreateFlags)
+bool isValidImageCreateFlagCombination (VkImageCreateFlags createFlags)
 {
-	return true;
+	bool isValid = true;
+
+	if (((createFlags & (VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT|VK_IMAGE_CREATE_SPARSE_ALIASED_BIT)) != 0) &&
+		((createFlags & VK_IMAGE_CREATE_SPARSE_BINDING_BIT) == 0))
+	{
+		isValid = false;
+	}
+
+	return isValid;
 }
 
 bool isRequiredImageParameterCombination (const VkPhysicalDeviceFeatures&	deviceFeatures,
@@ -4584,12 +4592,18 @@ tcu::TestStatus deviceMemoryProperties2 (Context& context)
 		TCU_FAIL("Mismatch between memoryTypeCount reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
 	if (coreProperties.memoryHeapCount != extProperties.memoryProperties.memoryHeapCount)
 		TCU_FAIL("Mismatch between memoryHeapCount reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
-	for (deUint32 i = 0; i < coreProperties.memoryTypeCount; i++)
-		if (deMemCmp(&coreProperties.memoryTypes[i], &extProperties.memoryProperties.memoryTypes[i], sizeof(VkMemoryType)) != 0)
+	for (deUint32 i = 0; i < coreProperties.memoryTypeCount; i++) {
+		const VkMemoryType *coreType = &coreProperties.memoryTypes[i];
+		const VkMemoryType *extType = &extProperties.memoryProperties.memoryTypes[i];
+		if (coreType->propertyFlags != extType->propertyFlags || coreType->heapIndex != extType->heapIndex)
 			TCU_FAIL("Mismatch between memoryTypes reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
-	for (deUint32 i = 0; i < coreProperties.memoryHeapCount; i++)
-		if (deMemCmp(&coreProperties.memoryHeaps[i], &extProperties.memoryProperties.memoryHeaps[i], sizeof(VkMemoryHeap)) != 0)
+	}
+	for (deUint32 i = 0; i < coreProperties.memoryHeapCount; i++) {
+		const VkMemoryHeap *coreHeap = &coreProperties.memoryHeaps[i];
+		const VkMemoryHeap *extHeap = &extProperties.memoryProperties.memoryHeaps[i];
+		if (coreHeap->size != extHeap->size || coreHeap->flags != extHeap->flags)
 			TCU_FAIL("Mismatch between memoryHeaps reported by vkGetPhysicalDeviceMemoryProperties and vkGetPhysicalDeviceMemoryProperties2");
+	}
 
 	log << TestLog::Message << extProperties << TestLog::EndMessage;
 
