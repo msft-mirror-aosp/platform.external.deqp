@@ -276,7 +276,7 @@ static bool checkComputeRequireFull (const void* internalData, std::vector<const
 		if (checkInternalData->caseDef.pipelineShaderStageCreateFlags == VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT && data[i].z() != numSubgroups)
 		{
 			log << tcu::TestLog::Message << "[" << localSize[0] << ", " << localSize[1] << ", " << localSize[2] << "] "
-				<< "expected number of subgroups dispatched (" << numSubgroups << ") doesn't match gl_NumSubgroups (" << data[i].z() << ")";
+				<< "expected number of subgroups dispatched (" << numSubgroups << ") doesn't match gl_NumSubgroups (" << data[i].z() << ")" << tcu::TestLog::EndMessage;
 			return DE_FALSE;
 		}
 	}
@@ -850,15 +850,18 @@ tcu::TestStatus testRequireSubgroupSize (Context& context, const CaseDefinition 
 		deUint32 localSizeX, localSizeY, localSizeZ;
 		getLocalSizes(physicalDeviceProperties, maxTotalLocalSize, localSizeX, localSizeY, localSizeZ);
 
-		const deUint32 localSizesToTestCount = 5;
-		deUint32 localSizesToTest[localSizesToTestCount][3] =
+		deUint32 localSizesToTest[5][3] =
 		{
+			{localSizeX, localSizeY, localSizeZ},
 			{requiredSubgroupSize, 1, 1},
 			{1, requiredSubgroupSize, 1},
 			{1, 1, requiredSubgroupSize},
-			{localSizeX, localSizeY, localSizeZ},
 			{1, 1, 1} // Isn't used, just here to make double buffering checks easier
 		};
+
+		deUint32 localSizesToTestCount = 5;
+		if (caseDef.pipelineShaderStageCreateFlags & VK_PIPELINE_SHADER_STAGE_CREATE_REQUIRE_FULL_SUBGROUPS_BIT_EXT)
+			localSizesToTestCount = 3;
 
 		struct internalDataStruct internalData =
 		{
