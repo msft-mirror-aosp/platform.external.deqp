@@ -2702,7 +2702,6 @@ dEQP-VK.ssbo.layout.random.scalar.66
 dEQP-VK.ssbo.layout.random.scalar.67
 dEQP-VK.ssbo.layout.random.scalar.68
 dEQP-VK.ssbo.layout.random.scalar.69
-dEQP-VK.ssbo.layout.random.scalar.70
 dEQP-VK.ssbo.layout.random.scalar.71
 dEQP-VK.ssbo.layout.random.scalar.72
 dEQP-VK.ssbo.layout.random.scalar.73
