@@ -64,6 +64,7 @@ dEQP-VK.ssbo.layout.random.all_shared_buffer.20
 dEQP-VK.ssbo.layout.random.scalar.19
 dEQP-VK.ssbo.layout.random.scalar.26
 dEQP-VK.ssbo.layout.random.scalar.38
+dEQP-VK.ssbo.layout.random.scalar.70
 dEQP-VK.ssbo.layout.random.16bit.all_per_block_buffers.47
 dEQP-VK.ssbo.layout.random.16bit.all_shared_buffer.31
 dEQP-VK.ssbo.layout.random.16bit.all_shared_buffer.45
