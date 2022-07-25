@@ -1788,6 +1788,9 @@ de::MovePtr<BufferWithMemory> RayTracingASBasicTestInstance::runTest(const deUin
 			topLevelRayTracedPtr = topLevelAccelerationStructureCopy.get();
 		}
 
+		const VkMemoryBarrier preTraceMemoryBarrier = makeMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT);
+		cmdPipelineMemoryBarrier(vkd, *cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, &preTraceMemoryBarrier);
+
 		VkWriteDescriptorSetAccelerationStructureKHR	accelerationStructureWriteDescriptorSet	=
 		{
 			VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR,	//  VkStructureType						sType;
@@ -2794,6 +2797,7 @@ tcu::TestStatus RayTracingHeaderBottomAddressTestInstance::iterate (void)
 
 	// deserialize all from the previous step to a new top-level AS
 	// bottom-level structure addresses should be updated when deep data is deserialized
+	vkd.resetCommandBuffer(*cmdBuffer, 0);
 	beginCommandBuffer(vkd, *cmdBuffer, 0);
 	dst->createAndDeserializeFrom(vkd, device, *cmdBuffer, allocator, &deepStorage);
 	endCommandBuffer(vkd, *cmdBuffer);
@@ -2802,6 +2806,7 @@ tcu::TestStatus RayTracingHeaderBottomAddressTestInstance::iterate (void)
 	SerialStorage										shallowStorage	(vkd, device, allocator, m_params->buildType, inSizes[0]);
 
 	// make shallow serialization - only top-level AS without bottom-level structures
+	vkd.resetCommandBuffer(*cmdBuffer, 0);
 	beginCommandBuffer(vkd, *cmdBuffer, 0);
 	dst->serialize(vkd, device, *cmdBuffer, &shallowStorage);
 	endCommandBuffer(vkd, *cmdBuffer);
