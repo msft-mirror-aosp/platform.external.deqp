@@ -1,3 +1,4 @@
+dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.1
 dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.15
 dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.45
 dEQP-VK.renderpass.suballocation.attachment_allocation.input_output_chain.51
