@@ -83,8 +83,7 @@ struct Swizzle2DTestParameters : public Texture2DTestCaseParameters
 };
 
 Swizzle2DTestParameters::Swizzle2DTestParameters (void)
-	: backingMode		(TextureBinding::IMAGE_BACKING_MODE_LAST)
-	, componentMapping	(makeComponentMappingRGBA())
+	: componentMapping	(makeComponentMappingRGBA())
 	, texCoordSwizzle	(DE_NULL)
 	, texCoordMapping	(DE_NULL)
 {

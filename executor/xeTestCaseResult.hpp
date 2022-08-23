@@ -49,7 +49,6 @@ enum TestStatusCode
 	TESTSTATUSCODE_CRASH,					//!< Test executable crashed before finishing the test.
 	TESTSTATUSCODE_DISABLED,				//!< Test case disabled (for current target)
 	TESTSTATUSCODE_TERMINATED,				//!< Terminated for other reason.
-	TESTSTATUSCODE_WAIVER,					//!< Test case waived.
 
 	TESTSTATUSCODE_LAST
 };
@@ -116,7 +115,6 @@ class TestCaseResultHeader
 public:
 						TestCaseResultHeader	(void) : caseType(TESTCASETYPE_LAST), statusCode(TESTSTATUSCODE_LAST) {}
 
-	std::string			caseVersion;			//!< Test case version.
 	std::string			casePath;				//!< Full test case path.
 	TestCaseType		caseType;				//!< Test case type.
 	TestStatusCode		statusCode;				//!< Test status code.
@@ -327,8 +325,6 @@ public:
 		SHADERTYPE_MISS,
 		SHADERTYPE_INTERSECTION,
 		SHADERTYPE_CALLABLE,
-		SHADERTYPE_TASK,
-		SHADERTYPE_MESH,
 
 		SHADERTYPE_LAST
 	};

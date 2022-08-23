@@ -101,7 +101,7 @@ std::string getShaderLayoutEquation (BlendEquation equation)
 		default:
 			DE_FATAL("Equation not supported.");
 	}
-	return "";
+	return DE_NULL;
 }
 
 glw::GLenum getEquation (BlendEquation equation)

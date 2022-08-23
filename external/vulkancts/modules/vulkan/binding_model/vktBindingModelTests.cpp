@@ -30,7 +30,6 @@
 #include "vktBindingBufferDeviceAddressTests.hpp"
 #include "vktBindingDynamicOffsetTests.hpp"
 #include "vktTestGroupUtil.hpp"
-#include "vktBindingValveMutableTests.hpp"
 
 namespace vkt
 {
@@ -50,7 +49,6 @@ void createChildren (tcu::TestCaseGroup* group)
 	group->addChild(createDescriptorCopyTests(testCtx));
 	group->addChild(createBufferDeviceAddressTests(testCtx));
 	group->addChild(createDynamicOffsetTests(testCtx));
-	group->addChild(createDescriptorValveMutableTests(testCtx));
 
 	// \todo [2015-07-30 jarkko] .change_binding.{between_renderpasses, within_pass}
 	// \todo [2015-07-30 jarkko] .descriptor_set_chain

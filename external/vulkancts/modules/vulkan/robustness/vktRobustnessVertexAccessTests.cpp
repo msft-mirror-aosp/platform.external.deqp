@@ -63,7 +63,6 @@ public:
 	virtual				~VertexAccessTest	(void) {}
 
 	void				initPrograms		(SourceCollections& programCollection) const;
-	void				checkSupport		(Context& context) const;
 	TestInstance*		createInstance		(Context& context) const = 0;
 
 protected:
@@ -245,13 +244,6 @@ VertexAccessTest::VertexAccessTest (tcu::TestContext&		testContext,
 	, m_numVertices				(numVertices)
 	, m_numInstances			(numInstances)
 {
-}
-
-
-void VertexAccessTest::checkSupport(Context& context) const
-{
-	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") && !context.getDeviceFeatures().robustBufferAccess)
-		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: robustBufferAccess not supported by this implementation");
 }
 
 void VertexAccessTest::initPrograms (SourceCollections& programCollection) const

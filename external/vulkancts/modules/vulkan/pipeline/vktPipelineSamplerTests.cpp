@@ -24,7 +24,6 @@
 
 #include "vktPipelineSamplerTests.hpp"
 #include "vktPipelineImageSamplingInstance.hpp"
-#include "vktPipelineSamplerBorderSwizzleTests.hpp"
 #include "vktPipelineImageUtil.hpp"
 #include "vktPipelineVertexUtil.hpp"
 #include "vktTestCase.hpp"
@@ -2013,7 +2012,7 @@ tcu::TestCaseGroup* createExactSamplingTests (tcu::TestContext& testCtx)
 		const std::string		desc;
 	} testEdges[] =
 	{
-		{ tcu::Nothing,				"centered",		"Sampling points centered in texel"		},
+		{ tcu::nothing<float>(),	"centered",		"Sampling points centered in texel"		},
 		{ tcu::just<float>(-1.0f),	"edge_left",	"Sampling points near left edge"		},
 		{ tcu::just<float>(+1.0f),	"edge_right",	"Sampling points near right edge"		},
 	};
@@ -2073,9 +2072,6 @@ tcu::TestCaseGroup* createSamplerTests (tcu::TestContext& testCtx)
 		separateStencilUsageSamplerTests->addChild(createAllFormatsSamplerTests(testCtx, true));
 		samplerTests->addChild(separateStencilUsageSamplerTests.release());
 	}
-
-	// Border color swizzle tests.
-	samplerTests->addChild(createSamplerBorderSwizzleTests(testCtx));
 
 	return samplerTests.release();
 }

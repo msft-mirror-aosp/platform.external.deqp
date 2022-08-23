@@ -111,9 +111,12 @@ StateQueryMemoryWriteGuard<T>::StateQueryMemoryWriteGuard (void)
 {
 	DE_STATIC_ASSERT(sizeof(T) * 3 == sizeof(StateQueryMemoryWriteGuard<T>)); // tightly packed
 
-	deMemset(&m_preguard, WRITE_GUARD_VALUE, sizeof(m_preguard));
-	deMemset(&m_value, WRITE_GUARD_VALUE, sizeof(m_value));
-	deMemset(&m_postguard, WRITE_GUARD_VALUE, sizeof(m_postguard));
+	for (size_t i = 0; i < sizeof(T); ++i)
+	{
+		((deUint8*)&m_preguard)[i]	= (deUint8)WRITE_GUARD_VALUE;
+		((deUint8*)&m_value)[i]		= (deUint8)WRITE_GUARD_VALUE;
+		((deUint8*)&m_postguard)[i]	= (deUint8)WRITE_GUARD_VALUE;
+	}
 }
 
 template <typename T>

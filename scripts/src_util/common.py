@@ -50,7 +50,6 @@ TEXT_FILE_EXTENSION = [
     ]
 
 BINARY_FILE_EXTENSION = [
-    ".bin",
     ".png",
     ".pkm",
     ".xcf",

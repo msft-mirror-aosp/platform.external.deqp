@@ -67,7 +67,6 @@ struct CaseDef
 	VkExtent2D				shadingRate;
 	VkSampleCountFlagBits	samples;
 	VkExtent2D				framebufferExtent;
-	bool					zwCoord;
 };
 
 struct Vertex
@@ -250,18 +249,8 @@ void FSRPixelConsistencyTestCase::initPrograms (SourceCollections& programCollec
 		"   vec4 gl_Position;\n"
 		"};\n"
 		"void main()\n"
-		"{\n";
-	if (!m_data.zwCoord)
-	{
-		vss <<
-			"  gl_Position = vec4(position, 0, 1);\n";
-	}
-	else
-	{
-		vss <<
-			"  gl_Position = vec4(position, position);\n";
-	}
-	vss <<
+		"{\n"
+		"  gl_Position = vec4(position, 0, 1);\n"
 		"}\n";
 
 	programCollection.glslSources.add("vert") << glu::VertexSource(vss.str());
@@ -275,20 +264,9 @@ void FSRPixelConsistencyTestCase::initPrograms (SourceCollections& programCollec
 		"} pc;\n"
 		"layout(location = 0) out uvec2 col0;\n"
 		"void main()\n"
-		"{\n";
-	if (!m_data.zwCoord)
-	{
-		fssPass0 <<
-			"  col0.x = (uint(gl_FragCoord.x) % pc.shadingRate[0].x) + ((uint(gl_FragCoord.y) % pc.shadingRate[0].y) * pc.shadingRate[0].x);\n"
-			"  col0.y = (uint(gl_FragCoord.x) % pc.shadingRate[1].x) + ((uint(gl_FragCoord.y) % pc.shadingRate[1].y) * pc.shadingRate[1].x);\n";
-	}
-	else
-	{
-		fssPass0 <<
-			"  col0.x = (uint(gl_FragCoord.z) % pc.shadingRate[0].x) + ((uint(gl_FragCoord.w) % pc.shadingRate[0].y) * pc.shadingRate[0].x);\n"
-			"  col0.y = (uint(gl_FragCoord.z) % pc.shadingRate[1].x) + ((uint(gl_FragCoord.w) % pc.shadingRate[1].y) * pc.shadingRate[1].x);\n";
-	}
-	fssPass0 <<
+		"{\n"
+		"  col0.x = (uint(gl_FragCoord.x) % pc.shadingRate[0].x) + ((uint(gl_FragCoord.y) % pc.shadingRate[0].y) * pc.shadingRate[0].x);\n"
+		"  col0.y = (uint(gl_FragCoord.x) % pc.shadingRate[1].x) + ((uint(gl_FragCoord.y) % pc.shadingRate[1].y) * pc.shadingRate[1].x);\n"
 		"}\n";
 
 	programCollection.glslSources.add("frag_pass0") << glu::FragmentSource(fssPass0.str());
@@ -1308,6 +1286,7 @@ tcu::TestStatus FSRPixelConsistencyInstance::iterate (void)
 		{m_data.framebufferExtent.width, m_data.framebufferExtent.height, 1}	// VkExtent3D				imageExtent;
 	};
 
+
 	vk.cmdCopyImageToBuffer(*cmdBuffer, **cbImagePass1, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, **colorOutputBuffer, 1u, &copyRegion);
 
 	const VkBufferMemoryBarrier	bufferBarrier =
@@ -1406,26 +1385,19 @@ void createPixelConsistencyTests(tcu::TestContext& testCtx, tcu::TestCaseGroup* 
 		for (int sampNdx = 0; sampNdx < DE_LENGTH_OF_ARRAY(sampCases); sampNdx++)
 		{
 			de::MovePtr<tcu::TestCaseGroup> sampleGroup(new tcu::TestCaseGroup(testCtx, sampCases[sampNdx].name, sampCases[sampNdx].description));
+
 			for (int extNdx = 0; extNdx < DE_LENGTH_OF_ARRAY(extentCases); extNdx++)
 			{
-				VkSampleCountFlagBits samples = static_cast<VkSampleCountFlagBits>(sampCases[sampNdx].count);
-				VkExtent2D framebufferExtent = extentCases[extNdx].count;
-
-				CaseDef caseParams{
-					shadingRateCases[rateNdx].count,
-					samples,
-					framebufferExtent,
-					false};
-				sampleGroup->addChild(new FSRPixelConsistencyTestCase(testCtx, extentCases[extNdx].name, extentCases[extNdx].description, caseParams));
-
-				// test FragCoord.zw but to avoid duplication limit tests to extent_151x431/256x256 and 1 or 4 samples
-				if ((framebufferExtent.width > 150) && (samples & (VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_4_BIT)))
+				CaseDef c =
 				{
-					std::string caseName = std::string(extentCases[extNdx].name) + "_zw_coord";
-					caseParams.zwCoord = true;
-					sampleGroup->addChild(new FSRPixelConsistencyTestCase(testCtx, caseName.c_str(), extentCases[extNdx].description, caseParams));
-				}
+					shadingRateCases[rateNdx].count,
+					(VkSampleCountFlagBits)sampCases[sampNdx].count,
+					extentCases[extNdx].count
+				};
+
+				sampleGroup->addChild(new FSRPixelConsistencyTestCase(testCtx, extentCases[extNdx].name, extentCases[extNdx].description, c));
 			}
+
 			rateGroup->addChild(sampleGroup.release());
 		}
 

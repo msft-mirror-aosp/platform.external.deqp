@@ -48,7 +48,6 @@ struct AllFeaturesBlobs
 {
 	VkPhysicalDeviceVulkan11Features& vk11;
 	VkPhysicalDeviceVulkan12Features& vk12;
-	VkPhysicalDeviceVulkan13Features& vk13;
 	// add blobs from future vulkan versions here
 };
 
@@ -97,8 +96,7 @@ public:
 																			 const deUint32						apiVersion,
 																			 const VkPhysicalDevice				physicalDevice,
 																			 const std::vector<std::string>&	instanceExtensions,
-																			 const std::vector<std::string>&	deviceExtensions,
-																			 const deBool						enableAllFeatures = DE_FALSE);
+																			 const std::vector<std::string>&	deviceExtensions);
 
 												~DeviceFeatures				(void);
 
@@ -108,7 +106,6 @@ public:
 	const VkPhysicalDeviceFeatures2&			getCoreFeatures2			(void) const { return m_coreFeatures2; }
 	const VkPhysicalDeviceVulkan11Features&		getVulkan11Features			(void) const { return m_vulkan11Features; }
 	const VkPhysicalDeviceVulkan12Features&		getVulkan12Features			(void) const { return m_vulkan12Features; }
-	const VkPhysicalDeviceVulkan13Features&		getVulkan13Features			(void) const { return m_vulkan13Features; }
 
 	bool										contains					(const std::string& feature, bool throwIfNotExists = false) const;
 
@@ -124,7 +121,6 @@ private:
 	mutable std::vector<FeatureStructWrapperBase*>	m_features;
 	VkPhysicalDeviceVulkan11Features				m_vulkan11Features;
 	VkPhysicalDeviceVulkan12Features				m_vulkan12Features;
-	VkPhysicalDeviceVulkan13Features				m_vulkan13Features;
 };
 
 template<class FeatureType>
