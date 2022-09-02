@@ -183,23 +183,23 @@ public:
 				extFunctions.push_back(FunctionInfo("vkGetImageMemoryRequirements2KHR", FUNCTIONORIGIN_DEVICE));
 
 				log << tcu::TestLog::Message << "Disabled extensions check - tries to get functions of disabled extensions from proper vkGet*ProcAddr." << tcu::TestLog::EndMessage;
-				const char * const				result				= specialCasesCheck(ctx, log, failsQuantity, extFunctions) ? "Passed" : "Failed";
+				const char * const				result					= specialCasesCheck(ctx, log, failsQuantity, extFunctions) ? "Passed" : "Failed";
 				log << tcu::TestLog::Message << result << tcu::TestLog::EndMessage;
 			}
 
 			// Check special cases
 			{
-				FunctionInfosList				dummyFunctions		= FunctionInfosList();
+				FunctionInfosList				nonexistingFunctions	= FunctionInfosList();
 				for (deUint32 i = 0; i <= FUNCTIONORIGIN_DEVICE; ++i)
 				{
 					const FunctionOrigin origin = static_cast<FunctionOrigin>(i);
-					dummyFunctions.push_back(FunctionInfo("vkSomeName", origin));
-					dummyFunctions.push_back(FunctionInfo("vkNonexistingKHR", origin));
-					dummyFunctions.push_back(FunctionInfo("", origin));
+					nonexistingFunctions.push_back(FunctionInfo("vkSomeName", origin));
+					nonexistingFunctions.push_back(FunctionInfo("vkNonexistingKHR", origin));
+					nonexistingFunctions.push_back(FunctionInfo("", origin));
 				}
 
-				log << tcu::TestLog::Message << "Special check - tries to get some dummy functions from various vkGet*ProcAddr." << tcu::TestLog::EndMessage;
-				const char * const				result				= specialCasesCheck(ctx, log, failsQuantity, dummyFunctions) ? "Passed" : "Failed";
+				log << tcu::TestLog::Message << "Special check - tries to get some nonexisting functions from various vkGet*ProcAddr." << tcu::TestLog::EndMessage;
+				const char * const				result				= specialCasesCheck(ctx, log, failsQuantity, nonexistingFunctions) ? "Passed" : "Failed";
 				log << tcu::TestLog::Message << result << tcu::TestLog::EndMessage;
 			}
 		}
@@ -448,25 +448,39 @@ private:
 	deBool regularCheck (const APIContext& ctx, tcu::TestLog& log, deUint32& failsQuantity, const vector<pair<const char*, FunctionOrigin> >& testsArr)
 	{
 		const deUint32 startingQuantity = failsQuantity;
+
 		for (deUint32 ndx = 0u; ndx < testsArr.size(); ++ndx)
 		{
-			if (deStringEqual(testsArr[ndx].first, "vkGetInstanceProcAddr") && m_context.getUsedApiVersion() < VK_API_VERSION_1_2)
+			const auto&	funcName	= testsArr[ndx].first;
+			const auto&	funcType	= testsArr[ndx].second;
+			const auto	apiVersion	= m_context.getUsedApiVersion();
+
+			if (deStringEqual(funcName, "vkGetInstanceProcAddr") && apiVersion < VK_API_VERSION_1_2)
 				continue;
 
-			const deUint32 functionType	= testsArr[ndx].second;
-			if (functionType == FUNCTIONORIGIN_PLATFORM)
-				checkPlatformFunction(ctx, log, testsArr[ndx].first, DE_TRUE, failsQuantity);
-			else if (functionType == FUNCTIONORIGIN_INSTANCE)
+			// VK_KHR_draw_indirect_count was promoted to core in Vulkan 1.2, but these entrypoints are not mandatory unless the
+			// device supports the extension. In that case, the drawIndirectCount feature bit will also be true. Any of the two
+			// checks is valid. We use the extension name for convenience here.
+			if ((deStringEqual(funcName, "vkCmdDrawIndirectCount") || deStringEqual(funcName, "vkCmdDrawIndexedIndirectCount"))
+				&& !isSupportedDeviceExt("VK_KHR_draw_indirect_count", apiVersion))
+				continue;
+
+			if (funcType == FUNCTIONORIGIN_PLATFORM)
 			{
-				checkInstanceFunction(ctx, log, testsArr[ndx].first, DE_TRUE, failsQuantity);
-				checkDeviceFunction(ctx, log, testsArr[ndx].first, DE_FALSE, failsQuantity);
+				checkPlatformFunction(ctx, log, funcName, DE_TRUE, failsQuantity);
 			}
-			else if (functionType == FUNCTIONORIGIN_DEVICE)
+			else if (funcType == FUNCTIONORIGIN_INSTANCE)
 			{
-				checkInstanceFunction(ctx, log, testsArr[ndx].first, DE_TRUE, failsQuantity);
-				checkDeviceFunction(ctx, log, testsArr[ndx].first, DE_TRUE, failsQuantity);
+				checkInstanceFunction(ctx, log, funcName, DE_TRUE, failsQuantity);
+				checkDeviceFunction(ctx, log, funcName, DE_FALSE, failsQuantity);
+			}
+			else if (funcType == FUNCTIONORIGIN_DEVICE)
+			{
+				checkInstanceFunction(ctx, log, funcName, DE_TRUE, failsQuantity);
+				checkDeviceFunction(ctx, log, funcName, DE_TRUE, failsQuantity);
 			}
 		}
+
 		return startingQuantity == failsQuantity;
 	}
 };
