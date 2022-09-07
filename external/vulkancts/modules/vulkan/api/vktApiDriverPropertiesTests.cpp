@@ -61,6 +61,7 @@ static const deUint32 knownDriverIds[] =
 	10,	// <enum value="10"      name="VK_DRIVER_ID_GOOGLE_SWIFTSHADER_KHR"        comment="Google LLC"/>
 	11,	// <enum value="11"      name="VK_DRIVER_ID_GGP_PROPRIETARY_KHR"           comment="Google LLC"/>
 	12,	// <enum value="12"      name="VK_DRIVER_ID_BROADCOM_PROPRIETARY_KHR"      comment="Broadcom Inc."/>
+	22,	// <enum value="22"      name="VK_DRIVER_ID_MESA_VENUS"                    comment="Mesa open source project"/>
 };
 
 static const VkConformanceVersionKHR knownConformanceVersions[] =
