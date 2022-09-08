@@ -3189,9 +3189,7 @@ tcu::TestCaseGroup* createImageCompressionTranscodingTests (tcu::TestContext& te
 					if (shaderType != SHADER_TYPE_COMPUTE && deInRange32(operationNdx, OPERATION_IMAGE_LOAD, OPERATION_IMAGE_STORE))
 						continue;
 
-					if (imageType == IMAGE_TYPE_3D &&
-						(operationNdx == OPERATION_ATTACHMENT_READ || operationNdx == OPERATION_ATTACHMENT_WRITE ||
-						 operationNdx == OPERATION_TEXTURE_READ))
+					if (imageType == IMAGE_TYPE_3D && (operationNdx == OPERATION_ATTACHMENT_READ || operationNdx == OPERATION_ATTACHMENT_WRITE))
 						continue;
 
 					MovePtr<tcu::TestCaseGroup>	imageOperationGroup	(new tcu::TestCaseGroup(testCtx, operationName[operationNdx].c_str(), ""));

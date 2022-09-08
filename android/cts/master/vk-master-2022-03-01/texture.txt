@@ -2960,8 +2960,17 @@ dEQP-VK.texture.filtering_anisotropy.single_level.anisotropy_max.mag_nearest_min
 dEQP-VK.texture.filtering_anisotropy.single_level.anisotropy_max.mag_linear_min_linear
 dEQP-VK.texture.conversion.snorm_clamp_linear.a2b10g10r10_snorm_pack32
 dEQP-VK.texture.conversion.snorm_clamp_linear.a2r10g10b10_snorm_pack32
+dEQP-VK.texture.conversion.snorm_clamp_linear.a8b8g8r8_snorm_pack32
+dEQP-VK.texture.conversion.snorm_clamp_linear.b8g8r8a8_snorm
 dEQP-VK.texture.conversion.snorm_clamp_linear.b8g8r8_snorm
+dEQP-VK.texture.conversion.snorm_clamp_linear.r16g16b16a16_snorm
+dEQP-VK.texture.conversion.snorm_clamp_linear.r16g16b16_snorm
+dEQP-VK.texture.conversion.snorm_clamp_linear.r16g16_snorm
+dEQP-VK.texture.conversion.snorm_clamp_linear.r16_snorm
+dEQP-VK.texture.conversion.snorm_clamp_linear.r8g8b8a8_snorm
 dEQP-VK.texture.conversion.snorm_clamp_linear.r8g8b8_snorm
+dEQP-VK.texture.conversion.snorm_clamp_linear.r8g8_snorm
+dEQP-VK.texture.conversion.snorm_clamp_linear.r8_snorm
 dEQP-VK.texture.multisample.invalid_sample_index.sample_count_2
 dEQP-VK.texture.multisample.invalid_sample_index.sample_count_4
 dEQP-VK.texture.multisample.invalid_sample_index.sample_count_8

@@ -392,21 +392,32 @@ void generateLookupCoordinates (const UVec2& imageSize, size_t numCoords, de::Ra
 	}
 }
 
-void checkImageFeatureSupport (Context& context, VkFormat format, VkFormatFeatureFlags req)
+void checkImageUsageSupport (Context&			context,
+							 VkFormat			format,
+							 VkImageUsageFlags	usage)
 {
-	const VkFormatProperties formatProperties = getPhysicalDeviceFormatProperties(	context.getInstanceInterface(),
-																					context.getPhysicalDevice(),
-																					format);
+	const VkFormatProperties	formatProperties	= getPhysicalDeviceFormatProperties(context.getInstanceInterface(),
+																						context.getPhysicalDevice(),
+																						format);
+	const VkFormatFeatureFlags	featureFlags		= formatProperties.optimalTilingFeatures;
 
-	if (req & ~formatProperties.optimalTilingFeatures)
-		TCU_THROW(NotSupportedError, "Format doesn't support required features");
+	if ((usage & VK_IMAGE_USAGE_SAMPLED_BIT) != 0
+		&& (featureFlags & VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) == 0)
+	{
+		TCU_THROW(NotSupportedError, "Format doesn't support sampling");
+	}
+
+	// Other image usages are not handled currently
+	DE_ASSERT((usage & ~(VK_IMAGE_USAGE_TRANSFER_SRC_BIT|VK_IMAGE_USAGE_TRANSFER_DST_BIT|VK_IMAGE_USAGE_SAMPLED_BIT)) == 0);
 }
 
 void checkSupport(Context& context, TestParameters params)
 {
+	const VkImageUsageFlags usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
 	checkImageSupport(context, params.format, params.createFlags);
-	checkImageFeatureSupport(context, params.format,				VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT | VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT);
-	checkImageFeatureSupport(context, params.planeCompatibleFormat,	VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT | VK_FORMAT_FEATURE_TRANSFER_DST_BIT);
+	checkImageUsageSupport(context, params.format, usage);
+	checkImageUsageSupport(context, params.planeCompatibleFormat, usage);
 }
 
 tcu::TestStatus testPlaneView (Context& context, TestParameters params)

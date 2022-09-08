@@ -1,5 +1,3 @@
-dEQP-GLES3.functional.shaders.matrix.inverse.dynamic.lowp_mat4_float_vertex
-dEQP-GLES3.functional.shaders.matrix.inverse.dynamic.mediump_mat4_float_vertex
 dEQP-GLES3.functional.texture.format.sized.2d.srgb_rg8_pot
 dEQP-GLES3.functional.texture.format.sized.2d.srgb_rg8_npot
 dEQP-GLES3.functional.texture.format.sized.cube.srgb_rg8_pot
