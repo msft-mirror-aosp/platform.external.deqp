@@ -303,7 +303,8 @@ void generateRandomLayout(RandomLayout &randomLayout, const CaseDef &caseDef)
 
 	// TODO: Consider varying these
 	deUint32 minBindings = 0;
-	deUint32 maxBindings = 32;
+	// Try to keep the workload roughly constant while exercising higher numbered sets.
+	deUint32 maxBindings = 128u / caseDef.numDescriptorSets;
 	// No larger than 32 elements for dynamic indexing tests, due to 128B limit
 	// for push constants (used for the indices)
 	deUint32 maxArray = caseDef.indexType == INDEX_TYPE_NONE ? 0 : 32;
