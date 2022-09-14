@@ -341,7 +341,7 @@ MASTER_VULKAN_PKG				= Package(module = VULKAN_MODULE, configurations = [
 					  filters				= [include("vk-incremental-deqp.txt")],
 					  runtime				= "5m",
 					  runByDefault			= False,
-					  splitToMultipleFiles	= True),
+					  splitToMultipleFiles	= False),
 	])
 
 MUSTPASS_LISTS				= [
