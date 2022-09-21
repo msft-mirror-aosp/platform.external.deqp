@@ -10,4 +10,4 @@
 # https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/2237
 # https://gitlab.khronos.org/Tracker/vk-gl-cts/-/issues/3255
 dEQP-GLES3.functional.transform_feedback.array_element.*
-dEQP-GLES3.functional.transform_feedback.random.
+dEQP-GLES3.functional.transform_feedback.random.*
