@@ -1412,8 +1412,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
     private void setRecoveryExpectationRecovery(RecoverableTestDevice mockDevice)
             throws DeviceNotAvailableException {
-        mockDevice.recoverDevice();
-        EasyMock.expectLastCall().once();
+        EasyMock.expect(mockDevice.recoverDevice()).andReturn(true).once();
     }
 
     private void setRecoveryExpectationReboot(RecoverableTestDevice mockDevice)
@@ -1644,8 +1643,7 @@ public class DeqpTestRunnerTest extends TestCase {
                 andReturn("root 1234 com.drawelement.deqp").once();
 
         // Recovery resets the connection
-        mockDevice.recoverDevice();
-        EasyMock.expectLastCall().once();
+        EasyMock.expect(mockDevice.recoverDevice()).andReturn(true);
 
         // and attempts to kill the process again
         EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains("ps"))).
