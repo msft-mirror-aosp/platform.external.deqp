@@ -1,0 +1,17 @@
+# Excluded dEQP test cases when testing ANGLE
+
+# TODO: add bug tracking
+dEQP-EGL.functional.get_frame_timestamps.rgb565_no_depth_stencil
+
+# http://b/223457236
+dEQP-GLES31.functional.geometry_shading.query.primitives_generated_amplification
+dEQP-GLES31.functional.geometry_shading.query.primitives_generated_instanced
+dEQP-GLES31.functional.geometry_shading.query.primitives_generated_no_amplification
+dEQP-GLES31.functional.geometry_shading.query.primitives_generated_no_geometry
+dEQP-GLES31.functional.geometry_shading.query.primitives_generated_partial_primitives
+
+# http://b/258445879
+dEQP-GLES3.functional.shader_api.program_binary.simple.uniform_reset_on_binary_load
+
+# http://b/258715758
+dEQP-GLES3.functional.shaders.precision.int.lowp_add_vertex
