@@ -1,7 +1,7 @@
 # Excluded dEQP test cases when testing ANGLE
 
-# TODO: add bug tracking
 dEQP-EGL.functional.get_frame_timestamps.rgb565_no_depth_stencil
+dEQP-GLES31.functional.synchronization.in_invocation.ssbo_alias_overwrite
 
 # http://b/223457236
 dEQP-GLES31.functional.geometry_shading.query.primitives_generated_amplification
