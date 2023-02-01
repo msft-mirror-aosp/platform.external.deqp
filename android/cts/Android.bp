@@ -47,7 +47,8 @@ java_test_host {
         "cts",
         "vts10",
         "general-tests",
-        "mts"
+        "mts",
+        "automotive-general-tests",
     ],
 
     srcs: ["runner/src/**/*.java"],
