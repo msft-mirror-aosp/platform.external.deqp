@@ -334,14 +334,18 @@ MASTER_VULKAN_PKG				= Package(module = VULKAN_MODULE, configurations = [
 					  runtime				= "2h29m",
 					  splitToMultipleFiles	= True),
 		Configuration(name					= "master-2022-03-01",
-					  filters				= MASTER_VULKAN_FILTERS + [exclude("vk-master-2019-03-01.txt"), exclude("vk-master-2020-03-01.txt"), exclude("vk-master-2021-03-01.txt")],
+					  filters				= [include("vk-master-2022-03-01.txt")],
+					  runtime				= "10m",
+					  splitToMultipleFiles	= True),
+		Configuration(name					= "master-2023-03-01",
+					  filters				= MASTER_VULKAN_FILTERS + [exclude("vk-master-2019-03-01.txt"), exclude("vk-master-2020-03-01.txt"), exclude("vk-master-2021-03-01.txt"), exclude("vk-master-2022-03-01.txt"),],
 					  runtime				= "10m",
 					  splitToMultipleFiles	= True),
 		Configuration(name					= "incremental-deqp",
 					  filters				= [include("vk-incremental-deqp.txt")],
 					  runtime				= "5m",
 					  runByDefault			= False,
-					  splitToMultipleFiles	= True),
+					  splitToMultipleFiles	= False),
 	])
 
 MUSTPASS_LISTS				= [
