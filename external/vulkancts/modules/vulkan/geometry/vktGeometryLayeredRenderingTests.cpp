@@ -270,7 +270,7 @@ Move<VkRenderPass> makeRenderPassWithSelfDependency (const DeviceInterface&	vk,
 		VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,	// VkPipelineStageFlags	dstStageMask
 		VK_ACCESS_SHADER_WRITE_BIT,				// VkAccessFlags		srcAccessMask
 		VK_ACCESS_SHADER_READ_BIT,				// VkAccessFlags		dstAccessMask
-		0u,										// VkDependencyFlags	dependencyFlags
+		VK_DEPENDENCY_BY_REGION_BIT,			// VkDependencyFlags	dependencyFlags
 	};
 
 	const VkRenderPassCreateInfo	renderPassInfo			=
@@ -535,6 +535,7 @@ bool verifyImageSingleColoredRow (tcu::TestLog& log, const tcu::ConstPixelBuffer
 		return false;
 	}
 
+	// Note: this is never reached
 	log << tcu::TestLog::Image("LayerContent", "Layer content", image);
 
 	return allPixelsOk;
@@ -801,7 +802,7 @@ bool verifyLayerContent (tcu::TestLog& log, const TestType testType, const tcu::
 		default:
 			DE_ASSERT(0);
 			return false;
-	};
+	}
 }
 
 std::string getLayerDescription (const VkImageViewType viewType, const int layer)
@@ -1169,7 +1170,7 @@ void initPrograms (SourceCollections& programCollection, const TestParams params
 				DE_ASSERT(params.image.viewType == VK_IMAGE_VIEW_TYPE_3D);
 				imageViewString = "image3D";
 				break;
-		};
+		}
 
 		std::ostringstream src;
 		src << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_450) << "\n"
@@ -1199,7 +1200,7 @@ void initPrograms (SourceCollections& programCollection, const TestParams params
 				default:
 					src << "    ivec3 coord = ivec3(int(gl_FragCoord.x), int(gl_FragCoord.y), gl_Layer);\n";
 					break;
-			};
+			}
 
 			src << "    vec4 src_color = imageLoad(storageImage, coord);\n"
 				<< "    o_color = (vert_color + src_color) / 2.0;\n"
@@ -1781,7 +1782,7 @@ tcu::TestStatus testSecondaryCmdBuffer (Context& context, const TestParams param
 			VK_ACCESS_SHADER_READ_BIT			// VkAccessFlags	dstAccessMask
 		};
 
-		vk.cmdPipelineBarrier(*secondaryCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0u, 1u, &barrier, 0u, DE_NULL, 0u, DE_NULL);
+		vk.cmdPipelineBarrier(*secondaryCmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1u, &barrier, 0u, DE_NULL, 0u, DE_NULL);
 	}
 	vk.cmdDraw(*secondaryCmdBuffer, 1u, 1u, 0u, 0u);
 	endCommandBuffer(vk, *secondaryCmdBuffer);

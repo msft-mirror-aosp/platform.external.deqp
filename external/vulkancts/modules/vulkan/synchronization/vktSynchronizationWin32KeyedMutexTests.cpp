@@ -45,9 +45,9 @@
 #	define NOMINMAX
 #	include <windows.h>
 #	include <aclapi.h>
-#	include "VersionHelpers.h"
-#	include "d3d11_2.h"
-#	include "d3dcompiler.h"
+#	include <versionhelpers.h>
+#	include <d3d11_2.h>
+#	include <d3dcompiler.h>
 
 typedef HRESULT				(WINAPI * LPD3DX11COMPILEFROMMEMORY)(LPCSTR,
 																 SIZE_T,
@@ -178,6 +178,8 @@ vk::Move<vk::VkDevice> createTestDevice (Context&						context,
 	extensions.push_back("VK_KHR_external_memory_win32");
 	extensions.push_back("VK_KHR_win32_keyed_mutex");
 
+	const auto& features = context.getDeviceFeatures();
+
 	try
 	{
 		std::vector<vk::VkDeviceQueueCreateInfo>	queues;
@@ -212,7 +214,7 @@ vk::Move<vk::VkDevice> createTestDevice (Context&						context,
 
 			(deUint32)extensions.size(),
 			extensions.empty() ? DE_NULL : &extensions[0],
-			0u
+			&features
 		};
 
 		return createCustomDevice(validationEnabled, vkp, instance, vki, physicalDevice, &createInfo);
@@ -418,6 +420,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 			DE_NULL,
 			(vk::VkExternalMemoryHandleTypeFlags)externalType
 		};
+		const vk::VkImageTiling								tiling					= VK_IMAGE_TILING_OPTIMAL;
 		const vk::VkImageCreateInfo							createInfo				=
 		{
 			vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -430,7 +433,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 			1u,
 			1u,
 			resourceDesc.imageSamples,
-			vk::VK_IMAGE_TILING_OPTIMAL,
+			tiling,
 			readOp.getInResourceUsageFlags() | writeOp.getOutResourceUsageFlags(),
 			vk::VK_SHARING_MODE_EXCLUSIVE,
 
@@ -442,7 +445,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 		vk::Move<vk::VkImage>								image					= vk::createImage(vkd, device, &createInfo);
 		de::MovePtr<vk::Allocation>							allocation				= importAndBindMemory(vkd, device, *image, nativeHandle, externalType);
 
-		return de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers));
+		return de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers, tiling));
 	}
 	else
 	{
@@ -1123,7 +1126,8 @@ private:
 			PSID*	ppEveryoneSID	= (PSID*)((PBYTE)pSD + SECURITY_DESCRIPTOR_MIN_LENGTH);
 			PACL*	ppACL			= (PACL*)((PBYTE)ppEveryoneSID + sizeof(PSID*));
 
-			InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION);
+			bool res = InitializeSecurityDescriptor(pSD, SECURITY_DESCRIPTOR_REVISION);
+			DE_ASSERT(res);
 
 			SID_IDENTIFIER_AUTHORITY	SIDAuthWorld = SECURITY_WORLD_SID_AUTHORITY;
 			AllocateAndInitializeSid(&SIDAuthWorld, 1, SECURITY_WORLD_RID, 0, 0, 0, 0, 0, 0, 0, ppEveryoneSID);
@@ -1138,7 +1142,8 @@ private:
 
 			SetEntriesInAcl(1, &ea, NULL, ppACL);
 
-			SetSecurityDescriptorDacl(pSD, TRUE, *ppACL, FALSE);
+			res = SetSecurityDescriptorDacl(pSD, TRUE, *ppACL, FALSE);
+			DE_ASSERT(res);
 		}
 
 		return pSD;

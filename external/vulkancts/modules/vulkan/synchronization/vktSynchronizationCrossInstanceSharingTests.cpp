@@ -785,6 +785,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 			DE_NULL,
 			(vk::VkExternalMemoryHandleTypeFlags)externalType
 		};
+		const vk::VkImageTiling				tiling					= vk::VK_IMAGE_TILING_OPTIMAL;
 		const vk::VkImageCreateInfo			createInfo				=
 		{
 			vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
@@ -797,7 +798,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 			1u,
 			1u,
 			resourceDesc.imageSamples,
-			vk::VK_IMAGE_TILING_OPTIMAL,
+			tiling,
 			readOp.getInResourceUsageFlags() | writeOp.getOutResourceUsageFlags(),
 			vk::VK_SHARING_MODE_EXCLUSIVE,
 
@@ -809,7 +810,7 @@ de::MovePtr<Resource> importResource (const vk::DeviceInterface&				vkd,
 		vk::Move<vk::VkImage>			image		= vk::createImage(vkd, device, &createInfo);
 		de::MovePtr<vk::Allocation>		allocation	= importAndBindMemory(vkd, device, *image, nativeHandle, externalType, exportedMemoryTypeIndex, dedicated);
 
-		return de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers));
+		return de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers, tiling));
 	}
 	else
 	{
@@ -1070,6 +1071,7 @@ tcu::TestStatus SharingTestInstance::iterate (void)
 
 			vk::Move<vk::VkImage>			image					= createImage(m_vkdA, *m_deviceA, resourceDesc, extent, m_queueFamilyIndicesA,
 																				  *m_supportReadOp, *m_supportWriteOp, m_memoryHandleType);
+			const vk::VkImageTiling			tiling					= vk::VK_IMAGE_TILING_OPTIMAL;
 			const vk::VkMemoryRequirements	requirements			= getMemoryRequirements(m_vkdA, *m_deviceA, *image, m_config.dedicated, m_getMemReq2Supported);
 											exportedMemoryTypeIndex = chooseMemoryType(requirements.memoryTypeBits);
 			vk::Move<vk::VkDeviceMemory>	memory					= allocateExportableMemory(m_vkdA, *m_deviceA, requirements.size, exportedMemoryTypeIndex, m_memoryHandleType, m_config.dedicated ? *image : (vk::VkImage)0);
@@ -1077,7 +1079,7 @@ tcu::TestStatus SharingTestInstance::iterate (void)
 			VK_CHECK(m_vkdA.bindImageMemory(*m_deviceA, *image, *memory, 0u));
 
 			de::MovePtr<vk::Allocation> allocation = de::MovePtr<vk::Allocation>(new SimpleAllocation(m_vkdA, *m_deviceA, memory.disown()));
-			resourceA = de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers));
+			resourceA = de::MovePtr<Resource>(new Resource(image, allocation, extent, resourceDesc.imageType, resourceDesc.imageFormat, subresourceRange, subresourceLayers, tiling));
 		}
 		else
 		{
@@ -1155,10 +1157,11 @@ tcu::TestStatus SharingTestInstance::iterate (void)
 			VK_CHECK(synchronizationWrapperA->queueSubmit(queueA, DE_NULL));
 
 			{
-				NativeHandle	nativeSemaphoreHandle;
+				NativeHandle						nativeSemaphoreHandle;
+				const vk::VkSemaphoreImportFlags	flags = isSupportedPermanence(m_semaphoreHandleType, PERMANENCE_PERMANENT) ? (vk::VkSemaphoreImportFlagBits)0u : vk::VK_SEMAPHORE_IMPORT_TEMPORARY_BIT;
 
 				getSemaphoreNative(m_vkdA, *m_deviceA, *semaphoreA, m_semaphoreHandleType, nativeSemaphoreHandle);
-				importSemaphore(m_vkdB, *m_deviceB, *semaphoreB, m_semaphoreHandleType, nativeSemaphoreHandle, 0u);
+				importSemaphore(m_vkdB, *m_deviceB, *semaphoreB, m_semaphoreHandleType, nativeSemaphoreHandle, flags);
 			}
 		}
 		{
@@ -1378,6 +1381,12 @@ static void createTests (tcu::TestCaseGroup* group, SynchronizationType type)
 				{
 					for (int semaphoreType = 0; semaphoreType < vk::VK_SEMAPHORE_TYPE_LAST; semaphoreType++)
 					{
+						if (cases[caseNdx].semaphoreType == vk::VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT &&
+						    (vk::VkSemaphoreType)semaphoreType == vk::VK_SEMAPHORE_TYPE_TIMELINE)
+						{
+							continue;
+						}
+
 						if (isResourceSupported(writeOp, resource) && isResourceSupported(readOp, resource))
 						{
 							const TestConfig	config (type, resource, (vk::VkSemaphoreType)semaphoreType, writeOp, readOp, cases[caseNdx].memoryType, cases[caseNdx].semaphoreType, dedicated);

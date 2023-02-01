@@ -28,7 +28,6 @@
 #include "tcuPlatform.hpp"
 #include "tcuRenderTarget.hpp"
 #include "tcuVectorUtil.hpp"
-#include "vkPlatform.hpp"
 #include <assert.h>
 #include <climits>
 #include <cmath>
@@ -190,8 +189,8 @@ public:
 
 	void scaleDimensionsToMemory(int& width, int& height, int devLayers, int sysLayers, int devBPP, int sysBPP)
 	{
-		vk::PlatformMemoryLimits memoryLimits;
-		m_context.getTestContext().getPlatform().getVulkanPlatform().getMemoryLimits(memoryLimits);
+		tcu::PlatformMemoryLimits memoryLimits;
+		m_context.getTestContext().getPlatform().getMemoryLimits(memoryLimits);
 		GLsizeiptr sysSpace		  = memoryLimits.totalSystemMemory;
 		GLsizeiptr devSpace		  = memoryLimits.totalDeviceLocalMemory;
 		int		   devInSysLayers = 0;
@@ -7849,14 +7848,11 @@ private:
 		case GL_TEXTURE_2D_ARRAY:
 		case GL_TEXTURE_3D:
 			return 1;
-			break;
 		case GL_TEXTURE_CUBE_MAP:
 		case GL_TEXTURE_CUBE_MAP_ARRAY:
 			return 6;
-			break;
 		default:
 			throw tcu::InternalError("Not supported texture type", "", __FILE__, __LINE__);
-			break;
 		}
 	}
 

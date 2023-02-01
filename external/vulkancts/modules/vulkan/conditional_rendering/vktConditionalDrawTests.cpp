@@ -110,13 +110,20 @@ protected:
 	de::SharedPtr<Draw::Buffer>		m_indirectCountBuffer;
 };
 
+void checkSupport(Context& context, DrawCommandType command)
+{
+	if (command == DRAW_COMMAND_TYPE_DRAW_INDIRECT_COUNT || command == DRAW_COMMAND_TYPE_DRAW_INDEXED_INDIRECT_COUNT)
+		context.requireDeviceFunctionality("VK_KHR_draw_indirect_count");
+}
+
 ConditionalDraw::ConditionalDraw (Context &context, ConditionalTestSpec testSpec)
-	: Draw::DrawTestsBaseClass(context, testSpec.shaders[glu::SHADERTYPE_VERTEX], testSpec.shaders[glu::SHADERTYPE_FRAGMENT], vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+	: Draw::DrawTestsBaseClass(context, testSpec.shaders[glu::SHADERTYPE_VERTEX], testSpec.shaders[glu::SHADERTYPE_FRAGMENT], false, vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
 	, m_command(testSpec.command)
 	, m_drawCalls(testSpec.drawCalls)
 	, m_conditionalData(testSpec.conditionalData)
 {
 	checkConditionalRenderingCapabilities(context, m_conditionalData);
+	checkSupport(context, m_command);
 
 	const float minX = -0.3f;
 	const float maxX = 0.3f;
@@ -152,7 +159,7 @@ ConditionalDraw::ConditionalDraw (Context &context, ConditionalTestSpec testSpec
 	initialize();
 
 	m_secondaryCmdBuffer = vk::allocateCommandBuffer(m_vk, m_context.getDevice(), *m_cmdPool, vk::VK_COMMAND_BUFFER_LEVEL_SECONDARY);
-};
+}
 
 void ConditionalDraw::createAndBindIndexBuffer (vk::VkCommandBuffer cmdBuffer)
 {
@@ -332,7 +339,7 @@ tcu::TestStatus ConditionalDraw::iterate (void)
 	const vk::VkDevice	device	= m_context.getDevice();
 
 	const bool useSecondaryCmdBuffer = m_conditionalData.conditionInherited || m_conditionalData.conditionInSecondaryCommandBuffer;
-	beginRenderPass(useSecondaryCmdBuffer ? vk::VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : vk::VK_SUBPASS_CONTENTS_INLINE);
+	beginRender(useSecondaryCmdBuffer ? vk::VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : vk::VK_SUBPASS_CONTENTS_INLINE);
 
 	vk::VkCommandBuffer targetCmdBuffer = *m_cmdBuffer;
 
@@ -450,7 +457,7 @@ tcu::TestStatus ConditionalDraw::iterate (void)
 		m_vk.cmdExecuteCommands(*m_cmdBuffer, 1, &m_secondaryCmdBuffer.get());
 	}
 
-	endRenderPass(m_vk, *m_cmdBuffer);
+	endRender();
 	endCommandBuffer(m_vk, *m_cmdBuffer);
 
 	submitCommandsAndWait(m_vk, device, queue, m_cmdBuffer.get());
@@ -502,7 +509,7 @@ tcu::TestStatus ConditionalDraw::iterate (void)
 	}
 
 	return tcu::TestStatus(res, qpGetTestResultName(res));
-};
+}
 
 }	// anonymous
 

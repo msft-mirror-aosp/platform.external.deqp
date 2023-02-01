@@ -554,20 +554,23 @@ Move<VkDescriptorSetLayout>	CommonDescriptorInstance::createDescriptorSetLayout 
 
 	bool optional = (m_testParams.additionalDescriptorBinding != BINDING_Undefined) && (m_testParams.additionalDescriptorType != VK_DESCRIPTOR_TYPE_UNDEFINED);
 
+	const VkShaderStageFlags bindingStageFlags = (m_testParams.descriptorType == VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT) ?
+													VkShaderStageFlags{VK_SHADER_STAGE_FRAGMENT_BIT} : m_testParams.stageFlags;
+
 	const VkDescriptorSetLayoutBinding	bindings[] =
 	{
 		{
 			m_testParams.descriptorBinding,				// binding
 			m_testParams.descriptorType,				// descriptorType
 			descriptorCount,							// descriptorCount
-			m_testParams.stageFlags,					// stageFlags
+			bindingStageFlags,							// stageFlags
 			DE_NULL,									// pImmutableSamplers
 		},
 		{
 			m_testParams.additionalDescriptorBinding,	// binding
 			m_testParams.additionalDescriptorType,		// descriptorType
 			1,											// descriptorCount
-			m_testParams.stageFlags,					// stageFlags
+			bindingStageFlags,							// stageFlags
 			DE_NULL,									// pImmutableSamplers
 		}
 	};
@@ -2217,7 +2220,6 @@ std::string CommonDescriptorInstance::getShaderAsm					(VkShaderStageFlagBits			
 					break;
 				default:
 					TCU_THROW(InternalError, "Unexpected descriptor type");
-					break;
 			}
 			break;
 		case VK_SHADER_STAGE_FRAGMENT_BIT:
@@ -2654,7 +2656,6 @@ std::string CommonDescriptorInstance::getShaderAsm					(VkShaderStageFlagBits			
 					break;
 				default:
 					TCU_THROW(InternalError, "Unexpected descriptor type");
-					break;
 			}
 		    break;
 		case VK_SHADER_STAGE_COMPUTE_BIT:
@@ -2734,12 +2735,10 @@ std::string CommonDescriptorInstance::getShaderAsm					(VkShaderStageFlagBits			
 					break;
 				default:
 					TCU_THROW(InternalError, "Unexpected descriptor type");
-					break;
 			}
 			break;
 		default:
 			TCU_THROW(InternalError, "Unexpected stage");
-			break;
 	}
 
 	return s.str();
@@ -3600,7 +3599,7 @@ void SamplerInstance::createAndPopulateDescriptors					(IterateCommonVariables&	
 		{
 			imageExtent.width *= 2;
 			imageExtent.height *= 2;
-		};
+		}
 
 		createImages(variables.descriptorsImages, variables.descriptorsBufferInfos, variables.descriptorsBuffer,
 			VK_BUFFER_USAGE_TRANSFER_SRC_BIT, imageExtent, m_colorFormat, VK_IMAGE_LAYOUT_UNDEFINED, 1, m_testParams.usesMipMaps);

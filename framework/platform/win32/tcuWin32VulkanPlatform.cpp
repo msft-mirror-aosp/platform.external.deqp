@@ -33,8 +33,6 @@
 #include "deUniquePtr.hpp"
 #include "deMemory.h"
 
-#pragma comment(lib, "version.lib")
-
 namespace tcu
 {
 namespace win32
@@ -284,16 +282,6 @@ void VulkanPlatform::describePlatform (std::ostream& dst) const
 	dst << "CPU: ";
 	getProcessorInfo(dst);
 	dst << "\n";
-}
-
-void VulkanPlatform::getMemoryLimits (vk::PlatformMemoryLimits& limits) const
-{
-	limits.totalSystemMemory					= 256*1024*1024;
-	limits.totalDeviceLocalMemory				= 128*1024*1024;
-	limits.deviceMemoryAllocationGranularity	= 64*1024;
-	limits.devicePageSize						= 4096;
-	limits.devicePageTableEntrySize				= 8;
-	limits.devicePageTableHierarchyLevels		= 3;
 }
 
 vk::wsi::Display* VulkanPlatform::createWsiDisplay (vk::wsi::Type wsiType) const

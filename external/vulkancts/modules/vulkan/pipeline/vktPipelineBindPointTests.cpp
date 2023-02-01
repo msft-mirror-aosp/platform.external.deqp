@@ -180,12 +180,18 @@ BindPointTest::BindPointTest (tcu::TestContext& testCtx, const std::string& name
 
 void BindPointTest::checkSupport (Context& context) const
 {
-	if (m_params.graphicsSetUpdateType != SetUpdateType::WRITE || m_params.computeSetUpdateType != SetUpdateType::WRITE)
+	if ((m_params.hasGraphics() && m_params.graphicsSetUpdateType != SetUpdateType::WRITE) ||
+		(m_params.hasCompute() && m_params.computeSetUpdateType != SetUpdateType::WRITE) ||
+		(m_params.hasRayTracing() && m_params.rayTracingSetUpdateType != SetUpdateType::WRITE))
 	{
 		context.requireDeviceFunctionality("VK_KHR_push_descriptor");
 
-		if (m_params.graphicsSetUpdateType == SetUpdateType::PUSH_WITH_TEMPLATE || m_params.computeSetUpdateType == SetUpdateType::PUSH_WITH_TEMPLATE)
+		if ((m_params.hasGraphics() && m_params.graphicsSetUpdateType == SetUpdateType::PUSH_WITH_TEMPLATE) ||
+			(m_params.hasCompute() && m_params.computeSetUpdateType == SetUpdateType::PUSH_WITH_TEMPLATE) ||
+			(m_params.hasRayTracing() && m_params.rayTracingSetUpdateType == SetUpdateType::PUSH_WITH_TEMPLATE))
+		{
 			context.requireDeviceFunctionality("VK_KHR_descriptor_update_template");
+		}
 	}
 
 	if (m_params.hasRayTracing())
@@ -205,9 +211,9 @@ void BindPointTest::initPrograms (vk::SourceCollections& programCollection) cons
 			<< "\n"
 			<< "void main()\n"
 			<< "{\n"
-			// Full-screen clockwise triangle fan with 4 vertices.
-			<< "    const float x = (-1.0+2.0*(((gl_VertexIndex+1)&2)>>1));\n"
-			<< "    const float y = (-1.0+2.0*(( gl_VertexIndex   &2)>>1));\n"
+			// Full-screen clockwise triangle strip with 4 vertices.
+			<< "	const float x = (-1.0+2.0*((gl_VertexIndex & 2)>>1));\n"
+			<< "	const float y = ( 1.0-2.0* (gl_VertexIndex % 2));\n"
 			<< "	gl_Position = vec4(x, y, 0.0, 1.0);\n"
 			<< "}\n"
 			;
@@ -515,7 +521,7 @@ tcu::TestStatus BindPointInstance::iterate (void)
 
 		graphicsPipeline = makeGraphicsPipeline(vkd, device, graphicsPipelineLayout.get(),
 			vertShader.get(), DE_NULL, DE_NULL, DE_NULL, fragShader.get(),	// Shaders.
-			renderPass.get(), viewports, scissors, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN, 0u, 0u, &vertexInputState);
+			renderPass.get(), viewports, scissors, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, 0u, 0u, &vertexInputState);
 	}
 
 	// Compute pipeline.

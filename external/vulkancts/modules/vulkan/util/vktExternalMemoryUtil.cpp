@@ -23,7 +23,7 @@
 
 #include "vkQueryUtil.hpp"
 
-#if (DE_OS == DE_OS_ANDROID) || (DE_OS == DE_OS_UNIX)
+#if (DE_OS == DE_OS_ANDROID) || (DE_OS == DE_OS_UNIX) || (DE_OS == DE_OS_OSX)
 #	include <unistd.h>
 #	include <fcntl.h>
 #	include <errno.h>
@@ -73,7 +73,7 @@ NativeHandle::NativeHandle (const NativeHandle& other)
 {
 	if (other.m_fd >= 0)
 	{
-#if (DE_OS == DE_OS_ANDROID) || (DE_OS == DE_OS_UNIX)
+#if (DE_OS == DE_OS_ANDROID) || (DE_OS == DE_OS_UNIX) || (DE_OS == DE_OS_OSX)
 		DE_ASSERT(!other.m_win32Handle.internal);
 		DE_ASSERT(!other.m_androidHardwareBuffer.internal);
 		m_fd = dup(other.m_fd);
@@ -118,7 +118,11 @@ NativeHandle::NativeHandle (const NativeHandle& other)
 		DE_ASSERT(other.m_fd == -1);
 		DE_ASSERT(!other.m_win32Handle.internal);
 		m_androidHardwareBuffer = other.m_androidHardwareBuffer;
-		AndroidHardwareBufferExternalApi::getInstance()->acquire(m_androidHardwareBuffer);
+
+		if (AndroidHardwareBufferExternalApi* ahbApi = AndroidHardwareBufferExternalApi::getInstance())
+			ahbApi->acquire(m_androidHardwareBuffer);
+		else
+			DE_FATAL("Platform doesn't support Android Hardware Buffer handles");
 	}
 	else
 		DE_FATAL("Native handle can't be duplicated");
@@ -160,7 +164,7 @@ void NativeHandle::reset (void)
 {
 	if (m_fd >= 0)
 	{
-#if (DE_OS == DE_OS_ANDROID) || (DE_OS == DE_OS_UNIX)
+#if (DE_OS == DE_OS_ANDROID) || (DE_OS == DE_OS_UNIX) || (DE_OS == DE_OS_OSX)
 		DE_ASSERT(!m_win32Handle.internal);
 		DE_ASSERT(!m_androidHardwareBuffer.internal);
 		::close(m_fd);
@@ -194,7 +198,11 @@ void NativeHandle::reset (void)
 	{
 		DE_ASSERT(m_fd == -1);
 		DE_ASSERT(!m_win32Handle.internal);
-		AndroidHardwareBufferExternalApi::getInstance()->release(m_androidHardwareBuffer);
+
+		if (AndroidHardwareBufferExternalApi* ahbApi = AndroidHardwareBufferExternalApi::getInstance())
+			ahbApi->release(m_androidHardwareBuffer);
+		else
+			DE_FATAL("Platform doesn't support Android Hardware Buffer handles");
 	}
 	m_fd					= -1;
 	m_win32Handle			= vk::pt::Win32Handle(DE_NULL);
@@ -1092,7 +1100,7 @@ static vk::Move<vk::VkDeviceMemory> importMemory (const vk::DeviceInterface&				
 			0u
 		};
 
-		vkd.getAndroidHardwareBufferPropertiesANDROID(device, handle.getAndroidHardwareBuffer(), &ahbProperties);
+		VK_CHECK(vkd.getAndroidHardwareBufferPropertiesANDROID(device, handle.getAndroidHardwareBuffer(), &ahbProperties));
 
 		vk::VkImportAndroidHardwareBufferInfoANDROID	importInfo =
 		{
