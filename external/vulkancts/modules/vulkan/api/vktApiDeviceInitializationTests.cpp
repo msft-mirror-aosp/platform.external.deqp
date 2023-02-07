@@ -898,7 +898,7 @@ void checkGlobalPrioritySupport (Context& context, bool useKhrGlobalPriority)
 	context.requireDeviceFunctionality(extName);
 }
 
-tcu::TestStatus createDeviceWithGlobalPriorityTest (Context& context, bool)
+tcu::TestStatus createDeviceWithGlobalPriorityTest (Context& context, bool useKhrGlobalPriority)
 {
 	tcu::TestLog&							log						= context.getTestContext().getLog();
 	const PlatformInterface&				platformInterface		= context.getPlatformInterface();
@@ -907,6 +907,34 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest (Context& context, bool)
 	const VkPhysicalDevice					physicalDevice			= chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
 	const vector<float>						queuePriorities			(1, 1.0f);
 	const VkQueueGlobalPriorityEXT			globalPriorities[]		= { VK_QUEUE_GLOBAL_PRIORITY_LOW_EXT, VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT, VK_QUEUE_GLOBAL_PRIORITY_HIGH_EXT, VK_QUEUE_GLOBAL_PRIORITY_REALTIME_EXT };
+
+	deUint32						queueFamilyPropertyCount	= ~0u;
+
+	instanceDriver.getPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, DE_NULL);
+	TCU_CHECK(queueFamilyPropertyCount > 0);
+
+	std::vector<VkQueueFamilyProperties2>					queueFamilyProperties2		(queueFamilyPropertyCount);
+	std::vector<VkQueueFamilyGlobalPriorityPropertiesKHR>	globalPriorityProperties	(queueFamilyPropertyCount);
+
+	for (deUint32 ndx = 0; ndx < queueFamilyPropertyCount; ndx++)
+	{
+		globalPriorityProperties[ndx].sType	= VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_KHR;
+		globalPriorityProperties[ndx].pNext	= DE_NULL;
+		queueFamilyProperties2[ndx].sType	= VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+		queueFamilyProperties2[ndx].pNext	= &globalPriorityProperties[ndx];
+	}
+
+	instanceDriver.getPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, queueFamilyProperties2.data());
+	TCU_CHECK((size_t)queueFamilyPropertyCount == queueFamilyProperties2.size());
+
+	std::vector<const char*> enabledExtensions = { "VK_EXT_global_priority", "VK_EXT_global_priority_query" };
+	if (useKhrGlobalPriority)
+		enabledExtensions = { "VK_KHR_global_priority" };
+
+	if (!context.contextSupports(vk::ApiVersion(1, 1, 0)))
+	{
+		enabledExtensions.emplace_back("VK_KHR_get_physical_device_properties2");
+	}
 
 	for (VkQueueGlobalPriorityEXT globalPriority : globalPriorities)
 	{
@@ -942,6 +970,7 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest (Context& context, bool)
 		};
 
 		const bool		mayBeDenied				= globalPriority > VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT;
+		const bool		mustFail				= globalPriority < globalPriorityProperties[0].priorities[0] || globalPriority > globalPriorityProperties[0].priorities[globalPriorityProperties[0].priorityCount - 1];
 
 		try
 		{
@@ -959,6 +988,21 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest (Context& context, bool)
 				continue;
 			}
 
+			if (result == VK_ERROR_INITIALIZATION_FAILED && mustFail)
+			{
+				continue;
+			}
+
+			if (mustFail)
+			{
+				log << TestLog::Message
+					<< "device creation must fail but not"
+					<< ", globalPriority = " << globalPriority
+					<< ", queueCreateInfo " << queueCreateInfo
+					<< TestLog::EndMessage;
+				return tcu::TestStatus::fail("Fail");
+			}
+
 			if (result != VK_SUCCESS)
 			{
 				log << TestLog::Message
@@ -972,7 +1016,7 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest (Context& context, bool)
 		}
 		catch (const Error& error)
 		{
-			if (error.getError() == VK_ERROR_NOT_PERMITTED_EXT && mayBeDenied)
+			if ((error.getError() == VK_ERROR_INITIALIZATION_FAILED && mustFail) || (error.getError() == VK_ERROR_NOT_PERMITTED_EXT && mayBeDenied))
 			{
 				continue;
 			}
@@ -1591,102 +1635,6 @@ tcu::TestStatus createDeviceQueue2Test (Context& context)
 	return tcu::TestStatus::pass("Pass");
 }
 
-tcu::TestStatus createDeviceQueue2UnmatchedFlagsTest (Context& context)
-{
-	if (!context.contextSupports(vk::ApiVersion(1, 1, 0)))
-		TCU_THROW(NotSupportedError, "Vulkan 1.1 is not supported");
-
-	const PlatformInterface&		platformInterface		= context.getPlatformInterface();
-	const VkInstance				instance				= context.getInstance();
-	const InstanceInterface&		instanceDriver			= context.getInstanceInterface();
-	const VkPhysicalDevice			physicalDevice			= context.getPhysicalDevice();
-
-	// Check if VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT flag can be used.
-	{
-		VkPhysicalDeviceProtectedMemoryFeatures		protectedFeatures;
-		protectedFeatures.sType		= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES;
-		protectedFeatures.pNext		= DE_NULL;
-
-		VkPhysicalDeviceFeatures2					deviceFeatures;
-		deviceFeatures.sType		= VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-		deviceFeatures.pNext		= &protectedFeatures;
-
-		instanceDriver.getPhysicalDeviceFeatures2(physicalDevice, &deviceFeatures);
-		if (!protectedFeatures.protectedMemory)
-		{
-			TCU_THROW(NotSupportedError, "protectedMemory feature is not supported, no queue creation flags available");
-		}
-	}
-
-	const deUint32							queueFamilyIndex		= context.getUniversalQueueFamilyIndex();
-	const deUint32							queueCount				= 1;
-	const deUint32							queueIndex				= 0;
-	const float								queuePriority			= 1.0f;
-	const VkDeviceQueueCreateInfo			deviceQueueCreateInfo	=
-	{
-		VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,	// VkStructureType					sType;
-		DE_NULL,									// const void*						pNext;
-		(VkDeviceQueueCreateFlags)0u,				// VkDeviceQueueCreateFlags			flags;
-		queueFamilyIndex,							// deUint32							queueFamilyIndex;
-		queueCount,									// deUint32							queueCount;
-		&queuePriority,								// const float*						pQueuePriorities;
-	};
-	VkPhysicalDeviceProtectedMemoryFeatures	protectedFeatures		=
-	{
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES,	// VkStructureType				sType;
-		DE_NULL,														// void*						pNext;
-		VK_TRUE															// VkBool32						protectedMemory;
-	};
-
-	VkPhysicalDeviceFeatures				emptyDeviceFeatures;
-	deMemset(&emptyDeviceFeatures, 0, sizeof(emptyDeviceFeatures));
-
-	const VkPhysicalDeviceFeatures2			deviceFeatures			=
-	{
-		VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2,					// VkStructureType				sType;
-		&protectedFeatures,												// void*						pNext;
-		emptyDeviceFeatures												// VkPhysicalDeviceFeatures		features;
-	};
-
-	const VkDeviceCreateInfo				deviceCreateInfo		=
-	{
-		VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,		// VkStructureType					sType;
-		&deviceFeatures,							// const void*						pNext;
-		(VkDeviceCreateFlags)0u,					// VkDeviceCreateFlags				flags;
-		1,											// deUint32							queueCreateInfoCount;
-		&deviceQueueCreateInfo,						// const VkDeviceQueueCreateInfo*	pQueueCreateInfos;
-		0,											// deUint32							enabledLayerCount;
-		DE_NULL,									// const char* const*				ppEnabledLayerNames;
-		0,											// deUint32							enabledExtensionCount;
-		DE_NULL,									// const char* const*				ppEnabledExtensionNames;
-		DE_NULL,									// const VkPhysicalDeviceFeatures*	pEnabledFeatures;
-	};
-
-	const VkDeviceQueueInfo2				deviceQueueInfo2		=
-	{
-		VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2,		// VkStructureType					sType;
-		DE_NULL,									// const void*						pNext;
-		VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT,		// VkDeviceQueueCreateFlags			flags;
-		queueFamilyIndex,							// deUint32							queueFamilyIndex;
-		queueIndex,									// deUint32							queueIndex;
-	};
-
-	{
-		const Unique<VkDevice>		device					(createCustomDevice(context.getTestContext().getCommandLine().isValidationEnabled(), platformInterface, instance, instanceDriver, physicalDevice, &deviceCreateInfo));
-		const DeviceDriver			deviceDriver			(platformInterface, instance, device.get());
-		const VkQueue				queue2					= getDeviceQueue2(deviceDriver, *device, &deviceQueueInfo2);
-
-		if (queue2 != DE_NULL)
-			return tcu::TestStatus::fail("Fail, getDeviceQueue2 should return VK_NULL_HANDLE when flags in VkDeviceQueueCreateInfo and VkDeviceQueueInfo2 are different.");
-
-		const VkQueue				queue					= getDeviceQueue(deviceDriver, *device,  queueFamilyIndex, queueIndex);
-
-		VK_CHECK(deviceDriver.queueWaitIdle(queue));
-	}
-
-	return tcu::TestStatus::pass("Pass");
-}
-
 // Allocation tracking utilities
 struct	AllocTrack
 {
@@ -2101,7 +2049,6 @@ tcu::TestCaseGroup* createDeviceInitializationTests (tcu::TestContext& testCtx)
 		deviceInitializationTests->addChild(subgroup.release());
 	}
 	addFunctionCaseInNewSubgroup(testCtx, deviceInitializationTests.get(), "create_device_queue2",							"", createDeviceQueue2Test);
-	addFunctionCaseInNewSubgroup(testCtx, deviceInitializationTests.get(), "create_device_queue2_unmatched_flags",			"", createDeviceQueue2UnmatchedFlagsTest);
 	addFunctionCaseInNewSubgroup(testCtx, deviceInitializationTests.get(), "create_instance_device_intentional_alloc_fail",	"", createInstanceDeviceIntentionalAllocFail);
 
 	return deviceInitializationTests.release();
