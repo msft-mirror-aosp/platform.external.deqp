@@ -256,6 +256,9 @@ void FSRTestCase::checkSupport(Context& context) const
 	if (result == VK_ERROR_FORMAT_NOT_SUPPORTED)
 		TCU_THROW(NotSupportedError, "VK_FORMAT_R32G32B32A32_UINT not supported");
 
+	if (m_data.geometryShader)
+		context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_GEOMETRY_SHADER);
+
 	if (!(imageProperties.sampleCounts & m_data.samples))
 		TCU_THROW(NotSupportedError, "color buffer sample count not supported");
 
@@ -1249,9 +1252,9 @@ tcu::TestStatus FSRTestInstance::iterate (void)
 			VkFormat srFormat = srFillFormats[formatIdx];
 			deUint32 srFillBpp = tcu::getPixelSize(mapVkFormat(srFormat));
 
-			VkImageLayout srLayout = modeIdx == ATTACHMENT_MODE_LAYOUT_OPTIMAL ? VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR : VK_IMAGE_LAYOUT_GENERAL;
-			VkImageViewType srViewType = modeIdx == ATTACHMENT_MODE_2DARRAY ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
-			VkImageTiling srTiling = (modeIdx == ATTACHMENT_MODE_TILING_LINEAR) ? VK_IMAGE_TILING_LINEAR : VK_IMAGE_TILING_OPTIMAL;
+			VkImageLayout	srLayout	= modeIdx == ATTACHMENT_MODE_LAYOUT_OPTIMAL ? VK_IMAGE_LAYOUT_FRAGMENT_SHADING_RATE_ATTACHMENT_OPTIMAL_KHR : VK_IMAGE_LAYOUT_GENERAL;
+			VkImageViewType srViewType	= modeIdx == ATTACHMENT_MODE_2DARRAY ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+			VkImageTiling	srTiling	= (modeIdx == ATTACHMENT_MODE_TILING_LINEAR) ? VK_IMAGE_TILING_LINEAR : VK_IMAGE_TILING_OPTIMAL;
 
 			VkFormatProperties srFormatProperties;
 			m_context.getInstanceInterface().getPhysicalDeviceFormatProperties(m_context.getPhysicalDevice(), srFormat, &srFormatProperties);
@@ -1564,7 +1567,7 @@ tcu::TestStatus FSRTestInstance::iterate (void)
 						srUsage,													//  VkImageUsageFlags	usage;
 						srWidth,													//  deUint32			width;
 						srHeight,													//  deUint32			height;
-						numSRLayers,												//  deUint32			layerCount;
+						srViewType == VK_IMAGE_VIEW_TYPE_2D ? 1 : numSRLayers,		//  deUint32			layerCount;
 						1u,															//  deUint32			viewFormatCount;
 						&srFormat													//  const VkFormat*		pViewFormats;
 					}
@@ -1713,11 +1716,11 @@ tcu::TestStatus FSRTestInstance::iterate (void)
 				// Split the viewport into left and right halves
 				int x0 = 0, x1 = m_data.framebufferDim.width/2, x2 = m_data.framebufferDim.width;
 
-				viewports.push_back(makeViewport((float)x0, 0, (float)(x1-x0), (float)m_data.framebufferDim.height, 0.0f, 1.0f));
-				scissors.push_back(makeRect2D(x0, 0, x1-x0, m_data.framebufferDim.height));
+				viewports.push_back(makeViewport((float)x0, 0, std::max((float)(x1 - x0), 1.0f), (float)m_data.framebufferDim.height, 0.0f, 1.0f));
+				scissors.push_back(makeRect2D(x0, 0, x1 - x0, m_data.framebufferDim.height));
 
-				viewports.push_back(makeViewport((float)x1, 0, (float)(x2-x1), (float)m_data.framebufferDim.height, 0.0f, 1.0f));
-				scissors.push_back(makeRect2D(x1, 0, x2-x1, m_data.framebufferDim.height));
+				viewports.push_back(makeViewport((float)x1, 0, std::max((float)(x2 - x1), 1.0f), (float)m_data.framebufferDim.height, 0.0f, 1.0f));
+				scissors.push_back(makeRect2D(x1, 0, x2 - x1, m_data.framebufferDim.height));
 			}
 			else
 			{
