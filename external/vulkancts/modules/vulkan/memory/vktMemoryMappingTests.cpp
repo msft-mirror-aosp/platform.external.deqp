@@ -475,7 +475,7 @@ Move<VkDeviceMemory> allocMemory (const DeviceInterface& vk, VkDevice device, Vk
 	const VkMemoryDedicatedAllocateInfo
 										dedicatedAllocateInfo			=
 	{
-		VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO_KHR,			// VkStructureType		sType
+		VK_STRUCTURE_TYPE_MEMORY_DEDICATED_ALLOCATE_INFO,				// VkStructureType		sType
 		DE_NULL,														// const void*			pNext
 		*image,															// VkImage				image
 		*buffer															// VkBuffer				buffer
@@ -1784,6 +1784,8 @@ TestConfig fullMappedConfig (VkDeviceSize	allocationSize,
 
 void checkSupport (Context& context, TestConfig config)
 {
+	context.requireInstanceFunctionality("VK_KHR_get_physical_device_properties2");
+
 	if (config.allocationKind == ALLOCATION_KIND_DEDICATED_IMAGE
 		|| config.allocationKind == ALLOCATION_KIND_DEDICATED_BUFFER)
 	{
@@ -1827,12 +1829,14 @@ tcu::TestCaseGroup* createMappingTests (tcu::TestContext& testCtx)
 	{
 		{ OP_NONE,						"simple"					},
 		{ OP_REMAP,						"remap"						},
+#ifndef CTS_USES_VULKANSC
+// implicit_unmap tests use VkAllocationCallbacks forbidden in Vulkan SC
 		{ OP_IMPLICIT_UNMAP,			"implicit_unmap"			},
+#endif // CTS_USES_VULKANSC
 		{ OP_FLUSH,						"flush"						},
 		{ OP_SUB_FLUSH,					"subflush"					},
 		{ OP_SUB_FLUSH_SEPARATE,		"subflush_separate"			},
 		{ OP_SUB_FLUSH_SEPARATE,		"subflush_overlapping"		},
-
 		{ OP_INVALIDATE,				"invalidate"				},
 		{ OP_SUB_INVALIDATE,			"subinvalidate"				},
 		{ OP_SUB_INVALIDATE_SEPARATE,	"subinvalidate_separate"	},
