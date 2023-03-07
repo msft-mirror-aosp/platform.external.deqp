@@ -367,6 +367,8 @@ void RobustnessExtsTestCase::checkSupport(Context& context) const
 		VkFormatProperties formatProperties;
 		vki.getPhysicalDeviceFormatProperties(context.getPhysicalDevice(), m_data.format, &formatProperties);
 
+		const VkFormatProperties3KHR formatProperties3 = context.getFormatProperties(m_data.format);
+
 		switch (m_data.descriptorType)
 		{
 		case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
@@ -376,6 +378,8 @@ void RobustnessExtsTestCase::checkSupport(Context& context) const
 		case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
 			if ((formatProperties.bufferFeatures & VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT) != VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT)
 				TCU_THROW(NotSupportedError, "VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT is not supported");
+			if ((formatProperties3.bufferFeatures & VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR) != VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR)
+				TCU_THROW(NotSupportedError, "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT is not supported");
 			break;
 		case VERTEX_ATTRIBUTE_FETCH:
 			if ((formatProperties.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) != VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
@@ -1727,15 +1731,26 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate (void)
 			(VkDeviceSize)(m_data.bufferLen ? m_data.bufferLen : 1),
 			(VkDeviceSize)256);
 
+		VkBufferUsageFlags usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
 			m_data.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
 		{
 			size = deIntRoundToPow2((int)size, (int)robustness2Properties.robustUniformBufferAccessSizeAlignment);
+			usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		}
 		else if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
 				 m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
 			size = deIntRoundToPow2((int)size, (int)robustness2Properties.robustStorageBufferAccessSizeAlignment);
+			usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		}
+		else if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+		{
+			usage |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+		}
+		else if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
+		{
+			usage |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 		}
 		else if (m_data.descriptorType == VERTEX_ATTRIBUTE_FETCH)
 		{
@@ -1743,13 +1758,7 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate (void)
 		}
 
 		buffer = de::MovePtr<BufferWithMemory>(new BufferWithMemory(
-			vk, device, allocator, makeBufferCreateInfo(size,
-														VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-														VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-														VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
-														VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT |
-														VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
-														MemoryRequirement::HostVisible));
+			vk, device, allocator, makeBufferCreateInfo(size, usage), MemoryRequirement::HostVisible));
 		bufferPtr = (deUint8 *)buffer->getAllocation().getHostPtr();
 
 		deMemset(bufferPtr, 0x3f, (size_t)size);

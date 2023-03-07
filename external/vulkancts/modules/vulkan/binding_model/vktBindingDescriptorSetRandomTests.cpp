@@ -594,6 +594,13 @@ void generateRandomLayout(RandomLayout& randomLayout, const CaseDef &caseDef, de
 						binding.descriptorCount = (arraySizes[b] ? arraySizes[b] : 1) * 16 + 16; // add 16 for "ivec4 unused"
 						numInlineUniformBlocks++;
 					}
+					else
+					{
+						// The meaning of descriptorCount for inline uniform blocks is diferrent from usual, which means
+						// (descriptorCount == 0) doesn't mean it will be discarded.
+						// So we use a similar trick to the below by replacing with a different type of descriptor.
+						binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+					}
 				}
 				else
 				{
@@ -2229,6 +2236,13 @@ tcu::TestStatus DescriptorSetRandomTestInstance::iterate (void)
 	de::MovePtr<BufferWithMemory>	callableShaderBindingTable;
 	de::MovePtr<RayTracingPipeline>	rayTracingPipeline;
 
+	// Disable interval watchdog timer for long shader compilations that can
+	// happen when the number of descriptor sets gets to 32 and above.
+	if (m_data.numDescriptorSets >= 32)
+	{
+		m_context.getTestContext().touchWatchdogAndDisableIntervalTimeLimit();
+	}
+
 	if (m_data.stage == STAGE_COMPUTE)
 	{
 		const Unique<VkShaderModule>	shader(createShaderModule(vk, device, m_context.getBinaryCollection().get("test"), 0));
@@ -2779,6 +2793,13 @@ tcu::TestStatus DescriptorSetRandomTestInstance::iterate (void)
 	endCommandBuffer(vk, *cmdBuffer);
 
 	submitCommandsAndWait(vk, device, queue, cmdBuffer.get());
+
+	// Re-enable watchdog interval timer here to favor virtualized vulkan
+	// implementation that asynchronously creates the pipeline on the host.
+	if (m_data.numDescriptorSets >= 32)
+	{
+		m_context.getTestContext().touchWatchdogAndEnableIntervalTimeLimit();
+	}
 
 	// Verify output image.
 	deUint32 *ptr = (deUint32 *)copyBuffer->getAllocation().getHostPtr();
