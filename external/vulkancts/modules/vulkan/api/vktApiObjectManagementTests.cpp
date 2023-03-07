@@ -331,7 +331,7 @@ inline bool hasDeviceExtension (Context& context, const string name)
 	return context.isDeviceFunctionalitySupported(name);
 }
 
-VkDeviceSize getPageTableSize (const PlatformMemoryLimits& limits, VkDeviceSize allocationSize)
+VkDeviceSize getPageTableSize (const tcu::PlatformMemoryLimits& limits, VkDeviceSize allocationSize)
 {
 	VkDeviceSize	totalSize	= 0;
 
@@ -383,9 +383,9 @@ size_t computeSystemMemoryUsage (Context& context, const typename Object::Parame
 	}
 }
 
-size_t getSafeObjectCount (const PlatformMemoryLimits&	memoryLimits,
-						   size_t						objectSystemMemoryUsage,
-						   VkDeviceSize					objectDeviceMemoryUsage = 0)
+size_t getSafeObjectCount (const tcu::PlatformMemoryLimits&	memoryLimits,
+						   size_t							objectSystemMemoryUsage,
+						   VkDeviceSize						objectDeviceMemoryUsage = 0)
 {
 	const VkDeviceSize	roundedUpDeviceMemory	= roundUpToNextMultiple(objectDeviceMemoryUsage, memoryLimits.deviceMemoryAllocationGranularity);
 
@@ -409,11 +409,11 @@ size_t getSafeObjectCount (const PlatformMemoryLimits&	memoryLimits,
 	}
 }
 
-PlatformMemoryLimits getPlatformMemoryLimits (Context& context)
+tcu::PlatformMemoryLimits getPlatformMemoryLimits (Context& context)
 {
-	PlatformMemoryLimits	memoryLimits;
+	tcu::PlatformMemoryLimits	memoryLimits;
 
-	context.getTestContext().getPlatform().getVulkanPlatform().getMemoryLimits(memoryLimits);
+	context.getTestContext().getPlatform().getMemoryLimits(memoryLimits);
 
 	return memoryLimits;
 }
@@ -448,6 +448,7 @@ enum
 	MAX_CONCURRENT_DEVICES			= 32,
 	MAX_CONCURRENT_SYNC_PRIMITIVES	= 100,
 	MAX_CONCURRENT_PIPELINE_CACHES	= 128,
+	MAX_CONCURRENT_QUERY_POOLS		= 8192,
 	DEFAULT_MAX_CONCURRENT_OBJECTS	= 16*1024,
 };
 
@@ -1174,7 +1175,7 @@ struct QueryPool
 
 	static deUint32 getMaxConcurrent (Context& context, const Parameters& params)
 	{
-		return getSafeObjectCount<QueryPool>(context, params, DEFAULT_MAX_CONCURRENT_OBJECTS);
+		return getSafeObjectCount<QueryPool>(context, params, MAX_CONCURRENT_QUERY_POOLS);
 	}
 
 	static Move<VkQueryPool> create (const Environment& env, const Resources&, const Parameters& params)
