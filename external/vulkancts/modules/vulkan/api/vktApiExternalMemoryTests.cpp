@@ -321,6 +321,16 @@ vk::Move<vk::VkDevice> createTestDevice (const Context&									context,
 		useExternalFence = true;
 	}
 
+	if (externalMemoryTypes & vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_ZIRCON_VMO_BIT_FUCHSIA)
+	{
+		deviceExtensions.push_back("VK_FUCHSIA_external_memory");
+	}
+
+	if (externalSemaphoreTypes & vk::VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA)
+	{
+		deviceExtensions.push_back("VK_FUCHSIA_external_semaphore");
+	}
+
 	if ((externalMemoryTypes
 			& (vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT
 			   | vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT
@@ -743,7 +753,7 @@ void submitAtomicCalculationsAndGetSemaphoreNative (const Context&									conte
 
 	// Create compute pipeline
 	const vk::Unique<vk::VkPipelineLayout>	pipelineLayout(makePipelineLayout(vk, device, *descriptorSetLayout));
-	const vk::Unique<vk::VkPipeline>		computePipeline(compute::makeComputePipeline(vk, device, *pipelineLayout, *compShader));
+	const vk::Unique<vk::VkPipeline>		computePipeline(makeComputePipeline(vk, device, *pipelineLayout, *compShader));
 
 	// Create descriptor pool
 	const vk::Unique<vk::VkDescriptorPool>	descriptorPool(
@@ -880,7 +890,7 @@ void submitAtomicCalculationsAndGetFenceNative (const Context&								context,
 
 	// Create compute pipeline
 	const vk::Unique<vk::VkPipelineLayout>	pipelineLayout(makePipelineLayout(vk, device, *descriptorSetLayout));
-	const vk::Unique<vk::VkPipeline>		computePipeline(compute::makeComputePipeline(vk, device, *pipelineLayout, *compShader));
+	const vk::Unique<vk::VkPipeline>		computePipeline(makeComputePipeline(vk, device, *pipelineLayout, *compShader));
 
 	// Create descriptor pool
 	const vk::Unique<vk::VkDescriptorPool>	descriptorPool(
@@ -4313,11 +4323,28 @@ de::MovePtr<tcu::TestCaseGroup> createFenceTests (tcu::TestContext& testCtx, vk:
 	return fenceGroup;
 }
 
-bool ValidateAHardwareBuffer(vk::VkFormat format, deUint64 requiredAhbUsage, const vk::DeviceDriver& vkd, const vk::VkDevice& device, vk::VkImageCreateFlags createFlag, deUint32 layerCount, bool& enableMaxLayerTest)
+void generateFailureText (TestLog& log, vk::VkFormat format, vk::VkImageUsageFlags usage, vk::VkImageCreateFlags create, vk::VkImageTiling tiling = static_cast<vk::VkImageTiling>(0), deUint32 width = 0, deUint32 height = 0, std::string exception = "")
+{
+	std::ostringstream combination;
+	combination << "Test failure with combination: ";
+	combination << " Format: "		<< getFormatName(format);
+	combination << " Usageflags: "	<< vk::getImageUsageFlagsStr(usage);
+	combination << " Createflags: "	<< vk::getImageCreateFlagsStr(create);
+	combination << " Tiling: "		<< getImageTilingStr(tiling);
+	if (width != 0 && height != 0)
+		combination << " Size: " << "(" << width << ", " << height << ")";
+	if (!exception.empty())
+		combination << "Error message: " << exception;
+
+	log << TestLog::Message << combination.str() << TestLog::EndMessage;
+}
+
+bool ValidateAHardwareBuffer (TestLog& log, vk::VkFormat format, deUint64 requiredAhbUsage, const vk::DeviceDriver& vkd, const vk::VkDevice& device, vk::VkImageUsageFlags usageFlag, vk::VkImageCreateFlags createFlag, deUint32 layerCount, bool& enableMaxLayerTest)
 {
 	DE_UNREF(createFlag);
 
 	AndroidHardwareBufferExternalApi* ahbApi = AndroidHardwareBufferExternalApi::getInstance();
+
 	if (!ahbApi)
 	{
 		TCU_THROW(NotSupportedError, "Platform doesn't support Android Hardware Buffer handles");
@@ -4372,24 +4399,35 @@ bool ValidateAHardwareBuffer(vk::VkFormat format, deUint64 requiredAhbUsage, con
 			0u
 		};
 
-		VK_CHECK(vkd.getAndroidHardwareBufferPropertiesANDROID(device, ahb, &bufferProperties));
-		TCU_CHECK(formatProperties.format != vk::VK_FORMAT_UNDEFINED);
-		TCU_CHECK(formatProperties.format == format);
-		TCU_CHECK(formatProperties.externalFormat != 0u);
-		TCU_CHECK((formatProperties.formatFeatures & vk::VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0u);
-		TCU_CHECK((formatProperties.formatFeatures & (vk::VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT | vk::VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) != 0u);
+		try
+		{
+			VK_CHECK(vkd.getAndroidHardwareBufferPropertiesANDROID(device, ahb, &bufferProperties));
+			TCU_CHECK(formatProperties.format != vk::VK_FORMAT_UNDEFINED);
+			TCU_CHECK(formatProperties.format == format);
+			TCU_CHECK(formatProperties.externalFormat != 0u);
+			TCU_CHECK((formatProperties.formatFeatures & vk::VK_FORMAT_FEATURE_SAMPLED_IMAGE_BIT) != 0u);
+			TCU_CHECK((formatProperties.formatFeatures & (vk::VK_FORMAT_FEATURE_MIDPOINT_CHROMA_SAMPLES_BIT | vk::VK_FORMAT_FEATURE_COSITED_CHROMA_SAMPLES_BIT)) != 0u);
+		}
+		catch (const tcu::Exception& exception)
+		{
+			log << TestLog::Message << "Failure validating Android Hardware Buffer. See error message and combination: " << TestLog::EndMessage;
+			generateFailureText(log, format, usageFlag, createFlag, static_cast<vk::VkImageTiling>(0), 0, 0, exception.getMessage());
+			return false;
+		}
 	}
 
 	return true;
 }
 
-tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkFormat format)
+tcu::TestStatus testAndroidHardwareBufferImageFormat (Context& context, vk::VkFormat format)
 {
 	AndroidHardwareBufferExternalApi* ahbApi = AndroidHardwareBufferExternalApi::getInstance();
 	if (!ahbApi)
 	{
 		TCU_THROW(NotSupportedError, "Platform doesn't support Android Hardware Buffer handles");
 	}
+
+	bool testsFailed = false;
 
 	const vk::VkExternalMemoryHandleTypeFlagBits  externalMemoryType  =	vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID;
 	const vk::PlatformInterface&				  vkp					(context.getPlatformInterface());
@@ -4475,7 +4513,7 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 			continue;
 
 		// Only test a combination if AHardwareBuffer can be successfully allocated for it.
-		if (!ValidateAHardwareBuffer(format, requiredAhbUsage, vkd, *device, createFlag, limits.maxImageArrayLayers, enableMaxLayerTest))
+		if (!ValidateAHardwareBuffer(log, format, requiredAhbUsage, vkd, *device, usage, createFlag, limits.maxImageArrayLayers, enableMaxLayerTest))
 			continue;
 
 		bool foundAnyUsableTiling = false;
@@ -4533,17 +4571,26 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 
 			foundAnyUsableTiling = true;
 
-			TCU_CHECK((externalProperties.externalMemoryProperties.externalMemoryFeatures & vk::VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) != 0);
-			TCU_CHECK((externalProperties.externalMemoryProperties.externalMemoryFeatures & vk::VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0);
-			TCU_CHECK((externalProperties.externalMemoryProperties.externalMemoryFeatures & vk::VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0);
-			deUint32 maxWidth   = properties.imageFormatProperties.maxExtent.width;
-			deUint32 maxHeight  = properties.imageFormatProperties.maxExtent.height;
-			TCU_CHECK(maxWidth >= 4096);
-			TCU_CHECK(maxHeight >= 4096);
-			// Even if not requested, at least one of GPU_* usage flags must be present.
-			TCU_CHECK((ahbUsageProperties.androidHardwareBufferUsage & mustSupportAhbUsageFlags) != 0u);
-			// The AHB usage flags corresponding to the create and usage flags used in info must be present.
-			TCU_CHECK((ahbUsageProperties.androidHardwareBufferUsage & requiredAhbUsage) == requiredAhbUsage);
+			try
+			{
+				TCU_CHECK((externalProperties.externalMemoryProperties.externalMemoryFeatures & vk::VK_EXTERNAL_MEMORY_FEATURE_EXPORTABLE_BIT) != 0);
+				TCU_CHECK((externalProperties.externalMemoryProperties.externalMemoryFeatures & vk::VK_EXTERNAL_MEMORY_FEATURE_IMPORTABLE_BIT) != 0);
+				TCU_CHECK((externalProperties.externalMemoryProperties.externalMemoryFeatures & vk::VK_EXTERNAL_MEMORY_FEATURE_DEDICATED_ONLY_BIT) != 0);
+				deUint32 maxWidth   = properties.imageFormatProperties.maxExtent.width;
+				deUint32 maxHeight  = properties.imageFormatProperties.maxExtent.height;
+				TCU_CHECK(maxWidth >= 4096);
+				TCU_CHECK(maxHeight >= 4096);
+				// Even if not requested, at least one of GPU_* usage flags must be present.
+				TCU_CHECK((ahbUsageProperties.androidHardwareBufferUsage & mustSupportAhbUsageFlags) != 0u);
+				// The AHB usage flags corresponding to the create and usage flags used in info must be present.
+				TCU_CHECK((ahbUsageProperties.androidHardwareBufferUsage & requiredAhbUsage) == requiredAhbUsage);
+			}
+			catch (const tcu::Exception& exception)
+			{
+				generateFailureText(log, format, usage, createFlag, tiling, 0, 0, exception.getMessage());
+				testsFailed = true;
+				continue;
+			}
 
 			log << TestLog::Message << "Required flags: " << std::hex << requiredAhbUsage << " Actual flags: " << std::hex << ahbUsageProperties.androidHardwareBufferUsage
 				<< TestLog::EndMessage;
@@ -4577,62 +4624,98 @@ tcu::TestStatus testAndroidHardwareBufferImageFormat  (Context& context, vk::VkF
 
 			for (size_t i = 0; i < DE_LENGTH_OF_ARRAY(sizes); i++)
 			{
-				const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, sizes[i].width, sizes[i].height, tiling, createFlag, usage));
-				const vk::VkMemoryRequirements			requirements			(getImageMemoryRequirements(vkd, *device, *image, externalMemoryType));
-				const vk::Unique<vk::VkDeviceMemory>	memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, externalMemoryType, *image));
-				NativeHandle							handle;
+				try
+				{
+					const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, sizes[i].width, sizes[i].height, tiling, createFlag, usage));
+					const vk::VkMemoryRequirements			requirements			(getImageMemoryRequirements(vkd, *device, *image, externalMemoryType));
+					const vk::Unique<vk::VkDeviceMemory>	memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, externalMemoryType, *image));
+					NativeHandle							handle;
 
-				VK_CHECK(vkd.bindImageMemory(*device, *image, *memory, 0u));
-				getMemoryNative(vkd, *device, *memory, externalMemoryType, handle);
+					VK_CHECK(vkd.bindImageMemory(*device, *image, *memory, 0u));
+					getMemoryNative(vkd, *device, *memory, externalMemoryType, handle);
 
-				deUint32 ahbFormat = 0;
-				deUint64 anhUsage  = 0;
-				ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, &anhUsage, DE_NULL);
-				TCU_CHECK(ahbFormat == ahbApi->vkFormatToAhbFormat(format));
-				TCU_CHECK((anhUsage & requiredAhbUsage) == requiredAhbUsage);
+					deUint32 ahbFormat = 0;
+					deUint64 anhUsage  = 0;
+					ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, &anhUsage, DE_NULL);
+					TCU_CHECK(ahbFormat == ahbApi->vkFormatToAhbFormat(format));
+					TCU_CHECK((anhUsage & requiredAhbUsage) == requiredAhbUsage);
 
-				// Let watchdog know we're alive
-				context.getTestContext().touchWatchdog();
+					// Let watchdog know we're alive
+					context.getTestContext().touchWatchdog();
+				}
+				catch (const tcu::Exception& exception)
+				{
+					generateFailureText(log, format, usage, createFlag, tiling, sizes[i].width, sizes[i].height, exception.getMessage());
+					testsFailed = true;
+					continue;
+				}
 			}
 
 			if (properties.imageFormatProperties.maxMipLevels >= 7u)
 			{
-				const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, 64u, 64u, tiling, createFlag, usage, 7u));
-				const vk::VkMemoryRequirements			requirements			(getImageMemoryRequirements(vkd, *device, *image, externalMemoryType));
-				const vk::Unique<vk::VkDeviceMemory>	memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, externalMemoryType, *image));
-				NativeHandle							handle;
+				try
+				{
+					const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, 64u, 64u, tiling, createFlag, usage, 7u));
+					const vk::VkMemoryRequirements			requirements			(getImageMemoryRequirements(vkd, *device, *image, externalMemoryType));
+					const vk::Unique<vk::VkDeviceMemory>	memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, externalMemoryType, *image));
+					NativeHandle							handle;
 
-				VK_CHECK(vkd.bindImageMemory(*device, *image, *memory, 0u));
-				getMemoryNative(vkd, *device, *memory, externalMemoryType, handle);
+					VK_CHECK(vkd.bindImageMemory(*device, *image, *memory, 0u));
+					getMemoryNative(vkd, *device, *memory, externalMemoryType, handle);
 
-				deUint32 ahbFormat = 0;
-				deUint64 anhUsage  = 0;
-				ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, &anhUsage, DE_NULL);
-				TCU_CHECK(ahbFormat == ahbApi->vkFormatToAhbFormat(format));
-				TCU_CHECK((anhUsage & requiredAhbUsage) == requiredAhbUsage);
+					deUint32 ahbFormat = 0;
+					deUint64 anhUsage  = 0;
+					ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, &anhUsage, DE_NULL);
+					TCU_CHECK(ahbFormat == ahbApi->vkFormatToAhbFormat(format));
+					TCU_CHECK((anhUsage & requiredAhbUsage) == requiredAhbUsage);
+				}
+				catch (const tcu::Exception& exception)
+				{
+					generateFailureText(log, format, usage, createFlag, tiling, 64, 64, exception.getMessage());
+					testsFailed = true;
+					continue;
+				}
 			}
 
 			if ((properties.imageFormatProperties.maxArrayLayers > 1u) && enableMaxLayerTest)
 			{
-				const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, 64u, 64u, tiling, createFlag, usage, 1u, properties.imageFormatProperties.maxArrayLayers));
-				const vk::VkMemoryRequirements			requirements			(getImageMemoryRequirements(vkd, *device, *image, externalMemoryType));
-				const vk::Unique<vk::VkDeviceMemory>	memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, externalMemoryType, *image));
-				NativeHandle							handle;
+				try
+				{
+					const vk::Unique<vk::VkImage>			image					(createExternalImage(vkd, *device, queueFamilyIndex, externalMemoryType, format, 64u, 64u, tiling, createFlag, usage, 1u, properties.imageFormatProperties.maxArrayLayers));
+					const vk::VkMemoryRequirements			requirements			(getImageMemoryRequirements(vkd, *device, *image, externalMemoryType));
+					const vk::Unique<vk::VkDeviceMemory>	memory					(allocateExportableMemory(vkd, *device, requirements.size, exportedMemoryTypeIndex, externalMemoryType, *image));
+					NativeHandle							handle;
 
-				VK_CHECK(vkd.bindImageMemory(*device, *image, *memory, 0u));
-				getMemoryNative(vkd, *device, *memory, externalMemoryType, handle);
+					VK_CHECK(vkd.bindImageMemory(*device, *image, *memory, 0u));
+					getMemoryNative(vkd, *device, *memory, externalMemoryType, handle);
 
-				deUint32 ahbFormat = 0;
-				deUint64 anhUsage  = 0;
-				ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, &anhUsage, DE_NULL);
-				TCU_CHECK(ahbFormat == ahbApi->vkFormatToAhbFormat(format));
-				TCU_CHECK((anhUsage & requiredAhbUsage) == requiredAhbUsage);
+					deUint32 ahbFormat = 0;
+					deUint64 anhUsage  = 0;
+					ahbApi->describe(handle.getAndroidHardwareBuffer(), DE_NULL, DE_NULL, DE_NULL, &ahbFormat, &anhUsage, DE_NULL);
+					TCU_CHECK(ahbFormat == ahbApi->vkFormatToAhbFormat(format));
+					TCU_CHECK((anhUsage & requiredAhbUsage) == requiredAhbUsage);
+				}
+				catch (const tcu::Exception& exception)
+				{
+					generateFailureText(log, format, usage, createFlag, tiling, 64, 64, exception.getMessage());
+					testsFailed = true;
+					continue;
+				}
 			}
 		}
 
-		TCU_CHECK(foundAnyUsableTiling);
+		if (!foundAnyUsableTiling)
+		{
+			generateFailureText(log, format, usage, createFlag, static_cast<vk::VkImageTiling>(0));
+			testsFailed = true;
+			continue;
+		}
 	}
-	return tcu::TestStatus::pass("Pass");
+
+	if (testsFailed)
+		return tcu::TestStatus::fail("Failure in at least one subtest. Check log for failed tests.");
+	else
+		return tcu::TestStatus::pass("Pass");
 }
 
 de::MovePtr<tcu::TestCaseGroup> createFenceTests (tcu::TestContext& testCtx)
@@ -4736,6 +4819,7 @@ de::MovePtr<tcu::TestCaseGroup> createSemaphoreTests (tcu::TestContext& testCtx)
 	semaphoreGroup->addChild(createSemaphoreTests(testCtx, vk::VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT).release());
 	semaphoreGroup->addChild(createSemaphoreTests(testCtx, vk::VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT).release());
 	semaphoreGroup->addChild(createSemaphoreTests(testCtx, vk::VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT).release());
+	semaphoreGroup->addChild(createSemaphoreTests(testCtx, vk::VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_ZIRCON_EVENT_BIT_FUCHSIA).release());
 
 	return semaphoreGroup;
 }
@@ -4827,6 +4911,7 @@ de::MovePtr<tcu::TestCaseGroup> createMemoryTests (tcu::TestContext& testCtx, vk
 			vk::VK_FORMAT_D32_SFLOAT,
 			vk::VK_FORMAT_D32_SFLOAT_S8_UINT,
 			vk::VK_FORMAT_S8_UINT,
+			vk::VK_FORMAT_R8_UNORM,
 		};
 		const size_t		numOfAhbFormats	= DE_LENGTH_OF_ARRAY(ahbFormats);
 
@@ -4853,6 +4938,7 @@ de::MovePtr<tcu::TestCaseGroup> createMemoryTests (tcu::TestContext& testCtx)
 	group->addChild(createMemoryTests(testCtx, vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT).release());
 	group->addChild(createMemoryTests(testCtx, vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_ANDROID_HARDWARE_BUFFER_BIT_ANDROID).release());
 	group->addChild(createMemoryTests(testCtx, vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT).release());
+	group->addChild(createMemoryTests(testCtx, vk::VK_EXTERNAL_MEMORY_HANDLE_TYPE_ZIRCON_VMO_BIT_FUCHSIA).release());
 
 	return group;
 }
