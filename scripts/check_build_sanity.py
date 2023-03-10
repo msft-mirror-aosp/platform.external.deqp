@@ -25,8 +25,8 @@ import argparse
 import tempfile
 import sys
 
-from build.common import *
-from build.build import *
+from ctsbuild.common import *
+from ctsbuild.build import *
 
 pythonExecutable = sys.executable or "python"
 
@@ -190,7 +190,8 @@ EARLY_SPECIAL_RECIPES	= [
 			RunScript(os.path.join("scripts", "opengl", "gen_all.py")),
 			RunScript(os.path.join("external", "vulkancts", "scripts", "gen_framework.py")),
 			RunScript(os.path.join("external", "vulkancts", "scripts", "gen_framework_c.py")),
-			RunScript(os.path.join("external", "vulkancts", "scripts", "gen_ext_deps.py")),
+			RunScript(os.path.join("external", "vulkancts", "scripts", "gen_framework.py"), lambda env: ["--api", "SC"] ),
+			RunScript(os.path.join("external", "vulkancts", "scripts", "gen_framework_c.py"), lambda env: ["--api", "SC"] ),
 			RunScript(os.path.join("scripts", "gen_android_bp.py"))
 		]),
 ]
@@ -209,6 +210,12 @@ LATE_SPECIAL_RECIPES	= [
 					  lambda env: ["--build-type", "Release",
 									"--build-dir", os.path.join(env.tmpDir, "spirv-binaries"),
 									"--dst-path", os.path.join(env.tmpDir, "spirv-binaries")]),
+		]),
+	('amber-verify', [
+			RunScript(os.path.join("external", "vulkancts", "scripts", "amber_verify.py"),
+					  lambda env: ["--build-type", "Release",
+									"--build-dir", os.path.join(env.tmpDir, "amber-verify"),
+									"--dst-path", os.path.join(env.tmpDir, "amber-verify")]),
 		]),
 	('check-all', [
 			RunScript(os.path.join("scripts", "src_util", "check_all.py")),
