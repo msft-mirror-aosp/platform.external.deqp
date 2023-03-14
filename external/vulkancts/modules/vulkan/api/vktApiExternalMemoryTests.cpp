@@ -1466,6 +1466,9 @@ tcu::TestStatus testSemaphoreMultipleExports (Context&					context,
 			}
 			else
 				getSemaphoreNative(vkd, *device, *semaphore, config.externalType, handle);
+
+			// Let watchdog know we're alive
+			context.getTestContext().touchWatchdog();
 		}
 
 		submitEmptySignal(vkd, queue, *semaphore);
@@ -2535,6 +2538,9 @@ tcu::TestStatus testFenceMultipleExports (Context&				context,
 			}
 			else
 				getFenceNative(vkd, *device, *fence, config.externalType, handle, exportNdx == 0 /* expect fence to be signaled after first pass */);
+
+			// Let watchdog know we're alive
+			context.getTestContext().touchWatchdog();
 		}
 
 		submitEmptySignal(vkd, queue, *fence);
