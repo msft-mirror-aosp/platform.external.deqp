@@ -499,15 +499,3 @@ KHR-GLES31.core.shader_image_size.advanced-nonMS-vs-float
 KHR-GLES31.core.shader_image_size.advanced-nonMS-vs-int
 KHR-GLES31.core.shader_image_size.advanced-nonMS-vs-uint
 KHR-GLES31.core.program_interface_query.transform-feedback-types
-
-
-# Failures introduced after vulkan-cts-1.3.5 branch upgrade on Android
-# b/274403338
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image2DShadow_vertex
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image1DShadow_vertex
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image2DArrayShadow_fragment
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image2DArrayShadow_vertex
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image1DArrayShadow_vertex
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image2DShadow_fragment
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image1DArrayShadow_fragment
-dEQP-GLES3.functional.shaders.keywords.allowed_keywords.image1DShadow_fragment
