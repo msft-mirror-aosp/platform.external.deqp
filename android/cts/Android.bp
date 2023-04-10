@@ -23,12 +23,12 @@ package {
 }
 
 filegroup {
-    name: "deqp_master_caselists",
+    name: "deqp_main_caselists",
     srcs: [
-        "master/*.txt",
-        "master/vk-*/*.txt",
+        "main/*.txt",
+        "main/vk-*/*.txt",
     ],
-    path: "master",
+    path: "main",
 }
 
 filegroup {
@@ -61,7 +61,7 @@ java_test_host {
     per_testcase_directory: true,
     data: [
         ":com.drawelements.deqp",
-        ":deqp_master_caselists",
+        ":deqp_main_caselists",
         ":deqp_angle_exclude_caselists",
     ],
 }
