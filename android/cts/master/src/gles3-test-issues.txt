@@ -153,3 +153,6 @@ dEQP-GLES3.functional.draw.draw_elements_instanced.indices.buffer.index_byte
 # Khronos bug 13916, internal bugs 20558284, 143459817
 dEQP-GLES3.functional.flush_finish.*
 
+# Bug 277158279
+dEQP-GLES3.functional.fbo.completeness.renderable.renderbuffer.color0.rgb9_e5
+dEQP-GLES3.functional.fbo.completeness.renderable.texture.color0.rgb9_e5
