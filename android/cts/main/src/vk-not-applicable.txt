@@ -3,3 +3,7 @@ dEQP-VK.wsi.xlib.*
 dEQP-VK.wsi.xcb.*
 dEQP-VK.wsi.wayland.*
 dEQP-VK.wsi.win32.*
+
+# Vulkan Video extensions are not supported on Android
+# https://source.android.com/docs/compatibility/13/android-13-cdd#7142_vulkan
+dEQP-VK.video.*
