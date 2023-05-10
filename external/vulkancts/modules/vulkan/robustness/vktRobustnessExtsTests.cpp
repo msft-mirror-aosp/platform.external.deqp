@@ -367,6 +367,8 @@ void RobustnessExtsTestCase::checkSupport(Context& context) const
 		VkFormatProperties formatProperties;
 		vki.getPhysicalDeviceFormatProperties(context.getPhysicalDevice(), m_data.format, &formatProperties);
 
+		const VkFormatProperties3KHR formatProperties3 = context.getFormatProperties(m_data.format);
+
 		switch (m_data.descriptorType)
 		{
 		case VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER:
@@ -376,6 +378,8 @@ void RobustnessExtsTestCase::checkSupport(Context& context) const
 		case VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER:
 			if ((formatProperties.bufferFeatures & VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT) != VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT)
 				TCU_THROW(NotSupportedError, "VK_FORMAT_FEATURE_STORAGE_TEXEL_BUFFER_BIT is not supported");
+			if ((formatProperties3.bufferFeatures & VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR) != VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT_KHR)
+				TCU_THROW(NotSupportedError, "VK_FORMAT_FEATURE_2_STORAGE_READ_WITHOUT_FORMAT_BIT is not supported");
 			break;
 		case VERTEX_ATTRIBUTE_FETCH:
 			if ((formatProperties.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT) != VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
@@ -1259,8 +1263,23 @@ void RobustnessExtsTestCase::initPrograms (SourceCollections& programCollection)
 					checks << "    else if (temp == zzzo) temp = " << vecType << "(0);\n";
 
 				// non-volatile value replaced with stored value
-				if (supportsStores(m_data.descriptorType) && !m_data.vol)
+				if (supportsStores(m_data.descriptorType) && !m_data.vol) {
 					checks << "    else if (temp == " << getStoreValue(m_data.descriptorType, numComponents, vecType, bufType) << ") temp = " << vecType << "(0);\n";
+
+					if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC || m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+
+						for (int mask = (numComponents*numComponents) - 2; mask > 0; mask--) {
+							checks << "    else if (temp == " << vecType << "(";
+							for (int vecIdx = 0; vecIdx < 4; vecIdx++) {
+								if (mask & (1 << vecIdx)) checks << storeValue;
+								else checks << "0";
+
+								if (vecIdx != 3) checks << ",";
+							}
+							checks << ")) temp = " << vecType << "(0);\n";
+						}
+					}
+				}
 
 				// value straddling the boundary, returning a partial vector
 				if (expectedOOB2 != expectedOOB)
@@ -1727,15 +1746,26 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate (void)
 			(VkDeviceSize)(m_data.bufferLen ? m_data.bufferLen : 1),
 			(VkDeviceSize)256);
 
+		VkBufferUsageFlags usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
 		if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER ||
 			m_data.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC)
 		{
 			size = deIntRoundToPow2((int)size, (int)robustness2Properties.robustUniformBufferAccessSizeAlignment);
+			usage |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		}
 		else if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER ||
 				 m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC)
 		{
 			size = deIntRoundToPow2((int)size, (int)robustness2Properties.robustStorageBufferAccessSizeAlignment);
+			usage |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		}
+		else if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER)
+		{
+			usage |= VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+		}
+		else if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER)
+		{
+			usage |= VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT;
 		}
 		else if (m_data.descriptorType == VERTEX_ATTRIBUTE_FETCH)
 		{
@@ -1743,13 +1773,7 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate (void)
 		}
 
 		buffer = de::MovePtr<BufferWithMemory>(new BufferWithMemory(
-			vk, device, allocator, makeBufferCreateInfo(size,
-														VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-														VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT |
-														VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT |
-														VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT |
-														VK_BUFFER_USAGE_VERTEX_BUFFER_BIT),
-														MemoryRequirement::HostVisible));
+			vk, device, allocator, makeBufferCreateInfo(size, usage), MemoryRequirement::HostVisible));
 		bufferPtr = (deUint8 *)buffer->getAllocation().getHostPtr();
 
 		deMemset(bufferPtr, 0x3f, (size_t)size);

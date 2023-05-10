@@ -1813,8 +1813,9 @@ void beginCommandBuffer (const DeviceInterface&			vk,
 		inheritanceRenderingInfo.pColorAttachmentFormats = colorAttachmentFormats.data();
 		if (pRenderInfo->getDepthStencilAttachment())
 		{
-			inheritanceRenderingInfo.depthAttachmentFormat		= pRenderInfo->getDepthStencilAttachment()->getFormat();
-			inheritanceRenderingInfo.stencilAttachmentFormat	= pRenderInfo->getDepthStencilAttachment()->getFormat();
+			const VkFormat dsFormat = pRenderInfo->getDepthStencilAttachment()->getFormat();
+			inheritanceRenderingInfo.depthAttachmentFormat		= tcu::hasDepthComponent(mapVkFormat(dsFormat).order) ? dsFormat : VK_FORMAT_UNDEFINED;
+			inheritanceRenderingInfo.stencilAttachmentFormat	= tcu::hasStencilComponent(mapVkFormat(dsFormat).order) ? dsFormat : VK_FORMAT_UNDEFINED;
 		}
 		if (pRenderInfo->getColorAttachmentCount())
 			inheritanceRenderingInfo.rasterizationSamples = pRenderInfo->getColorAttachment(0).getSamples();
@@ -1985,6 +1986,8 @@ Move<VkPipeline> createSubpassPipeline (const DeviceInterface&		vk,
 									? VK_TRUE
 									: VK_FALSE;
 
+	VkStencilOp		stencilOp		= writeStencil ? VK_STENCIL_OP_REPLACE : VK_STENCIL_OP_KEEP;
+
 	const VkPipelineDepthStencilStateCreateInfo depthStencilState =
 	{
 		VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO,	// sType
@@ -1996,18 +1999,18 @@ Move<VkPipeline> createSubpassPipeline (const DeviceInterface&		vk,
 		VK_FALSE,													// depthBoundsEnable
 		writeStencil,												// stencilTestEnable
 		{
-			VK_STENCIL_OP_REPLACE,									// stencilFailOp
-			VK_STENCIL_OP_REPLACE,									// stencilPassOp
-			VK_STENCIL_OP_REPLACE,									// stencilDepthFailOp
+			stencilOp,												// stencilFailOp
+			stencilOp,												// stencilPassOp
+			stencilOp,												// stencilDepthFailOp
 			VK_COMPARE_OP_ALWAYS,									// stencilCompareOp
 			~0u,													// stencilCompareMask
 			~0u,													// stencilWriteMask
 			((stencilIndex % 2) == 0) ? ~0x0u : 0x0u				// stencilReference
 		},															// front
 		{
-			VK_STENCIL_OP_REPLACE,									// stencilFailOp
-			VK_STENCIL_OP_REPLACE,									// stencilPassOp
-			VK_STENCIL_OP_REPLACE,									// stencilDepthFailOp
+			stencilOp,												// stencilFailOp
+			stencilOp,												// stencilPassOp
+			stencilOp,												// stencilDepthFailOp
 			VK_COMPARE_OP_ALWAYS,									// stencilCompareOp
 			~0u,													// stencilCompareMask
 			~0u,													// stencilWriteMask
@@ -2034,12 +2037,25 @@ Move<VkPipeline> createSubpassPipeline (const DeviceInterface&		vk,
 	for (deUint32 i = 0; i < renderInfo.getColorAttachmentCount(); ++i)
 		colorAttachmentFormats.push_back(renderInfo.getColorAttachment(i).getFormat());
 
-	vk::VkFormat depthStencilFormat = VK_FORMAT_UNDEFINED;
+	vk::VkFormat depthFormat = VK_FORMAT_UNDEFINED;
+	vk::VkFormat stencilFormat = VK_FORMAT_UNDEFINED;
 	if (renderInfo.getDepthStencilAttachment())
 	{
 		const Attachment& attachment = *renderInfo.getDepthStencilAttachment();
-		depthStencilFormat = attachment.getFormat();
+		vk::VkFormat depthStencilFormat = attachment.getFormat();
+		if (depthStencilFormat != VK_FORMAT_UNDEFINED)
+		{
+			if (tcu::hasDepthComponent(mapVkFormat(depthStencilFormat).order))
+			{
+				depthFormat = depthStencilFormat;
+			}
+			if (tcu::hasStencilComponent(mapVkFormat(depthStencilFormat).order))
+			{
+				stencilFormat = depthStencilFormat;
+			}
+		}
 	}
+
 
 	VkPipelineRenderingCreateInfoKHR renderingCreateInfo
 	{
@@ -2048,8 +2064,8 @@ Move<VkPipeline> createSubpassPipeline (const DeviceInterface&		vk,
 		0u,
 		static_cast<deUint32>(colorAttachmentFormats.size()),
 		colorAttachmentFormats.data(),
-		depthStencilFormat,
-		depthStencilFormat
+		depthFormat,
+		stencilFormat
 	};
 
 	return makeGraphicsPipeline(vk,												// const DeviceInterface&                        vk
