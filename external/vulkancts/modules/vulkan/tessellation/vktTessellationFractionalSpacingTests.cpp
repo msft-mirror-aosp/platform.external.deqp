@@ -35,6 +35,8 @@
 #include "vkTypeUtil.hpp"
 #include "vkCmdUtil.hpp"
 #include "vkObjUtil.hpp"
+#include "vkBufferWithMemory.hpp"
+#include "vkImageWithMemory.hpp"
 
 #include "deUniquePtr.hpp"
 #include "deStringUtil.hpp"
@@ -526,17 +528,17 @@ tcu::TestStatus test (Context& context, TestParams testParams)
 	// Counter buffer: used to calculate offset into result buffer.
 
 	const VkDeviceSize		counterBufferSizeBytes = sizeof(int);
-	const Buffer	counterBuffer(vk, device, allocator, makeBufferCreateInfo(counterBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
+	const BufferWithMemory	counterBuffer(vk, device, allocator, makeBufferCreateInfo(counterBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
 
 	// Result buffer: generated tess coords go here.
 
-	const VkDeviceSize resultBufferSizeBytes = sizeof(float) * maxNumVertices;
-	const Buffer	   resultBuffer			 (vk, device, allocator, makeBufferCreateInfo(resultBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
+	const VkDeviceSize		resultBufferSizeBytes = sizeof(float) * maxNumVertices;
+	const BufferWithMemory	resultBuffer			 (vk, device, allocator, makeBufferCreateInfo(resultBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
 
 	// Outer1 tessellation level constant buffer.
 
-	const VkDeviceSize tessLevelsBufferSizeBytes = sizeof(float);  // we pass only outer1
-	const Buffer	   tessLevelsBuffer			 (vk, device, allocator, makeBufferCreateInfo(tessLevelsBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
+	const VkDeviceSize		tessLevelsBufferSizeBytes = sizeof(float);  // we pass only outer1
+	const BufferWithMemory	tessLevelsBuffer			 (vk, device, allocator, makeBufferCreateInfo(tessLevelsBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
 
 	// Descriptors
 
@@ -668,11 +670,15 @@ tcu::TestStatus test (Context& context, TestParams testParams)
 
 void checkSupportTess(Context& context, const TestParams)
 {
+#ifndef CTS_USES_VULKANSC
 	if (const vk::VkPhysicalDevicePortabilitySubsetFeaturesKHR* const features = getPortability(context))
 	{
 		checkPointMode(*features);
 		checkIsolines(*features);
 	}
+#else
+	DE_UNREF(context);
+#endif // CTS_USES_VULKANSC
 }
 
 } // anonymous
