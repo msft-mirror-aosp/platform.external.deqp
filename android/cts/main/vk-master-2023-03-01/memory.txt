@@ -1,3 +1,4 @@
+dEQP-VK.memory.device_memory_report.vk_device_memory.allocation_failed
 dEQP-VK.memory.address_binding_report.create_and_destroy_object.device
 dEQP-VK.memory.address_binding_report.create_and_destroy_object.device_memory_small
 dEQP-VK.memory.address_binding_report.create_and_destroy_object.buffer_uniform_small
