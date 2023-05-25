@@ -2529,6 +2529,16 @@ void ExtendedDynamicStateTest::checkSupport (Context& context) const
 
 		TCU_THROW(NotSupportedError, "VK_AMD_mixed_attachment_samples or VK_NV_framebuffer_mixed_samples are not supported");
 
+	if (m_testConfig.rasterizationSamplesConfig.dynamicValue &&
+		(m_testConfig.sequenceOrdering == SequenceOrdering::BETWEEN_PIPELINES ||
+		 m_testConfig.sequenceOrdering == SequenceOrdering::AFTER_PIPELINES ||
+		 m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
+		 m_testConfig.isReversed()) &&
+		(context.isDeviceFunctionalitySupported("VK_AMD_mixed_attachment_samples") ||
+		context.isDeviceFunctionalitySupported("VK_NV_framebuffer_mixed_samples")))
+
+		TCU_THROW(NotSupportedError, "Test not supported with VK_AMD_mixed_attachment_samples or VK_NV_framebuffer_mixed_samples");
+
 	// Check the number of viewports needed and the corresponding limits.
 	const auto&	viewportConfig	= m_testConfig.viewportConfig;
 	auto		numViewports	= viewportConfig.staticValue.size();
@@ -2683,6 +2693,8 @@ void ExtendedDynamicStateTest::checkSupport (Context& context) const
 				TCU_THROW(NotSupportedError, "vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV supported no combinations");
 
 			std::vector<vk::VkFramebufferMixedSamplesCombinationNV> combinations(combinationCount);
+			for (auto& combination : combinations)
+				combination = vk::initVulkanStructure();
 			result = vki.getPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(physicalDevice, &combinationCount, combinations.data());
 			if (result != vk::VK_SUCCESS)
 				TCU_THROW(NotSupportedError, "vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV supported no combinations");
@@ -3659,12 +3671,28 @@ public:
 
 #ifndef CTS_USES_VULKANSC
 		const auto&	contextMeshFeatures	= context.getMeshShaderFeaturesEXT();
+		const auto& contextGPLFeatures	= context.getGraphicsPipelineLibraryFeaturesEXT();
 		const bool	meshShaderSupport	= contextMeshFeatures.meshShader;
+		const bool	gplSupport			= contextGPLFeatures.graphicsPipelineLibrary;
 
 		vk::VkPhysicalDeviceMeshShaderFeaturesEXT				meshFeatures				= vk::initVulkanStructure();
-		vk::VkPhysicalDeviceExtendedDynamicState2FeaturesEXT	eds3Features				= vk::initVulkanStructure(meshShaderSupport ? &meshFeatures : nullptr);
+		vk::VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT	gplFeatures					= vk::initVulkanStructure();
+
+		vk::VkPhysicalDeviceExtendedDynamicState3FeaturesEXT	eds3Features				= vk::initVulkanStructure();
 		vk::VkPhysicalDeviceShadingRateImageFeaturesNV			shadingRateImageFeatures	= vk::initVulkanStructure(&eds3Features);
 		vk::VkPhysicalDeviceFeatures2							features2					= vk::initVulkanStructure(&shadingRateImageFeatures);
+
+		if (meshShaderSupport)
+		{
+			meshFeatures.pNext	= features2.pNext;
+			features2.pNext		= &meshFeatures;
+		}
+
+		if (gplSupport)
+		{
+			gplFeatures.pNext	= features2.pNext;
+			features2.pNext		= &gplFeatures;
+		}
 
 		vki.getPhysicalDeviceFeatures2(physicalDevice, &features2);
 #endif // CTS_USES_VULKANSC
@@ -3674,9 +3702,19 @@ public:
 			"VK_EXT_extended_dynamic_state3",
 			"VK_NV_shading_rate_image",
 		};
+
 #ifndef CTS_USES_VULKANSC
 		if (meshShaderSupport)
 			extensions.push_back("VK_EXT_mesh_shader");
+
+		if (gplSupport)
+		{
+			extensions.push_back("VK_KHR_pipeline_library");
+			extensions.push_back("VK_EXT_graphics_pipeline_library");
+		}
+
+		// Disable robustness.
+		features2.features.robustBufferAccess = VK_FALSE;
 #endif // CTS_USES_VULKANSC
 
 		const vk::VkDeviceCreateInfo deviceCreateInfo =
