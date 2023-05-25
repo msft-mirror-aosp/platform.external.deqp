@@ -45,6 +45,7 @@ bool						isUnormFormat				(VkFormat format);
 bool						isSnormFormat				(VkFormat format);
 bool						isIntFormat					(VkFormat format);
 bool						isUintFormat				(VkFormat format);
+bool						isScaledFormat				(VkFormat format);
 bool						isDepthStencilFormat		(VkFormat format);
 bool						isCompressedFormat			(VkFormat format);
 bool						isSrgbFormat				(VkFormat format);
@@ -171,6 +172,7 @@ class ImageWithBuffer {
 bool							isYCbCrFormat					(VkFormat						format);
 bool							isYCbCrExtensionFormat			(VkFormat						format);
 bool							isYCbCrConversionFormat			(VkFormat						format);
+bool							isPvrtcFormat					(VkFormat						format);
 PlanarFormatDescription			getPlanarFormatDescription		(VkFormat						format);
 int								getPlaneCount					(VkFormat						format);
 deUint32						getMipmapCount					(VkFormat						format,
