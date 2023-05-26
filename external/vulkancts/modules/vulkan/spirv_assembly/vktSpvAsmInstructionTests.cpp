@@ -5575,8 +5575,9 @@ tcu::TestCaseGroup* createOpConstantCompositeGroup (tcu::TestContext& testCtx)
 		"             OpReturn\n"
 		"             OpFunctionEnd\n");
 
-	cases.push_back(CaseParameter("vector",			"%five = OpConstant %u32 5\n"
-													"%const = OpConstantComposite %uvec3 %five %zero %five"));
+	cases.push_back(CaseParameter("vector",			"%five = OpConstant %i32 5\n"
+													"%ivec3 = OpTypeVector %i32 3\n"
+													"%const = OpConstantComposite %ivec3 %five %zero %five"));
 	cases.push_back(CaseParameter("matrix",			"%m3fvec3 = OpTypeMatrix %fvec3 3\n"
 													"%ten = OpConstant %f32 10.\n"
 													"%fzero = OpConstant %f32 0.\n"
@@ -5706,6 +5707,26 @@ bool compareNan (const std::vector<Resource>&, const vector<AllocationSp>& outpu
 	return true;
 }
 
+// Checks that every output from a test-case is either +0.0f or -0.0f
+bool compareZeros (const std::vector<Resource>&, const vector<AllocationSp>& outputAllocs, const std::vector<Resource>& expectedOutputs, TestLog&)
+{
+	if (outputAllocs.size() != 1)
+		return false;
+
+	// Only size is needed because all the results are supposed to be zero.
+	size_t byteSize = expectedOutputs[0].getByteSize();
+
+	const float* const	output_as_float	= static_cast<const float*>(outputAllocs[0]->getHostPtr());
+
+	for (size_t idx = 0; idx < byteSize / sizeof(float); ++idx)
+	{
+		if (output_as_float[idx] != 0)
+			return false;
+	}
+
+	return true;
+}
+
 // Checks that a compute shader can generate a constant composite value of various types, without exercising a computation on it.
 tcu::TestCaseGroup* createOpQuantizeToF16Group (tcu::TestContext& testCtx)
 {
@@ -5822,35 +5843,31 @@ tcu::TestCaseGroup* createOpQuantizeToF16Group (tcu::TestContext& testCtx)
 			{
 				case 0:
 					small.push_back(0.f);
-					zeros.push_back(0.f);
 					break;
 				case 1:
 					small.push_back(-0.f);
-					zeros.push_back(-0.f);
 					break;
 				case 2:
 					small.push_back(std::ldexp(1.0f, -16));
-					zeros.push_back(0.f);
 					break;
 				case 3:
 					small.push_back(std::ldexp(-1.0f, -32));
-					zeros.push_back(-0.f);
 					break;
 				case 4:
 					small.push_back(std::ldexp(1.0f, -127));
-					zeros.push_back(0.f);
 					break;
 				case 5:
 					small.push_back(-std::ldexp(1.0f, -128));
-					zeros.push_back(-0.f);
 					break;
 			}
 		}
 
 		spec.assembly = shader;
 		spec.inputs.push_back(BufferSp(new Float32Buffer(small)));
-		spec.outputs.push_back(BufferSp(new Float32Buffer(zeros)));
+		// Only the size of outputs[0] will be used, actual expected values aren't needed.
+		spec.outputs.push_back(BufferSp(new Float32Buffer(small)));
 		spec.numWorkGroups = IVec3(numElements, 1, 1);
+		spec.verifyIO = &compareZeros;
 
 		group->addChild(new SpvAsmComputeShaderCase(
 			testCtx, "flush_to_zero", "Check that values are zeroed correctly", spec));
@@ -6040,15 +6057,11 @@ tcu::TestCaseGroup* createSpecConstantOpQuantizeToF16Group (tcu::TestContext& te
 		spec.specConstants.append<deInt32>(bitwiseCast<deUint32>(std::ldexp(1.0f, -127)));
 		spec.specConstants.append<deInt32>(bitwiseCast<deUint32>(-std::ldexp(1.0f, -128)));
 
-		outputs.push_back(0.f);
-		outputs.push_back(-0.f);
-		outputs.push_back(0.f);
-		outputs.push_back(-0.f);
-		outputs.push_back(0.f);
-		outputs.push_back(-0.f);
+		spec.verifyIO = &compareZeros;
 
 		spec.inputs.push_back(BufferSp(new Float32Buffer(inputs)));
-		spec.outputs.push_back(BufferSp(new Float32Buffer(outputs)));
+		// Only the size of outputs[0] will be used, actual expected values aren't needed.
+		spec.outputs.push_back(BufferSp(new Float32Buffer(inputs)));
 
 		group->addChild(new SpvAsmComputeShaderCase(
 			testCtx, "flush_to_zero", "Check that values are zeroed correctly", spec));
