@@ -197,8 +197,6 @@ android_test {
     name: "com.drawelements.deqp",
 
     test_suites: [
-        "cts",
-        "mts",
         "vts10",
     ],
 
