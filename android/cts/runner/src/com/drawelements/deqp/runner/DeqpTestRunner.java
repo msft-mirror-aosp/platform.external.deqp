@@ -2096,9 +2096,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     testlist = FileUtil.findFile(mBuildHelper.getTestsDir(), mCaselistFile);
                     if (testlist == null || !testlist.isFile()) {
                         throw new FileNotFoundException("Cannot find deqp test list file: "
-                            + mCaselistFile);
+                            + testlist.getAbsolutePath());
                     }
                 }
+                CLog.d("Getting test list from file %s", testlist.getAbsolutePath());
                 reader = new FileReader(testlist);
             }
             mTestInstances = generateTestInstances(reader, mConfigName, mScreenRotation, mSurfaceType, mConfigRequired);
@@ -2106,7 +2107,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             reader.close();
         }
         catch (FileNotFoundException e) {
-            throw new RuntimeException("Cannot read deqp test list file: "  + mCaselistFile);
+            throw new RuntimeException("Cannot read deqp test list file: "  + mCaselistFile, e);
         }
         catch (IOException e) {
             CLog.w("Failed to close test list reader.");
