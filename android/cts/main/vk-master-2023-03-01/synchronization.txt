@@ -2,7 +2,6 @@ dEQP-VK.synchronization.global_priority_transition.low.no_sync.no_modifiers.from
 dEQP-VK.synchronization.global_priority_transition.low.no_sync.no_modifiers.from_compute_to_graphics
 dEQP-VK.synchronization.global_priority_transition.low.no_sync.sparse.from_graphics_to_compute
 dEQP-VK.synchronization.global_priority_transition.low.no_sync.sparse.from_compute_to_graphics
-dEQP-VK.synchronization.global_priority_transition.low.no_sync.protected.from_graphics_to_compute
 dEQP-VK.synchronization.global_priority_transition.low.no_sync.protected.from_compute_to_graphics
 dEQP-VK.synchronization.global_priority_transition.low.no_sync.sparse_protected.from_graphics_to_compute
 dEQP-VK.synchronization.global_priority_transition.low.no_sync.sparse_protected.from_compute_to_graphics
