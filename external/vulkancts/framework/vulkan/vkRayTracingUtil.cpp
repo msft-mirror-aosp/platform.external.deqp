@@ -39,6 +39,8 @@
 #include <type_traits>
 #include <map>
 
+static const deUint32 WATCHDOG_INTERVAL = 16384; // Touch watchDog every N iterations.
+
 namespace vk
 {
 
@@ -2091,7 +2093,8 @@ void BottomLevelAccelerationStructurePool::batchBuild (const DeviceInterface&	vk
 void BottomLevelAccelerationStructurePool::batchBuild (const DeviceInterface&	vk,
 													   const VkDevice			device,
 													   VkCommandPool			cmdPool,
-													   VkQueue					queue)
+													   VkQueue					queue,
+													   qpWatchDog*				watchDog)
 {
 	const deUint32			limit	= 10000u;
 	const deUint32			count	= structCount();
@@ -2125,6 +2128,9 @@ void BottomLevelAccelerationStructurePool::batchBuild (const DeviceInterface&	vk
 			buildOnDevice();
 			buildingOnDevice.clear();
 		}
+
+		if ((i % WATCHDOG_INTERVAL) == 0 && watchDog)
+			qpWatchDog_touch(watchDog);
 	}
 }
 
