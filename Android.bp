@@ -92,6 +92,7 @@ cc_defaults {
         // explicit defs:
         // -DDE_PTR_SIZE=8
         // -DDE_CPU=DE_CPU_ARM_64
+        //"-DDE_FENV_ACCESS_ON=_Pragma(\"STDC FENV_ACCESS ON\")",
 
         // dEQP defines:
         "-D_XOPEN_SOURCE=600",
