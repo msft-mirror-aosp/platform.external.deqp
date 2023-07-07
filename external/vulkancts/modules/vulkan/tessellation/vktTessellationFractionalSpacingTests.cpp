@@ -35,6 +35,8 @@
 #include "vkTypeUtil.hpp"
 #include "vkCmdUtil.hpp"
 #include "vkObjUtil.hpp"
+#include "vkBufferWithMemory.hpp"
+#include "vkImageWithMemory.hpp"
 
 #include "deUniquePtr.hpp"
 #include "deStringUtil.hpp"
@@ -419,11 +421,15 @@ void initPrograms (vk::SourceCollections& programCollection, TestParams testPara
 		}
 
 		// Tessellation evaluation shader
+		for (deUint32 i = 0; i < 2; ++i)
 		{
+			bool pointSize = i == 1;
 			std::ostringstream src;
 			src << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_310_ES) << "\n"
-				<< "#extension GL_EXT_tessellation_shader : require\n"
-				<< "\n"
+				<< "#extension GL_EXT_tessellation_shader : require\n";
+			if (pointSize)
+				src << "#extension GL_EXT_tessellation_point_size : require\n";
+			src << "\n"
 				<< "layout(" << getTessPrimitiveTypeShaderName(TESSPRIMITIVETYPE_ISOLINES) << ", "
 							 << getSpacingModeShaderName(testParams.spacingMode) << ", point_mode) in;\n"
 				<< "\n"
@@ -437,10 +443,13 @@ void initPrograms (vk::SourceCollections& programCollection, TestParams testPara
 				<< "void main (void)\n"
 				<< "{\n"
 				<< "    int index = atomicAdd(sb_out_numInvocations.data, 1);\n"
-				<< "    sb_out_tessCoord.data[index] = gl_TessCoord.x;\n"
-				<< "}\n";
+				<< "    sb_out_tessCoord.data[index] = gl_TessCoord.x;\n";
+			if (pointSize)
+				src << "    gl_PointSize = 1.0f;\n";
+			src << "}\n";
 
-			programCollection.glslSources.add("tese") << glu::TessellationEvaluationSource(src.str());
+			std::string tese = pointSize ? "tese_point_size" : "tese";
+			programCollection.glslSources.add(tese.c_str()) << glu::TessellationEvaluationSource(src.str());
 		}
 	}
 	else
@@ -503,6 +512,7 @@ void initPrograms (vk::SourceCollections& programCollection, TestParams testPara
 				<< "}\n";
 
 			programCollection.hlslSources.add("tese") << glu::TessellationEvaluationSource(src.str());
+			programCollection.hlslSources.add("tese_point_size") << glu::TessellationEvaluationSource(src.str());
 		}
 	}
 }
@@ -519,6 +529,7 @@ tcu::TestStatus test (Context& context, TestParams testParams)
 	const VkQueue			queue				= context.getUniversalQueue();
 	const deUint32			queueFamilyIndex	= context.getUniversalQueueFamilyIndex();
 	Allocator&				allocator			= context.getDefaultAllocator();
+	const bool				tessGeomPointSize	= context.getDeviceFeatures().shaderTessellationAndGeometryPointSize;
 
 	const std::vector<float>	tessLevelCases = genTessLevelCases();
 	const int					maxNumVertices = 1 + getClampedRoundedTessLevel(testParams.spacingMode, *std::max_element(tessLevelCases.begin(), tessLevelCases.end()));
@@ -526,17 +537,17 @@ tcu::TestStatus test (Context& context, TestParams testParams)
 	// Counter buffer: used to calculate offset into result buffer.
 
 	const VkDeviceSize		counterBufferSizeBytes = sizeof(int);
-	const Buffer	counterBuffer(vk, device, allocator, makeBufferCreateInfo(counterBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
+	const BufferWithMemory	counterBuffer(vk, device, allocator, makeBufferCreateInfo(counterBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
 
 	// Result buffer: generated tess coords go here.
 
-	const VkDeviceSize resultBufferSizeBytes = sizeof(float) * maxNumVertices;
-	const Buffer	   resultBuffer			 (vk, device, allocator, makeBufferCreateInfo(resultBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
+	const VkDeviceSize		resultBufferSizeBytes = sizeof(float) * maxNumVertices;
+	const BufferWithMemory	resultBuffer			 (vk, device, allocator, makeBufferCreateInfo(resultBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
 
 	// Outer1 tessellation level constant buffer.
 
-	const VkDeviceSize tessLevelsBufferSizeBytes = sizeof(float);  // we pass only outer1
-	const Buffer	   tessLevelsBuffer			 (vk, device, allocator, makeBufferCreateInfo(tessLevelsBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
+	const VkDeviceSize		tessLevelsBufferSizeBytes = sizeof(float);  // we pass only outer1
+	const BufferWithMemory	tessLevelsBuffer			 (vk, device, allocator, makeBufferCreateInfo(tessLevelsBufferSizeBytes, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT), MemoryRequirement::HostVisible);
 
 	// Descriptors
 
@@ -574,7 +585,7 @@ tcu::TestStatus test (Context& context, TestParams testParams)
 	const Unique<VkPipeline> pipeline(GraphicsPipelineBuilder()
 		.setShader(vk, device, VK_SHADER_STAGE_VERTEX_BIT,					context.getBinaryCollection().get("vert"), DE_NULL)
 		.setShader(vk, device, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,	context.getBinaryCollection().get("tesc"), DE_NULL)
-		.setShader(vk, device, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, context.getBinaryCollection().get("tese"), DE_NULL)
+		.setShader(vk, device, VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, context.getBinaryCollection().get(tessGeomPointSize ? "tese_point_size" : "tese"), DE_NULL)
 		.build(vk, device, *pipelineLayout, *renderPass));
 
 	// Data that will be verified across all cases
@@ -668,11 +679,15 @@ tcu::TestStatus test (Context& context, TestParams testParams)
 
 void checkSupportTess(Context& context, const TestParams)
 {
+#ifndef CTS_USES_VULKANSC
 	if (const vk::VkPhysicalDevicePortabilitySubsetFeaturesKHR* const features = getPortability(context))
 	{
 		checkPointMode(*features);
 		checkIsolines(*features);
 	}
+#else
+	DE_UNREF(context);
+#endif // CTS_USES_VULKANSC
 }
 
 } // anonymous
