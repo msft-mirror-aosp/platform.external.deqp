@@ -116,7 +116,7 @@ enum Program
 	PROGRAM_LAST
 };
 
-void initializePrograms (vk::SourceCollections& programCollection, glu::Precision texCoordPrecision, const std::vector<Program>& programs, const char* texCoordSwizzle = DE_NULL, glu::Precision fragOutputPrecision = glu::Precision::PRECISION_MEDIUMP);
+void initializePrograms (vk::SourceCollections& programCollection, glu::Precision texCoordPrecision, const std::vector<Program>& programs, const char* texCoordSwizzle = DE_NULL, glu::Precision fragOutputPrecision = glu::Precision::PRECISION_MEDIUMP, bool unnormal = false);
 
 typedef de::SharedPtr<pipeline::TestTexture>			TestTextureSp;
 typedef de::SharedPtr<pipeline::TestTexture2D>			TestTexture2DSp;
@@ -304,6 +304,9 @@ protected:
 	vk::Move<vk::VkFramebuffer>				m_frameBuffer;
 
 	vk::Move<vk::VkDescriptorPool>			m_descriptorPool;
+	vk::Move<vk::VkDescriptorSet>			m_descriptorSet[2];
+	vk::Move<vk::VkDescriptorSetLayout>		m_descriptorSetLayout[2];
+	vk::Move<vk::VkPipelineLayout>			m_pipelineLayout;
 
 	vk::Move<vk::VkBuffer>					m_uniformBuffer;
 	de::MovePtr<vk::Allocation>				m_uniformBufferMemory;
@@ -368,7 +371,7 @@ public:
 
 	virtual void						initPrograms				(vk::SourceCollections& programCollection) const
 										{
-											initializePrograms(programCollection, m_testsParameters.texCoordPrecision, m_testsParameters.programs);
+											initializePrograms(programCollection, m_testsParameters.texCoordPrecision, m_testsParameters.programs, DE_NULL, glu::PRECISION_MEDIUMP, m_testsParameters.unnormal);
 										}
 
 	virtual void						checkSupport				(Context& context) const
@@ -424,6 +427,7 @@ struct TextureCubeTestCaseParameters : public TextureCommonTestCaseParameters
 								TextureCubeTestCaseParameters	(void);
 	tcu::Sampler::WrapMode		wrapT;
 	int							size;
+	deBool						seamless;
 };
 
 struct Texture2DArrayTestCaseParameters : public Texture2DTestCaseParameters
@@ -456,6 +460,12 @@ struct TextureCubeArrayTestCaseParameters : public TextureCubeTestCaseParameters
 {
 								TextureCubeArrayTestCaseParameters	(void);
 	int							numLayers;
+};
+
+struct TextureCubeFilteringTestCaseParameters : public TextureCubeTestCaseParameters
+{
+								TextureCubeFilteringTestCaseParameters	(void);
+	bool						onlySampleFaceInterior;
 };
 
 } // util
