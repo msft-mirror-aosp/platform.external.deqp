@@ -44,6 +44,8 @@ namespace vk
 
 #ifndef CTS_USES_VULKANSC
 
+static const deUint32 WATCHDOG_INTERVAL = 16384; // Touch watchDog every N iterations.
+
 struct DeferredThreadParams
 {
 	const DeviceInterface&	vk;
@@ -678,8 +680,8 @@ void BottomLevelAccelerationStructure::setDefaultGeometryData (const VkShaderSta
 		geometryData.push_back(tcu::Vec3(-1.0f, -1.0f, z));
 		geometryData.push_back(tcu::Vec3(-1.0f, +1.0f, z));
 		geometryData.push_back(tcu::Vec3(+1.0f, -1.0f, z));
-		geometryData.push_back(tcu::Vec3(-1.0f, +1.0f, z));
 		geometryData.push_back(tcu::Vec3(+1.0f, -1.0f, z));
+		geometryData.push_back(tcu::Vec3(-1.0f, +1.0f, z));
 		geometryData.push_back(tcu::Vec3(+1.0f, +1.0f, z));
 	}
 	else
@@ -2091,7 +2093,8 @@ void BottomLevelAccelerationStructurePool::batchBuild (const DeviceInterface&	vk
 void BottomLevelAccelerationStructurePool::batchBuild (const DeviceInterface&	vk,
 													   const VkDevice			device,
 													   VkCommandPool			cmdPool,
-													   VkQueue					queue)
+													   VkQueue					queue,
+													   qpWatchDog*				watchDog)
 {
 	const deUint32			limit	= 10000u;
 	const deUint32			count	= structCount();
@@ -2125,6 +2128,9 @@ void BottomLevelAccelerationStructurePool::batchBuild (const DeviceInterface&	vk
 			buildOnDevice();
 			buildingOnDevice.clear();
 		}
+
+		if ((i % WATCHDOG_INTERVAL) == 0 && watchDog)
+			qpWatchDog_touch(watchDog);
 	}
 }
 
