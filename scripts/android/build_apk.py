@@ -39,9 +39,9 @@ import xml.etree.ElementTree
 # Import from <root>/scripts
 sys.path.append(os.path.join(os.path.dirname(__file__), ".."))
 
-from build.common import *
-from build.config import *
-from build.build import *
+from ctsbuild.common import *
+from ctsbuild.config import *
+from ctsbuild.build import *
 
 class SDKEnv:
 	def __init__(self, path, desired_version):
@@ -769,8 +769,7 @@ class AddNativeLibsToAPK (BuildStep):
 			libFiles.append(libRelPath)
 
 			if config.layers:
-				# Need to copy everything in the layer folder
-				layersGlob = os.path.join(config.layers, abi, "*")
+				layersGlob = os.path.join(config.layers, abi, "libVkLayer_*.so")
 				libVkLayers = glob.glob(layersGlob)
 				for layer in libVkLayers:
 					layerFilename = os.path.basename(layer)

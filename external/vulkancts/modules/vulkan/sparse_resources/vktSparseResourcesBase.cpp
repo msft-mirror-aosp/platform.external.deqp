@@ -71,7 +71,7 @@ void SparseResourcesBaseInstance::createDeviceSupportingQueues(const QueueRequir
 	std::vector<const char*>							deviceExtensions;
 	VkDeviceGroupDeviceCreateInfo						deviceGroupInfo =
 	{
-		VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO_KHR,		//stype
+		VK_STRUCTURE_TYPE_DEVICE_GROUP_DEVICE_CREATE_INFO,			//stype
 		DE_NULL,													//pNext
 		0,															//physicalDeviceCount
 		DE_NULL														//physicalDevices
@@ -81,7 +81,7 @@ void SparseResourcesBaseInstance::createDeviceSupportingQueues(const QueueRequir
 	// If requested, create an intance with device groups
 	if (m_useDeviceGroups)
 	{
-		const std::vector<std::string>	requiredExtensions(1, "VK_KHR_device_group_creation");
+		const std::vector<std::string>	requiredExtensions { "VK_KHR_device_group_creation", "VK_KHR_get_physical_device_properties2" };
 		m_deviceGroupInstance	=		createCustomInstanceWithExtensions(m_context, requiredExtensions);
 		devGroupProperties		=		enumeratePhysicalDeviceGroups(m_context.getInstanceInterface(), m_deviceGroupInstance);
 		m_numPhysicalDevices	=		devGroupProperties[m_deviceGroupIdx].physicalDeviceCount;
@@ -99,6 +99,10 @@ void SparseResourcesBaseInstance::createDeviceSupportingQueues(const QueueRequir
 
 		if (!isCoreDeviceExtension(m_context.getUsedApiVersion(), "VK_KHR_device_group"))
 			deviceExtensions.push_back("VK_KHR_device_group");
+	}
+	else
+	{
+		m_context.requireInstanceFunctionality("VK_KHR_get_physical_device_properties2");
 	}
 
 	const VkInstance&					instance(m_useDeviceGroups ? m_deviceGroupInstance : m_context.getInstance());
