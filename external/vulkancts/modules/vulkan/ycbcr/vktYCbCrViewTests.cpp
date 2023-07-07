@@ -424,18 +424,14 @@ void checkSupport(Context& context, TestParameters params)
 }
 
 Vec4 castResult(Vec4 result, VkFormat f) {
-	union {
-		Vec4 vec;
-		IVec4 ivec;
-		UVec4 uvec;
-	} cast = { result };
-
 	if (isIntFormat(f)) {
-		IVec4 ivec = cast.ivec;
+		IVec4* result_ptr = reinterpret_cast<IVec4*>(&result);
+		IVec4 ivec = *(result_ptr);
 		return Vec4((float)ivec.x(), (float)ivec.y(), (float)ivec.z(), (float)ivec.w());
 	}
 	else if (isUintFormat(f)) {
-		UVec4 uvec = cast.uvec;
+		UVec4* result_ptr = reinterpret_cast<UVec4*>(&result);
+		UVec4 uvec = *(result_ptr);
 		return Vec4((float)uvec.x(), (float)uvec.y(), (float)uvec.z(), (float)uvec.w());
 	}
 	else {
@@ -470,14 +466,14 @@ tcu::TestStatus testPlaneView (Context& context, TestParameters params)
 		{
 			VkBindImagePlaneMemoryInfo	planeInfo	=
 			{
-				VK_STRUCTURE_TYPE_BIND_IMAGE_PLANE_MEMORY_INFO_KHR,
+				VK_STRUCTURE_TYPE_BIND_IMAGE_PLANE_MEMORY_INFO,
 				DE_NULL,
-				VK_IMAGE_ASPECT_PLANE_0_BIT_KHR
+				VK_IMAGE_ASPECT_PLANE_0_BIT
 			};
 
 			VkBindImageMemoryInfo coreInfo	=
 			{
-				VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO_KHR,
+				VK_STRUCTURE_TYPE_BIND_IMAGE_MEMORY_INFO,
 				&planeInfo,
 				*imageAlias,
 				allocations[params.planeNdx]->getMemory(),
@@ -826,5 +822,6 @@ tcu::TestCaseGroup* createViewTests (tcu::TestContext& testCtx)
 }
 
 } // ycbcr
+
 } // vkt
 
