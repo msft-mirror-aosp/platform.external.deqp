@@ -232,22 +232,14 @@ tcu::TestStatus SSBOCornerCaseInstance::iterate (void)
 		descriptor	= makeDescriptorBufferInfo(*buffer, 0, bufferSize);
 	}
 
-	// Query the buffer device address and push them via push constants
-	const bool useKHR = m_context.isDeviceFunctionalitySupported("VK_KHR_buffer_device_address");
-
-	vk::VkBufferDeviceAddressInfo info =
+	vk::VkBufferDeviceAddressInfo info
 	{
 		vk::VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,	// VkStructureType	sType;
 		DE_NULL,											// const void*		pNext;
-		0,													// VkBuffer			buffer
+		descriptor.buffer									// VkBuffer			buffer
 	};
 
-	info.buffer = descriptor.buffer;
-	vk::VkDeviceAddress	addr;
-	if (useKHR)
-		addr = vk.getBufferDeviceAddress(device, &info);
-	else
-		addr = vk.getBufferDeviceAddressEXT(device, &info);
+	vk::VkDeviceAddress addr = vk.getBufferDeviceAddress(device, &info);
 
 	setUpdateBuilder.update(vk, device);
 
