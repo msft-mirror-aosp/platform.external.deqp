@@ -37,8 +37,8 @@
 #include "vkBuilderUtil.hpp"
 #include "tcuCommandLine.hpp"
 #include "deUniquePtr.hpp"
-#include "deSharedPtr.hpp"
 #include "deRandom.hpp"
+#include "deSTLUtil.hpp"
 
 #include <vector>
 
@@ -51,20 +51,7 @@ namespace
 using namespace vk;
 using de::UniquePtr;
 using de::MovePtr;
-using de::SharedPtr;
 using namespace vkt::ExternalMemoryUtil;
-
-template<typename T>
-inline const T* dataOrNullPtr(const std::vector<T>& v)
-{
-	return (v.empty() ? DE_NULL : &v[0]);
-}
-
-template<typename T>
-inline T* dataOrNullPtr(std::vector<T>& v)
-{
-	return (v.empty() ? DE_NULL : &v[0]);
-}
 
 //! Common test data related to the device
 struct WorkingDevice
@@ -102,7 +89,7 @@ bool queueFamilyMatchesTestCase(const VkQueueFamilyProperties& props, VkQueueFla
 }
 
 // We create a custom device because we don't want to always use the universal queue.
-void createDeviceWithExtension (Context& context, WorkingDevice& wd, VkQueueFlagBits testQueue, bool hostPtr)
+void createDeviceWithExtension (Context& context, WorkingDevice& wd, VkQueueFlagBits testQueue, bool hostPtr, size_t offset)
 {
 	const PlatformInterface&	vkp				= context.getPlatformInterface();
 	const VkInstance			instance		= context.getInstance();
@@ -153,13 +140,13 @@ void createDeviceWithExtension (Context& context, WorkingDevice& wd, VkQueueFlag
 		0u,													// deUint32							enabledLayerCount;
 		DE_NULL,											// const char* const*				ppEnabledLayerNames;
 		static_cast<deUint32>(cstrDeviceExtensions.size()),	// deUint32							enabledExtensionCount;
-		dataOrNullPtr(cstrDeviceExtensions),				// const char* const*				ppEnabledExtensionNames;
+		de::dataOrNull(cstrDeviceExtensions),				// const char* const*				ppEnabledExtensionNames;
 		&context.getDeviceFeatures(),						// const VkPhysicalDeviceFeatures*	pEnabledFeatures;
 	};
 
 	wd.logicalDevice	= createCustomDevice(useValidation, vkp, instance, instanceDriver, physicalDevice, &deviceInfo);
 	wd.deviceDriver		= MovePtr<DeviceDriver>(new DeviceDriver(vkp, instance, *wd.logicalDevice));
-	wd.allocator		= MovePtr<Allocator>(new SimpleAllocator(*wd.deviceDriver, *wd.logicalDevice, getPhysicalDeviceMemoryProperties(instanceDriver, physicalDevice)));
+	wd.allocator		= MovePtr<Allocator>(new SimpleAllocator(*wd.deviceDriver, *wd.logicalDevice, getPhysicalDeviceMemoryProperties(instanceDriver, physicalDevice), deAlignSize(offset, static_cast<size_t>(context.getDeviceProperties().limits.nonCoherentAtomSize))));
 	wd.queueFamilyIdx	= queueCreateInfo.queueFamilyIndex;
 	wd.queue			= getDeviceQueue(*wd.deviceDriver, *wd.logicalDevice, wd.queueFamilyIdx, 0u);
 	wd.queueProps		= queueFamilyProperties[queueCreateInfo.queueFamilyIndex];
@@ -193,7 +180,7 @@ void invalidateHostMemory (const vk::DeviceInterface&	vkd,
 	vkd.unmapMemory(device, memory);
 }
 
-bool checkMarkerBuffer	(const DeviceInterface& vk, VkDevice device, const MovePtr<vk::Allocation>& memory, size_t offset,
+bool checkMarkerBuffer	(const DeviceInterface& vk, VkDevice device, const MovePtr<vk::Allocation>& memory,
 						 const std::vector<deUint32>& expected, size_t size, bool useHostMemory)
 {
 	if (useHostMemory)
@@ -205,7 +192,7 @@ bool checkMarkerBuffer	(const DeviceInterface& vk, VkDevice device, const MovePt
 		invalidateAlloc(vk, device, *memory);
 	}
 
-	const deUint32* data = reinterpret_cast<const deUint32*>(static_cast<const char*>(memory->getHostPtr()) + offset);
+	const deUint32* data = reinterpret_cast<const deUint32*>(static_cast<const char*>(memory->getHostPtr()));
 
 	for (size_t i = 0; i < expected.size(); ++i)
 	{
@@ -222,6 +209,7 @@ struct BaseTestParams
 	VkPipelineStageFlagBits stage;		// Pipeline stage where any marker writes for this test case occur in
 	deUint32				size;		// Number of buffer markers
 	bool					useHostPtr;	// Whether to use host pointer as backing buffer memory
+	size_t					offset;		// The offset of the data in the buffer
 };
 
 deUint32 chooseExternalMarkerMemoryType(const DeviceInterface&				vkd,
@@ -242,36 +230,29 @@ deUint32 chooseExternalMarkerMemoryType(const DeviceInterface&				vkd,
 		allowedBits &= props.memoryTypeBits;
 	}
 
-	deUint32 index = 0;
-
-	while ((index < VK_MAX_MEMORY_TYPES) && ((allowedBits & 0x1) == 0))
-	{
-		index++;
-		allowedBits >>= 1;
-	}
-
-	return index;
+	return deInt32BitScan((deInt32 *)&allowedBits);
 }
 
 class ExternalHostAllocation : public Allocation
 {
 public:
-	ExternalHostAllocation(Move<VkDeviceMemory> mem, void* hostPtr) : Allocation(*mem, (VkDeviceSize)0, hostPtr), m_memHolder(mem) { }
+	ExternalHostAllocation(Move<VkDeviceMemory> mem, void* hostPtr, size_t offset) : Allocation(*mem, offset, hostPtr), m_memHolder(mem) { }
 
 private:
 	const Unique<VkDeviceMemory>	m_memHolder;
 };
 
 void createMarkerBufferMemory(const InstanceInterface&		vki,
-							 const DeviceInterface&			vkd,
-							 VkPhysicalDevice				physicalDevice,
-							 VkDevice						device,
-							 VkBuffer						buffer,
-							 MovePtr<Allocator>&			allocator,
-							 const MemoryRequirement		allocRequirement,
-							 bool							externalHostPtr,
-							 MovePtr<ExternalHostMemory>&	hostMemory,
-							 MovePtr<Allocation>&			deviceMemory)
+							const DeviceInterface&			vkd,
+							VkPhysicalDevice				physicalDevice,
+							VkDevice						device,
+							VkBuffer						buffer,
+							size_t							bufferOffset,
+							MovePtr<Allocator>&				allocator,
+							const MemoryRequirement			allocRequirement,
+							bool							externalHostPtr,
+							MovePtr<ExternalHostMemory>&	hostMemory,
+							MovePtr<Allocation>&			deviceMemory)
 {
 	VkMemoryRequirements memReqs = getBufferMemoryRequirements(vkd, device, buffer);
 
@@ -284,8 +265,8 @@ void createMarkerBufferMemory(const InstanceInterface&		vki,
 		const VkExternalMemoryHandleTypeFlagBits externalType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
 
 		const VkPhysicalDeviceExternalMemoryHostPropertiesEXT hostProps = getPhysicalDeviceExternalMemoryHostProperties(vki, physicalDevice);
-
-		hostMemory = MovePtr<ExternalHostMemory>(new ExternalHostMemory(memReqs.size, hostProps.minImportedHostPointerAlignment));
+		bufferOffset = deAlignSize(bufferOffset, static_cast<size_t>(memReqs.alignment));
+		hostMemory = MovePtr<ExternalHostMemory>(new ExternalHostMemory(memReqs.size + bufferOffset, hostProps.minImportedHostPointerAlignment));
 
 		const deUint32 externalMemType = chooseExternalMarkerMemoryType(vkd, device, externalType, memReqs.memoryTypeBits, hostMemory);
 
@@ -310,7 +291,9 @@ void createMarkerBufferMemory(const InstanceInterface&		vki,
 			externalMemType
 		};
 
-		deviceMemory = MovePtr<Allocation>(new ExternalHostAllocation(allocateMemory(vkd, device, &info), hostMemory->data));
+		deviceMemory = MovePtr<Allocation>(new ExternalHostAllocation(allocateMemory(vkd, device, &info),
+																	  (((deUint8 *)hostMemory->data) + bufferOffset),
+																	  bufferOffset));
 	}
 
 	VK_CHECK(vkd.bindBufferMemory(device, buffer, deviceMemory->getMemory(), deviceMemory->getOffset()));
@@ -320,7 +303,7 @@ tcu::TestStatus bufferMarkerSequential(Context& context, BaseTestParams params)
 {
 	WorkingDevice wd;
 
-	createDeviceWithExtension(context, wd, params.testQueue, params.useHostPtr);
+	createDeviceWithExtension(context, wd, params.testQueue, params.useHostPtr, params.offset);
 
 	const DeviceInterface&			vk(*wd.deviceDriver);
 	const VkDevice					device(*wd.logicalDevice);
@@ -339,7 +322,7 @@ tcu::TestStatus bufferMarkerSequential(Context& context, BaseTestParams params)
 	MovePtr<Allocation>				markerMemory;
 
 	createMarkerBufferMemory(context.getInstanceInterface(), vk, context.getPhysicalDevice(), device,
-							 *markerBuffer, wd.allocator, MemoryRequirement::HostVisible, params.useHostPtr, hostMemory, markerMemory);
+							 *markerBuffer, params.offset, wd.allocator, MemoryRequirement::HostVisible, params.useHostPtr, hostMemory, markerMemory);
 
 	de::Random						rng(12345 ^ params.size);
 	std::vector<deUint32>			expected(params.size);
@@ -381,7 +364,7 @@ tcu::TestStatus bufferMarkerSequential(Context& context, BaseTestParams params)
 
 	submitCommandsAndWait(vk, device, wd.queue, *cmdBuffer);
 
-	if (!checkMarkerBuffer(vk, device, markerMemory, 0, expected, params.useHostPtr ? hostMemory->size : 0, params.useHostPtr))
+	if (!checkMarkerBuffer(vk, device, markerMemory, expected, params.useHostPtr ? hostMemory->size : 0, params.useHostPtr))
 		return tcu::TestStatus::fail("Some marker values were incorrect");
 
 	return tcu::TestStatus::pass("Pass");
@@ -391,7 +374,7 @@ tcu::TestStatus bufferMarkerOverwrite(Context& context, BaseTestParams params)
 {
 	WorkingDevice wd;
 
-	createDeviceWithExtension(context, wd, params.testQueue, params.useHostPtr);
+	createDeviceWithExtension(context, wd, params.testQueue, params.useHostPtr, params.offset);
 
 	const DeviceInterface&				vk(*wd.deviceDriver);
 	const VkDevice						device(*wd.logicalDevice);
@@ -411,7 +394,7 @@ tcu::TestStatus bufferMarkerOverwrite(Context& context, BaseTestParams params)
 	MovePtr<Allocation>					markerMemory;
 
 	createMarkerBufferMemory(context.getInstanceInterface(), vk, context.getPhysicalDevice(), device,
-							 *markerBuffer, wd.allocator, MemoryRequirement::HostVisible, params.useHostPtr, hostMemory, markerMemory);
+							 *markerBuffer, params.offset, wd.allocator, MemoryRequirement::HostVisible, params.useHostPtr, hostMemory, markerMemory);
 
 	de::Random						rng(12345 ^ params.size);
 	std::vector<deUint32>			expected(params.size);
@@ -457,7 +440,7 @@ tcu::TestStatus bufferMarkerOverwrite(Context& context, BaseTestParams params)
 
 	submitCommandsAndWait(vk, device, wd.queue, *cmdBuffer);
 
-	if (!checkMarkerBuffer(vk, device, markerMemory, 0, expected, params.useHostPtr ? hostMemory->size : 0, params.useHostPtr))
+	if (!checkMarkerBuffer(vk, device, markerMemory, expected, params.useHostPtr ? hostMemory->size : 0, params.useHostPtr))
 		return tcu::TestStatus::fail("Some marker values were incorrect");
 
 	return tcu::TestStatus::pass("Pass");
@@ -521,7 +504,7 @@ tcu::TestStatus bufferMarkerMemoryDep(Context& context, MemoryDepParams params)
 {
 	WorkingDevice wd;
 
-	createDeviceWithExtension(context, wd, params.base.testQueue, params.base.useHostPtr);
+	createDeviceWithExtension(context, wd, params.base.testQueue, params.base.useHostPtr, params.base.offset);
 
 	VkBufferUsageFlags usageFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
@@ -549,7 +532,7 @@ tcu::TestStatus bufferMarkerMemoryDep(Context& context, MemoryDepParams params)
 	MovePtr<Allocation>				markerMemory;
 
 	createMarkerBufferMemory(context.getInstanceInterface(), vk, context.getPhysicalDevice(), device,
-		*markerBuffer, wd.allocator, MemoryRequirement::HostVisible, params.base.useHostPtr, hostMemory, markerMemory);
+		*markerBuffer, params.base.offset, wd.allocator, MemoryRequirement::HostVisible, params.base.useHostPtr, hostMemory, markerMemory);
 
 	de::Random						rng(size ^ params.base.size);
 	std::vector<deUint32>			expected(params.base.size, 0);
@@ -839,7 +822,7 @@ tcu::TestStatus bufferMarkerMemoryDep(Context& context, MemoryDepParams params)
 			DE_NULL,													// const void*										pNext;
 			(VkPipelineCreateFlags)0,									// VkPipelineCreateFlags							flags;
 			static_cast<deUint32>(shaderStages.size()),					// deUint32											stageCount;
-			dataOrNullPtr(shaderStages),								// const VkPipelineShaderStageCreateInfo*			pStages;
+			de::dataOrNull(shaderStages),								// const VkPipelineShaderStageCreateInfo*			pStages;
 			&vertexInputStateInfo,										// const VkPipelineVertexInputStateCreateInfo*		pVertexInputState;
 			&pipelineInputAssemblyStateInfo,							// const VkPipelineInputAssemblyStateCreateInfo*	pInputAssemblyState;
 			DE_NULL,													// const VkPipelineTessellationStateCreateInfo*		pTessellationState;
@@ -1045,7 +1028,7 @@ tcu::TestStatus bufferMarkerMemoryDep(Context& context, MemoryDepParams params)
 
 	submitCommandsAndWait(vk, device, wd.queue, *cmdBuffer);
 
-	if (!checkMarkerBuffer(vk, device, markerMemory, 0, expected, params.base.useHostPtr ? hostMemory->size : 0, params.base.useHostPtr))
+	if (!checkMarkerBuffer(vk, device, markerMemory, expected, params.base.useHostPtr ? hostMemory->size : 0, params.base.useHostPtr))
 		return tcu::TestStatus::fail("Some marker values were incorrect");
 
 	return tcu::TestStatus::pass("Pass");
@@ -1118,6 +1101,13 @@ void checkBufferMarkerSupport (Context& context, MemoryDepParams params)
 	context.requireDeviceFunctionality("VK_AMD_buffer_marker");
 }
 
+std::string getTestCaseName(const std::string base, size_t offset)
+{
+	if (offset == 0)
+		return base;
+	return base + "_offset_" + std::to_string(offset);
+}
+
 tcu::TestCaseGroup* createBufferMarkerTestsInGroup(tcu::TestContext& testCtx)
 {
 	tcu::TestCaseGroup* root = (new tcu::TestCaseGroup(testCtx, "buffer_marker", "AMD_buffer_marker Tests"));
@@ -1156,17 +1146,29 @@ tcu::TestCaseGroup* createBufferMarkerTestsInGroup(tcu::TestContext& testCtx)
 					tcu::TestCaseGroup* sequentialGroup = (new tcu::TestCaseGroup(testCtx, "sequential", "Buffer marker tests for sequentially writing"));
 
 					base.size = 4;
+					base.offset = 0;
 
 					addFunctionCase(sequentialGroup, "4", "Writes 4 sequential marker values into a buffer", checkBufferMarkerSupport, bufferMarkerSequential, base);
 
 					base.size = 64;
+					base.offset = 0;
 
 					addFunctionCase(sequentialGroup, "64", "Writes 64 sequential marker values into a buffer", checkBufferMarkerSupport, bufferMarkerSequential, base);
 
+					base.offset = 16;
+
+					addFunctionCase(sequentialGroup, getTestCaseName("64", base.offset), "Writes 64 sequential marker values into a buffer offset by 16", checkBufferMarkerSupport, bufferMarkerSequential, base);
+
 					base.size = 65536;
+					base.offset = 0;
 
 					addFunctionCase(sequentialGroup, "65536", "Writes 65536 sequential marker values into a buffer", checkBufferMarkerSupport, bufferMarkerSequential, base);
 
+					base.offset = 1024;
+
+					addFunctionCase(sequentialGroup, getTestCaseName("65536", base.offset), "Writes 65536 sequential marker values into a buffer offset by 1024", checkBufferMarkerSupport, bufferMarkerSequential, base);
+
+					base.offset = 0;
 					stageGroup->addChild(sequentialGroup);
 				}
 
@@ -1184,6 +1186,11 @@ tcu::TestCaseGroup* createBufferMarkerTestsInGroup(tcu::TestContext& testCtx)
 					base.size = 64;
 
 					addFunctionCase(overwriteGroup, "64", "Randomly overwrites markers values to a 64-size buffer", checkBufferMarkerSupport, bufferMarkerOverwrite, base);
+					base.offset = 24;
+
+					addFunctionCase(overwriteGroup, getTestCaseName("64", base.offset), "Randomly overwrites markers values to a 64-size buffer at offset 24", checkBufferMarkerSupport, bufferMarkerOverwrite, base);
+
+					base.offset = 0;
 
 					stageGroup->addChild(overwriteGroup);
 				}
@@ -1192,28 +1199,32 @@ tcu::TestCaseGroup* createBufferMarkerTestsInGroup(tcu::TestContext& testCtx)
 					tcu::TestCaseGroup* memoryDepGroup = (new tcu::TestCaseGroup(testCtx, "memory_dep", "Buffer marker tests for memory dependencies between marker writes and other operations"));
 
 					MemoryDepParams params;
+					size_t offsets[] = { 0, 24 };
 					deMemset(&params, 0, sizeof(params));
 
-					params.base		 = base;
-					params.base.size = 128;
+					for (size_t offsetIdx = 0; offsetIdx < de::arrayLength(offsets); offsetIdx++) {
+						params.base		 = base;
+						params.base.size = 128;
+						params.base.offset = offsets[offsetIdx];
 
-					if (params.base.testQueue == VK_QUEUE_GRAPHICS_BIT)
-					{
-						params.method = MEMORY_DEP_DRAW;
+						if (params.base.testQueue == VK_QUEUE_GRAPHICS_BIT)
+						{
+							params.method = MEMORY_DEP_DRAW;
 
-						addFunctionCaseWithPrograms(memoryDepGroup, "draw", "Test memory dependencies between marker writes and draws", checkBufferMarkerSupport, initMemoryDepPrograms, bufferMarkerMemoryDep, params);
+							addFunctionCaseWithPrograms(memoryDepGroup, getTestCaseName("draw", params.base.offset), "Test memory dependencies between marker writes and draws", checkBufferMarkerSupport, initMemoryDepPrograms, bufferMarkerMemoryDep, params);
+						}
+
+						if (params.base.testQueue != VK_QUEUE_TRANSFER_BIT)
+						{
+							params.method = MEMORY_DEP_DISPATCH;
+
+							addFunctionCaseWithPrograms(memoryDepGroup, getTestCaseName("dispatch", params.base.offset), "Test memory dependencies between marker writes and compute dispatches", checkBufferMarkerSupport, initMemoryDepPrograms, bufferMarkerMemoryDep, params);
+						}
+
+						params.method = MEMORY_DEP_COPY;
+
+						addFunctionCaseWithPrograms(memoryDepGroup, getTestCaseName("buffer_copy", params.base.offset), "Test memory dependencies between marker writes and buffer copies", checkBufferMarkerSupport, initMemoryDepPrograms, bufferMarkerMemoryDep, params);
 					}
-
-					if (params.base.testQueue != VK_QUEUE_TRANSFER_BIT)
-					{
-						params.method = MEMORY_DEP_DISPATCH;
-
-						addFunctionCaseWithPrograms(memoryDepGroup, "dispatch", "Test memory dependencies between marker writes and compute dispatches", checkBufferMarkerSupport, initMemoryDepPrograms, bufferMarkerMemoryDep, params);
-					}
-
-					params.method = MEMORY_DEP_COPY;
-
-					addFunctionCaseWithPrograms(memoryDepGroup, "buffer_copy", "Test memory dependencies between marker writes and buffer copies", checkBufferMarkerSupport, initMemoryDepPrograms, bufferMarkerMemoryDep, params);
 
 					stageGroup->addChild(memoryDepGroup);
 				}

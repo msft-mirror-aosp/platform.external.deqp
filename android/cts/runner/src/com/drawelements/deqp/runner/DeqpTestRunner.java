@@ -86,7 +86,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private static final String DEQP_ONDEVICE_APK = "com.drawelements.deqp.apk";
     private static final String DEQP_ONDEVICE_PKG = "com.drawelements.deqp";
     private static final String INCOMPLETE_LOG_MESSAGE = "Crash: Incomplete test log";
-    private static final String TIMEOUT_LOG_MESSAGE = "Timeout: Test timeout";
     private static final String SKIPPED_INSTANCE_LOG_MESSAGE = "Configuration skipped";
     private static final String NOT_EXECUTABLE_LOG_MESSAGE = "Abort: Test cannot be executed";
     private static final String APP_DIR = "/sdcard/";
@@ -100,7 +99,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
 
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int TESTCASE_BATCH_LIMIT_LARGE = 10000;
-    private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT = 10 * 60 * 1000; // 10min
+    private static final int UNRESPONSIVE_CMD_TIMEOUT_MS = 10 * 60 * 1000; // 10min
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
 
@@ -111,10 +110,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     // !NOTE: There's a static method copyOptions() for copying options during split.
     // If you add state update copyOptions() as appropriate!
 
-    @Option(name="timeout",
-        description="Timeout for unresponsive tests in milliseconds. Default: " + UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT,
-        importance=Option.Importance.NEVER)
-    private long mUnresponsiveCmdTimeoutMs = UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT;
     @Option(name="deqp-package",
             description="Name of the deqp module used. Determines GLES version.",
             importance=Option.Importance.ALWAYS)
@@ -1395,12 +1390,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         }
     }
 
-    private static final class AdbComLinkUnresponsiveError extends Exception {
-        public AdbComLinkUnresponsiveError(String description, Throwable inner) {
-            super(description, inner);
-        }
-    }
-
     /**
      * Executes a given command in adb shell
      *
@@ -1409,10 +1398,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private void executeShellCommandAndReadOutput(final String command,
             final IShellOutputReceiver receiver)
-            throws AdbComLinkOpenError, AdbComLinkKilledError, AdbComLinkUnresponsiveError {
+            throws AdbComLinkOpenError, AdbComLinkKilledError {
         try {
             mDevice.getIDevice().executeShellCommand(command, receiver,
-                mUnresponsiveCmdTimeoutMs, TimeUnit.MILLISECONDS);
+                    UNRESPONSIVE_CMD_TIMEOUT_MS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException ex) {
             // Opening connection timed out
             throw new AdbComLinkOpenError("opening connection timed out", ex);
@@ -1424,7 +1413,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             throw new AdbComLinkKilledError("command link killed", ex);
         } catch (ShellCommandUnresponsiveException ex) {
             // shell command halted
-            throw new AdbComLinkUnresponsiveError("command link was unresponsive for longer than requested timeout", ex);
+            throw new AdbComLinkKilledError("command link hung", ex);
         }
     }
 
@@ -1548,14 +1537,9 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             mDeviceRecovery.onExecutionProgressed();
         }
 
-        // interrupted either because of ADB or test timeout
+        // interrupted, try to recover
         if (interruptingError != null) {
-
-            // AdbComLinkUnresponsiveError means the test has timeout during execution.
-            // Device is likely fine, so we won't attempt to recover the device.
-            if (interruptingError instanceof AdbComLinkUnresponsiveError) {
-                mInstanceListerner.abortTest(mInstanceListerner.getCurrentTestId(), TIMEOUT_LOG_MESSAGE);
-            } else if (interruptingError instanceof AdbComLinkOpenError) {
+            if (interruptingError instanceof AdbComLinkOpenError) {
                 mDeviceRecovery.recoverConnectionRefused();
             } else if (interruptingError instanceof AdbComLinkKilledError) {
                 mDeviceRecovery.recoverComLinkKilled();
@@ -1777,6 +1761,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         CLog.d("    2020-03-01 -> 132383489");
         CLog.d("    2021-03-01 -> 132449025");
         CLog.d("    2022-03-01 -> 132514561");
+        CLog.d("    2023-03-01 -> 132580097");
 
         CLog.d("Minimum level required to run this caselist is %d", minimumLevel);
 
@@ -2202,11 +2187,31 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             for (String filterFile : mIncludeFilterFiles) {
                 CLog.d("Read include filter file '%s'", filterFile);
                 File file = new File(mBuildHelper.getTestsDir(), filterFile);
+                if (!file.isFile())
+                {
+                    // Find file in sub directory if no matching file in the first layer of
+                    // testdir.
+                    file = FileUtil.findFile(mBuildHelper.getTestsDir(), filterFile);
+                    if(file == null || !file.isFile()){
+                        throw new FileNotFoundException(
+                            "Cannot find include-filter-file file: " + filterFile);
+                    }
+                }
                 readFile(mIncludeFilters, file);
             }
             for (String filterFile : mExcludeFilterFiles) {
                 CLog.d("Read exclude filter file '%s'", filterFile);
                 File file = new File(mBuildHelper.getTestsDir(), filterFile);
+                if(!file.isFile())
+                {
+                    // Find file in sub directory if no matching file in the first layer of
+                    // testdir.
+                    file = FileUtil.findFile(mBuildHelper.getTestsDir(), filterFile);
+                    if(file == null || !file.isFile()){
+                        throw new FileNotFoundException(
+                            "Cannot find exclude-filter-file file: " + filterFile);
+                    }
+                }
                 readFile(mExcludeFilters, file);
             }
         }
@@ -2424,7 +2429,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     }
 
     private static void copyOptions(DeqpTestRunner destination, DeqpTestRunner source) {
-        destination.mUnresponsiveCmdTimeoutMs = source.mUnresponsiveCmdTimeoutMs;
         destination.mDeqpPackage = source.mDeqpPackage;
         destination.mConfigName = source.mConfigName;
         destination.mCaselistFile = source.mCaselistFile;
