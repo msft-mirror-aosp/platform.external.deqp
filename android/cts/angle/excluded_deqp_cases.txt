@@ -6,6 +6,7 @@ dEQP-GLES31.functional.copy_image.mixed.viewclass_128_bits_mixed.rgba_astc_4x4_k
 
 # http://b/290050838
 dEQP-EGL.functional.get_frame_timestamps#rgb565_no_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps#rgb565_depth_no_stencil
 dEQP-EGL.functional.get_frame_timestamps#rgb565_no_depth_stencil
 dEQP-EGL.functional.get_frame_timestamps#other
 
