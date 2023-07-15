@@ -347,7 +347,7 @@ def genAndroidTestXml (mustpass):
 	preparerElement.set("class", "com.android.compatibility.common.tradefed.targetprep.FilePusher")
 	addOptionElement(preparerElement, "cleanup", "true")
 	addOptionElement(preparerElement, "disable", "true")
-	addOptionElement(preparerElement, "push", "deqp-binary->/data/local/tmp/deqp-binary")
+	addOptionElement(preparerElement, "push", "deqp-binary32->/data/local/tmp/deqp-binary32")
 	addOptionElement(preparerElement, "push", "deqp-binary64->/data/local/tmp/deqp-binary64")
 	addOptionElement(preparerElement, "push", "gles2->/data/local/tmp/gles2")
 	addOptionElement(preparerElement, "push", "gles3->/data/local/tmp/gles3")
