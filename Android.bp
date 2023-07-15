@@ -240,6 +240,9 @@ cc_test {
     ],
 
     multilib: {
+        lib32: {
+            suffix: "32",
+        },
         lib64: {
             suffix: "64",
         },
