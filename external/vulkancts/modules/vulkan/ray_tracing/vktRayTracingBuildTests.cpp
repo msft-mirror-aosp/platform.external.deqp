@@ -478,7 +478,7 @@ de::MovePtr<BufferWithMemory> RayTracingBuildTestInstance::runTest (bool useGpuB
 	const VkMemoryBarrier						postCopyMemoryBarrier				= makeMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT);
 	const VkClearValue							clearValue							= makeClearValueColorU32(5u, 5u, 5u, 255u);
 
-	qpWatchDog*									watchDog 							= m_context.getTestContext().getWatchDog();
+	qpWatchDog*									watchDog							= m_context.getTestContext().getWatchDog();
 	TlasPtr										topLevelAccelerationStructure;
 	BottomLevelAccelerationStructurePool		blasPool;
 
