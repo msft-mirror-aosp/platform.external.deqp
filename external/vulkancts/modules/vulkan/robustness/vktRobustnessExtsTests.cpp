@@ -1477,8 +1477,23 @@ void RobustnessExtsTestCase::initPrograms (SourceCollections& programCollection)
 					checks << "    else if (temp == zzzo) temp = " << vecType << "(0);\n";
 
 				// non-volatile value replaced with stored value
-				if (supportsStores(m_data.descriptorType) && !m_data.vol)
+				if (supportsStores(m_data.descriptorType) && !m_data.vol) {
 					checks << "    else if (temp == " << getStoreValue(m_data.descriptorType, numComponents, vecType, bufType) << ") temp = " << vecType << "(0);\n";
+
+					if (m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC || m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_BUFFER) {
+
+						for (int mask = (numComponents*numComponents) - 2; mask > 0; mask--) {
+							checks << "    else if (temp == " << vecType << "(";
+							for (int vecIdx = 0; vecIdx < 4; vecIdx++) {
+								if (mask & (1 << vecIdx)) checks << storeValue;
+								else checks << "0";
+
+								if (vecIdx != 3) checks << ",";
+							}
+							checks << ")) temp = " << vecType << "(0);\n";
+						}
+					}
+				}
 
 				// value straddling the boundary, returning a partial vector
 				if (expectedOOB2 != expectedOOB)
@@ -2655,7 +2670,38 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate (void)
 	{
 		const Unique<VkShaderModule>	shader(createShaderModule(vk, device, m_context.getBinaryCollection().get("test"), 0));
 
-		pipeline = makeComputePipeline(vk, device, *pipelineLayout, *shader);
+		const VkPipelineShaderStageCreateInfo pipelineShaderStageParams =
+		{
+			VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	// VkStructureType						sType;
+			nullptr,												// const void*							pNext;
+			static_cast<VkPipelineShaderStageCreateFlags>(0u),		// VkPipelineShaderStageCreateFlags		flags;
+			VK_SHADER_STAGE_COMPUTE_BIT,							// VkShaderStageFlagBits				stage;
+			*shader,												// VkShaderModule						module;
+			"main",													// const char*							pName;
+			nullptr,												// const VkSpecializationInfo*			pSpecializationInfo;
+		};
+
+		VkComputePipelineCreateInfo pipelineCreateInfo =
+		{
+			VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,			// VkStructureType					sType;
+			nullptr,												// const void*						pNext;
+			static_cast<VkPipelineCreateFlags>(0u),					// VkPipelineCreateFlags			flags;
+			pipelineShaderStageParams,								// VkPipelineShaderStageCreateInfo	stage;
+			*pipelineLayout,										// VkPipelineLayout					layout;
+			DE_NULL,												// VkPipeline						basePipelineHandle;
+			0,														// deInt32							basePipelineIndex;
+		};
+
+#ifndef CTS_USES_VULKANSC
+		VkPipelineRobustnessCreateInfoEXT pipelineRobustnessInfo;
+		if (m_data.testPipelineRobustness)
+		{
+			pipelineRobustnessInfo = getPipelineRobustnessInfo(m_data.testRobustness2, m_data.descriptorType);
+			pipelineCreateInfo.pNext = &pipelineRobustnessInfo;
+		}
+#endif
+
+		pipeline = createComputePipeline(vk, device, DE_NULL, &pipelineCreateInfo);
 
 	}
 #ifndef CTS_USES_VULKANSC
@@ -2698,6 +2744,13 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate (void)
 			(vk::VkPipeline)0,										// basePipelineHandle
 			0u,														// basePipelineIndex
 		};
+
+		VkPipelineRobustnessCreateInfoEXT pipelineRobustnessInfo;
+		if (m_data.testPipelineRobustness)
+		{
+			pipelineRobustnessInfo = getPipelineRobustnessInfo(m_data.testRobustness2, m_data.descriptorType);
+			pipelineCreateInfo.pNext = &pipelineRobustnessInfo;
+		}
 
 		pipeline = createRayTracingPipelineNV(vk, device, DE_NULL, &pipelineCreateInfo, NULL);
 
