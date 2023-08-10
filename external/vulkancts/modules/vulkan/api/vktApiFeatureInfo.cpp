@@ -3223,9 +3223,21 @@ bool isYcbcrConversionSupported (Context& context)
 	return (ycbcrFeatures.samplerYcbcrConversion == VK_TRUE);
 }
 
+bool requiresYCbCrConversion(VkFormat format)
+{
+	return isYCbCrFormat(format) &&
+			format != VK_FORMAT_R10X6_UNORM_PACK16 && format != VK_FORMAT_R10X6G10X6_UNORM_2PACK16 &&
+			format != VK_FORMAT_R12X4_UNORM_PACK16 && format != VK_FORMAT_R12X4G12X4_UNORM_2PACK16;
+}
+
 VkFormatFeatureFlags getAllowedYcbcrFormatFeatures (VkFormat format)
 {
 	DE_ASSERT(isYCbCrFormat(format));
+
+	if (!requiresYCbCrConversion(format)) {
+		DE_ASSERT(getPlaneCount(format) == 1);
+		return ~VK_FORMAT_FEATURE_DISJOINT_BIT;
+	}
 
 	VkFormatFeatureFlags	flags	= (VkFormatFeatureFlags)0;
 
@@ -3253,6 +3265,12 @@ VkFormatFeatureFlags getAllowedYcbcrFormatFeatures (VkFormat format)
 	return flags;
 }
 
+VkFormatFeatureFlags getAllowedBufferFeatures (VkFormat format)
+{
+	// TODO: Do we allow non-buffer flags in the bufferFeatures?
+	return requiresYCbCrConversion(format) ? (VkFormatFeatureFlags)0 : (VkFormatFeatureFlags)(~VK_FORMAT_FEATURE_DISJOINT_BIT);
+}
+
 tcu::TestStatus ycbcrFormatProperties (Context& context, VkFormat format)
 {
 	DE_ASSERT(isYCbCrFormat(format));
@@ -3263,6 +3281,7 @@ tcu::TestStatus ycbcrFormatProperties (Context& context, VkFormat format)
 	const VkFormatProperties	properties				= getPhysicalDeviceFormatProperties(context.getInstanceInterface(), context.getPhysicalDevice(), format);
 	bool						allOk					= true;
 	const VkFormatFeatureFlags	allowedImageFeatures	= getAllowedYcbcrFormatFeatures(format);
+	const VkFormatFeatureFlags	allowedBufferFeatures	= getAllowedBufferFeatures(format);
 
 	const struct
 	{
@@ -3274,7 +3293,7 @@ tcu::TestStatus ycbcrFormatProperties (Context& context, VkFormat format)
 	{
 		{ &VkFormatProperties::linearTilingFeatures,	"linearTilingFeatures",		false,	allowedImageFeatures	},
 		{ &VkFormatProperties::optimalTilingFeatures,	"optimalTilingFeatures",	true,	allowedImageFeatures	},
-		{ &VkFormatProperties::bufferFeatures,			"bufferFeatures",			false,	(VkFormatFeatureFlags)0	}
+		{ &VkFormatProperties::bufferFeatures,			"bufferFeatures",			false,	allowedBufferFeatures	}
 	};
 	static const VkFormat		s_requiredBaseFormats[]	=
 	{
