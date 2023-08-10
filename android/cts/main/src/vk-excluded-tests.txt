@@ -66,3 +66,7 @@ dEQP-VK.texture.conversion.snorm_clamp_linear.r16_snorm
 dEQP-VK.texture.conversion.snorm_clamp_linear.r8g8b8a8_snorm
 dEQP-VK.texture.conversion.snorm_clamp_linear.r8g8_snorm
 dEQP-VK.texture.conversion.snorm_clamp_linear.r8_snorm
+
+# VK-GL-CTS 3005
+dEQP-VK.ray_tracing_pipeline.build.cpuht*1048576_1_1
+dEQP-VK.ray_tracing_pipeline.build.cpuht*65536_4_4
