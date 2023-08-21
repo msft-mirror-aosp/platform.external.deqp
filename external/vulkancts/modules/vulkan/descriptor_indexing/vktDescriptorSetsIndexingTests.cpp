@@ -89,7 +89,12 @@ static const VkExtent3D RESOLUTION = { RESOLUTION_width, RESOLUTION_height, 1 };
 
 static const VkExtent3D			smallImageExtent				= { 4, 4, 1 };
 static const VkExtent3D			bigImageExtent					= { 32, 32, 1 };
-static const VkDescriptorType	VK_DESCRIPTOR_TYPE_UNDEFINED = VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
+
+#ifndef CTS_USES_VULKANSC
+static const VkDescriptorType	VK_DESCRIPTOR_TYPE_UNDEFINED	= VK_DESCRIPTOR_TYPE_INLINE_UNIFORM_BLOCK_EXT;
+#else
+static const VkDescriptorType	VK_DESCRIPTOR_TYPE_UNDEFINED	= VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT;
+#endif
 
 template<deUint32 BindingNumber>
 struct Binding
@@ -367,8 +372,8 @@ public:
 																 bool										collectBeforeSubmit = true);
 
 	bool						iterateVerifyResults			(IterateCommonVariables&					variables,
-																	 ut::UpdatablePixelBufferAccessPtr	programResult,
-																	 ut::UpdatablePixelBufferAccessPtr	referenceResult);
+																 ut::UpdatablePixelBufferAccessPtr			programResult,
+																 ut::UpdatablePixelBufferAccessPtr			referenceResult);
 
 	Move<VkCommandBuffer>		createCmdBuffer					(void);
 
@@ -1390,7 +1395,9 @@ tcu::TestStatus	CommonDescriptorInstance::iterate					(void)
 			programResult->invalidate();
 		}
 
-	return ( iterateVerifyResults(v, programResult, referenceResult) ? tcu::TestStatus::pass : tcu::TestStatus::fail)("");
+	if (iterateVerifyResults(v, programResult, referenceResult))
+		return tcu::TestStatus::pass("Pass");
+	return tcu::TestStatus::fail("Failed -- check log for details");
 }
 
 std::vector<float> CommonDescriptorInstance::createColorScheme		(void)
@@ -1425,11 +1432,12 @@ void CommonDescriptorInstance::iterateCommandEnd					(IterateCommonVariables&			
 		iterateCollectResults(programResult, variables, true);
 		iterateCollectResults(referenceResult, variables, false);
 	}
+	m_context.resetCommandPoolForVKSC(m_vkd, *m_commandPool);
 }
 
-bool CommonDescriptorInstance::iterateVerifyResults			(IterateCommonVariables&					variables,
-																	 ut::UpdatablePixelBufferAccessPtr	programResult,
-																	 ut::UpdatablePixelBufferAccessPtr	referenceResult)
+bool CommonDescriptorInstance::iterateVerifyResults			(IterateCommonVariables&			variables,
+															 ut::UpdatablePixelBufferAccessPtr	programResult,
+															 ut::UpdatablePixelBufferAccessPtr	referenceResult)
 {
 	bool result = false;
 	if (m_testParams.fuzzyComparison)
@@ -1445,7 +1453,7 @@ bool CommonDescriptorInstance::iterateVerifyResults			(IterateCommonVariables&		
 
 	if (m_testParams.allowVertexStoring)
 	{
-		result = verifyVertexWriteResults(variables);
+		result = (verifyVertexWriteResults(variables) && result);
 	}
 
 	return result;
@@ -2978,11 +2986,15 @@ void StorageBufferInstance::createAndPopulateDescriptors			(IterateCommonVariabl
 
 bool StorageBufferInstance::verifyVertexWriteResults				(IterateCommonVariables&					variables)
 {
+	auto&						log				= m_context.getTestContext().getLog();
 	const tcu::Vec4				threshold		(0.002f, 0.002f, 0.002f, 0.002f);
 	const std::vector<deUint32>	primes			= ut::generatePrimes(variables.availableDescriptorCount);
-
-	unsigned char*				buffer = static_cast<unsigned char*>(variables.descriptorsBuffer->alloc->getHostPtr());
+	unsigned char*				buffer			= static_cast<unsigned char*>(variables.descriptorsBuffer->alloc->getHostPtr());
 	BindingStorageBuffer::Data	data;
+
+	log << tcu::TestLog::Message << "Available descriptor count: " << variables.availableDescriptorCount << tcu::TestLog::EndMessage;
+	log << tcu::TestLog::Message << "Valid descriptor count:     " << variables.validDescriptorCount << tcu::TestLog::EndMessage;
+
 	for (deUint32 primeIdx = 0; primeIdx < variables.validDescriptorCount; ++primeIdx)
 	{
 		const deUint32			prime		= primes[primeIdx];
@@ -2995,7 +3007,14 @@ bool StorageBufferInstance::verifyVertexWriteResults				(IterateCommonVariables&
 
 		const tcu::Vec4			diff = tcu::absDiff(referenceValue, realValue);
 		if (!tcu::boolAll(tcu::lessThanEqual(diff, threshold)))
+		{
+			log << tcu::TestLog::Message
+				<< "Error in valid descriptor " << primeIdx << " (descriptor " << prime << "): expected "
+				<< referenceValue << " but found " << realValue << " (threshold " << threshold << ")"
+				<< tcu::TestLog::EndMessage;
+
 			return false;
+		}
 	}
 	return true;
 }
@@ -3089,9 +3108,13 @@ void StorageTexelInstance::createAndPopulateDescriptors			(IterateCommonVariable
 
 bool StorageTexelInstance::verifyVertexWriteResults(IterateCommonVariables&					variables)
 {
+	auto&						log				= m_context.getTestContext().getLog();
 	const VkExtent3D			imageExtent		= { 4, 4, 1 };
 	const tcu::Vec4				threshold		(0.002f, 0.002f, 0.002f, 0.002f);
 	const std::vector<deUint32>	primes			= ut::generatePrimes(variables.availableDescriptorCount);
+
+	log << tcu::TestLog::Message << "Available descriptor count: " << variables.availableDescriptorCount << tcu::TestLog::EndMessage;
+	log << tcu::TestLog::Message << "Valid descriptor count:     " << variables.validDescriptorCount << tcu::TestLog::EndMessage;
 
 	for (deUint32 primeIdx = 0; primeIdx < variables.validDescriptorCount; ++primeIdx)
 	{
@@ -3104,7 +3127,14 @@ bool StorageTexelInstance::verifyVertexWriteResults(IterateCommonVariables&					
 
 		const tcu::Vec4			diff		= tcu::absDiff(referenceValue, realValue);
 		if (!tcu::boolAll(tcu::lessThanEqual(diff, threshold)))
+		{
+			log << tcu::TestLog::Message
+				<< "Error in valid descriptor " << primeIdx << " (descriptor " << prime << "): expected "
+				<< referenceValue << " but found " << realValue << " (threshold " << threshold << ")"
+				<< tcu::TestLog::EndMessage;
+
 			return false;
+		}
 	}
 	return true;
 }
@@ -3279,7 +3309,9 @@ tcu::TestStatus	DynamicBuffersInstance::iterate						(void)
 			programResult->invalidate();
 		}
 
-	return (iterateVerifyResults(v, programResult, referenceResult) ? tcu::TestStatus::pass : tcu::TestStatus::fail)("");
+	if (iterateVerifyResults(v, programResult, referenceResult))
+		return tcu::TestStatus::pass("Pass");
+	return tcu::TestStatus::fail("Failed -- check log for details");
 }
 
 class DynamicStorageBufferInstance : public DynamicBuffersInstance, public StorageBufferInstance
@@ -3626,7 +3658,11 @@ void SamplerInstance::createAndPopulateDescriptors					(IterateCommonVariables&	
 		m_testParams.usesMipMaps ? tcu::Sampler::LINEAR_MIPMAP_NEAREST : tcu::Sampler::NEAREST,	// minFilter
 		m_testParams.usesMipMaps ? tcu::Sampler::LINEAR_MIPMAP_NEAREST : tcu::Sampler::NEAREST,	// magFilter
 		0.0f,																					// lodTreshold
-		true);																					// normalizeCoords
+		true,																					// normalizeCoords
+		tcu::Sampler::COMPAREMODE_NONE,															// compare
+		0,																						// compareChannel
+		tcu::Vec4(0.0f, 0.0f, 0.0f, 0.0f),														// borderColor
+		true);																					// seamlessCubeMap
 	const VkSamplerCreateInfo createInfo = vk::mapSampler(sampler, vk::mapVkFormat(m_colorFormat));
 	variables.descriptorSamplers.resize(variables.validDescriptorCount);
 
@@ -3713,7 +3749,11 @@ void SampledImageInstance::createAndPopulateDescriptors				(IterateCommonVariabl
 			m_testParams.usesMipMaps ? tcu::Sampler::NEAREST_MIPMAP_NEAREST : tcu::Sampler::NEAREST,	// minFilter
 			m_testParams.usesMipMaps ? tcu::Sampler::NEAREST_MIPMAP_NEAREST : tcu::Sampler::NEAREST,	// magFilter
 			0.0f,																						// lodTreshold
-			true);																						// normalizeCoords
+			true,																						// normalizeCoords
+			tcu::Sampler::COMPAREMODE_NONE,																// compare
+			0,																							// compareChannel
+			tcu::Vec4(0.0f, 0.0f, 0.0f, 0.0f),															// borderColor
+			true);																						// seamlessCubeMap
 		const VkSamplerCreateInfo createInfo = vk::mapSampler(sampler, vk::mapVkFormat(m_colorFormat));
 		variables.descriptorSamplers.push_back(ut::SamplerSp(new Move<VkSampler>(vk::createSampler(m_vki, m_vkd, &createInfo))));
 	}
@@ -3827,7 +3867,11 @@ void CombinedImageInstance::createAndPopulateDescriptors			(IterateCommonVariabl
 		m_testParams.usesMipMaps ? tcu::Sampler::NEAREST_MIPMAP_NEAREST : tcu::Sampler::NEAREST,	// minFilter
 		m_testParams.usesMipMaps ? tcu::Sampler::NEAREST_MIPMAP_NEAREST : tcu::Sampler::NEAREST,	// magFilter
 		0.0f,																						// lodTreshold
-		true);																						// normalizeCoords
+		true,																						// normalizeCoords
+		tcu::Sampler::COMPAREMODE_NONE,																// compare
+		0,																							// compareChannel
+		tcu::Vec4(0.0f, 0.0f, 0.0f, 0.0f),															// borderColor
+		true);																						// seamlessCubeMap
 	const VkSamplerCreateInfo	createInfo = vk::mapSampler(sampler, vk::mapVkFormat(m_colorFormat));
 	variables.descriptorSamplers.push_back(ut::SamplerSp(new Move<VkSampler>(vk::createSampler(m_vki, m_vkd, &createInfo))));
 
@@ -3999,7 +4043,9 @@ tcu::TestStatus StorageImageInstance::iterate						(void)
 
 	iterateCommandEnd(v, programResult, referenceResult, false);
 
-	return ( iterateVerifyResults(v, programResult, referenceResult) ? tcu::TestStatus::pass : tcu::TestStatus::fail)("");
+	if (iterateVerifyResults(v, programResult, referenceResult))
+		return tcu::TestStatus::pass("Pass");
+	return tcu::TestStatus::fail("Failed -- check log for details");
 }
 
 void StorageImageInstance::iterateCollectResults					(ut::UpdatablePixelBufferAccessPtr&			result,
@@ -4090,7 +4136,7 @@ public:
 	{
 		context.requireDeviceFunctionality("VK_EXT_descriptor_indexing");
 
-		const vk::VkPhysicalDeviceDescriptorIndexingFeaturesEXT& feats = context.getDescriptorIndexingFeatures();
+		const vk::VkPhysicalDeviceDescriptorIndexingFeatures& feats = context.getDescriptorIndexingFeatures();
 
 		switch (m_testCaseParams.descriptorType)
 		{
@@ -4182,7 +4228,7 @@ public:
 
 		std::string(*genShaderSource)(VkShaderStageFlagBits, const TestCaseParams&, bool) = &CommonDescriptorInstance::getShaderAsm;
 
-		deUint32 vulkan_version = VK_MAKE_VERSION(1, 2, 0);
+		deUint32 vulkan_version = VK_MAKE_API_VERSION(0, 1, 2, 0);
 		vk::SpirvVersion spirv_version = vk::SPIRV_VERSION_1_4;
 		vk::SpirVAsmBuildOptions asm_options(vulkan_version, spirv_version);
 
