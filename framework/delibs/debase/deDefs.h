@@ -347,6 +347,9 @@ DE_INLINE deBool deGetTrue (void) { return DE_TRUE; }
 /* Floating-point environment flag. */
 #if defined(DE_FENV_ACCESS_ON)
 	/* Already defined */
+#elif (DE_COMPILER == DE_COMPILER_CLANG) && (DE_CPU == DE_CPU_ARM)
+//TODO(b/298204279): FENV_ACCESS is not supported, disabling all optimizations to make tests pass
+#	define DE_FENV_ACCESS_ON _Pragma("clang optimize off")
 #elif (DE_COMPILER == DE_COMPILER_CLANG) && (DE_CPU != DE_CPU_ARM)
 #	define DE_FENV_ACCESS_ON _Pragma("STDC FENV_ACCESS ON")
 #elif (DE_COMPILER == DE_COMPILER_MSC)
