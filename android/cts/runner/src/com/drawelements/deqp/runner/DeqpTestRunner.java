@@ -2095,8 +2095,9 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     // testdir.
                     testlist = FileUtil.findFile(mBuildHelper.getTestsDir(), mCaselistFile);
                     if (testlist == null || !testlist.isFile()) {
-                        throw new FileNotFoundException("Cannot find deqp test list file: "
-                            + testlist.getAbsolutePath());
+                        throw new FileNotFoundException(String.format(
+                            "Cannot find deqp test list file %s under %s",
+                            mCaselistFile, mBuildHelper.getTestsDir()));
                     }
                 }
                 CLog.d("Getting test list from file %s", testlist.getAbsolutePath());
