@@ -352,10 +352,16 @@ tcu::TestStatus basicMultiQueueCase (Context& context, TestConfig config)
 	deMemset(&deviceInfo, 0, sizeof(deviceInfo));
 	instance.getPhysicalDeviceFeatures(physicalDevice, &deviceFeatures);
 
+	std::vector<const char*> deviceExtensions;
+	if (config.semaphoreType == VK_SEMAPHORE_TYPE_TIMELINE_KHR)
+	{
+		deviceExtensions.push_back("VK_KHR_timeline_semaphore");
+	}
+
 	deviceInfo.sType					= VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
 	deviceInfo.pNext					= DE_NULL;
-	deviceInfo.enabledExtensionCount	= 0u;
-	deviceInfo.ppEnabledExtensionNames	= DE_NULL;
+	deviceInfo.enabledExtensionCount	= static_cast<deUint32>(deviceExtensions.size());
+	deviceInfo.ppEnabledExtensionNames	= deviceExtensions.empty() ? DE_NULL : deviceExtensions.data();
 	deviceInfo.enabledLayerCount		= 0u;
 	deviceInfo.ppEnabledLayerNames		= DE_NULL;
 	deviceInfo.pEnabledFeatures			= &deviceFeatures;
