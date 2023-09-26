@@ -1,9 +1,5 @@
 # Excluded dEQP test cases when testing ANGLE
 
-# http://b/290049349
-dEQP-GLES31.functional.copy_image.non_compressed.*
-dEQP-GLES31.functional.copy_image.mixed.viewclass_128_bits_mixed.rgba_astc_4x4_khr_rgba32f#texture2d_to_cubemap
-
 # http://b/290050838
 dEQP-EGL.functional.get_frame_timestamps#rgb565_no_depth_no_stencil
 dEQP-EGL.functional.get_frame_timestamps#rgb565_depth_no_stencil
