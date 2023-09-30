@@ -982,6 +982,7 @@ tcu::TestStatus UnusedShaderStagesInstance::iterate ()
 
 	VkGraphicsPipelineCreateInfo linkedPipelineInfo	= initVulkanStructure(&linkedPipelineLibraryInfo);
 	linkedPipelineInfo.flags						= linkFlags;
+	linkedPipelineInfo.layout						= pipelineLayout.get();
 	linkedPipelineInfo.stageCount					= de::sizeU32(allBadStages);
 	linkedPipelineInfo.pStages						= de::dataOrNull(allBadStages);
 
@@ -1274,7 +1275,6 @@ void PipelineLibraryInterpolateAtSampleTestInstance::runTest(BufferWithMemory& i
 	vkd.cmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, graphicsPipelineLayout.get(), 0u, 1, &descriptorSetBuffer.get(), 0u, nullptr);
 
 	vkd.cmdBeginRendering(*commandBuffer, &render_info);
-	vkd.cmdSetPatchControlPointsEXT(commandBuffer.get(), 3);
 	vkd.cmdBindPipeline(commandBuffer.get(), vk::VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline1.getPipeline());
 	vkd.cmdDraw(commandBuffer.get(), 6, 1, 0, 0);
 	vkd.cmdEndRendering(*commandBuffer);
