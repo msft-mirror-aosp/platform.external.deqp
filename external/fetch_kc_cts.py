@@ -29,10 +29,10 @@ import subprocess
 from fetch_sources import *
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "scripts"))
 
-from build.common import *
+from ctsbuild.common import *
 
 EXTERNAL_DIR	= os.path.realpath(os.path.normpath(os.path.dirname(__file__)))
-SHA1 = "0eb3b7e9d717bda5b9ccc1e32f6dfdc4a12b8b2e"
+SHA1 = "3e256baab38a1c29d753fa4605f507aee8684d84"
 
 PACKAGES = [
 	GitRepo(
