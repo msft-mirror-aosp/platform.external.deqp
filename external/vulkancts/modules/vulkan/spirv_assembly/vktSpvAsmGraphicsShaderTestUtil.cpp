@@ -243,7 +243,7 @@ static void requireFormatUsageSupport (const InstanceInterface& vki, VkPhysicalD
 
 	if ((requiredUsageFlags & VK_IMAGE_USAGE_TRANSFER_SRC_BIT) != 0)
 	{
-		if ((tilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT_KHR) == 0)
+		if ((tilingFeatures & VK_FORMAT_FEATURE_TRANSFER_SRC_BIT) == 0)
 			TCU_THROW(NotSupportedError, "Image format cannot be used as transfer source");
 		requiredUsageFlags ^= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 	}
@@ -2946,7 +2946,7 @@ Move<VkImage> createImageForResource (const DeviceInterface& vk, const VkDevice 
 	return createImage(vk, vkDevice, &resourceImageParams);
 }
 
-void copyBufferToImage (const DeviceInterface& vk, const VkDevice& device, const VkQueue& queue, VkCommandBuffer cmdBuffer, VkBuffer buffer, VkImage image, VkImageAspectFlags aspect)
+void copyBufferToImage (Context& context, const DeviceInterface& vk, const VkDevice& device, const VkQueue& queue, VkCommandPool cmdPool, VkCommandBuffer cmdBuffer, VkBuffer buffer, VkImage image, VkImageAspectFlags aspect)
 {
 	const VkBufferImageCopy			copyRegion			=
 	{
@@ -2971,6 +2971,7 @@ void copyBufferToImage (const DeviceInterface& vk, const VkDevice& device, const
 	endCommandBuffer(vk, cmdBuffer);
 
 	submitCommandsAndWait(vk, device, queue, cmdBuffer);
+	context.resetCommandPoolForVKSC(device, cmdPool);
 }
 
 VkImageAspectFlags getImageAspectFlags (VkFormat format)
@@ -3055,6 +3056,7 @@ TestStatus runAndVerifyDefaultPipeline (Context& context, InstanceContext instan
 			TCU_THROW(NotSupportedError, (std::string("Extension not supported: ") + *i).c_str());
 	}
 
+#ifndef CTS_USES_VULKANSC
 	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") &&
 		!context.getPortabilitySubsetFeatures().mutableComparisonSamplers)
 	{
@@ -3073,6 +3075,7 @@ TestStatus runAndVerifyDefaultPipeline (Context& context, InstanceContext instan
 			}
 		}
 	}
+#endif // CTS_USES_VULKANSC
 
 	{
 		VulkanFeatures localRequired = instance.requestedFeatures;
@@ -3501,7 +3504,7 @@ TestStatus runAndVerifyDefaultPipeline (Context& context, InstanceContext instan
 
 				VK_CHECK(vk.bindImageMemory(device, *resourceImage, resourceImageMemory->getMemory(), resourceImageMemory->getOffset()));
 
-				copyBufferToImage(vk, device, queue, *cmdBuf, resourceBuffer.get(), resourceImage.get(), inputImageAspect);
+				copyBufferToImage(context, vk, device, queue, *cmdPool, *cmdBuf, resourceBuffer.get(), resourceImage.get(), inputImageAspect);
 
 				inResourceMemories.push_back(AllocationSp(resourceImageMemory.release()));
 				inResourceImages.push_back(ImageHandleSp(new ImageHandleUp(resourceImage)));
@@ -4015,11 +4018,13 @@ TestStatus runAndVerifyDefaultPipeline (Context& context, InstanceContext instan
 		// this value is usually 4 and current tests meet this requirement but
 		// if this changes in future then this limit should be verified in checkSupport
 		const deUint32 stride = instance.interfaces.getInputType().getNumBytes();
+#ifndef CTS_USES_VULKANSC
 		if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") &&
 			((stride % context.getPortabilitySubsetProperties().minVertexInputBindingStrideAlignment) != 0))
 		{
 			DE_FATAL("stride is not multiply of minVertexInputBindingStrideAlignment");
 		}
+#endif // CTS_USES_VULKANSC
 
 		const VkVertexInputBindingDescription	vertexBinding1			=
 		{
@@ -4418,6 +4423,7 @@ TestStatus runAndVerifyDefaultPipeline (Context& context, InstanceContext instan
 
 			// Submit & wait for completion
 			submitCommandsAndWait(vk, device, queue, cmdBuf.get());
+			context.resetCommandPoolForVKSC(device, *cmdPool);
 		}
 	}
 
