@@ -1092,6 +1092,11 @@ void checkTimelineSemaphore (Context& context)
 {
 	checkSupport(context);
 	context.requireDeviceFunctionality("VK_KHR_timeline_semaphore");
+
+#ifndef CTS_USES_VULKANSC
+	if (context.isDeviceFunctionalitySupported("VK_KHR_portability_subset") && !context.getPortabilitySubsetFeatures().events)
+		TCU_THROW(NotSupportedError, "VK_KHR_portability_subset: Events are not supported by this implementation");
+#endif // CTS_USES_VULKANSC
 }
 
 } // unnamed namespace
