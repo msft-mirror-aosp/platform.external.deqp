@@ -189,7 +189,7 @@ tcu::TestStatus basicChainCase (Context& context)
 	return tcu::TestStatus::fail("Basic semaphore chain test failed");
 }
 
-tcu::TestStatus basicChainTimelineCase (Context& context)
+tcu::TestStatus basicChainTimelineCase (Context& context, TestConfig config)
 {
 	VkResult						err			= VK_SUCCESS;
 	const DeviceInterface&			vk			= context.getDeviceInterface();
@@ -468,6 +468,12 @@ tcu::TestStatus basicMultiQueueCase (Context& context, TestConfig config)
 	return tcu::TestStatus::pass("Basic semaphore tests with multi queue passed");
 }
 
+void checkSupport (Context& context, TestConfig config)
+{
+	if (config.semaphoreType == VK_SEMAPHORE_TYPE_TIMELINE_KHR)
+		context.requireDeviceFunctionality("VK_KHR_timeline_semaphore");
+}
+
 } // anonymous
 
 tcu::TestCaseGroup* createBasicBinarySemaphoreTests (tcu::TestContext& testCtx)
@@ -501,9 +507,9 @@ tcu::TestCaseGroup* createBasicTimelineSemaphoreTests (tcu::TestContext& testCtx
 		VK_SEMAPHORE_TYPE_TIMELINE_KHR,
 	};
 
-	addFunctionCase(basicTests.get(), "one_queue",   "Basic timeline semaphore tests with one queue",   basicOneQueueCase, config);
-	addFunctionCase(basicTests.get(), "multi_queue", "Basic timeline semaphore tests with multi queue", basicMultiQueueCase, config);
-	addFunctionCase(basicTests.get(), "chain", "Timeline semaphore chain test", basicChainTimelineCase);
+	addFunctionCase(basicTests.get(), "one_queue",   "Basic timeline semaphore tests with one queue",	checkSupport, basicOneQueueCase, config);
+	addFunctionCase(basicTests.get(), "multi_queue", "Basic timeline semaphore tests with multi queue",	checkSupport, basicMultiQueueCase, config);
+	addFunctionCase(basicTests.get(), "chain", "Timeline semaphore chain test",							checkSupport, basicChainTimelineCase, config);
 
 	return basicTests.release();
 }
