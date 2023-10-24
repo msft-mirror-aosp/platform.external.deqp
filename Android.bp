@@ -125,12 +125,15 @@ cc_defaults {
 
 cc_library_shared {
     name: "libdeqp",
-    defaults: ["libdeqp_defaults"]
+    defaults: ["libdeqp_defaults"],
 }
 
 cc_defaults {
     name: "libdeqp_defaults",
-    defaults: ["libdeqp_gen", "deqp_and_deps_defaults"],
+    defaults: [
+        "libdeqp_gen",
+        "deqp_and_deps_defaults",
+    ],
 
     tidy_checks: [
         // The clang-tidy google-explicit-constructor warning is issued to nearly
@@ -241,7 +244,7 @@ cc_test {
     ],
 
     local_include_dirs: [
-       "framework/platform/surfaceless",
+        "framework/platform/surfaceless",
     ],
 
     multilib: {
