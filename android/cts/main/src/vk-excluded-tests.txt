@@ -42,9 +42,6 @@ dEQP-VK.texture.explicit_lod.*
 #VK-GL-CTS 110: Excluded wsi android tests as they require android loader support
 dEQP-VK.wsi.android.surface.query_devgroup_*
 
-# Issue: b/67022169
-dEQP-VK.wsi.android.incremental_present.scale_down.*
-
 # Exclude conformance version from android test, issue 1839
 dEQP-VK.api.driver_properties.conformance_version
 
