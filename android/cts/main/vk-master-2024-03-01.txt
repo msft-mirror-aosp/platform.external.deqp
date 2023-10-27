@@ -3,4 +3,5 @@ vk-master-2024-03-01/glsl.txt
 vk-master-2024-03-01/pipeline.txt
 vk-master-2024-03-01/renderpass2.txt
 vk-master-2024-03-01/ssbo.txt
+vk-master-2024-03-01/texture.txt
 vk-master-2024-03-01/wsi.txt
