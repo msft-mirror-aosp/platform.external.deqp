@@ -39,12 +39,12 @@
 #include <type_traits>
 #include <map>
 
-static const deUint32 WATCHDOG_INTERVAL = 16384; // Touch watchDog every N iterations.
-
 namespace vk
 {
 
 #ifndef CTS_USES_VULKANSC
+
+static const deUint32 WATCHDOG_INTERVAL = 16384; // Touch watchDog every N iterations.
 
 struct DeferredThreadParams
 {

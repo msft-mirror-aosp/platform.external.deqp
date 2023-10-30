@@ -20,4 +20,5 @@ dEQP-VK.ssbo.phys.layout.random.16bit.scalar.13
 dEQP-VK.renderpass2.depth_stencil_resolve.*separate_layouts.*
 
 # Issue 4468, b/285407037: Test violates spec on protected memory usage.
-dEQP-VK.synchronization.global_priority_transition.low.no_sync.protected.from_graphics_to_compute
+dEQP-VK.synchronization.global_priority_transition.*.protected.*
+dEQP-VK.synchronization.global_priority_transition.*.sparse_protected.*
