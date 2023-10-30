@@ -4209,6 +4209,7 @@ dEQP-VK.ubo.random.all_shared_buffer.44
 dEQP-VK.ubo.random.all_shared_buffer.45
 dEQP-VK.ubo.random.all_shared_buffer.46
 dEQP-VK.ubo.random.all_shared_buffer.47
+dEQP-VK.ubo.random.all_shared_buffer.48
 dEQP-VK.ubo.random.all_shared_buffer.49
 dEQP-VK.ubo.random.all_out_of_order_offsets.0
 dEQP-VK.ubo.random.all_out_of_order_offsets.1
