@@ -302,3 +302,6 @@ dEQP-VK.clipping.clip_volume.depth_clip.triangle_list_with_adjacency
 dEQP-VK.clipping.clip_volume.depth_clip.triangle_strip
 dEQP-VK.clipping.clip_volume.depth_clip.triangle_strip_with_adjacency
 dEQP-VK.clipping.clip_volume.depth_clip.triangle_fan
+dEQP-VK.clipping.clip_volume.clipped.large_points
+dEQP-VK.clipping.clip_volume.clipped.wide_lines_axis_aligned
+dEQP-VK.clipping.clip_volume.clipped.wide_lines_diagonal
