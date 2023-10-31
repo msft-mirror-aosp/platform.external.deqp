@@ -115,6 +115,8 @@
 #define DE_CPU_ARM_64	4
 #define DE_CPU_MIPS		5
 #define DE_CPU_MIPS_64	6
+#define DE_CPU_RISCV_32	7
+#define DE_CPU_RISCV_64	8
 
 /* CPU detection. */
 #if defined(DE_CPU)
@@ -131,6 +133,10 @@
 #	define DE_CPU DE_CPU_MIPS
 #elif defined(__mips__) && ((__mips) == 64)
 #	define DE_CPU DE_CPU_MIPS_64
+#elif defined(__riscv) && ((__riscv_xlen) == 32)
+#	define DE_CPU DE_CPU_RISCV_32
+#elif defined(__riscv) && ((__riscv_xlen) == 64)
+#	define DE_CPU DE_CPU_RISCV_64
 #else
 #	error Unknown CPU.
 #endif
@@ -341,8 +347,9 @@ DE_INLINE deBool deGetTrue (void) { return DE_TRUE; }
 /* Floating-point environment flag. */
 #if defined(DE_FENV_ACCESS_ON)
 	/* Already defined */
-#elif (DE_OS == DE_OS_ANDROID)
-#	define DE_FENV_ACCESS_ON	/* not supported on 13*/
+#elif (DE_COMPILER == DE_COMPILER_CLANG) && (DE_CPU == DE_CPU_ARM)
+//TODO(b/298204279): FENV_ACCESS is not supported, disabling all optimizations to make tests pass
+#	define DE_FENV_ACCESS_ON _Pragma("clang optimize off")
 #elif (DE_COMPILER == DE_COMPILER_CLANG) && (DE_CPU != DE_CPU_ARM)
 #	define DE_FENV_ACCESS_ON _Pragma("STDC FENV_ACCESS ON")
 #elif (DE_COMPILER == DE_COMPILER_MSC)
