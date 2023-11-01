@@ -1954,9 +1954,17 @@ tcu::TestStatus UniformBlockCaseInstance::iterate (void)
 	vk::Unique<VkFramebuffer>			framebuffer			(createFramebuffer(*renderPass, *colorImageView));
 	vk::Unique<VkPipelineLayout>		pipelineLayout		(createPipelineLayout(m_context, *descriptorSetLayout));
 
+	// Disable the watchdog to prevent long shader compilation failing tests due to time out
+	// on certain hardware(s)
+	m_context.getTestContext().touchWatchdogAndDisableIntervalTimeLimit();
+
 	vk::Unique<VkShaderModule>			vtxShaderModule		(vk::createShaderModule(vk, device, m_context.getBinaryCollection().get("vert"), 0));
 	vk::Unique<VkShaderModule>			fragShaderModule	(vk::createShaderModule(vk, device, m_context.getBinaryCollection().get("frag"), 0));
 	vk::Unique<VkPipeline>				pipeline			(createPipeline(*vtxShaderModule, *fragShaderModule, *pipelineLayout, *renderPass));
+
+	//Re-enable the watchdog
+	m_context.getTestContext().touchWatchdogAndEnableIntervalTimeLimit();
+
 	vk::Unique<VkCommandPool>			cmdPool				(createCmdPool(m_context));
 	vk::Unique<VkCommandBuffer>			cmdBuffer			(createCmdBuffer(m_context, *cmdPool));
 	vk::Unique<VkBuffer>				readImageBuffer		(createBuffer(m_context, (vk::VkDeviceSize)(RENDER_WIDTH * RENDER_HEIGHT * 4), vk::VK_BUFFER_USAGE_TRANSFER_DST_BIT));
