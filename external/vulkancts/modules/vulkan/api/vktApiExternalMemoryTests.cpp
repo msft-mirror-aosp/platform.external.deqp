@@ -1459,6 +1459,9 @@ tcu::TestStatus testSemaphoreMultipleExports (Context&					context,
 		{
 			NativeHandle handle;
 
+			// Need to touch watchdog due to how long one iteration takes
+			context.getTestContext().touchWatchdog();
+
 			if (transference == TRANSFERENCE_COPY)
 			{
 				submitAtomicCalculationsAndGetSemaphoreNative(context, vkd, *device, alloc, queue, queueFamilyIndex, *semaphore, config.externalType, handle);
@@ -1467,9 +1470,6 @@ tcu::TestStatus testSemaphoreMultipleExports (Context&					context,
 			}
 			else
 				getSemaphoreNative(vkd, *device, *semaphore, config.externalType, handle);
-
-			// Let watchdog know we're alive
-			context.getTestContext().touchWatchdog();
 		}
 
 		submitEmptySignal(vkd, queue, *semaphore);
@@ -2531,6 +2531,9 @@ tcu::TestStatus testFenceMultipleExports (Context&				context,
 		{
 			NativeHandle handle;
 
+			// Need to touch watchdog due to how long one iteration takes
+			context.getTestContext().touchWatchdog();
+
 			if (transference == TRANSFERENCE_COPY)
 			{
 				submitAtomicCalculationsAndGetFenceNative(context, vkd, *device, alloc, queue, queueFamilyIndex, *fence, config.externalType, handle, exportNdx == 0 /* expect fence to be signaled after first pass */);
@@ -2539,9 +2542,6 @@ tcu::TestStatus testFenceMultipleExports (Context&				context,
 			}
 			else
 				getFenceNative(vkd, *device, *fence, config.externalType, handle, exportNdx == 0 /* expect fence to be signaled after first pass */);
-
-			// Let watchdog know we're alive
-			context.getTestContext().touchWatchdog();
 		}
 
 		submitEmptySignal(vkd, queue, *fence);
@@ -3354,7 +3354,7 @@ tcu::TestStatus testMemoryImportTwice (Context& context, MemoryTestConfig config
 		};
 		vkd.getAndroidHardwareBufferPropertiesANDROID(device.get(), handleA.getAndroidHardwareBuffer(), &ahbProperties);
 
-		exportedMemoryTypeIndex	= chooseMemoryType(ahbProperties.memoryTypeBits);
+		exportedMemoryTypeIndex	= getExportedMemoryTypeIndex(vki, physicalDevice, config.hostVisible, ahbProperties.memoryTypeBits);
 	}
 
 	{
@@ -3424,7 +3424,7 @@ tcu::TestStatus testMemoryMultipleImports (Context& context, MemoryTestConfig co
 		};
 		vkd.getAndroidHardwareBufferPropertiesANDROID(device.get(), handleA.getAndroidHardwareBuffer(), &ahbProperties);
 
-		exportedMemoryTypeIndex	= chooseMemoryType(ahbProperties.memoryTypeBits);
+		exportedMemoryTypeIndex	= getExportedMemoryTypeIndex(vki, physicalDevice, config.hostVisible, ahbProperties.memoryTypeBits);
 	}
 
 	for (size_t ndx = 0; ndx < count; ndx++)
