@@ -1,8 +1,3 @@
-dEQP-VK.wsi.display_control.swapchain_counter
-dEQP-VK.wsi.display_control.display_power_control
-dEQP-VK.wsi.display_control.register_display_event
-dEQP-VK.wsi.display_control.register_device_event
-dEQP-VK.wsi.display.surface_counters
 dEQP-VK.wsi.android.surface.query_presentation_support
 dEQP-VK.wsi.android.surface.query_surface_counters
 dEQP-VK.wsi.android.swapchain.create.image_swapchain_create_info
@@ -14,3 +9,8 @@ dEQP-VK.wsi.android.swapchain.render.2swapchains
 dEQP-VK.wsi.android.swapchain.render.2swapchains2
 dEQP-VK.wsi.android.swapchain.render.10swapchains
 dEQP-VK.wsi.android.swapchain.render.10swapchains2
+dEQP-VK.wsi.display.surface_counters
+dEQP-VK.wsi.display_control.swapchain_counter
+dEQP-VK.wsi.display_control.display_power_control
+dEQP-VK.wsi.display_control.register_display_event
+dEQP-VK.wsi.display_control.register_device_event
