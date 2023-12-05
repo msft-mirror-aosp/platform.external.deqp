@@ -544,7 +544,7 @@ tcu::TestStatus InstancedDrawInstance::iterate()
 	int firstInstanceIndicesCount = DE_LENGTH_OF_ARRAY(firstInstanceIndices);
 
 	// Require 'drawIndirectFirstInstance' feature to run non-zero firstInstance indirect draw tests.
-	if (m_params.function == TestParams::FUNCTION_DRAW_INDIRECT && !m_context.getDeviceFeatures().drawIndirectFirstInstance)
+	if ((m_params.function == TestParams::FUNCTION_DRAW_INDIRECT || m_params.function == TestParams::FUNCTION_DRAW_INDEXED_INDIRECT) && !m_context.getDeviceFeatures().drawIndirectFirstInstance)
 	{
 		firstInstanceIndicesCount = 1;
 	}
