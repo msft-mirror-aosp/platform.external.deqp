@@ -924,8 +924,11 @@ bool AttachmentRateInstance::verifyUsingAtomicChecks(deUint32 tileWidth, deUint3
 	deUint32 triangleTopEdgeY	= 0;
 
 	// this method assumes that greatest angle in the triangle points to the top-left corner of FB;
-	// this vector will then store fragments on the right edge of triangle; vector index represents y coordinate and value is x
+	// these vectors will then store fragments on the right and bottom edges of triangle respectively;
+	// for the right edge vector, the index represents y coordinate and value is x;
+	// for the bottom edge vector, the index represents x coordinate and value is y
 	std::vector<deUint32> fragmentsOnTheRightTriangleEdgeVect(m_cbHeight, 0);
+	std::vector<deUint32> fragmentsOnTheBottomTriangleEdgeVect(m_cbWidth, 0);
 
 	tcu::clear(errorMaskAccess, tcu::Vec4(0.0f, 0.0f, 0.0f, 1.0));
 
@@ -948,6 +951,9 @@ bool AttachmentRateInstance::verifyUsingAtomicChecks(deUint32 tileWidth, deUint3
 
 		// constantly overwrite coordinate on right edge so that we are left with the farthest one
 		fragmentsOnTheRightTriangleEdgeVect[cbFragmentY] = cbFragmentX;
+
+		// constantly overwrite coordinate on bottom edge so that we are left with the farthest one
+		fragmentsOnTheBottomTriangleEdgeVect[cbFragmentX] = cbFragmentY;
 
 		// make sure that fragment g and a components are 0
 		if ((fragmentColor[1] != 0) || (fragmentColor[3] != 0))
@@ -1030,12 +1036,14 @@ bool AttachmentRateInstance::verifyUsingAtomicChecks(deUint32 tileWidth, deUint3
 		{
 			const auto&	topLeftFragment		= fragmentSet[0];
 			deUint32	triangleRightEdgeX	= fragmentsOnTheRightTriangleEdgeVect[topLeftFragment.y()];
+			deUint32	triangleBottomEdgeY	= fragmentsOnTheBottomTriangleEdgeVect[topLeftFragment.x()];
 
 			// we can only count this as an error if set is fully inside of triangle, sets on
 			// edges may not have same number of fragments as sets fully located in the triangle
 			if ((topLeftFragment.y() > (triangleTopEdgeY)) &&
 				(topLeftFragment.x() > (triangleLeftEdgeX)) &&
-				(topLeftFragment.x() < (triangleRightEdgeX - rateWidth)))
+				(topLeftFragment.x() < (triangleRightEdgeX - rateWidth)) &&
+				(topLeftFragment.y() < (triangleBottomEdgeY - rateHeight)))
 			{
 				wrongFragments += (deUint32)fragmentSet.size();
 				fragmentColor	= tcu::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
@@ -1403,12 +1411,12 @@ bool AttachmentRateInstance::runCopyMode (void)
 		beginCommandBuffer(vk, *cmdBuffer, 0u);
 
 		// wait till sr images layout are changed
-		VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
 		std::vector<VkImageMemoryBarrier> srImageBarrierGeneral(2,
 			makeImageMemoryBarrier(
 				VK_ACCESS_NONE_KHR,
-				VK_ACCESS_NONE_KHR,
+				(VK_ACCESS_TRANSFER_WRITE_BIT | VK_ACCESS_TRANSFER_READ_BIT),
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_GENERAL,
 				**m_srImage[0],
@@ -1655,20 +1663,18 @@ bool AttachmentRateInstance::runCopyModeOnTransferQueue(void)
 		beginCommandBuffer(vk, *transferCmdBuffer, 0u);
 
 		// wait till sr data is ready in buffer and change sr image layouts to general
-		VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 		VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		memoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		memoryBarrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 		std::vector<VkImageMemoryBarrier> srImageBarrierGeneral(2,
 			makeImageMemoryBarrier(
 				VK_ACCESS_NONE_KHR,
-				VK_ACCESS_NONE_KHR,
+				(VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT),
 				VK_IMAGE_LAYOUT_UNDEFINED,
 				VK_IMAGE_LAYOUT_GENERAL,
 				**m_srImage[0],
 				m_defaultImageSubresourceRange));
 		srImageBarrierGeneral[1].image = **srSrcImage;
-		vk.cmdPipelineBarrier(*transferCmdBuffer, srcStageMask, dstStageMask, 0, 1, &memoryBarrier, 0, DE_NULL, 2, srImageBarrierGeneral.data());
+		vk.cmdPipelineBarrier(*transferCmdBuffer, srcStageMask, dstStageMask, 0, 0, nullptr, 0, DE_NULL, 2, srImageBarrierGeneral.data());
 
 		// copy sr data to images
 		const VkBufferImageCopy srCopyBuffer = makeBufferImageCopy({ srWidth, srHeight, 1u }, m_defaultImageSubresourceLayers);
@@ -1998,12 +2004,12 @@ bool AttachmentRateInstance::runTwoSubpassMode(void)
 	beginCommandBuffer(vk, *cmdBuffer, 0u);
 
 	// change sr image layouts to general
-	VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	VkPipelineStageFlags srcStageMask = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
 	VkPipelineStageFlags dstStageMask = VK_PIPELINE_STAGE_TRANSFER_BIT;
 	std::vector<VkImageMemoryBarrier> srImageBarrierGeneral(2,
 		makeImageMemoryBarrier(
 			VK_ACCESS_NONE_KHR,
-			VK_ACCESS_NONE_KHR,
+			(VK_ACCESS_TRANSFER_READ_BIT | VK_ACCESS_TRANSFER_WRITE_BIT),
 			VK_IMAGE_LAYOUT_UNDEFINED,
 			VK_IMAGE_LAYOUT_GENERAL,
 			**m_srImage[0],
