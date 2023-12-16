@@ -6,10 +6,6 @@ dEQP-VK.glsl.switch.empty_case_default_static_vertex
 dEQP-VK.glsl.switch.empty_case_default_static_fragment
 dEQP-VK.glsl.switch.empty_case_default_uniform_vertex
 dEQP-VK.glsl.switch.empty_case_default_uniform_fragment
-dEQP-VK.glsl.crash_test.divbyzero_vert
-dEQP-VK.glsl.crash_test.divbyzero_tesc
-dEQP-VK.glsl.crash_test.divbyzero_tese
-dEQP-VK.glsl.crash_test.divbyzero_geom
 dEQP-VK.glsl.atomic_operations.exchange_float16_task
 dEQP-VK.glsl.atomic_operations.exchange_float16_task_shared
 dEQP-VK.glsl.atomic_operations.exchange_float16_task_reference
@@ -318,3 +314,7 @@ dEQP-VK.glsl.atomic_operations.xor_unsigned64bit_task_payload
 dEQP-VK.glsl.atomic_operations.xor_unsigned64bit_mesh
 dEQP-VK.glsl.atomic_operations.xor_unsigned64bit_mesh_shared
 dEQP-VK.glsl.atomic_operations.xor_unsigned64bit_mesh_reference
+dEQP-VK.glsl.crash_test.divbyzero_vert
+dEQP-VK.glsl.crash_test.divbyzero_tesc
+dEQP-VK.glsl.crash_test.divbyzero_tese
+dEQP-VK.glsl.crash_test.divbyzero_geom
