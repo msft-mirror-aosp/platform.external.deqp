@@ -88,7 +88,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private static final String INCOMPLETE_LOG_MESSAGE = "Crash: Incomplete test log";
     private static final String TIMEOUT_LOG_MESSAGE = "Timeout: Test timeout";
     private static final String SKIPPED_INSTANCE_LOG_MESSAGE = "Configuration skipped";
-    private static final String ASSUMPTION_FAILURE_DEQP_LEVEL_LOG_MESSAGE = "Features to be tested are not supported by device";
     private static final String NOT_EXECUTABLE_LOG_MESSAGE = "Abort: Test cannot be executed";
     private static final String APP_DIR = "/sdcard/";
     private static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
@@ -1701,7 +1700,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     }
 
     /**
-     * Pass tests without running them
+     * Pass all remaining tests without running them
      */
     private void fakePassTests(ITestInvocationListener listener) {
         HashMap<String, Metric> emptyMap = new HashMap<>();
@@ -1709,45 +1708,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             listener.testStarted(test);
             listener.testEnded(test, emptyMap);
         }
-
         // Log only once all the skipped tests
-        CLog.d("Marking tests '%s', as pass due to either because tests are simply being collected",
-                mTestInstances.keySet());
-        mRemainingTests.removeAll(mTestInstances.keySet());
-    }
-
-    /**
-     * Ignoring tests without running them
-     */
-    private void markTestsAsAssumptionFailure(ITestInvocationListener listener) {
-        HashMap<String, Metric> emptyMap = new HashMap<>();
-        for (TestDescription test : mTestInstances.keySet()) {
-            listener.testStarted(test);
-            listener.testAssumptionFailure(test, ASSUMPTION_FAILURE_DEQP_LEVEL_LOG_MESSAGE);
-            listener.testEnded(test, emptyMap);
-        }
-
-        // Log only once after all the tests marked as assumption Failure
-        CLog.d("Assumption failed for tests '%s' because features are not supported by device",
-            mRemainingTests);
-        mRemainingTests.removeAll(mTestInstances.keySet());
-    }
-
-    /**
-     * Ignoring tests without running them
-     */
-    private void ignoreTests(ITestInvocationListener listener) {
-        HashMap<String, Metric> emptyMap = new HashMap<>();
-        for (TestDescription test : mTestInstances.keySet()) {
-            listener.testStarted(test);
-            listener.testIgnored(test);
-            listener.testEnded(test, emptyMap);
-        }
-
-        // Log only once after all the tests ignored
-        CLog.d("Tests '%s', ignored because they are not required by the deqp level",
-            mRemainingTests);
-        mRemainingTests.removeAll(mTestInstances.keySet());
+        CLog.d("Skipping tests '%s', either because they are not supported by the device or "
+            + "because tests are simply being collected", mRemainingTests);
+        mRemainingTests.clear();
     }
 
     /**
@@ -2370,18 +2334,14 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             final boolean isSupportedApi = (isOpenGlEsPackage() && isSupportedGles())
                                             || (isVulkanPackage() && isSupportedVulkan())
                                             || (!isOpenGlEsPackage() && !isVulkanPackage());
-            if (mCollectTestsOnly) {
+            if (mCollectTestsOnly
+                || !isSupportedApi
+                || !claimedDeqpLevelIsRecentEnough()) {
                 // Pass all tests trivially if:
-                // - we are only collecting the names of the tests
+                // - we are collecting the names of the tests only, or
+                // - the relevant API is not supported, or
+                // - the device's feature flags do not claim to pass the tests
                 fakePassTests(listener);
-            } else if(!isSupportedApi) {
-                // Skip tests with "Assumption Failure" when
-                // - the relevant API/feature is not supported or
-                markTestsAsAssumptionFailure(listener);
-            } else if(!claimedDeqpLevelIsRecentEnough()) {
-                // Skip tests with "Ignore" when
-                // - the device's deqp level do not claim to pass the tests
-                ignoreTests(listener);
             } else if (!mRemainingTests.isEmpty()) {
                 mInstanceListerner.setSink(listener);
                 mDeviceRecovery.setDevice(mDevice);
