@@ -176,6 +176,11 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     "Disable the native testrunner's per-test watchdog.")
     private boolean mDisableWatchdog = false;
 
+    @Option(name = "force-deqp-level",
+            description = "Force dEQP level to a specific level instead of device dEQP level. " +
+            "'all' enforces all dEQP tests to run")
+    private String mForceDeqpLevel = "";
+
     private Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
     private final TestInstanceResultListener mInstanceListerner = new TestInstanceResultListener();
@@ -1772,6 +1777,11 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private boolean claimedDeqpLevelIsRecentEnough() throws CapabilityQueryFailureException,
             DeviceNotAvailableException {
+        if (mForceDeqpLevel.equals("all")) {
+            CLog.d("All deqp levels have been forced for this run");
+            return true;
+        }
+
         // Determine whether we need to check the dEQP feature flag for Vulkan or OpenGL ES.
         final String featureName;
         if (isVulkanPackage()) {
@@ -1797,6 +1807,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             CLog.d("No dEQP level date found in caselist. Running unconditionally.");
             return true;
         }
+
         final int year = Integer.parseInt(matcher.group(1));
         final int month = Integer.parseInt(matcher.group(2));
         final int day = Integer.parseInt(matcher.group(3));
@@ -1817,6 +1828,21 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         CLog.d("    2024-03-01 -> 132645633");
 
         CLog.d("Minimum level required to run this caselist is %d", minimumLevel);
+
+        if (!mForceDeqpLevel.isEmpty()) {
+            int forcedDepqLevel;
+            try {
+                forcedDepqLevel = Integer.parseInt(mForceDeqpLevel);
+                CLog.d("%s forced as deqp level");
+            }
+            catch (NumberFormatException e) {
+                throw new AssertionError("Deqp Level is not an acceptable numeric value");
+            }
+
+            final boolean shouldRunCaselist = forcedDepqLevel >= minimumLevel;
+            CLog.d("Running caselist? %b", shouldRunCaselist);
+            return shouldRunCaselist;
+        }
 
         // Now look for the feature flag.
         final Map<String, Optional<Integer>> features = getDeviceFeatures(mDevice);
@@ -2505,7 +2531,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         destination.mAngle = source.mAngle;
         destination.mDisableWatchdog = source.mDisableWatchdog;
         destination.mIncrementalDeqpIncludeFiles = new ArrayList<>(source.mIncrementalDeqpIncludeFiles);
-
+        destination.mForceDeqpLevel = source.mForceDeqpLevel;
     }
 
     /**
