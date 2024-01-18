@@ -322,7 +322,7 @@ struct TestParams
 	deBool			singleCommand;
 	deUint32		barrierCount;
 	deBool			separateDepthStencilLayouts;
-	deBool			clearDestination;
+	deBool			clearDestinationWithRed;		// Used for CopyImageToImage tests to clear dst image with vec4(1.0f, 0.0f, 0.0f, 1.0f)
 	deBool			imageOffset;
 
 	TestParams (void)
@@ -337,7 +337,7 @@ struct TestParams
 		dst.image.createFlags		= VK_IMAGE_CREATE_FLAG_BITS_MAX_ENUM;
 		src.image.fillMode			= FILL_MODE_GRADIENT;
 		dst.image.fillMode			= FILL_MODE_WHITE;
-		clearDestination			= DE_FALSE;
+		clearDestinationWithRed		= DE_FALSE;
 		samples						= VK_SAMPLE_COUNT_1_BIT;
 		imageOffset					= false;
 	}
@@ -1120,12 +1120,12 @@ tcu::TestStatus CopyImageToImage::iterate (void)
 																				(int)m_params.src.image.extent.width,
 																				(int)m_params.src.image.extent.height,
 																				(int)m_params.src.image.extent.depth));
-	generateBuffer(m_sourceTextureLevel->getAccess(), m_params.src.image.extent.width, m_params.src.image.extent.height, m_params.src.image.extent.depth, FILL_MODE_GRADIENT);
+	generateBuffer(m_sourceTextureLevel->getAccess(), m_params.src.image.extent.width, m_params.src.image.extent.height, m_params.src.image.extent.depth, m_params.src.image.fillMode);
 	m_destinationTextureLevel = de::MovePtr<tcu::TextureLevel>(new tcu::TextureLevel(dstTcuFormat,
 																				(int)m_params.dst.image.extent.width,
 																				(int)m_params.dst.image.extent.height,
 																				(int)m_params.dst.image.extent.depth));
-	generateBuffer(m_destinationTextureLevel->getAccess(), m_params.dst.image.extent.width, m_params.dst.image.extent.height, m_params.dst.image.extent.depth, m_params.clearDestination ? FILL_MODE_WHITE : FILL_MODE_GRADIENT);
+	generateBuffer(m_destinationTextureLevel->getAccess(), m_params.dst.image.extent.width, m_params.dst.image.extent.height, m_params.dst.image.extent.depth, m_params.clearDestinationWithRed ? FILL_MODE_RED : m_params.dst.image.fillMode);
 	generateExpectedResult();
 
 	uploadImage(m_sourceTextureLevel->getAccess(), m_source.get(), m_params.src.image);
@@ -1229,14 +1229,14 @@ tcu::TestStatus CopyImageToImage::iterate (void)
 	beginCommandBuffer(vk, *m_cmdBuffer);
 	vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)DE_NULL, 0, (const VkBufferMemoryBarrier*)DE_NULL, DE_LENGTH_OF_ARRAY(imageBarriers), imageBarriers);
 
-	if (m_params.clearDestination)
+	if (m_params.clearDestinationWithRed)
 	{
 		VkImageSubresourceRange	range		= { VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u };
 		VkClearColorValue		clearColor;
 
 		clearColor.float32[0] = 1.0f;
-		clearColor.float32[1] = 1.0f;
-		clearColor.float32[2] = 1.0f;
+		clearColor.float32[1] = 0.0f;
+		clearColor.float32[2] = 0.0f;
 		clearColor.float32[3] = 1.0f;
 		vk.cmdClearColorImage(*m_cmdBuffer, m_destination.get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1u, &range);
 		imageBarriers[0].oldLayout = imageBarriers[0].newLayout;
@@ -1323,16 +1323,8 @@ tcu::TestStatus CopyImageToImage::checkTestResult (tcu::ConstPixelBufferAccess r
 	}
 	else
 	{
-		if (isFloatFormat(result.getFormat()))
-		{
-			if (!tcu::floatThresholdCompare(m_context.getTestContext().getLog(), "Compare", "Result comparison", m_expectedTextureLevel[0]->getAccess(), result, fThreshold, tcu::COMPARE_LOG_RESULT))
-				return tcu::TestStatus::fail("CopiesAndBlitting test");
-		}
-		else
-		{
-			if (!tcu::intThresholdCompare(m_context.getTestContext().getLog(), "Compare", "Result comparison", m_expectedTextureLevel[0]->getAccess(), result, uThreshold, tcu::COMPARE_LOG_RESULT))
-				return tcu::TestStatus::fail("CopiesAndBlitting test");
-		}
+		if (!tcu::bitwiseCompare(m_context.getTestContext().getLog(), "Compare", "Result comparison", m_expectedTextureLevel[0]->getAccess(), result, tcu::COMPARE_LOG_RESULT))
+			return tcu::TestStatus::fail("CopiesAndBlitting test");
 	}
 
 	return tcu::TestStatus::pass("CopiesAndBlitting test");
@@ -1346,15 +1338,22 @@ void CopyImageToImage::copyRegionToTextureLevel (tcu::ConstPixelBufferAccess src
 	VkOffset3D	dstOffset	= region.imageCopy.dstOffset;
 	VkExtent3D	extent		= region.imageCopy.extent;
 
-	if (m_params.src.image.imageType == VK_IMAGE_TYPE_3D && m_params.dst.image.imageType == VK_IMAGE_TYPE_2D)
+	// 2D images require modifying offset.z/extent.depth values if they are layered for correct cpu copy of the images due to test set up
+	if (m_params.src.image.imageType == vk::VK_IMAGE_TYPE_2D)
 	{
-		dstOffset.z = srcOffset.z;
-		extent.depth = std::max(region.imageCopy.extent.depth, region.imageCopy.dstSubresource.layerCount);
+		if (region.imageCopy.srcSubresource.baseArrayLayer != 0u)
+			srcOffset.z = region.imageCopy.srcSubresource.baseArrayLayer;
+
+		if (m_params.dst.image.imageType == vk::VK_IMAGE_TYPE_2D && extent.depth != region.imageCopy.srcSubresource.layerCount)
+		{
+			DE_ASSERT(region.imageCopy.srcSubresource.layerCount == region.imageCopy.dstSubresource.layerCount);
+			extent.depth = region.imageCopy.srcSubresource.layerCount;
+		}
 	}
-	if (m_params.src.image.imageType == VK_IMAGE_TYPE_2D && m_params.dst.image.imageType == VK_IMAGE_TYPE_3D)
+
+	if (m_params.dst.image.imageType == vk::VK_IMAGE_TYPE_2D && region.imageCopy.dstSubresource.baseArrayLayer != 0u)
 	{
-		srcOffset.z = dstOffset.z;
-		extent.depth = std::max(region.imageCopy.extent.depth, region.imageCopy.srcSubresource.layerCount);
+		dstOffset.z = region.imageCopy.dstSubresource.baseArrayLayer;
 	}
 
 
@@ -2942,6 +2941,9 @@ tcu::TestStatus CopyBufferToDepthStencil::iterate(void)
 			// Issue a a copy command per region defined by the test.
 			for (deUint32 i = 0; i < bufferImageCopies.size(); i++)
 			{
+				if (i > 0)
+					vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)DE_NULL, 0, (const VkBufferMemoryBarrier*)DE_NULL, 1, &imageBarrier);
+
 				vk.cmdCopyBufferToImage(*m_cmdBuffer, m_source.get(), m_destination.get(), VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &bufferImageCopies[i]);
 			}
 		}
@@ -2971,6 +2973,9 @@ tcu::TestStatus CopyBufferToDepthStencil::iterate(void)
 			// Issue a a copy command per region defined by the test.
 			for (deUint32 i = 0; i < bufferImageCopies2KHR.size(); i++)
 			{
+				if (i > 0)
+					vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0, 0, (const VkMemoryBarrier*)DE_NULL, 0, (const VkBufferMemoryBarrier*)DE_NULL, 1, &imageBarrier);
+
 				const VkCopyBufferToImageInfo2KHR copyBufferToImageInfo2KHR =
 				{
 					VK_STRUCTURE_TYPE_COPY_BUFFER_TO_IMAGE_INFO_2_KHR,	// VkStructureType				sType;
@@ -8745,7 +8750,7 @@ void addImageToImageSimpleTests (tcu::TestCaseGroup* group, AllocationKind alloc
 				params.dst.image.operationLayout	= VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
 				params.allocationKind				= allocationKind;
 				params.extensionUse					= extensionUse;
-				params.clearDestination				= clear.clear;
+				params.clearDestinationWithRed		= clear.clear;
 
 				{
 					VkImageCopy	testCopy	=
@@ -9249,6 +9254,8 @@ void addImageToImageAllFormatsColorTests (tcu::TestCaseGroup* group, AllocationK
 		params.dst.image.extent		= defaultExtent;
 		params.src.image.tiling		= VK_IMAGE_TILING_OPTIMAL;
 		params.dst.image.tiling		= VK_IMAGE_TILING_OPTIMAL;
+		params.src.image.fillMode	= FILL_MODE_WHITE;
+		params.dst.image.fillMode	= FILL_MODE_GRADIENT;
 		params.allocationKind		= allocationKind;
 		params.extensionUse			= extensionUse;
 
@@ -9260,7 +9267,7 @@ void addImageToImageAllFormatsColorTests (tcu::TestCaseGroup* group, AllocationK
 				{0, 0, 0},										// VkOffset3D				srcOffset;
 				defaultSourceLayer,								// VkImageSubresourceLayers	dstSubresource;
 				{i, defaultSize - i - defaultQuarterSize, 0},	// VkOffset3D				dstOffset;
-				{defaultQuarterSize, defaultQuarterSize, 1},		// VkExtent3D				extent;
+				{defaultQuarterSize, defaultQuarterSize, 1},	// VkExtent3D				extent;
 			};
 
 			CopyRegion	imageCopy;
@@ -9303,6 +9310,8 @@ void addImageToImageAllFormatsColorTests (tcu::TestCaseGroup* group, AllocationK
 		params.dst.image.extent		= default1dExtent;
 		params.src.image.tiling		= VK_IMAGE_TILING_OPTIMAL;
 		params.dst.image.tiling		= VK_IMAGE_TILING_OPTIMAL;
+		params.src.image.fillMode	= FILL_MODE_WHITE;
+		params.dst.image.fillMode	= FILL_MODE_GRADIENT;
 		params.allocationKind		= allocationKind;
 		params.extensionUse			= extensionUse;
 
@@ -9357,6 +9366,8 @@ void addImageToImageAllFormatsColorTests (tcu::TestCaseGroup* group, AllocationK
 		params.dst.image.extent		= default3dExtent;
 		params.src.image.tiling		= VK_IMAGE_TILING_OPTIMAL;
 		params.dst.image.tiling		= VK_IMAGE_TILING_OPTIMAL;
+		params.src.image.fillMode	= FILL_MODE_WHITE;
+		params.dst.image.fillMode	= FILL_MODE_GRADIENT;
 		params.allocationKind		= allocationKind;
 		params.extensionUse			= extensionUse;
 
@@ -9973,7 +9984,7 @@ void addImageToImage3dImagesTests (tcu::TestCaseGroup* group, AllocationKind all
 
 			params3DTo2D.regions.push_back(imageCopy);
 		}
-		group->addChild(new CopyImageToImageTestCase(testCtx, "3d_to_2d_by_slices", "copy 2d layers to 3d slices one by one", params3DTo2D));
+		group->addChild(new CopyImageToImageTestCase(testCtx, "3d_to_2d_by_slices", "copy 3d slices to 2d layers one by one", params3DTo2D));
 	}
 
 	{
@@ -10027,7 +10038,7 @@ void addImageToImage3dImagesTests (tcu::TestCaseGroup* group, AllocationKind all
 			params2DTo3D.regions.push_back(imageCopy);
 		}
 
-		group->addChild(new CopyImageToImageTestCase(testCtx, "2d_to_3d_by_layers", "copy 3d slices to 2d layers one by one", params2DTo3D));
+		group->addChild(new CopyImageToImageTestCase(testCtx, "2d_to_3d_by_layers", "copy 2d layers to 3d slices one by one", params2DTo3D));
 	}
 
 	{
