@@ -164,6 +164,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             description="The estimated config runtime. Defaults to 200ms x num tests.")
     private long mRuntimeHint = -1;
 
+    @Option(name = "collect-raw-logs",
+            description = "whether to collect raw deqp test log data")
+    private boolean mLogData = false;
+
     @Option(name="deqp-use-angle",
             description="ANGLE backend ('none', 'vulkan', 'opengles'). Defaults to 'none' (don't use ANGLE)",
             importance=Option.Importance.NEVER)
@@ -181,7 +185,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private final Map<TestDescription, Integer> mTestInstabilityRatings = new HashMap<>();
     private IAbi mAbi;
     private CompatibilityBuildHelper mBuildHelper;
-    private boolean mLogData = false;
     private ITestDevice mDevice;
     private Map<String, Optional<Integer>> mDeviceFeatures;
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
@@ -229,13 +232,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     public void setBuildHelper(CompatibilityBuildHelper helper) {
         mBuildHelper = helper;
-    }
-
-    /**
-     * Enable or disable raw dEQP test log collection.
-     */
-    public void setCollectLogs(boolean logData) {
-        mLogData = logData;
     }
 
     /**
