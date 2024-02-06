@@ -36,6 +36,7 @@ import com.android.tradefed.result.ByteArrayInputStreamSource;
 import com.android.tradefed.result.ITestInvocationListener;
 import com.android.tradefed.result.LogDataType;
 import com.android.tradefed.result.TestDescription;
+import com.android.tradefed.result.error.DeviceErrorIdentifier;
 import com.android.tradefed.result.error.TestErrorIdentifier;
 import com.android.tradefed.testtype.IAbi;
 import com.android.tradefed.testtype.IAbiReceiver;
@@ -973,7 +974,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     // Fourth failure in a row, just fail
                     CLog.w("Cannot recover ADB connection");
                     throw new DeviceNotAvailableException("link killed after reboot",
-                            mDevice.getSerialNumber());
+                            mDevice.getSerialNumber(),
+                            DeviceErrorIdentifier.DEVICE_UNAVAILABLE);
             }
         }
 
