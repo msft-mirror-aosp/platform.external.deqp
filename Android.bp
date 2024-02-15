@@ -92,16 +92,17 @@ cc_defaults {
         // explicit defs:
         // -DDE_PTR_SIZE=8
         // -DDE_CPU=DE_CPU_ARM_64
+        //"-DDE_FENV_ACCESS_ON=_Pragma(\"STDC FENV_ACCESS ON\")",
 
         // dEQP defines:
         "-D_XOPEN_SOURCE=600",
-        "-DDE_ANDROID_API=28",
         "-DDE_ASSERT_FAILURE_CALLBACK",
         "-DDE_COMPILER=DE_COMPILER_CLANG",
         "-DDE_MINGW=0",
         "-DDE_OS=DE_OS_ANDROID",
         "-DDEQP_GLES2_DIRECT_LINK=1",
         "-DDEQP_HAVE_RENDERDOC_HEADER=0", // Needs to be 0.
+        "-DDEQP_EXCLUDE_VK_VIDEO_TESTS",
         "-DDEQP_SUPPORT_DRM=0",
         "-DDEQP_SUPPORT_GLES1=1",
         "-DDEQP_TARGET_NAME=\"Android\"",
@@ -120,16 +121,27 @@ cc_defaults {
     sdk_version: "27",
     rtti: true,
     stl: "c++_static",
+    product_variables: {
+        platform_sdk_version: {
+            cflags: [
+                // dEQP defines:
+                "-DDE_ANDROID_API=%d",
+            ],
+        },
+    },
 }
 
 cc_library_shared {
     name: "libdeqp",
-    defaults: ["libdeqp_defaults"]
+    defaults: ["libdeqp_defaults"],
 }
 
 cc_defaults {
     name: "libdeqp_defaults",
-    defaults: ["libdeqp_gen", "deqp_and_deps_defaults"],
+    defaults: [
+        "libdeqp_gen",
+        "deqp_and_deps_defaults",
+    ],
 
     tidy_checks: [
         // The clang-tidy google-explicit-constructor warning is issued to nearly
@@ -240,10 +252,13 @@ cc_test {
     ],
 
     local_include_dirs: [
-       "framework/platform/surfaceless",
+        "framework/platform/surfaceless",
     ],
 
     multilib: {
+        lib32: {
+            suffix: "32",
+        },
         lib64: {
             suffix: "64",
         },

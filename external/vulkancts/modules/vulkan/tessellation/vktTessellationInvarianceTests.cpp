@@ -661,7 +661,7 @@ BaseTestInstance::DrawResult BaseTestInstance::draw (const deUint32 vertexCount,
 	}
 
 	beginCommandBuffer(vk, *m_cmdBuffer);
-	beginRenderPassWithRasterizationDisabled(vk, *m_cmdBuffer, *m_renderPass, *m_framebuffer);
+	beginRenderPass(vk, *m_cmdBuffer, *m_renderPass, *m_framebuffer, makeRect2D(1, 1));
 
 	vk.cmdBindPipeline(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
 	vk.cmdBindDescriptorSets(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_pipelineLayout, 0u, 1u, &m_descriptorSet.get(), 0u, DE_NULL);
@@ -1439,6 +1439,9 @@ tcu::TestStatus InvarianceTestInstance::iterate (void)
 
 	for (int tessLevelCaseNdx = 0; tessLevelCaseNdx < static_cast<int>(tessLevelCases.size()); ++tessLevelCaseNdx)
 	{
+		if (m_caseDef.caseType == CASETYPE_INVARIANT_OUTER_TRIANGLE_SET)
+			m_context.getTestContext().touchWatchdog();
+
 		const LevelCase& levelCase = tessLevelCases[tessLevelCaseNdx];
 		PerPrimitiveVec  firstPrim;
 
@@ -1487,7 +1490,7 @@ tcu::TestStatus InvarianceTestInstance::iterate (void)
 				}
 
 				beginCommandBuffer(vk, *cmdBuffer);
-				beginRenderPassWithRasterizationDisabled(vk, *cmdBuffer, *renderPass, *framebuffer);
+				beginRenderPass(vk, *cmdBuffer, *renderPass, *framebuffer, makeRect2D(1, 1));
 
 				vk.cmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
 				vk.cmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipelineLayout, 0u, 1u, &descriptorSet.get(), 0u, DE_NULL);
@@ -2129,7 +2132,7 @@ tcu::TestStatus test (Context& context, const CaseDefinition caseDef)
 		}
 
 		beginCommandBuffer(vk, *cmdBuffer);
-		beginRenderPassWithRasterizationDisabled(vk, *cmdBuffer, *renderPass, *framebuffer);
+		beginRenderPass(vk, *cmdBuffer, *renderPass, *framebuffer, makeRect2D(1, 1));
 
 		vk.cmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
 		vk.cmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipelineLayout, 0u, 1u, &descriptorSet.get(), 0u, DE_NULL);

@@ -36,6 +36,7 @@ import com.android.tradefed.result.ByteArrayInputStreamSource;
 import com.android.tradefed.result.ITestInvocationListener;
 import com.android.tradefed.result.LogDataType;
 import com.android.tradefed.result.TestDescription;
+import com.android.tradefed.result.error.DeviceErrorIdentifier;
 import com.android.tradefed.result.error.TestErrorIdentifier;
 import com.android.tradefed.testtype.IAbi;
 import com.android.tradefed.testtype.IAbiReceiver;
@@ -86,7 +87,9 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     private static final String DEQP_ONDEVICE_APK = "com.drawelements.deqp.apk";
     private static final String DEQP_ONDEVICE_PKG = "com.drawelements.deqp";
     private static final String INCOMPLETE_LOG_MESSAGE = "Crash: Incomplete test log";
+    private static final String TIMEOUT_LOG_MESSAGE = "Timeout: Test timeout";
     private static final String SKIPPED_INSTANCE_LOG_MESSAGE = "Configuration skipped";
+    public static final String ASSUMPTION_FAILURE_DEQP_LEVEL_LOG_MESSAGE = "Features to be tested are not supported by device";
     private static final String NOT_EXECUTABLE_LOG_MESSAGE = "Abort: Test cannot be executed";
     private static final String APP_DIR = "/sdcard/";
     private static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
@@ -99,7 +102,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
 
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int TESTCASE_BATCH_LIMIT_LARGE = 10000;
-    private static final int UNRESPONSIVE_CMD_TIMEOUT_MS = 10 * 60 * 1000; // 10min
+    private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT = 10 * 60 * 1000; // 10min
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
 
@@ -110,6 +113,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     // !NOTE: There's a static method copyOptions() for copying options during split.
     // If you add state update copyOptions() as appropriate!
 
+    @Option(name="timeout",
+        description="Timeout for unresponsive tests in milliseconds. Default: " + UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT,
+        importance=Option.Importance.NEVER)
+    private long mUnresponsiveCmdTimeoutMs = UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT;
     @Option(name="deqp-package",
             description="Name of the deqp module used. Determines GLES version.",
             importance=Option.Importance.ALWAYS)
@@ -159,6 +166,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             description="The estimated config runtime. Defaults to 200ms x num tests.")
     private long mRuntimeHint = -1;
 
+    @Option(name = "collect-raw-logs",
+            description = "whether to collect raw deqp test log data")
+    private boolean mLogData = false;
+
     @Option(name="deqp-use-angle",
             description="ANGLE backend ('none', 'vulkan', 'opengles'). Defaults to 'none' (don't use ANGLE)",
             importance=Option.Importance.NEVER)
@@ -170,13 +181,17 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     "Disable the native testrunner's per-test watchdog.")
     private boolean mDisableWatchdog = false;
 
+    @Option(name = "force-deqp-level",
+            description = "Force dEQP level to a specific level instead of device dEQP level. " +
+            "'all' enforces all dEQP tests to run")
+    private String mForceDeqpLevel = "";
+
     private Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances = null;
     private final TestInstanceResultListener mInstanceListerner = new TestInstanceResultListener();
     private final Map<TestDescription, Integer> mTestInstabilityRatings = new HashMap<>();
     private IAbi mAbi;
     private CompatibilityBuildHelper mBuildHelper;
-    private boolean mLogData = false;
     private ITestDevice mDevice;
     private Map<String, Optional<Integer>> mDeviceFeatures;
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
@@ -224,13 +239,6 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     public void setBuildHelper(CompatibilityBuildHelper helper) {
         mBuildHelper = helper;
-    }
-
-    /**
-     * Enable or disable raw dEQP test log collection.
-     */
-    public void setCollectLogs(boolean logData) {
-        mLogData = logData;
     }
 
     /**
@@ -966,7 +974,8 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
                     // Fourth failure in a row, just fail
                     CLog.w("Cannot recover ADB connection");
                     throw new DeviceNotAvailableException("link killed after reboot",
-                            mDevice.getSerialNumber());
+                            mDevice.getSerialNumber(),
+                            DeviceErrorIdentifier.DEVICE_UNAVAILABLE);
             }
         }
 
@@ -1390,6 +1399,12 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         }
     }
 
+    private static final class AdbComLinkUnresponsiveError extends Exception {
+        public AdbComLinkUnresponsiveError(String description, Throwable inner) {
+            super(description, inner);
+        }
+    }
+
     /**
      * Executes a given command in adb shell
      *
@@ -1398,10 +1413,10 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private void executeShellCommandAndReadOutput(final String command,
             final IShellOutputReceiver receiver)
-            throws AdbComLinkOpenError, AdbComLinkKilledError {
+            throws AdbComLinkOpenError, AdbComLinkKilledError, AdbComLinkUnresponsiveError {
         try {
             mDevice.getIDevice().executeShellCommand(command, receiver,
-                    UNRESPONSIVE_CMD_TIMEOUT_MS, TimeUnit.MILLISECONDS);
+                mUnresponsiveCmdTimeoutMs, TimeUnit.MILLISECONDS);
         } catch (TimeoutException ex) {
             // Opening connection timed out
             throw new AdbComLinkOpenError("opening connection timed out", ex);
@@ -1413,7 +1428,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             throw new AdbComLinkKilledError("command link killed", ex);
         } catch (ShellCommandUnresponsiveException ex) {
             // shell command halted
-            throw new AdbComLinkKilledError("command link hung", ex);
+            throw new AdbComLinkUnresponsiveError("command link was unresponsive for longer than requested timeout", ex);
         }
     }
 
@@ -1537,9 +1552,14 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             mDeviceRecovery.onExecutionProgressed();
         }
 
-        // interrupted, try to recover
+        // interrupted either because of ADB or test timeout
         if (interruptingError != null) {
-            if (interruptingError instanceof AdbComLinkOpenError) {
+
+            // AdbComLinkUnresponsiveError means the test has timeout during execution.
+            // Device is likely fine, so we won't attempt to recover the device.
+            if (interruptingError instanceof AdbComLinkUnresponsiveError) {
+                mInstanceListerner.abortTest(mInstanceListerner.getCurrentTestId(), TIMEOUT_LOG_MESSAGE);
+            } else if (interruptingError instanceof AdbComLinkOpenError) {
                 mDeviceRecovery.recoverConnectionRefused();
             } else if (interruptingError instanceof AdbComLinkKilledError) {
                 mDeviceRecovery.recoverComLinkKilled();
@@ -1684,7 +1704,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     }
 
     /**
-     * Pass all remaining tests without running them
+     * Pass tests without running them
      */
     private void fakePassTests(ITestInvocationListener listener) {
         HashMap<String, Metric> emptyMap = new HashMap<>();
@@ -1692,10 +1712,45 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             listener.testStarted(test);
             listener.testEnded(test, emptyMap);
         }
+
         // Log only once all the skipped tests
-        CLog.d("Skipping tests '%s', either because they are not supported by the device or "
-            + "because tests are simply being collected", mRemainingTests);
-        mRemainingTests.clear();
+        CLog.d("Marking tests '%s', as pass because tests are simply being collected",
+                mTestInstances.keySet());
+        mRemainingTests.removeAll(mTestInstances.keySet());
+    }
+
+    /**
+     * Ignoring tests without running them
+     */
+    private void markTestsAsAssumptionFailure(ITestInvocationListener listener) {
+        HashMap<String, Metric> emptyMap = new HashMap<>();
+        for (TestDescription test : mTestInstances.keySet()) {
+            listener.testStarted(test);
+            listener.testAssumptionFailure(test, ASSUMPTION_FAILURE_DEQP_LEVEL_LOG_MESSAGE);
+            listener.testEnded(test, emptyMap);
+        }
+
+        // Log only once after all the tests marked as assumption Failure
+        CLog.d("Assumption failed for tests '%s' because features are not supported by device",
+            mRemainingTests);
+        mRemainingTests.removeAll(mTestInstances.keySet());
+    }
+
+    /**
+     * Ignoring tests without running them
+     */
+    private void ignoreTests(ITestInvocationListener listener) {
+        HashMap<String, Metric> emptyMap = new HashMap<>();
+        for (TestDescription test : mTestInstances.keySet()) {
+            listener.testStarted(test);
+            listener.testIgnored(test);
+            listener.testEnded(test, emptyMap);
+        }
+
+        // Log only once after all the tests ignored
+        CLog.d("Tests '%s', ignored because they are not required by the deqp level",
+            mRemainingTests);
+        mRemainingTests.removeAll(mTestInstances.keySet());
     }
 
     /**
@@ -1720,6 +1775,11 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
      */
     private boolean claimedDeqpLevelIsRecentEnough() throws CapabilityQueryFailureException,
             DeviceNotAvailableException {
+        if (mForceDeqpLevel.equals("all")) {
+            CLog.d("All deqp levels have been forced for this run");
+            return true;
+        }
+
         // Determine whether we need to check the dEQP feature flag for Vulkan or OpenGL ES.
         final String featureName;
         if (isVulkanPackage()) {
@@ -1745,6 +1805,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             CLog.d("No dEQP level date found in caselist. Running unconditionally.");
             return true;
         }
+
         final int year = Integer.parseInt(matcher.group(1));
         final int month = Integer.parseInt(matcher.group(2));
         final int day = Integer.parseInt(matcher.group(3));
@@ -1762,8 +1823,24 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         CLog.d("    2021-03-01 -> 132449025");
         CLog.d("    2022-03-01 -> 132514561");
         CLog.d("    2023-03-01 -> 132580097");
+        CLog.d("    2024-03-01 -> 132645633");
 
         CLog.d("Minimum level required to run this caselist is %d", minimumLevel);
+
+        if (!mForceDeqpLevel.isEmpty()) {
+            int forcedDepqLevel;
+            try {
+                forcedDepqLevel = Integer.parseInt(mForceDeqpLevel);
+                CLog.d("%s forced as deqp level");
+            }
+            catch (NumberFormatException e) {
+                throw new AssertionError("Deqp Level is not an acceptable numeric value");
+            }
+
+            final boolean shouldRunCaselist = forcedDepqLevel >= minimumLevel;
+            CLog.d("Running caselist? %b", shouldRunCaselist);
+            return shouldRunCaselist;
+        }
 
         // Now look for the feature flag.
         final Map<String, Optional<Integer>> features = getDeviceFeatures(mDevice);
@@ -2317,14 +2394,20 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
             final boolean isSupportedApi = (isOpenGlEsPackage() && isSupportedGles())
                                             || (isVulkanPackage() && isSupportedVulkan())
                                             || (!isOpenGlEsPackage() && !isVulkanPackage());
-            if (mCollectTestsOnly
-                || !isSupportedApi
-                || !claimedDeqpLevelIsRecentEnough()) {
+            final boolean deqpLevelIsRecent = claimedDeqpLevelIsRecentEnough();
+
+            if (mCollectTestsOnly) {
                 // Pass all tests trivially if:
-                // - we are collecting the names of the tests only, or
-                // - the relevant API is not supported, or
-                // - the device's feature flags do not claim to pass the tests
+                // - we are only collecting the names of the tests
                 fakePassTests(listener);
+            } else if(!isSupportedApi) {
+                // Skip tests with "Assumption Failure" when
+                // - the relevant API/feature is not supported or
+                markTestsAsAssumptionFailure(listener);
+            } else if(!deqpLevelIsRecent) {
+                // Skip tests with "Ignore" when
+                // - the device's deqp level do not claim to pass the tests
+                ignoreTests(listener);
             } else if (!mRemainingTests.isEmpty()) {
                 mInstanceListerner.setSink(listener);
                 mDeviceRecovery.setDevice(mDevice);
@@ -2429,6 +2512,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
     }
 
     private static void copyOptions(DeqpTestRunner destination, DeqpTestRunner source) {
+        destination.mUnresponsiveCmdTimeoutMs = source.mUnresponsiveCmdTimeoutMs;
         destination.mDeqpPackage = source.mDeqpPackage;
         destination.mConfigName = source.mConfigName;
         destination.mCaselistFile = source.mCaselistFile;
@@ -2445,7 +2529,7 @@ public class DeqpTestRunner implements IBuildReceiver, IDeviceTest,
         destination.mAngle = source.mAngle;
         destination.mDisableWatchdog = source.mDisableWatchdog;
         destination.mIncrementalDeqpIncludeFiles = new ArrayList<>(source.mIncrementalDeqpIncludeFiles);
-
+        destination.mForceDeqpLevel = source.mForceDeqpLevel;
     }
 
     /**
