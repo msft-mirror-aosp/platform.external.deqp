@@ -128,7 +128,6 @@
 #ifdef CTS_USES_VULKANSC
 #include "vktSafetyCriticalTests.hpp"
 #endif // CTS_USES_VULKANSC
-#include "vktVideoTests.hpp"
 #include "vktShaderObjectTests.hpp"
 
 #include <vector>
