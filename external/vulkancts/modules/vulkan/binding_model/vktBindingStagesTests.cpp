@@ -30,6 +30,8 @@
 #include "vkBuilderUtil.hpp"
 #include "vkImageUtil.hpp"
 #include "vkBarrierUtil.hpp"
+#include <cstdlib>
+#include <cmath>
 
 namespace vkt
 {
@@ -409,7 +411,7 @@ tcu::TestStatus	StagesTestInstance::iterate (void)
 
 	for (deUint32 i = 0; i < 4; ++i)
 	{
-		if (de::abs(writeDataPtr[i] - (float(i) + 1.0f)) >= 0.02f)
+		if (std::abs((float)(writeDataPtr[i] - (float(i) + 1.0f))) >= 0.02f)
 		{
 			return tcu::TestStatus::fail("Fail");
 		}
@@ -426,7 +428,7 @@ tcu::TestStatus	StagesTestInstance::iterate (void)
 			const auto pixel = resultBuffer.getPixel(x, y);
 			for (int i = 0; i < 4; ++i)
 			{
-				if (de::abs(pixel[i] - float(i + 1) / 4.0f) >= 0.02f)
+				if (std::abs((float)(pixel[i] - float(i + 1) / 4.0f)) >= 0.02f)
 				{
 					return tcu::TestStatus::fail("Fail");
 				}
