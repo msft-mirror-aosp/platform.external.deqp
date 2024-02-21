@@ -3,6 +3,8 @@
  * ------------------------
  *
  * Copyright (c) 2021 The Khronos Group Inc.
+ * Copyright (c) 2023 LunarG, Inc.
+ * Copyright (c) 2023 Nintendo
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -49,6 +51,7 @@
 #include <vector>
 #include <chrono>
 #include <set>
+#include <limits>
 
 namespace vkt
 {
@@ -89,6 +92,7 @@ struct TestParams
 	PipelineTreeConfiguration	pipelineTreeConfiguration;
 	bool						optimize;
 	bool						delayedShaderCreate;
+	bool						useMaintenance5;
 };
 
 struct RuntimePipelineTreeNode
@@ -866,7 +870,7 @@ bool PipelineLibraryTestInstance::runTest (RuntimePipelineTreeConfiguration&	run
 	VkDescriptorSetLayout vecLayoutBoth[2] = { *descriptorSetLayoutVert, *descriptorSetLayoutFrag };
 
 	VkPipelineLayoutCreateFlags pipelineLayoutCreateFlag = 0u;
-	if (m_data.delayedShaderCreate || (m_data.pipelineTreeConfiguration.size() > 1))
+	if (!m_data.useMaintenance5 && (m_data.delayedShaderCreate || (m_data.pipelineTreeConfiguration.size() > 1)))
 		pipelineLayoutCreateFlag = VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT;
 
 	const Move<VkCommandPool>				cmdPool					= createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, queueFamilyIndex);
@@ -941,7 +945,7 @@ bool PipelineLibraryTestInstance::runTest (RuntimePipelineTreeConfiguration&	run
 		}
 
 
-		if (linkedLibrariesFlags != ALL_GRAPHICS_PIPELINE_LIBRARY_FLAGS  && graphicsPipelineLibraryCreateInfo.flags != 0)
+		if (!m_data.useMaintenance5 && linkedLibrariesFlags != ALL_GRAPHICS_PIPELINE_LIBRARY_FLAGS && graphicsPipelineLibraryCreateInfo.flags != 0)
 			appendStructurePtrToVulkanChain(&graphicsPipelineCreateInfo.pNext, &graphicsPipelineLibraryCreateInfo);
 
 		if (linkingInfo.libraryCount != 0)
@@ -1203,7 +1207,7 @@ tcu::TestStatus PipelineLibraryTestInstance::iterate (void)
 class PipelineLibraryTestCase : public TestCase
 {
 	public:
-							PipelineLibraryTestCase		(tcu::TestContext& context, const char* name, const char* desc, const TestParams data);
+							PipelineLibraryTestCase		(tcu::TestContext& context, const char* name, const TestParams data);
 							~PipelineLibraryTestCase	(void);
 
 	virtual void			checkSupport				(Context& context) const;
@@ -1213,8 +1217,8 @@ private:
 	TestParams				m_data;
 };
 
-PipelineLibraryTestCase::PipelineLibraryTestCase (tcu::TestContext& context, const char* name, const char* desc, const TestParams data)
-	: vkt::TestCase	(context, name, desc)
+PipelineLibraryTestCase::PipelineLibraryTestCase (tcu::TestContext& context, const char* name, const TestParams data)
+	: vkt::TestCase	(context, name)
 	, m_data		(data)
 {
 }
@@ -1225,6 +1229,14 @@ PipelineLibraryTestCase::~PipelineLibraryTestCase (void)
 
 void PipelineLibraryTestCase::checkSupport (Context& context) const
 {
+	if (m_data.useMaintenance5)
+	{
+		context.requireDeviceFunctionality("VK_KHR_maintenance5");
+		return;
+	}
+
+	context.requireDeviceFunctionality("VK_KHR_pipeline_library");
+
 	if (m_data.delayedShaderCreate || (m_data.pipelineTreeConfiguration.size() > 1))
 	{
 		context.requireDeviceFunctionality("VK_EXT_graphics_pipeline_library");
@@ -1292,6 +1304,7 @@ enum class MiscTestMode
 	SHADER_MODULE_CREATE_INFO_COMP,
 	SHADER_MODULE_CREATE_INFO_RT,
 	SHADER_MODULE_CREATE_INFO_RT_LIB,
+	NULL_RENDERING_CREATE_INFO,
 };
 
 struct MiscTestParams
@@ -2420,6 +2433,262 @@ tcu::TestStatus	PipelineLibraryShaderModuleInfoRTInstance::iterate (void)
 	return tcu::TestStatus::pass("Pass");
 }
 
+class NullRenderingCreateInfoInstance : public vkt::TestInstance
+{
+public:
+						NullRenderingCreateInfoInstance		(Context& context)
+							: vkt::TestInstance(context)
+							{}
+	virtual				~NullRenderingCreateInfoInstance	(void) {}
+
+	tcu::TestStatus		iterate			(void) override;
+};
+
+tcu::TestStatus NullRenderingCreateInfoInstance::iterate (void)
+{
+	const auto			ctx				= m_context.getContextCommonData();
+	const tcu::IVec3	colorExtent		(1, 1, 1);
+	const auto			imageExtent		= makeExtent3D(colorExtent);
+	const auto			colorFormat		= VK_FORMAT_R8G8B8A8_UNORM;
+	const auto			tcuFormat		= mapVkFormat(colorFormat);
+	const auto			colorUsage		= (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+	const auto			colorSRR		= makeDefaultImageSubresourceRange();
+	const auto			colorSRL		= makeDefaultImageSubresourceLayers();
+
+	// Color buffer and view.
+	ImageWithBuffer	colorBuffer	(ctx.vkd, ctx.device, ctx.allocator, imageExtent, colorFormat, colorUsage, VK_IMAGE_TYPE_2D);
+	const auto		colorView	= makeImageView(ctx.vkd, ctx.device, colorBuffer.getImage(), VK_IMAGE_VIEW_TYPE_2D, colorFormat, colorSRR);
+
+	// Verification buffer.
+	const auto			verificationBufferSize	= static_cast<VkDeviceSize>(colorExtent.x() * colorExtent.y() * colorExtent.z() * tcu::getPixelSize(tcuFormat));
+	const auto			verificationBufferInfo	= makeBufferCreateInfo(verificationBufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+	BufferWithMemory	verificationBuffer		(ctx.vkd, ctx.device, ctx.allocator, verificationBufferInfo, MemoryRequirement::HostVisible);
+	auto&				verificationBufferAlloc = verificationBuffer.getAllocation();
+	void*				verificationBufferPtr	= verificationBufferAlloc.getHostPtr();
+
+	const auto pipelineLayout = makePipelineLayout(ctx.vkd, ctx.device);
+
+	const VkPipelineVertexInputStateCreateInfo	vertexInputStateInfo	= initVulkanStructure();
+	VkPipelineInputAssemblyStateCreateInfo		inputAssemblyStateInfo	= initVulkanStructure();
+	inputAssemblyStateInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+	const std::vector<VkViewport>	viewports	(1u, makeViewport(imageExtent));
+	const std::vector<VkRect2D>		scissors	(1u, makeRect2D(imageExtent));
+
+	const auto&	binaries	= m_context.getBinaryCollection();
+	const auto	vertModule	= createShaderModule(ctx.vkd, ctx.device, binaries.get("vert"));
+	const auto	fragModule	= createShaderModule(ctx.vkd, ctx.device, binaries.get("frag"));
+
+	// We will use a null-filled pipeline rendering info structure for all substates except the fragment output state.
+	VkPipelineRenderingCreateInfo nullRenderingInfo = initVulkanStructure();
+	nullRenderingInfo.colorAttachmentCount = std::numeric_limits<uint32_t>::max();
+
+	VkPipelineRenderingCreateInfo finalRenderingInfo = initVulkanStructure();
+	finalRenderingInfo.colorAttachmentCount		= 1u;
+	finalRenderingInfo.pColorAttachmentFormats	= &colorFormat;
+
+	const VkPipelineViewportStateCreateInfo viewportStateInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,	//	VkStructureType						sType;
+		nullptr,												//	const void*							pNext;
+		0u,														//	VkPipelineViewportStateCreateFlags	flags;
+		de::sizeU32(viewports),									//	uint32_t							viewportCount;
+		de::dataOrNull(viewports),								//	const VkViewport*					pViewports;
+		de::sizeU32(scissors),									//	uint32_t							scissorCount;
+		de::dataOrNull(scissors),								//	const VkRect2D*						pScissors;
+	};
+
+	const VkPipelineRasterizationStateCreateInfo rasterizationStateInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,		//	VkStructureType							sType;
+		nullptr,														//	const void*								pNext;
+		0u,																//	VkPipelineRasterizationStateCreateFlags	flags;
+		VK_FALSE,														//	VkBool32								depthClampEnable;
+		VK_FALSE,														//	VkBool32								rasterizerDiscardEnable;
+		VK_POLYGON_MODE_FILL,											//	VkPolygonMode							polygonMode;
+		VK_CULL_MODE_BACK_BIT,											//	VkCullModeFlags							cullMode;
+		VK_FRONT_FACE_COUNTER_CLOCKWISE,								//	VkFrontFace								frontFace;
+		VK_FALSE,														//	VkBool32								depthBiasEnable;
+		0.0f,															//	float									depthBiasConstantFactor;
+		0.0f,															//	float									depthBiasClamp;
+		0.0f,															//	float									depthBiasSlopeFactor;
+		1.0f,															//	float									lineWidth;
+	};
+
+	const VkPipelineMultisampleStateCreateInfo multisampleStateInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,	//	VkStructureType							sType;
+		nullptr,													//	const void*								pNext;
+		0u,															//	VkPipelineMultisampleStateCreateFlags	flags;
+		VK_SAMPLE_COUNT_1_BIT,										//	VkSampleCountFlagBits					rasterizationSamples;
+		VK_FALSE,													//	VkBool32								sampleShadingEnable;
+		1.0f,														//	float									minSampleShading;
+		nullptr,													//	const VkSampleMask*						pSampleMask;
+		VK_FALSE,													//	VkBool32								alphaToCoverageEnable;
+		VK_FALSE,													//	VkBool32								alphaToOneEnable;
+	};
+
+	const VkPipelineDepthStencilStateCreateInfo depthStencilStateInfo = initVulkanStructure();
+
+	const VkColorComponentFlags colorComponentFlags = (VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT);
+
+	const VkPipelineColorBlendAttachmentState colorBlendAttachmentState =
+	{
+		VK_FALSE,				//	VkBool32				blendEnable;
+		VK_BLEND_FACTOR_ZERO,	//	VkBlendFactor			srcColorBlendFactor;
+		VK_BLEND_FACTOR_ZERO,	//	VkBlendFactor			dstColorBlendFactor;
+		VK_BLEND_OP_ADD,		//	VkBlendOp				colorBlendOp;
+		VK_BLEND_FACTOR_ZERO,	//	VkBlendFactor			srcAlphaBlendFactor;
+		VK_BLEND_FACTOR_ZERO,	//	VkBlendFactor			dstAlphaBlendFactor;
+		VK_BLEND_OP_ADD,		//	VkBlendOp				alphaBlendOp;
+		colorComponentFlags,	//	VkColorComponentFlags	colorWriteMask;
+	};
+
+	const VkPipelineColorBlendStateCreateInfo colorBlendStateInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,	//	VkStructureType								sType;
+		nullptr,													//	const void*									pNext;
+		0u,															//	VkPipelineColorBlendStateCreateFlags		flags;
+		VK_FALSE,													//	VkBool32									logicOpEnable;
+		VK_LOGIC_OP_CLEAR,											//	VkLogicOp									logicOp;
+		1u,															//	uint32_t									attachmentCount;
+		&colorBlendAttachmentState,									//	const VkPipelineColorBlendAttachmentState*	pAttachments;
+		{ 0.0f, 0.0f, 0.0f, 0.0f },									//	float										blendConstants[4];
+	};
+
+	// Build the different pipeline pieces.
+	Move<VkPipeline> vertexInputLib;
+	Move<VkPipeline> preRasterShaderLib;
+	Move<VkPipeline> fragShaderLib;
+	Move<VkPipeline> fragOutputLib;
+
+	const VkPipelineCreateFlags libCreationFlags	= VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
+	const VkPipelineCreateFlags linkFlags			= 0u;
+
+	// Vertex input state library.
+	{
+		VkGraphicsPipelineLibraryCreateInfoEXT vertexInputLibInfo	= initVulkanStructure();
+		vertexInputLibInfo.flags									|= VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT;
+
+		VkGraphicsPipelineCreateInfo vertexInputPipelineInfo	= initVulkanStructure(&vertexInputLibInfo);
+		vertexInputPipelineInfo.flags							= libCreationFlags;
+		vertexInputPipelineInfo.pVertexInputState				= &vertexInputStateInfo;
+		vertexInputPipelineInfo.pInputAssemblyState				= &inputAssemblyStateInfo;
+
+		vertexInputLib = createGraphicsPipeline(ctx.vkd, ctx.device, VK_NULL_HANDLE, &vertexInputPipelineInfo);
+	}
+
+	// Pre-rasterization shader state library.
+	{
+		VkGraphicsPipelineLibraryCreateInfoEXT preRasterShaderLibInfo	= initVulkanStructure(&nullRenderingInfo); // What we're testing.
+		preRasterShaderLibInfo.flags									|= VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT;
+
+		VkGraphicsPipelineCreateInfo preRasterShaderPipelineInfo	= initVulkanStructure(&preRasterShaderLibInfo);
+		preRasterShaderPipelineInfo.flags							= libCreationFlags;
+		preRasterShaderPipelineInfo.layout							= pipelineLayout.get();
+		preRasterShaderPipelineInfo.pViewportState					= &viewportStateInfo;
+		preRasterShaderPipelineInfo.pRasterizationState				= &rasterizationStateInfo;
+
+		const auto vertShaderInfo = makePipelineShaderStageCreateInfo(VK_SHADER_STAGE_VERTEX_BIT, vertModule.get());
+		preRasterShaderPipelineInfo.stageCount	= 1u;
+		preRasterShaderPipelineInfo.pStages		= &vertShaderInfo;
+
+		preRasterShaderLib = createGraphicsPipeline(ctx.vkd, ctx.device, DE_NULL, &preRasterShaderPipelineInfo);
+	}
+
+	// Fragment shader stage library.
+	{
+		VkGraphicsPipelineLibraryCreateInfoEXT fragShaderLibInfo	= initVulkanStructure(&nullRenderingInfo); // What we're testing.
+		fragShaderLibInfo.flags										|= VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT;
+
+		VkGraphicsPipelineCreateInfo fragShaderPipelineInfo	= initVulkanStructure(&fragShaderLibInfo);
+		fragShaderPipelineInfo.flags						= libCreationFlags;
+		fragShaderPipelineInfo.layout						= pipelineLayout.get();
+		fragShaderPipelineInfo.pMultisampleState			= &multisampleStateInfo;
+		fragShaderPipelineInfo.pDepthStencilState			= &depthStencilStateInfo;
+
+		const auto fragShaderInfo = makePipelineShaderStageCreateInfo(VK_SHADER_STAGE_FRAGMENT_BIT, fragModule.get());
+		fragShaderPipelineInfo.stageCount	= 1u;
+		fragShaderPipelineInfo.pStages		= &fragShaderInfo;
+
+		fragShaderLib = createGraphicsPipeline(ctx.vkd, ctx.device, DE_NULL, &fragShaderPipelineInfo);
+	}
+
+	// Fragment output library.
+	{
+		VkGraphicsPipelineLibraryCreateInfoEXT fragOutputLibInfo	= initVulkanStructure(&finalRenderingInfo); // Good info only in the fragment output substate.
+		fragOutputLibInfo.flags										|= VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT;
+
+		VkGraphicsPipelineCreateInfo fragOutputPipelineInfo	= initVulkanStructure(&fragOutputLibInfo);
+		fragOutputPipelineInfo.flags						= libCreationFlags;
+		fragOutputPipelineInfo.pColorBlendState				= &colorBlendStateInfo;
+		fragOutputPipelineInfo.pMultisampleState			= &multisampleStateInfo;
+
+		fragOutputLib = createGraphicsPipeline(ctx.vkd, ctx.device, DE_NULL, &fragOutputPipelineInfo);
+	}
+
+	// Linked pipeline.
+	const std::vector<VkPipeline> libraryHandles
+	{
+		vertexInputLib.get(),
+		preRasterShaderLib.get(),
+		fragShaderLib.get(),
+		fragOutputLib.get(),
+	};
+
+	VkPipelineLibraryCreateInfoKHR linkedPipelineLibraryInfo	= initVulkanStructure();
+	linkedPipelineLibraryInfo.libraryCount						= de::sizeU32(libraryHandles);
+	linkedPipelineLibraryInfo.pLibraries						= de::dataOrNull(libraryHandles);
+
+	VkGraphicsPipelineCreateInfo linkedPipelineInfo	= initVulkanStructure(&linkedPipelineLibraryInfo);
+	linkedPipelineInfo.flags						= linkFlags;
+	linkedPipelineInfo.layout						= pipelineLayout.get();
+
+	const auto pipeline = createGraphicsPipeline(ctx.vkd, ctx.device, DE_NULL, &linkedPipelineInfo);
+
+	CommandPoolWithBuffer cmd (ctx.vkd, ctx.device, ctx.qfIndex);
+	const auto cmdBuffer = cmd.cmdBuffer.get();
+
+	const auto clearValue = makeClearValueColorF32(0.0f, 0.0f, 0.0f, 1.0f);
+
+	beginCommandBuffer(ctx.vkd, cmdBuffer);
+
+	const auto preRenderBarrier = makeImageMemoryBarrier(0u, (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT),
+														 VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+														 colorBuffer.getImage(), colorSRR);
+	cmdPipelineImageMemoryBarrier(ctx.vkd, cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, &preRenderBarrier);
+
+	beginRendering(ctx.vkd, cmdBuffer, colorView.get(), scissors.at(0u), clearValue, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+	ctx.vkd.cmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline.get());
+	ctx.vkd.cmdDraw(cmdBuffer, 3u, 1u, 0u, 0u);
+	endRendering(ctx.vkd, cmdBuffer);
+
+	const auto color2Transfer = makeImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+													   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+													   colorBuffer.getImage(), colorSRR);
+	cmdPipelineImageMemoryBarrier(ctx.vkd, cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, &color2Transfer);
+	const auto copyRegion = makeBufferImageCopy(imageExtent, colorSRL);
+	ctx.vkd.cmdCopyImageToBuffer(cmdBuffer, colorBuffer.getImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, verificationBuffer.get(), 1u, &copyRegion);
+
+	const auto transfer2Host = makeMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT);
+	cmdPipelineMemoryBarrier(ctx.vkd, cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, &transfer2Host);
+
+	endCommandBuffer(ctx.vkd, cmdBuffer);
+
+	submitCommandsAndWait(ctx.vkd, ctx.device, ctx.queue, cmdBuffer);
+	invalidateAlloc(ctx.vkd, ctx.device, verificationBufferAlloc);
+
+	auto&						testLog			= m_context.getTestContext().getLog();
+	const tcu::Vec4				expectedColor	(0.0f, 0.0f, 1.0f, 1.0f); // Must match frag shader.
+	const tcu::Vec4				threshold		(0.0f, 0.0f, 0.0f, 0.0f);
+	tcu::ConstPixelBufferAccess	resultAccess	(tcuFormat, colorExtent, verificationBufferPtr);
+
+	if (!tcu::floatThresholdCompare(testLog, "Result", "", expectedColor, resultAccess, threshold, tcu::COMPARE_LOG_ON_ERROR))
+		return tcu::TestStatus::fail("Unexpected color buffer contents -- check log for details");
+
+	return tcu::TestStatus::pass("Pass");
+}
+
 class PipelineLibraryMiscTestCase : public TestCase
 {
 public:
@@ -2435,7 +2704,7 @@ private:
 };
 
 PipelineLibraryMiscTestCase::PipelineLibraryMiscTestCase(tcu::TestContext& context, const char* name, const MiscTestParams params)
-	: TestCase			(context, name, "")
+	: TestCase			(context, name)
 	, m_testParams		(params)
 {
 }
@@ -2443,12 +2712,6 @@ PipelineLibraryMiscTestCase::PipelineLibraryMiscTestCase(tcu::TestContext& conte
 void PipelineLibraryMiscTestCase::checkSupport(Context& context) const
 {
 	context.requireDeviceFunctionality("VK_EXT_graphics_pipeline_library");
-
-	// VK_KHR_pipeline_library must be supported if the VK_EXT_graphics_pipeline_library extension is supported.
-	// Note that vktTestCase skips enabling VK_KHR_pipeline_library by default and we can't use requireDeviceFunctionality for it.
-	const auto supportedExtensions = enumerateDeviceExtensionProperties(context.getInstanceInterface(), context.getPhysicalDevice(), DE_NULL);
-	if (!isExtensionStructSupported(supportedExtensions, RequiredExtension("VK_KHR_pipeline_library")))
-		TCU_FAIL("VK_KHR_pipeline_library not supported but VK_EXT_graphics_pipeline_library supported");
 
 	if ((m_testParams.mode == MiscTestMode::INDEPENDENT_PIPELINE_LAYOUT_SETS_FAST_LINKED) &&
 		!context.getGraphicsPipelineLibraryPropertiesEXT().graphicsPipelineLibraryFastLinking)
@@ -2459,6 +2722,9 @@ void PipelineLibraryMiscTestCase::checkSupport(Context& context) const
 
 	if (m_testParams.mode == MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB)
 		context.requireDeviceFunctionality("VK_KHR_pipeline_library");
+
+	if (m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO)
+		context.requireDeviceFunctionality("VK_KHR_dynamic_rendering");
 }
 
 void PipelineLibraryMiscTestCase::initPrograms(SourceCollections& programCollection) const
@@ -2647,6 +2913,32 @@ void PipelineLibraryMiscTestCase::initPrograms(SourceCollections& programCollect
 			;
 		programCollection.glslSources.add("rgen") << glu::RaygenSource(rgen.str()) << buildOptions;
 	}
+	else if (m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO)
+	{
+		std::ostringstream vert;
+		vert
+			<< "#version 460\n"
+			<< "vec2 positions[3] = vec2[](\n"
+			<< "    vec2(-1.0, -1.0),\n"
+			<< "    vec2(-1.0,  3.0),\n"
+			<< "    vec2( 3.0, -1.0)\n"
+			<< ");\n"
+			<< "void main() {\n"
+			<< "    gl_Position = vec4(positions[gl_VertexIndex % 3], 0.0, 1.0);\n"
+			<< "}\n"
+			;
+		programCollection.glslSources.add("vert") << glu::VertexSource(vert.str());
+
+		std::ostringstream frag;
+		frag
+			<< "#version 460\n"
+			<< "layout (location=0) out vec4 color;\n"
+			<< "void main () {\n"
+			<< "    color = vec4(0.0, 0.0, 1.0, 1.0);\n"
+			<< "}\n"
+			;
+		programCollection.glslSources.add("frag") << glu::FragmentSource(frag.str());
+	}
 	else
 	{
 		DE_ASSERT(false);
@@ -2664,10 +2956,11 @@ TestInstance* PipelineLibraryMiscTestCase::createInstance(Context& context) cons
 	if (m_testParams.mode == MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB)
 		return new PipelineLibraryShaderModuleInfoRTInstance(context, true/*withLibrary*/);
 
+	if (m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO)
+		return new NullRenderingCreateInfoInstance(context);
+
 	return new PipelineLibraryMiscTestInstance(context, m_testParams);
 }
-
-}	// anonymous
 
 void addPipelineLibraryConfigurationsTests (tcu::TestCaseGroup* group, bool optimize)
 {
@@ -2776,32 +3069,52 @@ void addPipelineLibraryConfigurationsTests (tcu::TestCaseGroup* group, bool opti
 		{
 			pipelineTreeConfiguration[libConfigNdx],	//  PipelineTreeConfiguration	pipelineTreeConfiguration;
 			optimize,									//  bool						optimize;
-			delayedShaderCreate							//  bool						delayedShaderCreate;
+			delayedShaderCreate,						//  bool						delayedShaderCreate;
+			false										//  bool						useMaintenance5;
 		};
 		const std::string	testName			= getTestName(pipelineTreeConfiguration[libConfigNdx]);
 
 		if (optimize && testParams.pipelineTreeConfiguration.size() == 1)
 			continue;
 
-		group->addChild(new PipelineLibraryTestCase(group->getTestContext(), testName.c_str(), "", testParams));
+		group->addChild(new PipelineLibraryTestCase(group->getTestContext(), testName.c_str(), testParams));
+	}
+
+	// repeat first case (one that creates montolithic pipeline) to test VK_KHR_maintenance5;
+	// VkShaderModule deprecation (tested with delayedShaderCreate) was added to VK_KHR_maintenance5
+	if (optimize == false)
+	{
+		const TestParams testParams
+		{
+			pipelineTreeConfiguration[0],				//  PipelineTreeConfiguration	pipelineTreeConfiguration;
+			false,										//  bool						optimize;
+			true,										//  bool						delayedShaderCreate;
+			true										//  bool						useMaintenance5;
+		};
+
+		group->addChild(new PipelineLibraryTestCase(group->getTestContext(), "maintenance5", testParams));
 	}
 }
 
-tcu::TestCaseGroup*	createPipelineLibraryTests(tcu::TestContext& testCtx)
+}	// anonymous
+
+tcu::TestCaseGroup*	createPipelineLibraryTests (tcu::TestContext& testCtx)
 {
-	de::MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, "graphics_library", "Tests verifying graphics pipeline libraries"));
+	de::MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, "graphics_library"));
 
-	addTestGroup(group.get(), "fast", "Tests graphics pipeline libraries linkage without optimization", addPipelineLibraryConfigurationsTests, false);
-	addTestGroup(group.get(), "optimize", "Tests graphics pipeline libraries linkage with optimization", addPipelineLibraryConfigurationsTests, true);
+	// Tests graphics pipeline libraries linkage without optimization
+	addTestGroup(group.get(), "fast", addPipelineLibraryConfigurationsTests, false);
+	// Tests graphics pipeline libraries linkage with optimization
+	addTestGroup(group.get(), "optimize", addPipelineLibraryConfigurationsTests, true);
 
-	de::MovePtr<tcu::TestCaseGroup> miscTests(new tcu::TestCaseGroup(testCtx, "misc", "Miscellaneous graphics pipeline library tests"));
+	de::MovePtr<tcu::TestCaseGroup> miscTests(new tcu::TestCaseGroup(testCtx, "misc"));
 
-	de::MovePtr<tcu::TestCaseGroup> independentLayoutSetsTests(new tcu::TestCaseGroup(testCtx, "independent_pipeline_layout_sets", ""));
+	de::MovePtr<tcu::TestCaseGroup> independentLayoutSetsTests(new tcu::TestCaseGroup(testCtx, "independent_pipeline_layout_sets"));
 	independentLayoutSetsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "fast_linked", { MiscTestMode::INDEPENDENT_PIPELINE_LAYOUT_SETS_FAST_LINKED, 0u, 0u }));
 	independentLayoutSetsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "link_opt_union_handle", { MiscTestMode::INDEPENDENT_PIPELINE_LAYOUT_SETS_WITH_LINK_TIME_OPTIMIZATION_UNION_HANDLE, 0u, 0u }));
 	miscTests->addChild(independentLayoutSetsTests.release());
 
-	de::MovePtr<tcu::TestCaseGroup> bindNullDescriptorCombinationsTests(new tcu::TestCaseGroup(testCtx, "bind_null_descriptor_set", ""));
+	de::MovePtr<tcu::TestCaseGroup> bindNullDescriptorCombinationsTests(new tcu::TestCaseGroup(testCtx, "bind_null_descriptor_set"));
 	const std::vector<const char*> bindNullDescriptorCombinations
 	{
 		// note: there will be as many descriptor sets layouts in pipeline layout as there are chcaracters in the case name;
@@ -2831,14 +3144,15 @@ tcu::TestCaseGroup*	createPipelineLibraryTests(tcu::TestContext& testCtx)
 	miscTests->addChild(bindNullDescriptorCombinationsTests.release());
 
 	{
-		de::MovePtr<tcu::TestCaseGroup> otherTests(new tcu::TestCaseGroup(testCtx, "other", ""));
+		de::MovePtr<tcu::TestCaseGroup> otherTests(new tcu::TestCaseGroup(testCtx, "other"));
 		otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "compare_link_times", { MiscTestMode::COMPARE_LINK_TIMES, 0u, 0u }));
 		otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "null_descriptor_set_in_monolithic_pipeline", { MiscTestMode::BIND_NULL_DESCRIPTOR_SET_IN_MONOLITHIC_PIPELINE, 0u, 0u }));
+		otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "null_rendering_create_info", { MiscTestMode::NULL_RENDERING_CREATE_INFO, 0u, 0u }));
 		miscTests->addChild(otherTests.release());
 	}
 
 	{
-		de::MovePtr<tcu::TestCaseGroup> nonGraphicsTests(new tcu::TestCaseGroup(testCtx, "non_graphics", "Tests that do not use graphics pipelines"));
+		de::MovePtr<tcu::TestCaseGroup> nonGraphicsTests(new tcu::TestCaseGroup(testCtx, "non_graphics"));
 		nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "shader_module_info_comp",		{ MiscTestMode::SHADER_MODULE_CREATE_INFO_COMP, 0u, 0u }));
 		nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "shader_module_info_rt",		{ MiscTestMode::SHADER_MODULE_CREATE_INFO_RT, 0u, 0u }));
 		nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "shader_module_info_rt_lib",	{ MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB, 0u, 0u }));

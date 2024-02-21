@@ -477,12 +477,12 @@ namespace subgroups
 {
 TestCaseGroup* createSubgroupsPartitionedTests (TestContext& testCtx)
 {
-	de::MovePtr<TestCaseGroup>	group				(new TestCaseGroup(testCtx, "partitioned", "Subgroup partitioned category tests"));
-	de::MovePtr<TestCaseGroup>	graphicGroup		(new TestCaseGroup(testCtx, "graphics", "Subgroup partitioned category tests: graphics"));
-	de::MovePtr<TestCaseGroup>	computeGroup		(new TestCaseGroup(testCtx, "compute", "Subgroup partitioned category tests: compute"));
-	de::MovePtr<TestCaseGroup>	meshGroup			(new TestCaseGroup(testCtx, "mesh", "Subgroup partitioned category tests: mesh shading"));
-	de::MovePtr<TestCaseGroup>	framebufferGroup	(new TestCaseGroup(testCtx, "framebuffer", "Subgroup partitioned category tests: framebuffer"));
-	de::MovePtr<TestCaseGroup>	raytracingGroup		(new TestCaseGroup(testCtx, "ray_tracing", "Subgroup partitioned category tests: ray tracing"));
+	de::MovePtr<TestCaseGroup>	group				(new TestCaseGroup(testCtx, "partitioned"));
+	de::MovePtr<TestCaseGroup>	graphicGroup		(new TestCaseGroup(testCtx, "graphics"));
+	de::MovePtr<TestCaseGroup>	computeGroup		(new TestCaseGroup(testCtx, "compute"));
+	de::MovePtr<TestCaseGroup>	meshGroup			(new TestCaseGroup(testCtx, "mesh"));
+	de::MovePtr<TestCaseGroup>	framebufferGroup	(new TestCaseGroup(testCtx, "framebuffer"));
+	de::MovePtr<TestCaseGroup>	raytracingGroup		(new TestCaseGroup(testCtx, "ray_tracing"));
 	const VkShaderStageFlags	fbStages[]			=
 	{
 		VK_SHADER_STAGE_VERTEX_BIT,
@@ -546,7 +546,7 @@ TestCaseGroup* createSubgroupsPartitionedTests (TestContext& testCtx)
 						DE_FALSE,						//  deBool				requires16BitUniformBuffer;
 					};
 
-					addFunctionCaseWithPrograms(computeGroup.get(), testName, "", supportedCheck, initPrograms, test, caseDef);
+					addFunctionCaseWithPrograms(computeGroup.get(), testName,supportedCheck, initPrograms, test, caseDef);
 				}
 
 				for (size_t groupSizeNdx = 0; groupSizeNdx < DE_LENGTH_OF_ARRAY(boolValues); ++groupSizeNdx)
@@ -567,7 +567,7 @@ TestCaseGroup* createSubgroupsPartitionedTests (TestContext& testCtx)
 							DE_FALSE,						//  deBool				requires16BitUniformBuffer;
 						};
 
-						addFunctionCaseWithPrograms(meshGroup.get(), testName, "", supportedCheck, initPrograms, test, caseDef);
+						addFunctionCaseWithPrograms(meshGroup.get(), testName,supportedCheck, initPrograms, test, caseDef);
 					}
 				}
 
@@ -584,7 +584,7 @@ TestCaseGroup* createSubgroupsPartitionedTests (TestContext& testCtx)
 						DE_FALSE						//  deBool				requires16BitUniformBuffer;
 					};
 
-					addFunctionCaseWithPrograms(graphicGroup.get(), name, "", supportedCheck, initPrograms, test, caseDef);
+					addFunctionCaseWithPrograms(graphicGroup.get(), name, supportedCheck, initPrograms, test, caseDef);
 				}
 
 				for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(fbStages); ++stageIndex)
@@ -602,7 +602,7 @@ TestCaseGroup* createSubgroupsPartitionedTests (TestContext& testCtx)
 					};
 					const string			testName	= name + "_" + getShaderStageName(caseDef.shaderStage);
 
-					addFunctionCaseWithPrograms(framebufferGroup.get(), testName, "", supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
+					addFunctionCaseWithPrograms(framebufferGroup.get(), testName,supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
 				}
 			}
 		}
@@ -647,7 +647,7 @@ TestCaseGroup* createSubgroupsPartitionedTests (TestContext& testCtx)
 					};
 					const string			name		= de::toLower(getOpTypeName(op, st)) + "_" + formatName;
 
-					addFunctionCaseWithPrograms(raytracingGroup.get(), name, "", supportedCheck, initPrograms, test, caseDef);
+					addFunctionCaseWithPrograms(raytracingGroup.get(), name, supportedCheck, initPrograms, test, caseDef);
 				}
 			}
 		}

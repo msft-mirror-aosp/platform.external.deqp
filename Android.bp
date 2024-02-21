@@ -53,7 +53,7 @@ cc_library_headers {
 // across dEQP and its dependencies.
 cc_defaults {
     name: "deqp_and_deps_defaults",
-    cpp_std: "c++11",
+    cpp_std: "c++17",
     cflags: [
         // Amber defines.
         "-DAMBER_CTS_VULKAN_HEADER=1",
@@ -177,7 +177,6 @@ cc_defaults {
     static_libs: [
         "libpng_ndk",
         "deqp_glslang_glslang",
-        "deqp_glslang_OGLCompiler",
         "deqp_glslang_OSDependent",
         "deqp_glslang_MachineIndependent",
         "deqp_glslang_GenericCodeGen",

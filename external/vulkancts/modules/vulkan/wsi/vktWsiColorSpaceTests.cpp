@@ -219,7 +219,7 @@ struct DeviceHelper
 												 queueFamilyIndex,
 												 pAllocator,
 												 context.getTestContext().getCommandLine().isValidationEnabled()))
-		, vkd				(context.getPlatformInterface(), instance, *device)
+		, vkd				(context.getPlatformInterface(), instance, *device, context.getUsedApiVersion(), context.getTestContext().getCommandLine())
 		, queue				(getDeviceQueue(vkd, *device, queueFamilyIndex, 0))
 	{
 	}
@@ -406,6 +406,8 @@ tcu::Vec4 getPixel (const DeviceInterface&		vkd,
 	}
 	endCommandBuffer(vkd, *commandBuffer);
 	submitCommandsAndWait(vkd, device, queue, commandBuffer.get());
+
+	invalidateMappedMemoryRange(vkd, device, resultBufferMemory->getMemory(), 0, VK_WHOLE_SIZE);
 
 	tcu::ConstPixelBufferAccess	resultAccess(textureFormat,
 											 tcu::IVec3(size.x(), size.y(), 1),
@@ -823,9 +825,12 @@ void getBasicRenderPrograms (SourceCollections& dst, Type)
 
 void createColorSpaceTests (tcu::TestCaseGroup* testGroup, vk::wsi::Type wsiType)
 {
-	addFunctionCase(testGroup, "extensions", "Verify Colorspace Extensions", basicExtensionTest, wsiType);
-	addFunctionCaseWithPrograms(testGroup, "basic", "Basic Rendering Tests", getBasicRenderPrograms, surfaceFormatRenderTests, wsiType);
-	addFunctionCaseWithPrograms(testGroup, "hdr", "Basic Rendering Tests with HDR", getBasicRenderPrograms, surfaceFormatRenderWithHdrTests, wsiType);
+	// Verify Colorspace Extensions
+	addFunctionCase(testGroup, "extensions", basicExtensionTest, wsiType);
+	// Basic Rendering Tests
+	addFunctionCaseWithPrograms(testGroup, "basic", getBasicRenderPrograms, surfaceFormatRenderTests, wsiType);
+	// Basic Rendering Tests with HDR
+	addFunctionCaseWithPrograms(testGroup, "hdr", getBasicRenderPrograms, surfaceFormatRenderWithHdrTests, wsiType);
 }
 
 void createColorspaceCompareTests (tcu::TestCaseGroup* testGroup, vk::wsi::Type wsiType)
@@ -849,7 +854,7 @@ void createColorspaceCompareTests (tcu::TestCaseGroup* testGroup, vk::wsi::Type 
 			wsiType,
 			format
 		};
-		addFunctionCaseWithPrograms(testGroup, caseName, "", getBasicRenderPrograms2, colorspaceCompareTest, params);
+		addFunctionCaseWithPrograms(testGroup, caseName, getBasicRenderPrograms2, colorspaceCompareTest, params);
 	}
 }
 

@@ -32,6 +32,8 @@
 
 #include "deMutex.h"
 
+#include "deClock.h"
+
 #if defined(QP_SUPPORT_PNG)
 #	include <png.h>
 #endif
@@ -44,6 +46,10 @@
 #	include <windows.h>
 #	include <io.h>
 #endif
+
+static deUint64 sessionStartTime;
+
+
 
 #if defined(DE_DEBUG)
 
@@ -172,6 +178,7 @@ static const qpKeyStringMap s_qpTestResultMap[] =
 	{ QP_TEST_RESULT_CRASH,						"Crash"					},
 	{ QP_TEST_RESULT_TIMEOUT,					"Timeout"				},
 	{ QP_TEST_RESULT_WAIVER,					"Waiver"				},
+	{ QP_TEST_RESULT_DEVICE_LOST,			"DeviceLost"		},
 
 	/* Add new values here if needed, remember to update qpTestResult enumeration. */
 
@@ -306,6 +313,10 @@ static deBool endSession (qpTestLog* log)
 	/* Make sure xml is flushed. */
 	qpXmlWriter_flush(log->writer);
 
+	deUint64 duration = deGetMicroseconds() - sessionStartTime;
+
+	fprintf(log->outputFile, "\nRun took %.2f seconds\n", (float)duration / 1000000.0f);
+
 	/* Write out #endSession. */
 	fprintf(log->outputFile, "\n#endSession\n");
 	qpTestLog_flushFile(log);
@@ -397,6 +408,7 @@ deBool qpTestLog_beginSession(qpTestLog* log, const char* additionalSessionInfo)
 	/* Write out #beginSession. */
 	fprintf(log->outputFile, "#beginSession\n");
 	qpTestLog_flushFile(log);
+	sessionStartTime = deGetMicroseconds();
 
 	log->isSessionOpen = DE_TRUE;
 
