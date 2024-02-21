@@ -31,6 +31,11 @@ namespace vk
 
 #include "vkTypeUtil.inl"
 
+inline VkBool32 makeVkBool (bool b)
+{
+	return (b ? VK_TRUE : VK_FALSE);
+}
+
 inline VkClearValue makeClearValueColorF32 (float r, float g, float b, float a)
 {
 	VkClearValue v;
@@ -201,6 +206,21 @@ inline VkSemaphoreSubmitInfoKHR makeSemaphoreSubmitInfo (VkSemaphore semaphore, 
 	};
 }
 
+inline VkPipelineShaderStageCreateInfo makePipelineShaderStageCreateInfo (VkShaderStageFlagBits stage, VkShaderModule module, const VkSpecializationInfo* pSpecializationInfo = nullptr, const void* pNext = nullptr)
+{
+	const VkPipelineShaderStageCreateInfo stageInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	//	VkStructureType						sType;
+		pNext,													//	const void*							pNext;
+		0u,														//	VkPipelineShaderStageCreateFlags	flags;
+		stage,													//	VkShaderStageFlagBits				stage;
+		module,													//	VkShaderModule						module;
+		"main",													//	const char*							pName;
+		pSpecializationInfo,									//	const VkSpecializationInfo*			pSpecializationInfo;
+	};
+	return stageInfo;
+}
+
 inline VkPrimitiveTopology primitiveTopologyCastToList (const VkPrimitiveTopology primitiveTopology)
 {
 	DE_STATIC_ASSERT(static_cast<deUint64>(VK_PRIMITIVE_TOPOLOGY_PATCH_LIST) + 1 == static_cast<deUint64>(VK_PRIMITIVE_TOPOLOGY_LAST));
@@ -277,6 +297,32 @@ inline bool isAllMeshShadingStages (const VkShaderStageFlags shaderStageFlags)
 }
 
 #endif // CTS_USES_VULKANSC
+
+template <typename T>
+class StructChainAdder
+{
+public:
+	StructChainAdder (T* baseStruct)
+		: m_baseStruct(baseStruct)
+		{}
+
+	template <typename U>
+	void operator()(U* nextStruct) const
+	{
+		nextStruct->pNext	= m_baseStruct->pNext;
+		m_baseStruct->pNext	= nextStruct;
+	}
+
+private:
+	T* const m_baseStruct;
+};
+
+template<typename T>
+StructChainAdder<T> makeStructChainAdder (T* baseStruct)
+{
+	return StructChainAdder<T>(baseStruct);
+}
+
 } // vk
 
 #endif // _VKTYPEUTIL_HPP

@@ -31,8 +31,10 @@ import subprocess
 import ssl
 import stat
 import platform
+import logging
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "scripts"))
+scriptPath = os.path.join(os.path.dirname(__file__), "..", "scripts")
+sys.path.insert(0, scriptPath)
 
 from ctsbuild.common import *
 
@@ -57,8 +59,10 @@ class Source:
 		# Remove read-only first
 		readonlydir = os.path.join(fullDstPath, ".git")
 		if os.path.exists(readonlydir):
+			logging.debug("Deleting " + readonlydir)
 			shutil.rmtree(readonlydir, onerror = onReadonlyRemoveError)
 		if os.path.exists(fullDstPath):
+			logging.debug("Deleting " + fullDstPath)
 			shutil.rmtree(fullDstPath, ignore_errors=False)
 
 class SourcePackage (Source):
@@ -70,34 +74,23 @@ class SourcePackage (Source):
 		self.archiveDir		= "packages"
 		self.postExtract	= postExtract
 
-		if SYSTEM_NAME == 'Windows' or SYSTEM_NAME.startswith('CYGWIN') or SYSTEM_NAME.startswith('MINGW'):
-			self.sysNdx = 0
-		elif SYSTEM_NAME == 'Linux':
-			self.sysNdx = 1
-		elif SYSTEM_NAME == 'Darwin':
-			self.sysNdx = 2
-		else:
-			self.sysNdx = -1  # unknown system
-
-		self.FFmpeg			= "FFmpeg" in url
-
 	def clean (self):
 		Source.clean(self)
 		self.removeArchives()
 
 	def update (self, cmdProtocol = None, force = False):
-		if self.sysNdx != 2:
-			if not self.isArchiveUpToDate():
-				self.fetchAndVerifyArchive()
+		if not self.isArchiveUpToDate():
+			self.fetchAndVerifyArchive()
 
-			if self.getExtractedChecksum() != self.checksum:
-				Source.clean(self)
-				self.extract()
-				self.storeExtractedChecksum(self.checksum)
+		if self.getExtractedChecksum() != self.checksum:
+			Source.clean(self)
+			self.extract()
+			self.storeExtractedChecksum(self.checksum)
 
 	def removeArchives (self):
 		archiveDir = os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.archiveDir)
 		if os.path.exists(archiveDir):
+			logging.debug("Deleting " + archiveDir)
 			shutil.rmtree(archiveDir, ignore_errors=False)
 
 	def isArchiveUpToDate (self):
@@ -151,7 +144,7 @@ class SourcePackage (Source):
 			raise Exception("Checksum mismatch for %s, expected %s, got %s" % (self.filename, self.checksum, checksum))
 
 		if not os.path.exists(os.path.dirname(dstPath)):
-			os.mkdir(os.path.dirname(dstPath))
+			os.makedirs(os.path.dirname(dstPath))
 
 		writeBinaryFile(dstPath, data)
 
@@ -262,6 +255,7 @@ class GitRepo (Source):
 			execute(["git", "clone", "--no-checkout", url, fullDstPath])
 
 		pushWorkingDir(fullDstPath)
+		print("Directory: " + fullDstPath)
 		try:
 			for tag in self.removeTags:
 				proc = subprocess.Popen(['git', 'tag', '-l', tag], stdout=subprocess.PIPE)
@@ -299,22 +293,9 @@ def postExtractLibpng (path):
 	shutil.copy(os.path.join(path, "scripts", "pnglibconf.h.prebuilt"),
 				os.path.join(path, "pnglibconf.h"))
 
-if SYSTEM_NAME == 'Windows' or SYSTEM_NAME.startswith('CYGWIN') or SYSTEM_NAME.startswith('MINGW'):
-    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-05-31-12-34/ffmpeg-n4.4.2-1-g8e98dfc57f-win64-lgpl-shared-4.4.zip"
-    ffmpeg_hash_value = "670df8e9d2ddd5e761459b3538f64b8826566270ef1ed13bcbfc63e73aab3fd9"
-elif SYSTEM_NAME == 'Linux':
-    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-05-31-12-34/ffmpeg-n4.4.2-1-g8e98dfc57f-linux64-gpl-shared-4.4.tar.xz"
-    ffmpeg_hash_value = "817f8c93ff1ef7ede3dad15b20415d5e366bcd6848844d55046111fd3de827d0"
-elif SYSTEM_NAME == 'Darwin':
-    ffmpeg_url = ""
-    ffmpeg_hash_value = ""
-else:
-    ffmpeg_url = None
-    ffmpeg_hash_value = None
-
 PACKAGES = [
 	SourcePackage(
-		"http://zlib.net/fossils/zlib-1.2.13.tar.gz",
+		"https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz",
 		"b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30",
 		"zlib"),
 	SourcePackage(
@@ -322,10 +303,6 @@ PACKAGES = [
 		"c9d164ec247f426a525a7b89936694aefbc91fb7a50182b198898b8fc91174b4",
 		"libpng",
 		postExtract = postExtractLibpng),
-	SourcePackage(
-		ffmpeg_url,
-		ffmpeg_hash_value,
-		"ffmpeg"),
 	SourceFile(
 		"https://raw.githubusercontent.com/baldurk/renderdoc/v1.1/renderdoc/api/app/renderdoc_app.h",
 		"renderdoc_app.h",
@@ -334,39 +311,47 @@ PACKAGES = [
 	GitRepo(
 		"https://github.com/KhronosGroup/SPIRV-Tools.git",
 		"git@github.com:KhronosGroup/SPIRV-Tools.git",
-		"f98473ceeb1d33700d01e20910433583e5256030",
+		"9a7b1af906e40b47b96e162a25c3faa04d78c39e",
 		"spirv-tools"),
 	GitRepo(
 		"https://github.com/KhronosGroup/glslang.git",
-		None,
-		"77417d5c9e0a5d4c79ddd0285d530b45f7259f0d",
+		"git@github.com:KhronosGroup/glslang.git",
+		"b1f7affe94ea108de7e38ee764f855a2130da398",
 		"glslang",
-		removeTags = ["master-tot"]),
+		removeTags = ["main-tot"]),
 	GitRepo(
 		"https://github.com/KhronosGroup/SPIRV-Headers.git",
 		"git@github.com:KhronosGroup/SPIRV-Headers.git",
-		"87d5b782bec60822aa878941e6b13c0a9a954c9b",
+		"e77d03080b90c5d361663a67834c57bb1fddaec2",
 		"spirv-headers"),
 	GitRepo(
 		"https://github.com/KhronosGroup/Vulkan-Docs.git",
 		"git@github.com:KhronosGroup/Vulkan-Docs.git",
-		"9a2e576a052a1e65a5d41b593e693ff02745604b",
+		"d99193d3fcc4b2a0dacc0a9d7e4951ea611a3e96",
 		"vulkan-docs"),
 	GitRepo(
 		"https://github.com/google/amber.git",
-		None,
-		"933ecb4d6288675a92eb1650e0f52b1d7afe8273",
+		"git@github.com:google/amber.git",
+		"8e90b2d2f532bcd4a80069e3f37a9698209a21bc",
 		"amber"),
 	GitRepo(
 		"https://github.com/open-source-parsers/jsoncpp.git",
 		"git@github.com:open-source-parsers/jsoncpp.git",
 		"9059f5cad030ba11d37818847443a53918c327b1",
 		"jsoncpp"),
+	# NOTE: The samples application is not well suited to external
+	# integration, this fork contains the small fixes needed for use
+	# by the CTS.
 	GitRepo(
-		"https://github.com/nvpro-samples/vk_video_samples.git",
-		None,
-		"7d68747d3524842afaf050c5e00a10f5b8c07904",
-		"video-parser"),
+		"https://github.com/Igalia/vk_video_samples.git",
+		"git@github.com:Igalia/vk_video_samples.git",
+		"b907158533534585d9182cb0becdaec055aa7e12",
+		"nvidia-video-samples"),
+	GitRepo(
+		"https://github.com/Igalia/ESExtractor.git",
+		"git@github.com:Igalia/ESExtractor.git",
+		"v0.3.3",
+		"ESExtractor"),
 ]
 
 def parseArgs ():
@@ -383,7 +368,10 @@ def parseArgs ():
 						help="Select protocol to checkout git repositories.")
 	parser.add_argument('--force', dest='force', action='store_true', default=False,
 						help="Pass --force to git fetch and checkout commands")
-
+	parser.add_argument("-v", "--verbose",
+						dest="verbose",
+						action="store_true",
+						help="Enable verbose logging")
 	args = parser.parse_args()
 
 	if args.insecure:
@@ -414,24 +402,11 @@ def run(*popenargs, **kwargs):
 	return retcode, stdout, stderr
 
 if __name__ == "__main__":
-	# Rerun script with python3 as python2 does not have lzma (xz) decompression support
-	if sys.version_info < (3, 0):
-		if SYSTEM_NAME == 'Windows' or SYSTEM_NAME.startswith('CYGWIN') or SYSTEM_NAME.startswith('MINGW'):
-			cmd = ['py', '-3']
-		elif SYSTEM_NAME == 'Linux':
-			cmd = ['python3']
-		elif SYSTEM_NAME == 'Darwin':
-			cmd = ['python3']
+	args = parseArgs()
+	initializeLogger(args.verbose)
+
+	for pkg in PACKAGES:
+		if args.clean:
+			pkg.clean()
 		else:
-			cmd = None  # unknown system
-
-		cmd = cmd + sys.argv
-		run(cmd)
-	else:
-		args = parseArgs()
-
-		for pkg in PACKAGES:
-			if args.clean:
-				pkg.clean()
-			else:
-				pkg.update(args.protocol, args.force)
+			pkg.update(args.protocol, args.force)

@@ -42,15 +42,14 @@ void createChildren (tcu::TestCaseGroup* spirVAssemblyTests)
 	spirVAssemblyTests->addChild(createInstructionTests(testCtx));
 	spirVAssemblyTests->addChild(createTypeTests(testCtx));
 	// \todo [2015-09-28 antiagainst] control flow
-	// \todo [2015-09-28 antiagainst] multiple entry points for the same shader stage
 	// \todo [2015-09-28 antiagainst] multiple shaders in the same module
 }
 
 } // anonymous
 
-tcu::TestCaseGroup* createTests (tcu::TestContext& testCtx)
+tcu::TestCaseGroup* createTests (tcu::TestContext& testCtx, const std::string& name)
 {
-	return createTestGroup(testCtx, "spirv_assembly", "SPIR-V Assembly tests", createChildren);
+	return createTestGroup(testCtx, name, createChildren);
 }
 
 } // SpirVAssembly
