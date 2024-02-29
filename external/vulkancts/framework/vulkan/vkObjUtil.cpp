@@ -41,15 +41,23 @@ Move<VkPipeline> makeComputePipeline (const DeviceInterface&					vk,
 									  const VkDevice							device,
 									  const VkPipelineLayout					pipelineLayout,
 									  const VkPipelineCreateFlags				pipelineFlags,
+									  const void*								pipelinePNext,
 									  const VkShaderModule						shaderModule,
 									  const VkPipelineShaderStageCreateFlags	shaderFlags,
 									  const VkSpecializationInfo*				specializationInfo,
-									  const VkPipelineCache						pipelineCache)
+									  const VkPipelineCache						pipelineCache,
+									  const uint32_t							subgroupSize)
 {
+	const VkPipelineShaderStageRequiredSubgroupSizeCreateInfoEXT subgroupSizeCreateInfo =
+	{
+		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_REQUIRED_SUBGROUP_SIZE_CREATE_INFO_EXT,	// VkStructureType	sType;
+		DE_NULL,																		// void*			pNext;
+		subgroupSize																	// uint32_t			requiredSubgroupSize;
+	};
 	const VkPipelineShaderStageCreateInfo pipelineShaderStageParams =
 	{
 		VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,	// VkStructureType						sType;
-		nullptr,												// const void*							pNext;
+		subgroupSize != 0 ? &subgroupSizeCreateInfo : nullptr,	// const void*							pNext;
 		shaderFlags,											// VkPipelineShaderStageCreateFlags		flags;
 		VK_SHADER_STAGE_COMPUTE_BIT,							// VkShaderStageFlagBits				stage;
 		shaderModule,											// VkShaderModule						module;
@@ -59,7 +67,7 @@ Move<VkPipeline> makeComputePipeline (const DeviceInterface&					vk,
 	const VkComputePipelineCreateInfo pipelineCreateInfo =
 	{
 		VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,		// VkStructureType					sType;
-		nullptr,											// const void*						pNext;
+		pipelinePNext,										// const void*						pNext;
 		pipelineFlags,										// VkPipelineCreateFlags			flags;
 		pipelineShaderStageParams,							// VkPipelineShaderStageCreateInfo	stage;
 		pipelineLayout,										// VkPipelineLayout					layout;
@@ -78,6 +86,7 @@ Move<VkPipeline> makeComputePipeline (const DeviceInterface&	vk,
 							   device,
 							   pipelineLayout,
 							   static_cast<VkPipelineCreateFlags>(0u),
+							   DE_NULL,
 							   shaderModule,
 							   static_cast<VkPipelineShaderStageCreateFlags>(0u),
 							   DE_NULL);
@@ -570,7 +579,8 @@ Move<VkRenderPass> makeRenderPass (const DeviceInterface&				vk,
 								   const VkImageLayout					finalLayoutDepthStencil,
 								   const VkImageLayout					subpassLayoutColor,
 								   const VkImageLayout					subpassLayoutDepthStencil,
-								   const VkAllocationCallbacks* const	allocationCallbacks)
+								   const VkAllocationCallbacks* const	allocationCallbacks,
+								   const void*							pNext)
 {
 	const bool								hasColor							= colorFormat != VK_FORMAT_UNDEFINED;
 	const bool								hasDepthStencil						= depthStencilFormat != VK_FORMAT_UNDEFINED;
@@ -639,7 +649,7 @@ Move<VkRenderPass> makeRenderPass (const DeviceInterface&				vk,
 	const VkRenderPassCreateInfo			renderPassInfo						=
 	{
 		VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,									// VkStructureType                   sType
-		DE_NULL,																	// const void*                       pNext
+		pNext,																		// const void*                       pNext
 		(VkRenderPassCreateFlags)0,													// VkRenderPassCreateFlags           flags
 		(deUint32)attachmentDescriptions.size(),									// deUint32                          attachmentCount
 		attachmentDescriptions.size() > 0 ? &attachmentDescriptions[0] : DE_NULL,	// const VkAttachmentDescription*    pAttachments
