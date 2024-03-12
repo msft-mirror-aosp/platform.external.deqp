@@ -52,7 +52,6 @@ GLES2_MODULE					= getModuleByName("dEQP-GLES2")
 GLES3_MODULE					= getModuleByName("dEQP-GLES3")
 GLES31_MODULE					= getModuleByName("dEQP-GLES31")
 VULKAN_MODULE					= getModuleByName("dEQP-VK")
-VULKANSC_MODULE					= getModuleByName("dEQP-VKSC")
 
 # Main
 
@@ -64,15 +63,6 @@ MAIN_EGL_COMMON_FILTERS		= [include("egl-master.txt"),
 
 # Android CTS is not using EGL test list for year 2021
 MAIN_EGL_PKG					= Package(module = EGL_MODULE, configurations = [
-		# Main
-		Configuration(name			= "master",
-					  glconfig		= "rgba8888d24s8ms0",
-					  rotation		= "unspecified",
-					  surfacetype	= "window",
-					  required		= True,
-					  filters		= MAIN_EGL_COMMON_FILTERS,
-					  runtime		= "23m",
-					  runByDefault	= False),
 		Configuration(name			= "master-2020-03-01",
 					  glconfig		= "rgba8888d24s8ms0",
 					  rotation		= "unspecified",
@@ -92,7 +82,14 @@ MAIN_EGL_PKG					= Package(module = EGL_MODULE, configurations = [
 					  rotation		= "unspecified",
 					  surfacetype	= "window",
 					  required		= True,
-					  filters		= MAIN_EGL_COMMON_FILTERS + [exclude("egl-master-2020-03-01.txt"), exclude("egl-master-2022-03-01.txt")],
+					  filters		= [include("egl-master-2023-03-01.txt")],
+					  runtime		= "5m"),
+		Configuration(name			= "master-2024-03-01",
+					  glconfig		= "rgba8888d24s8ms0",
+					  rotation		= "unspecified",
+					  surfacetype	= "window",
+					  required		= True,
+					  filters		= MAIN_EGL_COMMON_FILTERS + [exclude("egl-master-2020-03-01.txt", "egl-master-2022-03-01.txt", "egl-master-2023-03-01.txt")],
 					  runtime		= "5m"),
 		# Risky subset
 		Configuration(name			= "master-risky",
@@ -111,15 +108,6 @@ MAIN_GLES2_COMMON_FILTERS		= [
 		exclude("gles2-temp-excluded.txt"),
 	]
 MAIN_GLES2_PKG				= Package(module = GLES2_MODULE, configurations = [
-		# Main
-		Configuration(name			= "master",
-					  glconfig		= "rgba8888d24s8ms0",
-					  rotation		= "unspecified",
-					  surfacetype	= "window",
-					  required		= True,
-					  filters		= MAIN_GLES2_COMMON_FILTERS,
-					  runtime		= "46m",
-					  runByDefault		= False),
 		Configuration(name			= "master-2020-03-01",
 					  glconfig		= "rgba8888d24s8ms0",
 					  rotation		= "unspecified",
@@ -146,7 +134,14 @@ MAIN_GLES2_PKG				= Package(module = GLES2_MODULE, configurations = [
 					  rotation		= "unspecified",
 					  surfacetype	= "window",
 					  required		= True,
-					  filters		= MAIN_GLES2_COMMON_FILTERS + [exclude("gles2-master-2020-03-01.txt"), exclude("gles2-master-2021-03-01.txt"), exclude("gles2-master-2022-03-01.txt")],
+					  filters		= [include("gles2-master-2023-03-01.txt")],
+					  runtime		= "10m"),
+		Configuration(name			= "master-2024-03-01",
+					  glconfig		= "rgba8888d24s8ms0",
+					  rotation		= "unspecified",
+					  surfacetype	= "window",
+					  required		= True,
+					  filters		= MAIN_GLES2_COMMON_FILTERS + [exclude("gles2-master-2020-03-01.txt", "gles2-master-2021-03-01.txt", "gles2-master-2022-03-01.txt", "gles2-master-2023-03-01.txt")],
 					  runtime		= "10m"),
 	])
 
@@ -161,14 +156,6 @@ MAIN_GLES3_COMMON_FILTERS		= [
 	]
 MAIN_GLES3_PKG				= Package(module = GLES3_MODULE, configurations = [
 		# Main
-		Configuration(name			= "master",
-					  glconfig		= "rgba8888d24s8ms0",
-					  rotation		= "unspecified",
-					  surfacetype	= "window",
-					  required		= True,
-					  filters		= MAIN_GLES3_COMMON_FILTERS,
-					  runtime		= "1h50m",
-					  runByDefault	= False),
 		Configuration(name			= "master-2020-03-01",
 					  glconfig		= "rgba8888d24s8ms0",
 					  rotation		= "unspecified",
@@ -195,7 +182,14 @@ MAIN_GLES3_PKG				= Package(module = GLES3_MODULE, configurations = [
 					  rotation		= "unspecified",
 					  surfacetype	= "window",
 					  required		= True,
-					  filters		= MAIN_GLES3_COMMON_FILTERS + [exclude("gles3-master-2020-03-01.txt"), exclude("gles3-master-2021-03-01.txt"), exclude("gles3-master-2022-03-01.txt")],
+					  filters		= [include("gles3-master-2023-03-01.txt")],
+					  runtime		= "10m"),
+		Configuration(name			= "master-2024-03-01",
+					  glconfig		= "rgba8888d24s8ms0",
+					  rotation		= "unspecified",
+					  surfacetype	= "window",
+					  required		= True,
+					  filters		= MAIN_GLES3_COMMON_FILTERS + [exclude("gles3-master-2020-03-01.txt", "gles3-master-2021-03-01.txt", "gles3-master-2022-03-01.txt", "gles3-master-2023-03-01.txt")],
 					  runtime		= "10m"),
 		# Rotations
 		Configuration(name			= "rotate-portrait",
@@ -257,15 +251,6 @@ MAIN_GLES31_COMMON_FILTERS	= [
 		exclude("gles31-waivers.txt"),
 	]
 MAIN_GLES31_PKG				= Package(module = GLES31_MODULE, configurations = [
-		# Main
-		Configuration(name			= "master",
-					  glconfig		= "rgba8888d24s8ms0",
-					  rotation		= "unspecified",
-					  surfacetype	= "window",
-					  required		= True,
-					  filters		= MAIN_GLES31_COMMON_FILTERS,
-					  runtime		= "1h40m",
-					  runByDefault		= False),
 		Configuration(name			= "master-2020-03-01",
 					  glconfig		= "rgba8888d24s8ms0",
 					  rotation		= "unspecified",
@@ -292,7 +277,14 @@ MAIN_GLES31_PKG				= Package(module = GLES31_MODULE, configurations = [
 					  rotation		= "unspecified",
 					  surfacetype	= "window",
 					  required		= True,
-					  filters		= MAIN_GLES31_COMMON_FILTERS + [exclude("gles31-master-2020-03-01.txt"), exclude("gles31-master-2021-03-01.txt"),exclude("gles31-master-2022-03-01.txt")],
+					  filters		= [include("gles31-master-2023-03-01.txt")],
+					  runtime		= "10m"),
+		Configuration(name			= "master-2024-03-01",
+					  glconfig		= "rgba8888d24s8ms0",
+					  rotation		= "unspecified",
+					  surfacetype	= "window",
+					  required		= True,
+					  filters		= MAIN_GLES31_COMMON_FILTERS + [exclude("gles31-master-2020-03-01.txt", "gles31-master-2021-03-01.txt", "gles31-master-2022-03-01.txt", "gles31-master-2023-03-01.txt")],
 					  runtime		= "10m"),
 		# Rotations
 		Configuration(name			= "rotate-portrait",
@@ -346,11 +338,6 @@ MAIN_VULKAN_FILTERS			= [
 		exclude("vk-temp-excluded.txt"),
 	]
 MAIN_VULKAN_PKG				= Package(module = VULKAN_MODULE, configurations = [
-		Configuration(name					= "master",
-					  filters				= MAIN_VULKAN_FILTERS,
-					  runtime				= "2h39m",
-					  runByDefault			= False,
-					  listOfGroupsToSplit	= ["dEQP-VK", "dEQP-VK.pipeline"]),
 		Configuration(name					= "master-2019-03-01",
 					  filters				= [include("vk-master-2019-03-01.txt")],
 					  runtime				= "2h29m",
@@ -368,7 +355,11 @@ MAIN_VULKAN_PKG				= Package(module = VULKAN_MODULE, configurations = [
 					  runtime				= "10m",
 					  listOfGroupsToSplit	= ["dEQP-VK"]),
 		Configuration(name					= "master-2023-03-01",
-					  filters				= MAIN_VULKAN_FILTERS + [exclude("vk-master-2019-03-01.txt"), exclude("vk-master-2020-03-01.txt"), exclude("vk-master-2021-03-01.txt"), exclude("vk-master-2022-03-01.txt"),],
+					  filters				= [include("vk-master-2023-03-01-part1.txt", "vk-master-2023-03-01-part2.txt")],
+					  runtime				= "10m",
+					  listOfGroupsToSplit	= ["dEQP-VK"]),
+		Configuration(name					= "master-2024-03-01",
+					  filters				= MAIN_VULKAN_FILTERS + [exclude("vk-master-2019-03-01.txt", "vk-master-2020-03-01.txt", "vk-master-2021-03-01.txt", "vk-master-2022-03-01.txt", "vk-master-2023-03-01-part1.txt", "vk-master-2023-03-01-part2.txt")],
 					  runtime				= "10m",
 					  listOfGroupsToSplit	= ["dEQP-VK"]),
 		Configuration(name					= "incremental-deqp",
@@ -378,19 +369,8 @@ MAIN_VULKAN_PKG				= Package(module = VULKAN_MODULE, configurations = [
 					  listOfGroupsToSplit	= []),
 	])
 
-MAIN_VULKANSC_FILTERS			= [
-		include("vksc-master.txt"),
-	]
-MAIN_VULKANSC_PKG				= Package(module = VULKANSC_MODULE, configurations = [
-		Configuration(name					= "main",
-					  filters				= MAIN_VULKANSC_FILTERS,
-					  runtime				= "2h39m",
-					  runByDefault			= False,
-					  listOfGroupsToSplit	= ["dEQP-VKSC"]),
-	])
-
 MUSTPASS_LISTS				= [
-		Mustpass(project = CTS_PROJECT, version = "main",		packages = [MAIN_EGL_PKG, MAIN_GLES2_PKG, MAIN_GLES3_PKG, MAIN_GLES31_PKG, MAIN_VULKAN_PKG, MAIN_VULKANSC_PKG])
+		Mustpass(project = CTS_PROJECT, version = "main",		packages = [MAIN_EGL_PKG, MAIN_GLES2_PKG, MAIN_GLES3_PKG, MAIN_GLES31_PKG, MAIN_VULKAN_PKG])
 	]
 
 if __name__ == "__main__":

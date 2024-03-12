@@ -1,0 +1,14 @@
+dEQP-VK.glsl.texture_functions.texture.sparse_isampler2d_bias_fragment
+dEQP-VK.glsl.texture_functions.texture.sparse_usampler2d_bias_fragment
+dEQP-VK.glsl.texture_functions.texture.sparse_isamplercube_bias_fragment
+dEQP-VK.glsl.texture_functions.texture.sparse_usamplercube_bias_fragment
+dEQP-VK.glsl.texture_functions.texture.sparse_isampler2darray_bias_fragment
+dEQP-VK.glsl.texture_functions.texture.sparse_usampler2darray_bias_fragment
+dEQP-VK.glsl.texture_functions.texture.sparse_isampler3d_bias_fragment
+dEQP-VK.glsl.texture_functions.texture.sparse_usampler3d_bias_fragment
+dEQP-VK.glsl.texture_functions.texturegrad.sparse_isamplercube_vertex
+dEQP-VK.glsl.texture_functions.texturegrad.sparse_isamplercube_fragment
+dEQP-VK.glsl.texture_functions.texturegrad.sparse_usamplercube_fragment
+dEQP-VK.glsl.texture_functions.texturegrad.sparse_isampler3d_vertex
+dEQP-VK.glsl.texture_functions.texturegrad.samplercubeshadow_vertex
+dEQP-VK.glsl.texture_functions.texturegrad.samplercubeshadow_fragment
