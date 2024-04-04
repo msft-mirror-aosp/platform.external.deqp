@@ -153,3 +153,6 @@ dEQP-GLES3.functional.draw.draw_elements_instanced.indices.buffer.index_byte
 # Khronos bug 13916, internal bugs 20558284, 143459817
 dEQP-GLES3.functional.flush_finish.*
 
+# Bug 326543603
+dEQP-GLES3.functional.shaders.matrix.inverse.dynamic.lowp_mat4_float_vertex
+dEQP-GLES3.functional.shaders.matrix.inverse.dynamic.mediump_mat4_float_vertex
