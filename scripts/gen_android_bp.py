@@ -24,7 +24,7 @@ import os
 import posixpath
 from fnmatch import fnmatch
 
-from ctsbuild.common import DEQP_DIR, writeFile
+from ctsbuild.common import DEQP_DIR, writeFile, which, execute
 
 SRC_ROOTS = [
 	"execserver",
@@ -148,7 +148,7 @@ def genBpStringList (items):
 	src = ""
 
 	for item in items:
-		src += "       \"%s\",\n" % item
+		src += "        \"%s\",\n" % item
 
 	return src
 
@@ -164,4 +164,11 @@ if __name__ == "__main__":
 	sourceDirs		= getSourceDirs(sourceFiles)
 	androidBpText	= genAndroidBp(sourceDirs, sourceFiles)
 
-	writeFile(os.path.join(DEQP_DIR, "AndroidGen.bp"), androidBpText)
+	bpFilename = os.path.join(DEQP_DIR, "AndroidGen.bp")
+	writeFile(bpFilename, androidBpText)
+
+	# Format the generated file
+	if which("bpfmt") != None:
+		execute(["bpfmt", "-w", bpFilename])
+	else:
+		print("Warning: Could not find bpfmt, file won't be formatted.")
