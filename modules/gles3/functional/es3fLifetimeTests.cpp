@@ -131,11 +131,15 @@ void ScaleProgram::draw(GLuint vao, GLfloat scale, bool tf, Surface *dst)
 
     gl.uniform1f(m_scaleLoc, scale);
 
-    if (tf)
-        gl.beginTransformFeedback(GL_TRIANGLES);
-    GLU_CHECK_CALL_ERROR(gl.drawArrays(GL_TRIANGLES, 0, 3), gl.getError());
-    if (tf)
-        gl.endTransformFeedback();
+	if (tf)
+	{
+		gl.beginTransformFeedback(GL_TRIANGLES);
+		if (gl.getError() == GL_INVALID_OPERATION)
+			return ;
+	}
+	GLU_CHECK_CALL_ERROR(gl.drawArrays(GL_TRIANGLES, 0, 3), gl.getError());
+	if (tf)
+		gl.endTransformFeedback();
 
     if (dst != DE_NULL)
         readRectangle(m_renderCtx, viewport, *dst);
