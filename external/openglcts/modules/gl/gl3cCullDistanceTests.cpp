@@ -2221,11 +2221,14 @@ void CullDistance::FunctionalTest::executeRenderTest(glw::GLuint	 clipdistances_
 	glw::GLenum			  mode						  = GL_NONE;
 	glw::GLuint			  n_clipped_vertices_real	 = 0;
 	glw::GLuint			  n_culled_primitives_real	= 0;
-	glw::GLuint			  n_not_clipped_vertices_real = 0;
 	const glw::GLuint	 primitive_vertices_count =
 		((primitive_mode == PRIMITIVE_MODE_LINES) ? 2 : (primitive_mode == PRIMITIVE_MODE_POINTS) ? 1 : 3);
 	const glw::GLuint stride_in_floats =
 		clipdistances_array_size + culldistances_array_size + 2 /* position's x, y*/ + 2 /* checkpoint x,y */;
+
+	// Release build does not use them
+	DE_UNREF(n_clipped_vertices_real);
+	DE_UNREF(n_culled_primitives_real);
 
 	switch (primitive_mode)
 	{
@@ -2455,10 +2458,6 @@ void CullDistance::FunctionalTest::executeRenderTest(glw::GLuint	 clipdistances_
 									   << "should not be clipped." << tcu::TestLog::EndMessage;
 
 					TCU_FAIL("Vertex is unexpectedly clipped or invisible");
-				}
-				else
-				{
-					n_not_clipped_vertices_real++;
 				}
 			}
 		}

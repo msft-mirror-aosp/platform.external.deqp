@@ -503,7 +503,7 @@ private:
 
 void SpvAsmPhysicalStorageBufferTestCase::checkSupport (Context& context) const
 {
-	context.requireInstanceFunctionality(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME); // "VK_KHR_get_physical_device_properties2"
+	context.requireInstanceFunctionality("VK_KHR_get_physical_device_properties2");
 
 	if (!context.isBufferDeviceAddressSupported())
 		TCU_THROW(NotSupportedError, "Request physical storage buffer feature not supported");
@@ -1056,7 +1056,7 @@ tcu::TestStatus SpvAsmPhysicalStorageBufferPushConstantsTestInstance::iterate (v
 	src.iota(m_params->elements, true);
 	dst.zero(true);
 
-	const PushConstant				 pc					= { src.getDeviceAddress(), dst.getDeviceAddress(), deInt32(m_params->elements), (m_params->method == PassMethod::PUSH_CONSTANTS_FUNCTION ? 1 : 0) };
+	const PushConstant				 pc					= { src.getDeviceAddress(), dst.getDeviceAddress(), deInt32(m_params->elements), m_params->method == PassMethod::PUSH_CONSTANTS_FUNCTION };
 
 	beginCommandBuffer(vki, *cmdBuffer);
 		vki.cmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);

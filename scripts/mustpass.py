@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import logging
 
 #-------------------------------------------------------------------------
 # drawElements Quality Program utilities
@@ -20,19 +21,17 @@
 #
 #-------------------------------------------------------------------------
 
-from build.common import *
-from build.config import ANY_GENERATOR
-from build.build import build
+from ctsbuild.common import *
+from ctsbuild.build import build
 from build_caselists import Module, getModuleByName, getBuildConfig, genCaseList, getCaseListPath, DEFAULT_BUILD_DIR, DEFAULT_TARGET
 from fnmatch import fnmatch
 from copy import copy
 from collections import defaultdict
 
 import argparse
+import re
 import xml.etree.cElementTree as ElementTree
 import xml.dom.minidom as minidom
-
-APK_NAME		= "com.drawelements.deqp.apk"
 
 GENERATED_FILE_WARNING = """
      This file has been automatically generated. Edit with caution.
@@ -44,7 +43,7 @@ class Project:
 		self.copyright	= copyright
 
 class Configuration:
-	def __init__ (self, name, filters, glconfig = None, rotation = None, surfacetype = None, required = False, runtime = None, runByDefault = True, splitToMultipleFiles = False):
+	def __init__ (self, name, filters, glconfig = None, rotation = None, surfacetype = None, required = False, runtime = None, runByDefault = True, listOfGroupsToSplit = []):
 		self.name					= name
 		self.glconfig				= glconfig
 		self.rotation				= rotation
@@ -53,7 +52,7 @@ class Configuration:
 		self.filters				= filters
 		self.expectedRuntime		= runtime
 		self.runByDefault			= runByDefault
-		self.splitToMultipleFiles	= splitToMultipleFiles
+		self.listOfGroupsToSplit	= listOfGroupsToSplit
 
 class Package:
 	def __init__ (self, module, configurations):
@@ -70,9 +69,10 @@ class Filter:
 	TYPE_INCLUDE = 0
 	TYPE_EXCLUDE = 1
 
-	def __init__ (self, type, filename):
+	def __init__ (self, type, filenames):
 		self.type		= type
-		self.filename	= filename
+		self.filenames	= filenames
+		self.key		= ",".join(filenames)
 
 class TestRoot:
 	def __init__ (self):
@@ -88,28 +88,8 @@ class TestCase:
 		self.name			= name
 		self.configurations	= []
 
-class GLESVersion:
-	def __init__(self, major, minor):
-		self.major = major
-		self.minor = minor
-
-	def encode (self):
-		return (self.major << 16) | (self.minor)
-
-def getModuleGLESVersion (module):
-	versions = {
-		'dEQP-EGL':		GLESVersion(2,0),
-		'dEQP-GLES2':	GLESVersion(2,0),
-		'dEQP-GLES3':	GLESVersion(3,0),
-		'dEQP-GLES31':	GLESVersion(3,1)
-	}
-	return versions[module.name] if module.name in versions else None
-
 def getSrcDir (mustpass):
 	return os.path.join(mustpass.project.path, mustpass.version, "src")
-
-def getTmpDir (mustpass):
-	return os.path.join(mustpass.project.path, mustpass.version, "tmp")
 
 def getModuleShorthand (module):
 	assert module.name[:5] == "dEQP-"
@@ -120,9 +100,6 @@ def getCaseListFileName (package, configuration):
 
 def getDstCaseListPath (mustpass):
 	return os.path.join(mustpass.project.path, mustpass.version)
-
-def getCTSPackageName (package):
-	return "com.drawelements.deqp." + getModuleShorthand(package.module)
 
 def getCommandLine (config):
 	cmdLine = ""
@@ -140,169 +117,23 @@ def getCommandLine (config):
 
 	return cmdLine
 
-def readCaseDict (filename):
-	# cases are grouped per high-level test group
-	# this is needed for chunked mustpass
-	casesPerHighLevelGroup = {}
-	currentHighLevelGroup = ""
-	with open(filename, 'rt') as f:
-		for line in f:
-			entryType = line[:6]
-			if entryType == "TEST: ":
-				assert currentHighLevelGroup != ""
-				casesPerHighLevelGroup[currentHighLevelGroup].append(line[6:].strip())
-			# detect high-level group by number of dots in path
-			elif entryType == "GROUP:" and line.count('.') == 1:
-				currentHighLevelGroup = line[line.find('.')+1:].rstrip().replace('_', '-')
-				casesPerHighLevelGroup[currentHighLevelGroup] = []
-	return casesPerHighLevelGroup
-
-def getCaseDict (buildCfg, generator, module):
+def getCaseListFile (buildCfg, generator, module):
 	build(buildCfg, generator, [module.binName])
 	genCaseList(buildCfg, generator, module, "txt")
-	return readCaseDict(getCaseListPath(buildCfg, module, "txt"))
+	return getCaseListPath(buildCfg, module, "txt")
 
-def readPatternList (filename):
-	ptrns = []
+def readPatternList (filename, patternList):
 	with open(filename, 'rt') as f:
 		for line in f:
 			line = line.strip()
 			if len(line) > 0 and line[0] != '#':
-				ptrns.append(line)
-	return ptrns
+				patternList.append(line)
 
+def include (*filenames):
+	return Filter(Filter.TYPE_INCLUDE, filenames)
 
-def constructNewDict(oldDict, listOfCases, op = lambda a: not a):
-	# Helper function used to construct case dictionary without specific cases
-	newDict = defaultdict(list)
-	for topGroup in oldDict:
-		for c in oldDict[topGroup]:
-			if op(c in listOfCases):
-				newDict[topGroup].append(c)
-	return newDict
-
-def applyPatterns (caseDict, patterns, filename, op):
-	matched			= set()
-	errors			= []
-	trivialPtrns	= [p for p in patterns if p.find('*') < 0]
-	regularPtrns	= [p for p in patterns if p.find('*') >= 0]
-
-	# Construct helper set that contains cases from all groups
-	allCasesSet = set()
-	for topGroup in caseDict:
-		allCasesSet = allCasesSet.union(set(caseDict[topGroup]))
-
-	# Apply trivial patterns - plain case paths without wildcard
-	for path in trivialPtrns:
-		if path in allCasesSet:
-			if path in matched:
-				errors.append((path, "Same case specified more than once"))
-			matched.add(path)
-		else:
-			errors.append((path, "Test case not found"))
-
-	# Construct new dictionary but without already matched paths
-	curDict = constructNewDict(caseDict, matched)
-
-	# Apply regular patterns - paths with wildcard
-	for pattern in regularPtrns:
-		matchedThisPtrn = set()
-
-		for topGroup in curDict:
-			for c in curDict[topGroup]:
-				if fnmatch(c, pattern):
-					matchedThisPtrn.add(c)
-
-		if len(matchedThisPtrn) == 0:
-			errors.append((pattern, "Pattern didn't match any cases"))
-
-		matched = matched | matchedThisPtrn
-
-		# To speed up search construct smaller case dictionary without already matched paths
-		curDict = constructNewDict(curDict, matched)
-
-	for pattern, reason in errors:
-		print("ERROR: %s: %s" % (reason, pattern))
-
-	if len(errors) > 0:
-		die("Found %s invalid patterns while processing file %s" % (len(errors), filename))
-
-	# Construct final dictionary using aproperiate operation
-	return constructNewDict(caseDict, matched, op)
-
-def applyInclude (caseDict, patterns, filename):
-	return applyPatterns(caseDict, patterns, filename, lambda b: b)
-
-def applyExclude (caseDict, patterns, filename):
-	return applyPatterns(caseDict, patterns, filename, lambda b: not b)
-
-def readPatternLists (mustpass):
-	lists = {}
-	for package in mustpass.packages:
-		for cfg in package.configurations:
-			for filter in cfg.filters:
-				if not filter.filename in lists:
-					lists[filter.filename] = readPatternList(os.path.join(getSrcDir(mustpass), filter.filename))
-	return lists
-
-def applyFilters (caseDict, patternLists, filters):
-	res = copy(caseDict)
-	for filter in filters:
-		ptrnList = patternLists[filter.filename]
-		if filter.type == Filter.TYPE_INCLUDE:
-			res = applyInclude(res, ptrnList, filter.filename)
-		else:
-			assert filter.type == Filter.TYPE_EXCLUDE
-			res = applyExclude(res, ptrnList, filter.filename)
-	return res
-
-def appendToHierarchy (root, casePath):
-	def findChild (node, name):
-		for child in node.children:
-			if child.name == name:
-				return child
-		return None
-
-	curNode		= root
-	components	= casePath.split('.')
-
-	for component in components[:-1]:
-		nextNode = findChild(curNode, component)
-		if not nextNode:
-			nextNode = TestGroup(component)
-			curNode.children.append(nextNode)
-		curNode = nextNode
-
-	if not findChild(curNode, components[-1]):
-		curNode.children.append(TestCase(components[-1]))
-
-def buildTestHierachy (caseList):
-	root = TestRoot()
-	for case in caseList:
-		appendToHierarchy(root, case)
-	return root
-
-def buildTestCaseMap (root):
-	caseMap = {}
-
-	def recursiveBuild (curNode, prefix):
-		curPath = prefix + curNode.name
-		if isinstance(curNode, TestCase):
-			caseMap[curPath] = curNode
-		else:
-			for child in curNode.children:
-				recursiveBuild(child, curPath + '.')
-
-	for child in root.children:
-		recursiveBuild(child, '')
-
-	return caseMap
-
-def include (filename):
-	return Filter(Filter.TYPE_INCLUDE, filename)
-
-def exclude (filename):
-	return Filter(Filter.TYPE_EXCLUDE, filename)
+def exclude (*filenames):
+	return Filter(Filter.TYPE_EXCLUDE, filenames)
 
 def insertXMLHeaders (mustpass, doc):
 	if mustpass.project.copyright != None:
@@ -343,6 +174,19 @@ def genAndroidTestXml (mustpass):
 	addOptionElement(preparerElement, "test-file-name", "com.drawelements.deqp.apk")
 
 	# Target preparer for incremental dEQP
+	preparerElement = ElementTree.SubElement(configElement, "target_preparer")
+	preparerElement.set("class", "com.android.compatibility.common.tradefed.targetprep.FilePusher")
+	addOptionElement(preparerElement, "cleanup", "true")
+	addOptionElement(preparerElement, "disable", "true")
+	addOptionElement(preparerElement, "push", "deqp-binary32->/data/local/tmp/deqp-binary32")
+	addOptionElement(preparerElement, "push", "deqp-binary64->/data/local/tmp/deqp-binary64")
+	addOptionElement(preparerElement, "push", "gles2->/data/local/tmp/gles2")
+	addOptionElement(preparerElement, "push", "gles3->/data/local/tmp/gles3")
+	addOptionElement(preparerElement, "push", "gles3-incremental-deqp.txt->/data/local/tmp/gles3-incremental-deqp.txt")
+	addOptionElement(preparerElement, "push", "gles31->/data/local/tmp/gles31")
+	addOptionElement(preparerElement, "push", "internal->/data/local/tmp/internal")
+	addOptionElement(preparerElement, "push", "vk-incremental-deqp.txt->/data/local/tmp/vk-incremental-deqp.txt")
+	addOptionElement(preparerElement, "push", "vulkan->/data/local/tmp/vulkan")
 	preparerElement = ElementTree.SubElement(configElement, "target_preparer")
 	preparerElement.set("class", "com.android.compatibility.common.tradefed.targetprep.IncrementalDeqpPreparer")
 	addOptionElement(preparerElement, "disable", "true")
@@ -393,60 +237,159 @@ def genAndroidTestXml (mustpass):
 
 	return configElement
 
-def genMustpass (mustpass, moduleCaseDicts):
-	print("Generating mustpass '%s'" % mustpass.version)
+class PatternSet:
+	def __init__(self):
+		self.namedPatternsTree = {}
+		self.namedPatternsDict = {}
+		self.wildcardPatternsDict = {}
 
-	patternLists = readPatternLists(mustpass)
+def readPatternSets (mustpass):
+	patternSets = {}
+	for package in mustpass.packages:
+		for cfg in package.configurations:
+			for filter in cfg.filters:
+				if not filter.key in patternSets:
+					patternList = []
+					for filename in filter.filenames:
+						readPatternList(os.path.join(getSrcDir(mustpass), filename), patternList)
+					patternSet = PatternSet()
+					for pattern in patternList:
+						if pattern.find('*') == -1:
+							patternSet.namedPatternsDict[pattern] = 0
+							t = patternSet.namedPatternsTree
+							parts = pattern.split('.')
+							for part in parts:
+								t = t.setdefault(part, {})
+						else:
+							# We use regex instead of fnmatch because it's faster
+							patternSet.wildcardPatternsDict[re.compile("^" + pattern.replace(".", r"\.").replace("*", ".*?") + "$")] = 0
+					patternSets[filter.key] = patternSet
+	return patternSets
+
+def genMustpassFromLists (mustpass, moduleCaseListFiles):
+	print("Generating mustpass '%s'" % mustpass.version)
+	patternSets = readPatternSets(mustpass)
 
 	for package in mustpass.packages:
-		allCasesInPkgDict	= moduleCaseDicts[package.module]
+		currentCaseListFile = moduleCaseListFiles[package.module]
+		logging.debug("Reading " + currentCaseListFile)
 
 		for config in package.configurations:
-
-			# construct dictionary with all filters applyed,
-			# key is top-level group name, value is list of all cases in that group
-			filteredCaseDict	= applyFilters(allCasesInPkgDict, patternLists, config.filters)
-
 			# construct components of path to main destination file
-			mainDstFilePath		= getDstCaseListPath(mustpass)
-			mainDstFileName		= getCaseListFileName(package, config)
-			mainDstFile			= os.path.join(mainDstFilePath, mainDstFileName)
-			gruopSubDir			= mainDstFileName[:-4]
+			mainDstFileDir = getDstCaseListPath(mustpass)
+			mainDstFileName = getCaseListFileName(package, config)
+			mainDstFilePath = os.path.join(mainDstFileDir, mainDstFileName)
+			mainGroupSubDir = mainDstFileName[:-4]
 
-			# if case paths should be split to multiple files then main
-			# destination file will contain paths to individual files containing cases
-			if config.splitToMultipleFiles:
-				groupPathsList = []
+			if not os.path.exists(mainDstFileDir):
+				os.makedirs(mainDstFileDir)
+			mainDstFile = open(mainDstFilePath, 'w')
+			print(mainDstFilePath)
+			output_files = {}
+			def openAndStoreFile(filePath, testFilePath, parentFile):
+				if filePath not in output_files:
+					try:
+						print("    " + filePath)
+						parentFile.write(mainGroupSubDir + "/" + testFilePath + "\n")
+						currentDir = os.path.dirname(filePath)
+						if not os.path.exists(currentDir):
+							os.makedirs(currentDir)
+						output_files[filePath] = open(filePath, 'w')
 
-				# make sure directory for group files exists
-				groupPath = os.path.join(mainDstFilePath, gruopSubDir)
-				if not os.path.exists(groupPath):
-					os.makedirs(groupPath)
+					except FileNotFoundError:
+						print(f"File not found: {filePath}")
+				return output_files[filePath]
 
-				# iterate over all top-level groups and write files containing their cases
-				print("  Writing top-level group caselists:")
-				for tlGroup in filteredCaseDict:
-					groupDstFileName    = tlGroup + ".txt"
-					groupDstFileFullDir = os.path.join(groupPath, groupDstFileName)
-					groupPathsList.append(gruopSubDir + "/" + groupDstFileName)
+			with open(currentCaseListFile, "r") as file:
+				lastOutputFile = ""
+				currentOutputFile = None
+				for line in file:
+					if not line.startswith("TEST: "):
+						continue
+					caseName = line.replace("TEST: ", "").strip("\n")
+					caseParts = caseName.split(".")
+					keep = True
+					# Do the includes with the complex patterns first
+					for filter in config.filters:
+						if filter.type == Filter.TYPE_INCLUDE:
+							keep = False
+							patterns = patternSets[filter.key].wildcardPatternsDict
+							for pattern in patterns.keys():
+								keep = pattern.match(caseName)
+								if keep:
+									patterns[pattern] += 1
+									break
 
-					print("    " + groupDstFileFullDir)
-					writeFile(groupDstFileFullDir, "\n".join(filteredCaseDict[tlGroup]) + "\n")
+							if not keep:
+								t = patternSets[filter.key].namedPatternsTree
+								if len(t.keys()) == 0:
+									continue
+								for part in caseParts:
+									if part in t:
+										t = t[part]
+									else:
+										t = None  # Not found
+										break
+								keep = t == {}
+								if keep:
+									patternSets[filter.key].namedPatternsDict[caseName] += 1
 
-				# write file containing names of all group files
-				print("  Writing deqp top-level groups file list: " + mainDstFile)
-				groupPathsList.sort()
-				writeFile(mainDstFile, "\n".join(groupPathsList) + "\n")
-			else:
-				# merge cases from all top level groups in to single case list
-				filteredCaseList = []
-				for tlGroup in filteredCaseDict:
-					filteredCaseList.extend(filteredCaseDict[tlGroup])
+						# Do the excludes
+						if filter.type == Filter.TYPE_EXCLUDE:
+							patterns = patternSets[filter.key].wildcardPatternsDict
+							for pattern in patterns.keys():
+								discard = pattern.match(caseName)
+								if discard:
+									patterns[pattern] += 1
+									keep = False
+									break
+							if keep:
+								t = patternSets[filter.key].namedPatternsTree
+								if len(t.keys()) == 0:
+									continue
+								for part in caseParts:
+									if part in t:
+										t = t[part]
+									else:
+										t = None  # Not found
+										break
+								if t == {}:
+									patternSets[filter.key].namedPatternsDict[caseName] += 1
+									keep = False
+						if not keep:
+							break
+					if not keep:
+						continue
 
-				# write file containing all cases
-				print("  Writing deqp caselist: " + mainDstFile)
-				writeFile(mainDstFile, "\n".join(filteredCaseList) + "\n")
+					parts = caseName.split('.')
+					if len(config.listOfGroupsToSplit) > 0:
+						if len(parts) > 2:
+							groupName = parts[1].replace("_", "-")
+							for splitPattern in config.listOfGroupsToSplit:
+								splitParts = splitPattern.split(".")
+								if len(splitParts) > 1 and caseName.startswith(splitPattern + "."):
+									groupName = groupName + "/" + parts[2].replace("_", "-")
+							filePath = os.path.join(mainDstFileDir, mainGroupSubDir, groupName + ".txt")
+							if lastOutputFile != filePath:
+								currentOutputFile = openAndStoreFile(filePath, groupName + ".txt", mainDstFile)
+								lastOutputFile = filePath
+							currentOutputFile.write(caseName + "\n")
+					else:
+						mainDstFile.write(caseName + "\n")
 
+			# Check that all patterns have been used in the filters
+			# This check will help identifying typos and patterns becoming stale
+			for filter in config.filters:
+				if filter.type == Filter.TYPE_INCLUDE:
+					patternSet = patternSets[filter.key]
+					for pattern, usage in patternSet.namedPatternsDict.items():
+						if usage == 0:
+							die("Case %s in file %s for module %s was never used!" % (pattern, filter.key, config.name))
+					for pattern, usage in patternSet.wildcardPatternsDict.items():
+						if usage == 0:
+							die("Pattern %s in file %s for module %s was never used!" % (pattern, filter.key, config.name))
+
+	# Generate XML
 	specXML = genSpecXML(mustpass)
 	specFilename = os.path.join(mustpass.project.path, mustpass.version, "mustpass.xml")
 
@@ -463,17 +406,18 @@ def genMustpass (mustpass, moduleCaseDicts):
 
 	print("Done!")
 
+
 def genMustpassLists (mustpassLists, generator, buildCfg):
-	moduleCaseDicts = {}
+	moduleCaseListFiles = {}
 
 	# Getting case lists involves invoking build, so we want to cache the results
 	for mustpass in mustpassLists:
 		for package in mustpass.packages:
-			if not package.module in moduleCaseDicts:
-				moduleCaseDicts[package.module] = getCaseDict(buildCfg, generator, package.module)
+			if not package.module in moduleCaseListFiles:
+				moduleCaseListFiles[package.module] = getCaseListFile(buildCfg, generator, package.module)
 
 	for mustpass in mustpassLists:
-		genMustpass(mustpass, moduleCaseDicts)
+		genMustpassFromLists(mustpass, moduleCaseListFiles)
 
 def parseCmdLineArgs ():
 	parser = argparse.ArgumentParser(description = "Build Android CTS mustpass",

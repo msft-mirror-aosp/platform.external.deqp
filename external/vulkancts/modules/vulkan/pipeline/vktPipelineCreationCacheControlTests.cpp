@@ -62,8 +62,6 @@ using ::std::vector;
  *//*--------------------------------------------------------------------*/
 namespace test_common
 {
-static constexpr auto VK_NULL_HANDLE = DE_NULL;
-
 using ::std::chrono::high_resolution_clock;
 using ::std::chrono::microseconds;
 
@@ -879,8 +877,9 @@ TestStatus testInstance(Context& context, const TestParams& testParameter)
 	const auto	pipelineCache = createPipelineCache(vk, device, testParameter);
 	const auto	layout		  = createPipelineLayout(vk, device, testParameter);
 	const auto	renderPass	  = createRenderPass(vk, device, testParameter);
-	const auto	modules		  = createShaderModules(vk, device, context.getBinaryCollection(), {"vertex", "fragment"});
-	const auto	shaderStages  = createShaderStages(modules, {VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_FRAGMENT_BIT});
+	// No fragment due to rasterizationDiscardEnabled
+	const auto	modules		  = createShaderModules(vk, device, context.getBinaryCollection(), std::vector<const char*>{"vertex"});
+	const auto	shaderStages  = createShaderStages(modules, std::vector<VkShaderStageFlagBits>{VK_SHADER_STAGE_VERTEX_BIT});
 
 	// Placeholder for base pipeline if using cacheType == DERIVATIVE_HANDLE
 	auto basePipeline = UniquePipeline{};
@@ -1117,8 +1116,6 @@ TestStatus testInstance(Context& context, const TestParams& testParameter)
 
 using namespace test_common;
 
-// Disable formatting on this next block for readability
-// clang-format off
 /*--------------------------------------------------------------------*//*!
  * \brief Duplicate single pipeline recreation with explicit caching
  *//*--------------------------------------------------------------------*/
@@ -1343,7 +1340,6 @@ static constexpr TestParams TEST_CASES[] =
 	DUPLICATE_BATCH_PIPELINES_NO_CACHE,
 	DUPLICATE_BATCH_PIPELINES_DERIVATIVE_INDEX
 };
-// clang-format on
 
 /*--------------------------------------------------------------------*//*!
  * \brief Variadic version of de::newMovePtr

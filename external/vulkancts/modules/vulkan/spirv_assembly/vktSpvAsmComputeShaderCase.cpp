@@ -116,7 +116,7 @@ Move<VkBuffer> createBufferAndBindMemory (vkt::Context&				context,
  * \brief Create image, allocate and bind memory for the image
  *
  *//*--------------------------------------------------------------------*/
-Move<VkImage> createImageAndBindMemory (const DeviceInterface& vkdi, const VkDevice& device, VkDescriptorType dtype, Allocator& allocator, deUint32 queueFamilyIndex, AllocationMp* outMemory)
+Move<VkImage> createImageAndBindMemory (const DeviceInterface& vkdi, const VkDevice& device, VkDescriptorType dtype, vk::VkFormat imageFormat, Allocator& allocator, deUint32 queueFamilyIndex, AllocationMp* outMemory)
 {
 	VkImageUsageFlags			usageBits			= (VkImageUsageFlags)0;
 
@@ -134,7 +134,7 @@ Move<VkImage> createImageAndBindMemory (const DeviceInterface& vkdi, const VkDev
 		DE_NULL,																//	const void*			pNext;
 		0u,																		//	VkImageCreateFlags	flags;
 		VK_IMAGE_TYPE_2D,														//	VkImageType			imageType;
-		VK_FORMAT_R32G32B32A32_SFLOAT,											//	VkFormat			format;
+		imageFormat,															//	VkFormat			format;
 		{ 8, 8, 1 },															//  VkExtent3D			extent;
 		1u,																		//	deUint32			mipLevels;
 		1u,																		//	deUint32			arraySize;
@@ -528,7 +528,7 @@ tcu::TestStatus SpvAsmComputeShaderInstance::iterate (void)
 			BufferHandleUp*				buffer			= new BufferHandleUp(createBufferAndBindMemory(m_context, vkdi, device, descType, allocator, numBytes, &bufferAlloc, m_shaderSpec.usesPhysStorageBuffer));
 
 			AllocationMp				imageAlloc;
-			ImageHandleUp*				image			= new ImageHandleUp(createImageAndBindMemory(vkdi, device, descType, allocator, queueFamilyIndex, &imageAlloc));
+			ImageHandleUp*				image			= new ImageHandleUp(createImageAndBindMemory(vkdi, device, descType, m_shaderSpec.inputFormat, allocator, queueFamilyIndex, &imageAlloc));
 
 			setMemory(vkdi, device, &*bufferAlloc, numBytes, &inputBytes.front());
 
@@ -587,7 +587,7 @@ tcu::TestStatus SpvAsmComputeShaderInstance::iterate (void)
 					0u,											//	VkImageViewCreateFlags	flags;
 					**inputImages[imageNdx++],					//	VkImage					image;
 					VK_IMAGE_VIEW_TYPE_2D,						//	VkImageViewType			viewType;
-					VK_FORMAT_R32G32B32A32_SFLOAT,				//	VkFormat				format;
+					m_shaderSpec.inputFormat,					//	VkFormat				format;
 					{
 						VK_COMPONENT_SWIZZLE_R,
 						VK_COMPONENT_SWIZZLE_G,
@@ -736,9 +736,7 @@ tcu::TestStatus SpvAsmComputeShaderInstance::iterate (void)
 	// all the descriptors with just a desciptor to this new buffer.
 	if (m_shaderSpec.usesPhysStorageBuffer)
 	{
-		const bool useKHR = m_context.isDeviceFunctionalitySupported("VK_KHR_buffer_device_address");
-
-		VkBufferDeviceAddressInfo info =
+		VkBufferDeviceAddressInfo info
 		{
 			VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO,		// VkStructureType	sType;
 			DE_NULL,											// const void*		pNext;
@@ -748,21 +746,15 @@ tcu::TestStatus SpvAsmComputeShaderInstance::iterate (void)
 		for (deUint32 inputNdx = 0; inputNdx < m_shaderSpec.inputs.size(); ++inputNdx)
 		{
 			info.buffer = **inputBuffers[inputNdx];
-			VkDeviceAddress addr;
-			if (useKHR)
-				addr = vkdi.getBufferDeviceAddress(device, &info);
-			else
-				addr = vkdi.getBufferDeviceAddressEXT(device, &info);
+			VkDeviceAddress addr = vkdi.getBufferDeviceAddress(device, &info);
+
 			gpuAddrs.push_back(addr);
 		}
 		for (deUint32 outputNdx = 0; outputNdx < m_shaderSpec.outputs.size(); ++outputNdx)
 		{
 			info.buffer = **outputBuffers[outputNdx];
-			VkDeviceAddress addr;
-			if (useKHR)
-				addr = vkdi.getBufferDeviceAddress(device, &info);
-			else
-				addr = vkdi.getBufferDeviceAddressEXT(device, &info);
+			VkDeviceAddress addr = vkdi.getBufferDeviceAddress(device, &info);
+
 			gpuAddrs.push_back(addr);
 		}
 
@@ -840,6 +832,7 @@ tcu::TestStatus SpvAsmComputeShaderInstance::iterate (void)
 	endCommandBuffer(vkdi, *cmdBuffer);
 
 	submitCommandsAndWait(vkdi, device, queue, *cmdBuffer);
+	m_context.resetCommandPoolForVKSC(device, *cmdPool);
 
 	// Invalidate output memory ranges before checking on host.
 	for (size_t outputNdx = 0; outputNdx < m_shaderSpec.outputs.size(); ++outputNdx)

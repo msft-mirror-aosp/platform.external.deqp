@@ -36,6 +36,7 @@
 #include "vkApiVersion.hpp"
 #include "vkDefs.hpp"
 #include "vkPlatform.hpp"
+#include "vkSafetyCriticalUtil.hpp"
 
 #include "vktApiVersionCheck.hpp"
 #include "vktTestCase.hpp"
@@ -132,9 +133,12 @@ public:
 		tcu::TestLog&						log				= m_context.getTestContext().getLog();
 		const deUint32						apiVersion		= m_context.getUsedApiVersion();
 		const vk::Platform&					platform		= m_context.getTestContext().getPlatform().getVulkanPlatform();
-		de::MovePtr<vk::Library>			vkLibrary		= de::MovePtr<vk::Library>(platform.createLibrary());
+#ifdef DE_PLATFORM_USE_LIBRARY_TYPE
+		de::MovePtr<vk::Library>			vkLibrary		= de::MovePtr<vk::Library>(platform.createLibrary(vk::Platform::LibraryType::LIBRARY_TYPE_VULKAN, m_context.getTestContext().getCommandLine().getVkLibraryPath()));
+#else
+		de::MovePtr<vk::Library>			vkLibrary		= de::MovePtr<vk::Library>(platform.createLibrary(m_context.getTestContext().getCommandLine().getVkLibraryPath()));
+#endif
 		const tcu::FunctionLibrary&			funcLibrary		= vkLibrary->getFunctionLibrary();
-
 		deUint32							failsQuantity	= 0u;
 
 		// Tests with default instance and device without extensions
@@ -166,7 +170,7 @@ public:
 				log << tcu::TestLog::Message << mixupResult << tcu::TestLog::EndMessage;
 			}
 
-			// Check function entry points of disabled extesions
+			// Check function entry points of disabled extensions
 			{
 				FunctionInfosList				extFunctions		= FunctionInfosList();
 				extFunctions.push_back(FunctionInfo("vkTrimCommandPoolKHR", FUNCTIONORIGIN_DEVICE));
@@ -348,9 +352,47 @@ private:
 			&queuePriority
 		};
 
+		void* pNext									= DE_NULL;
+#ifdef CTS_USES_VULKANSC
+		VkDeviceObjectReservationCreateInfo memReservationInfo	= context.getTestContext().getCommandLine().isSubProcess() ? context.getResourceInterface()->getStatMax() : resetDeviceObjectReservationCreateInfo();
+		memReservationInfo.pNext								= pNext;
+		pNext													= &memReservationInfo;
+
+		VkPhysicalDeviceVulkanSC10Features sc10Features			= createDefaultSC10Features();
+		sc10Features.pNext										= pNext;
+		pNext													= &sc10Features;
+
+		VkPipelineCacheCreateInfo			pcCI;
+		std::vector<VkPipelinePoolSize>		poolSizes;
+		if (context.getTestContext().getCommandLine().isSubProcess())
+		{
+			if (context.getResourceInterface()->getCacheDataSize() > 0)
+			{
+				pcCI =
+				{
+					VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,		// VkStructureType				sType;
+					DE_NULL,											// const void*					pNext;
+					VK_PIPELINE_CACHE_CREATE_READ_ONLY_BIT |
+						VK_PIPELINE_CACHE_CREATE_USE_APPLICATION_STORAGE_BIT,	// VkPipelineCacheCreateFlags	flags;
+					context.getResourceInterface()->getCacheDataSize(),	// deUintptr					initialDataSize;
+					context.getResourceInterface()->getCacheData()		// const void*					pInitialData;
+				};
+				memReservationInfo.pipelineCacheCreateInfoCount		= 1;
+				memReservationInfo.pPipelineCacheCreateInfos		= &pcCI;
+			}
+
+			poolSizes							= context.getResourceInterface()->getPipelinePoolSizes();
+			if (!poolSizes.empty())
+			{
+				memReservationInfo.pipelinePoolSizeCount		= deUint32(poolSizes.size());
+				memReservationInfo.pPipelinePoolSizes			= poolSizes.data();
+			}
+		}
+#endif // CTS_USES_VULKANSC
+
 		const VkDeviceCreateInfo	deviceInfo		= {
 			VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
-			DE_NULL,
+			pNext,
 			static_cast<VkDeviceCreateFlags>(0u),
 			1u,
 			&queueInfo,
@@ -461,6 +503,15 @@ private:
 			// checks is valid. We use the extension name for convenience here.
 			if ((deStringEqual(funcName, "vkCmdDrawIndirectCount") || deStringEqual(funcName, "vkCmdDrawIndexedIndirectCount"))
 				&& !isSupportedDeviceExt("VK_KHR_draw_indirect_count", apiVersion))
+				continue;
+
+			// vkCmdPushDescriptorSetWithTemplateKHR is available if:
+			// - VK_KHR_push_descriptor is supported AND
+			//   - API >= VK_VERSION_1_1 OR
+			//   - VK_KHR_descriptor_update_template is supported
+			if (deStringEqual(funcName, "vkCmdPushDescriptorSetWithTemplateKHR") &&
+			    (!isSupportedDeviceExt("VK_KHR_push_descriptor", apiVersion) ||
+			      (apiVersion < VK_API_VERSION_1_1 && !isSupportedDeviceExt("VK_KHR_descriptor_update_template", apiVersion))))
 				continue;
 
 			if (funcType == FUNCTIONORIGIN_PLATFORM)

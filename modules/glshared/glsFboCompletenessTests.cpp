@@ -209,6 +209,12 @@ static const FormatKey s_extTextureSRGBRG8Formats[] =
 	GL_SRG8_EXT,
 };
 
+static const FormatKey s_qcomRenderSRGBR8RG8Formats[] =
+{
+	GL_SR8_EXT,
+	GL_SRG8_EXT,
+};
+
 static const FormatExtEntry s_esExtFormats[] =
 {
 	{
@@ -388,6 +394,12 @@ static const FormatExtEntry s_esExtFormats[] =
 		"GL_EXT_texture_sRGB_RG8",
 		(deUint32)TEXTURE_VALID,
 		GLS_ARRAY_RANGE(s_extTextureSRGBRG8Formats)
+	},
+
+	{
+		"GL_QCOM_render_sRGB_R8_RG8",
+		(deUint32)(REQUIRED_RENDERABLE | COLOR_RENDERABLE | RENDERBUFFER_VALID | TEXTURE_VALID),
+		GLS_ARRAY_RANGE(s_qcomRenderSRGBR8RG8Formats)
 	},
 };
 
@@ -668,6 +680,16 @@ IterateResult TestBase::iterate (void)
 			else
 				// An incomplete status is allowed, but not _this_ incomplete status.
 				fail("Framebuffer checked as incomplete, but with wrong status");
+		}
+		else if (fboStatus == GL_FRAMEBUFFER_UNSUPPORTED)
+		{
+			// The spec requires
+			//     "when both depth and stencil attachments are present,implementations are only required
+			//      to support framebuffer objects where both attachments refer to the same image."
+			//
+			// Thus, it is acceptable for an implementation returning GL_FRAMEBUFFER_UNSUPPORTED,
+			// and the test cannot be marked as failed.
+			pass();
 		}
 		else if (fboStatus != GL_FRAMEBUFFER_COMPLETE && reference.isFBOStatusValid(GL_FRAMEBUFFER_COMPLETE))
 			qualityWarning("Framebuffer object could have checked as complete but did not.");
