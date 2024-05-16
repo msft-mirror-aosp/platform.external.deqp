@@ -1,9 +1,7 @@
 {
-	"mandatory_features":
+	"register_extension":
 	{
-		"VkPhysicalDeviceIndexTypeUint8FeaturesEXT":
-		[
-			{ "features": ["indexTypeUint8"],		"requirements": ["VK_EXT_index_type_uint8"] }
-		]
+		"type": "device",
+		"core": ""
 	}
 }
