@@ -300,11 +300,11 @@ def postExtractLibpng (path):
 				os.path.join(path, "pnglibconf.h"))
 
 if SYSTEM_NAME == 'Windows' or SYSTEM_NAME.startswith('CYGWIN') or SYSTEM_NAME.startswith('MINGW'):
-    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-05-31-12-34/ffmpeg-n4.4.2-1-g8e98dfc57f-win64-lgpl-shared-4.4.zip"
-    ffmpeg_hash_value = "670df8e9d2ddd5e761459b3538f64b8826566270ef1ed13bcbfc63e73aab3fd9"
+    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-06-30-12-32/ffmpeg-n4.4.2-2-g7ffb7d4b04-win64-lgpl-shared-4.4.zip"
+    ffmpeg_hash_value = "c3f0217edb848e5ca8ba2a8c240c42d73d1c4095a23fdd7b6d95be66930265b1"
 elif SYSTEM_NAME == 'Linux':
-    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-05-31-12-34/ffmpeg-n4.4.2-1-g8e98dfc57f-linux64-gpl-shared-4.4.tar.xz"
-    ffmpeg_hash_value = "817f8c93ff1ef7ede3dad15b20415d5e366bcd6848844d55046111fd3de827d0"
+    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-06-30-12-32/ffmpeg-n4.4.2-2-g7ffb7d4b04-linux64-gpl-shared-4.4.tar.xz"
+    ffmpeg_hash_value = "d2eb3522bdf8a225a850882fc27129db0e69539ed3f3a679de4ae2534b9f8dd3"
 elif SYSTEM_NAME == 'Darwin':
     ffmpeg_url = ""
     ffmpeg_hash_value = ""
@@ -338,7 +338,7 @@ PACKAGES = [
 		"spirv-tools"),
 	GitRepo(
 		"https://github.com/KhronosGroup/glslang.git",
-		"git@github.com:KhronosGroup/glslang.git",
+		None,
 		"77417d5c9e0a5d4c79ddd0285d530b45f7259f0d",
 		"glslang",
 		removeTags = ["master-tot"]),
@@ -354,8 +354,8 @@ PACKAGES = [
 		"vulkan-docs"),
 	GitRepo(
 		"https://github.com/google/amber.git",
-		"git@github.com:google/amber.git",
-		"8b145a6c89dcdb4ec28173339dd176fb7b6f43ed",
+		None,
+		"933ecb4d6288675a92eb1650e0f52b1d7afe8273",
 		"amber"),
 	GitRepo(
 		"https://github.com/open-source-parsers/jsoncpp.git",
