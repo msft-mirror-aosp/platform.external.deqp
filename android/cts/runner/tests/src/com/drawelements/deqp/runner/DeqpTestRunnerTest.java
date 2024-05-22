@@ -83,6 +83,9 @@ public class DeqpTestRunnerTest extends TestCase {
             ONLY_LANDSCAPE_FEATURES + "\nfeature:"+DeqpTestRunner.FEATURE_PORTRAIT;
     private static List<Map<String,String>> DEFAULT_INSTANCE_ARGS;
 
+    private static String ASSUMPTION_FAILURE_MESSAGE = "Assumption Failure";
+    private static String PASS_MESSAGE = "Pass";
+
     static {
         DEFAULT_INSTANCE_ARGS = new ArrayList<>(1);
         DEFAULT_INSTANCE_ARGS.add(new HashMap<String,String>());
@@ -177,7 +180,7 @@ public class DeqpTestRunnerTest extends TestCase {
     /**
      * Test version of OpenGL ES.
      */
-    private void testGlesVersion(int requiredMajorVersion, int requiredMinorVersion, int majorVersion, int minorVersion) throws Exception {
+    private void testGlesVersion(int requiredMajorVersion, int requiredMinorVersion, int majorVersion, int minorVersion, String resultCode) throws Exception {
         final TestDescription testId = new TestDescription("dEQP-GLES"
                 + Integer.toString(requiredMajorVersion) + Integer.toString(requiredMinorVersion)
                 + ".info", "version");
@@ -190,7 +193,10 @@ public class DeqpTestRunnerTest extends TestCase {
                 + Integer.toString(requiredMajorVersion) + Integer.toString(requiredMinorVersion)
                 + "{info{version}}}";
 
-        final String resultCode = "Pass";
+        String resultDetails = resultCode;
+        if (resultCode.equals(ASSUMPTION_FAILURE_MESSAGE)) {
+            resultDetails = DeqpTestRunner.ASSUMPTION_FAILURE_DEQP_LEVEL_LOG_MESSAGE;
+        }
 
         /* MultiLineReceiver expects "\r\n" line ending. */
         final String output = "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
@@ -211,7 +217,7 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=" + testPath + "\r\n"
                 + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
                 + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=" + resultCode + "\r\n"
-                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Detail" + resultCode + "\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Detail" + resultDetails + "\r\n"
                 + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
                 + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
                 + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
@@ -266,6 +272,12 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testStarted(EasyMock.eq(testId));
         EasyMock.expectLastCall().once();
+
+        if (resultCode.equals(ASSUMPTION_FAILURE_MESSAGE)) {
+            mockListener.testAssumptionFailure(EasyMock.eq(testId),
+                EasyMock.eq(DeqpTestRunner.ASSUMPTION_FAILURE_DEQP_LEVEL_LOG_MESSAGE));
+            EasyMock.expectLastCall().once();
+        }
 
         mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
@@ -1288,42 +1300,42 @@ public class DeqpTestRunnerTest extends TestCase {
      * Test OpeGL ES3 tests on device with OpenGL ES2.
      */
     public void testRun_require30DeviceVersion20() throws Exception {
-        testGlesVersion(3, 0, 2, 0);
+        testGlesVersion(3, 0, 2, 0, ASSUMPTION_FAILURE_MESSAGE);
     }
 
     /**
      * Test OpeGL ES3.1 tests on device with OpenGL ES2.
      */
     public void testRun_require31DeviceVersion20() throws Exception {
-        testGlesVersion(3, 1, 2, 0);
+        testGlesVersion(3, 1, 2, 0, ASSUMPTION_FAILURE_MESSAGE);
     }
 
     /**
      * Test OpeGL ES3 tests on device with OpenGL ES3.
      */
     public void testRun_require30DeviceVersion30() throws Exception {
-        testGlesVersion(3, 0, 3, 0);
+        testGlesVersion(3, 0, 3, 0, PASS_MESSAGE);
     }
 
     /**
      * Test OpeGL ES3.1 tests on device with OpenGL ES3.
      */
     public void testRun_require31DeviceVersion30() throws Exception {
-        testGlesVersion(3, 1, 3, 0);
+        testGlesVersion(3, 1, 3, 0, ASSUMPTION_FAILURE_MESSAGE);
     }
 
     /**
      * Test OpeGL ES3 tests on device with OpenGL ES3.1.
      */
     public void testRun_require30DeviceVersion31() throws Exception {
-        testGlesVersion(3, 0, 3, 1);
+        testGlesVersion(3, 0, 3, 1, PASS_MESSAGE);
     }
 
     /**
      * Test OpeGL ES3.1 tests on device with OpenGL ES3.1.
      */
     public void testRun_require31DeviceVersion31() throws Exception {
-        testGlesVersion(3, 1, 3, 1);
+        testGlesVersion(3, 1, 3, 1, PASS_MESSAGE);
     }
 
     /**

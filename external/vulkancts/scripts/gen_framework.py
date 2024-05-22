@@ -23,18 +23,24 @@
 import os
 import re
 import sys
-import copy
 import glob
 import json
 import argparse
+import datetime
+import collections
+import ast
+import logging
 from lxml import etree
-from itertools import chain
-from collections import OrderedDict
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "scripts"))
+scriptPath = os.path.join(os.path.dirname(__file__), "..", "..", "..", "scripts")
+sys.path.insert(0, scriptPath)
 
 from ctsbuild.common import DEQP_DIR, execute
 from khr_util.format import indentLines, writeInlFile
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "..", "vulkan-docs", "src", "scripts"))
+
+from reg import stripNonmatchingAPIs
 
 VULKAN_XML_DIR				= os.path.join(os.path.dirname(__file__), "..", "..", "vulkan-docs", "src", "xml")
 SCRIPTS_SRC_DIR				= os.path.join(os.path.dirname(__file__), "src")
@@ -119,6 +125,13 @@ PLATFORM_TYPES		= [
 	(["MTLTexture_id"],						["MTLTexture_id"],				"void*"),
 	(["IOSurfaceRef"],						["IOSurfaceRef"],				"void*"),
 	(["MTLSharedEvent_id"],					["MTLSharedEvent_id"],			"void*"),
+
+	# VK_NV_external_sci_sync
+	(["NvSciBufObj"],						["NvSciBufObj"],				"int"),
+	(["NvSciSyncObj"],						["NvSciSyncObj"],				"int"),
+	(["NvSciSyncFence"],					["NvSciSyncFence"],				"int"),
+	(["NvSciBufAttrList"],					["NvSciBufAttrList"],			"int"),
+	(["NvSciSyncAttrList"],					["NvSciSyncAttrList"],			"int"),
 ]
 
 PLATFORM_TYPE_NAMESPACE	= "pt"
@@ -132,6 +145,48 @@ TYPE_SUBSTITUTIONS		= [
 EXTENSION_POSTFIXES_STANDARD	= ["KHR", "EXT"]
 EXTENSION_POSTFIXES_VENDOR		= ["AMD", "ARM", "NV", 'INTEL', "NVX", "KHX", "NN", "MVK", "FUCHSIA", 'QCOM', "GGP", "QNX", "ANDROID", 'VALVE', 'HUAWEI']
 EXTENSION_POSTFIXES				= EXTENSION_POSTFIXES_STANDARD + EXTENSION_POSTFIXES_VENDOR
+
+# Converts the dependecies expression into an Abstract Syntax Tree that uses boolean operators
+def parseDependsEpression(string):
+	try:
+		# Parse the input string into an abstract syntax tree (AST)
+		tree = ast.parse(string.replace('+', ' and ').replace(',', ' or '), mode='eval')
+		expression = tree.body
+		return expression
+	except SyntaxError as e:
+		print(f"Syntax error in the input string: {e}")
+		return None
+
+# Checks the dependencies AST against the passed extensions
+def checkDependencyAST(node, extensions):
+	if isinstance(node, ast.BoolOp):
+		assert(len(node.values) >= 2)
+		value = checkDependencyAST(node.values.pop(), extensions)
+		while node.values:
+			nextValue = checkDependencyAST(node.values.pop(), extensions)
+			if isinstance(node.op, ast.And):
+				value = value and nextValue
+			if isinstance(node.op, ast.Or):
+				value = value or nextValue
+		return value
+	elif isinstance(node, ast.Name):
+		if '_VERSION_' in node.id:
+			return True
+		for ext in extensions:
+			if node.id == ext.name:
+				return True
+		return False
+	elif isinstance(node, ast.Constant):
+		return node.value
+
+# helper function that check if dependency is in list of extension
+def isDependencyMet(dependsExpression, extensionList):
+	if dependsExpression is None:
+		return True
+	tree = parseDependsEpression(dependsExpression)
+	# check if requirement dependencies are meet; if not then struct/function is not used
+	ret = checkDependencyAST(tree, extensionList)
+	return ret
 
 def substituteType(object):		# both CompositeMember and FunctionArgument can be passed to this function
 	for src, dst in TYPE_SUBSTITUTIONS:
@@ -222,13 +277,14 @@ class Composite:
 		self.members		= members			# list of CompositeMember objects
 
 class FunctionArgument:
-	def __init__ (self, name, qualifiers, aType, pointer = None, secondPointerIsConst = False, arraySize = None):
+	def __init__ (self, name, qualifiers, aType, pointer = None, secondPointerIsConst = False, arraySize = None, len = None):
 		self.name					= name
 		self.qualifiers				= qualifiers
 		self.type					= aType
 		self.pointer				= pointer			# None, '*' or '**'
 		self.secondPointerIsConst	= secondPointerIsConst
 		self.arraySize				= arraySize
+		self.len					= len
 
 		# check if type should be swaped
 		substituteType(self)
@@ -241,6 +297,7 @@ class Function:
 	def __init__ (self, name, returnType = None, arguments = None):
 		self.name			= name
 		self.aliasList		= []
+		self.queuesList		= []
 		self.returnType		= returnType
 		self.arguments		= arguments				# list of FunctionArgument objects
 		self.functionType	= Function.TYPE_PLATFORM
@@ -258,12 +315,18 @@ class Function:
 	def getType (self):
 		return self.functionType
 
+class FeatureEnumerator:
+	def __init__ (self, name, extends):
+		self.name		= name
+		self.extends	= extends
+
 class FeatureRequirement:
-	def __init__ (self, comment, enumList, typeList, commandList):
+	def __init__ (self, operation, comment, enumList, typeList, commandList):
+		self.operation			= operation				# "require" or "remove"
 		self.comment			= comment
-		self.enumList			= enumList
-		self.typeList			= typeList
-		self.commandList		= commandList			# list of strings, each representing required function
+		self.enumList			= enumList				# list of FeatureEnumerator objects
+		self.typeList			= typeList				# list of strings, each representing required structure name
+		self.commandList		= commandList			# list of strings, each representing required function name
 
 class Feature:
 	def __init__ (self, api, name, number, requirementsList):
@@ -273,13 +336,15 @@ class Feature:
 		self.requirementsList	= requirementsList		# list of FeatureRequirement objects
 
 class ExtensionEnumerator:
-	def __init__ (self, name, extends, alias, value, extnumber, offset, comment):
+	def __init__ (self, name, extends, alias, value, extnumber, offset, bitpos, vdir, comment):
 		self.name		= name
 		self.extends	= extends
 		self.alias		= alias
 		self.value		= value
 		self.extnumber	= extnumber
 		self.offset		= offset
+		self.bitpos		= bitpos
+		self.dir		= vdir
 		self.comment	= comment						# note: comment is used to mark not promoted features for partially promoted extensions
 
 class ExtensionCommand:
@@ -293,39 +358,40 @@ class ExtensionType:
 		self.comment	= comment
 
 class ExtensionRequirements:
-	def __init__ (self, extensionName, extendedEnums, newCommands, newTypes):
-		self.extensionName	= extensionName					# None when requirements apply to all implementations of extension;
+	def __init__ (self, depends, extendedEnums, newCommands, newTypes):
+		self.depends		= depends						# None when requirement apply to all implementations of extension or string with dependencies
 															# string with extension name when requirements apply to implementations that also support given extension
 		self.extendedEnums	= extendedEnums					# list of ExtensionEnumerator objects
 		self.newCommands	= newCommands					# list of ExtensionCommand objects
 		self.newTypes		= newTypes						# list of ExtensionType objects
 
 class Extension:
-	def __init__ (self, name, number, type, requiresCore, requiredExtensions, platform, promotedto, partiallyPromoted, requirementsList):
+	def __init__ (self, name, number, type, depends, platform, promotedto, partiallyPromoted, requirementsList):
 		self.name				= name						# extension name
 		self.number				= number					# extension version
 		self.type				= type						# extension type - "device" or "instance"
-		self.requiresCore		= requiresCore				# required core vulkan version e.g. "1.1"
-		self.requiredExtensions	= requiredExtensions		# list of extensions names that also need to be available on implementation or None
+		self.depends			= depends					# string containig grammar for required core vulkan version and/or other extensions
 		self.platform			= platform					# None, "win32", "ios", "android" etc.
 		self.promotedto			= promotedto				# vulkan version, other extension or None
 		self.partiallyPromoted	= partiallyPromoted			# when True then some of requirements were not promoted
 		self.requirementsList	= requirementsList			# list of ExtensionRequirements objects
 
 class API:
-	def __init__ (self):
-		self.versions			= []
-		self.basetypes			= {}	# dictionary, e.g. one of keys is VkFlags and its value is uint32_t
-		self.defines			= []
-		self.handles			= []
-		self.bitmasks			= []	# list of Bitmask objects
-		self.enums				= []	# list of Enum objects - each contains individual enum definition (including extension enums)
-		self.compositeTypes		= []	# list of Composite objects - each contains individual structure/union definition (including extension structures)
-		self.functions			= []	# list of Function objects - each contains individual command definition (including extension functions)
-		self.features			= []	# list of Feature objects
-		self.extensions			= []	# list of Extension objects - each contains individual extension definition
-		self.basicCTypes		= []	# list of basic C types e.g. 'void', 'int8_t'
-		self.tempAliasesList	= []	# list of touples used to handle aliases for enumerators that will be defined later
+	def __init__ (self, apiName):
+		self.apiName				= apiName	# string "vulkan" or "vulkansc"
+		self.versions				= []
+		self.basetypes				= {}		# dictionary, e.g. one of keys is VkFlags and its value is uint32_t
+		self.defines				= []
+		self.handles				= []		# list of Handle objects
+		self.bitmasks				= []		# list of Bitmask objects
+		self.enums					= []		# list of Enum objects - each contains individual enum definition (including extension enums)
+		self.compositeTypes			= []		# list of Composite objects - each contains individual structure/union definition (including extension structures)
+		self.functions				= []		# list of Function objects - each contains individual command definition (including extension functions)
+		self.features				= []		# list of Feature objects
+		self.extensions				= []		# list of Extension objects - each contains individual, supported extension definition
+		self.notSupportedExtensions	= []		# list of Extension objects - it contains NOT supported extensions; this is filled and needed only for SC
+		self.basicCTypes			= []		# list of basic C types e.g. 'void', 'int8_t'
+		self.tempAliasesList		= []		# list of aliases for enums that could not be added because enum is defined later than its alias; this is needed for SC
 
 		# read all files from extensions directory
 		additionalExtensionData	= {}
@@ -341,45 +407,28 @@ class API:
 				sys.exit(-1)
 		self.additionalExtensionData = sorted(additionalExtensionData.items(), key=lambda e: e[0])
 
-	def addOrUpdateEnumerator (self, enumeratorNode, enumDefinition, extensionNumber = None):
-		name	= enumeratorNode.get("name")
-		alias	= enumeratorNode.get("alias")
-		# if enumerator node has alias atribute then update existing enumerator
-		if alias is not None:
-			for e in reversed(enumDefinition.enumeratorList):
-				if alias == e.name or alias in e.aliasList:
-					# make sure same alias is not already on the list; this handles special case like
-					# VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES_KHR alais which is defined in three places
-					if name not in e.aliasList:
-						e.aliasList.append(name)
-					return
-			# there are cases where alias is specified for enumerator that wasn't yet defined,
-			# we need to remember those aliases and assign them after we parse whole xml
-			self.tempAliasesList.append((enumDefinition, name, alias))
-			return
+	def addEnumerator(self, targetEnum, name, value, offset, extnumber, bitpos, dir = None):
 		# calculate enumerator value if offset attribute is present
-		value = enumeratorNode.get("value")
-		if value is None:
-			value = enumeratorNode.get("offset")
-			if value is not None:
-				# check if extensionNumber should be overridden
-				extnumber = enumeratorNode.get("extnumber")
-				if extnumber is not None:
-					extensionNumber = extnumber
-				value = 1000000000 + (int(extensionNumber)-1) * 1000 + int(value)
-				# check if value should be negative
-				dir = enumeratorNode.get("dir")
-				if dir == "-":
-					value *= -1
-				# convert to string so that type matches the type in which values
-				# are stored for enums that were read from enums xml section
-				value = str(value)
+		if value is None and offset is not None:
+			value = 1000000000 + (int(extnumber) - 1) * 1000 + int(offset)
+			# check if value should be negative
+			value = -value if dir == "-" else value
+			# convert to string so that type matches the type in which values
+			# are stored for enums that were read from enums xml section
+			value = str(value)
 		# add new enumerator
-		enumDefinition.enumeratorList.append(Enumerator(
-			name,
-			value,
-			enumeratorNode.get("bitpos")
-		))
+		targetEnum.enumeratorList.append(Enumerator(name, value, bitpos))
+
+	def addAliasToEnumerator (self, targetEnum, name, alias):
+		assert(alias is not None)
+		for e in reversed(targetEnum.enumeratorList):
+			if alias == e.name or alias in e.aliasList:
+				# make sure same alias is not already on the list; this handles special case like
+				# VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES_KHR alais which is defined in three places
+				if name not in e.aliasList:
+					e.aliasList.append(name)
+				return True
+		return False
 
 	def readEnum (self, enumsNode):
 		enumName = enumsNode.get("name")
@@ -406,7 +455,19 @@ class API:
 			# skip comment tags
 			if enumeratorItem.tag != "enum":
 				continue
-			self.addOrUpdateEnumerator(enumeratorItem, enumDefinition)
+			name	= enumeratorItem.get("name")
+			alias	= enumeratorItem.get("alias")
+			if alias is None:
+				self.addEnumerator(
+					enumDefinition,
+					name,
+					enumeratorItem.get("value"),
+					enumeratorItem.get("offset"),
+					enumeratorItem.get("extnumber"),
+					enumeratorItem.get("bitpos"),
+					enumeratorItem.get("dir"))
+			else:
+				self.addAliasToEnumerator(enumDefinition, name, alias)
 
 	def readCommand (self, commandNode):
 		protoNode = None					# proto is a first child of every command node
@@ -426,6 +487,8 @@ class API:
 			return
 		# memorize all parameters
 		functionParams = []
+		queuesList = []
+
 		for paramNode in commandNode:
 			# memorize prototype node
 			if paramNode.tag == "proto":
@@ -437,25 +500,37 @@ class API:
 			nameNode	= paramNode.find("name")
 			typeNode	= paramNode.find("type")
 			starCount	= typeNode.tail.count('*')
+			lenAttr		= paramNode.get("len")
 			functionParams.append(FunctionArgument(
 				nameNode.text,
 				paramNode.text,
 				paramNode.find("type").text,
 				'*' * starCount if starCount > 0 else None,
 				'const' in typeNode.tail,
-				nameNode.tail
+				nameNode.tail,
+				lenAttr
 			))
+
+		queuesAttr = commandNode.get("queues")
+		if queuesAttr:
+			queuesList = queuesAttr.split(",")
+
 		# memorize whole function
-		self.functions.append(Function(
+		func = Function(
 			protoNode.find("name").text,
 			protoNode.find("type").text,
 			functionParams,
-		))
+		)
+
+		func.queuesList = queuesList
+		self.functions.append(func)
 
 	def readExtension (self, extensionNode):
-		# skip disabled extensions
-		if extensionNode.get("supported") == "disabled":
-			return
+		# check to which list this extension should be added
+		supportedList			= extensionNode.get("supported")
+		isExtensionSupported	= self.apiName in supportedList.split(',')
+		targetExtensionList		= self.extensions if isExtensionSupported else self.notSupportedExtensions
+		# read extension definition to proper list
 		extensionName		= extensionNode.get("name")
 		extensionNumber		= extensionNode.get("number")
 		partiallyPromoted	= False
@@ -485,15 +560,9 @@ class API:
 						individualRequirement.get("value"),
 						individualRequirement.get("extnumber"),
 						individualRequirement.get("offset"),
+						individualRequirement.get("bitpos"),
+						individualRequirement.get("dir"),
 						requirementComment))
-					# add enumerator to proper enum from api.enums
-					if extendedEnumName is not None:
-						newEnumerator = individualRequirement.get("name")
-						# find extendedEnumName in self.enums
-						matchedEnum = [enum for enum in self.enums if enum.name == extendedEnumName][0]
-						# add enumerator only when it is not already in enum
-						if len([e for e in matchedEnum.enumeratorList if e.name == newEnumerator]) == 0:
-							self.addOrUpdateEnumerator(individualRequirement, matchedEnum, extensionNumber)
 				elif individualRequirement.tag == "command":
 					newCommands.append(ExtensionCommand(requirementName, requirementComment))
 				elif individualRequirement.tag == "type":
@@ -504,23 +573,17 @@ class API:
 					partiallyPromoted = True
 			# construct requirement object and add it to the list
 			requirementsList.append(ExtensionRequirements(
-				requireItem.get("extension"),	# extensionName
+				requireItem.get("depends"),		# dependencies that can include "and/or" grammar
 				extendedEnums,					# extendedEnums
 				newCommands,					# newCommands
 				newTypes						# newTypes
 			))
-		# read extensions that need to be supported when current extension is suported;
-		# in xml this is single comma separated string, we split it to list of strings
-		requiredExtensions = extensionNode.get("requires")
-		if requiredExtensions is not None:
-			requiredExtensions = requiredExtensions.split(',')
-		# add extension definition to api object
-		self.extensions.append(Extension(
+		# add extension definition to proper api object
+		targetExtensionList.append(Extension(
 			extensionName,						# name
 			extensionNumber,					# number
 			extensionNode.get("type"),			# type
-			extensionNode.get("requiresCore"),	# requiresCore
-			requiredExtensions,					# requiredExtensions
+			extensionNode.get("depends"),		# depends
 			extensionNode.get("platform"),		# platform
 			extensionNode.get("promotedto"),	# promotedto
 			partiallyPromoted,					# partiallyPromoted
@@ -536,20 +599,32 @@ class API:
 			for requirement in requirementGroup:
 				requirementName = requirement.get("name")
 				if requirement.tag == "enum":
-					enumList.append(requirementName)
 					extendedEnumName = requirement.get("extends")
+					enumList.append(FeatureEnumerator(requirementName, extendedEnumName))
 					if extendedEnumName is not None:
 						# find extended enum in api.enums list
 						for e in self.enums:
 							if extendedEnumName == e.name:
 								# read enumerator and add it to enum
-								self.addOrUpdateEnumerator(requirement, e)
+								alias = requirement.get("alias")
+								if alias is None:
+									self.addEnumerator(
+										e,
+										requirementName,
+										requirement.get("value"),
+										requirement.get("offset"),
+										requirement.get("extnumber"),
+										requirement.get("bitpos"),
+										requirement.get("dir"))
+								elif not self.addAliasToEnumerator(e, requirementName, alias):
+									self.tempAliasesList.append((e, requirementName, alias))
 								break
 				elif requirement.tag == "type":
 					typeList.append(requirementName)
 				elif requirement.tag == "command":
 					commandList.append(requirementName)
 			requirementsList.append(FeatureRequirement(
+				requirementGroup.tag,
 				requirementGroup.get("comment"),
 				enumList,
 				typeList,
@@ -628,11 +703,14 @@ class API:
 			for memberNode in typeNode:
 				if memberNode.tag != "member":
 					continue
-				# handle enum nodes that can be used for arrays
+				# handle enum nodes that can be used for array dimensions
 				arraySizeList = []
 				for node in memberNode:
 					if node.tag == "enum":
 						arraySizeList.append(node.text)
+						# check if there are array dimension that are not enums
+						if '[' in node.tail and len(node.tail) > 2:
+							arraySizeList += node.tail.replace(']', ' ').replace('[', ' ').split()
 				# handle additional text after name tag; it can represent array
 				# size like in VkPipelineFragmentShadingRateEnumStateCreateInfoNV
 				# or number of bits like in VkAccelerationStructureInstanceKHR
@@ -644,7 +722,7 @@ class API:
 						fieldWidth = nameTail.replace(':', '').replace(' ', '')
 					elif '[' in nameTail and ']' in nameTail:
 						nameTail = nameTail.replace(']', ' ').replace('[', ' ')
-						arraySizeList = nameTail.split()
+						arraySizeList = nameTail.split() + arraySizeList
 				# handle additional text after type tag; it can represent pointers like *pNext
 				memberTypeNode	= memberNode.find("type")
 				pointer			= memberTypeNode.tail.strip() if memberTypeNode.tail is not None else None
@@ -669,12 +747,18 @@ class API:
 				structMembers
 			))
 		elif category == "define":
+			nNode = typeNode.find("name")
+			tNode = typeNode.find("type")
+			if nNode == None or tNode == None:
+				return
 			requires = typeNode.get("requires")
-			if requires == "VK_MAKE_API_VERSION" or requires == "VK_MAKE_VIDEO_STD_VERSION":
-				value = typeNode.find("type").tail
-				value = requires + value[:value.find(')')+1]
+			name = nNode.text
+			if "API_VERSION_" in name or requires == "VK_MAKE_VIDEO_STD_VERSION":
+				value = tNode.tail
+				value = tNode.text + value[:value.find(')')+1]
+				value = value.replace('VKSC_API_VARIANT', '1')
 				self.defines.append(Define(
-					typeNode.find("name").text,
+					name,
 					"uint32_t",
 					None,
 					value
@@ -715,55 +799,303 @@ class API:
 				for typeItem in typesNode:
 					self.readType(typeItem)
 
+		# Verify that promotedto extensions are supported by the api
+		for ext in self.extensions:
+			if ext.promotedto is not None and "VK_VERSION" not in ext.promotedto:
+				if not any(x.name == ext.promotedto for x in self.extensions):
+					ext.promotedto = None
+
 	def postProcess (self):
-		def removeExtensionFromApi(extName, structureNameList, commandNameList):
-			extObjectList = [e for e in api.extensions if e.name == extName]
-			if len(extObjectList) > 0:
-				api.extensions.remove(extObjectList[0])
-			structObjectList = [ct for ct in api.compositeTypes if ct.name in structureNameList]
-			for s in structObjectList:
-				api.compositeTypes.remove(s)
-			commandObjectList = [f for f in api.functions if f.name in commandNameList]
-			for f in commandObjectList:
-				api.functions.remove(f)
 
-		# remove structures and commands added by VK_EXT_directfb_surface extension
-		removeExtensionFromApi("VK_EXT_directfb_surface",
-							   ["VkDirectFBSurfaceCreateFlagsEXT", "VkDirectFBSurfaceCreateInfoEXT"],
-							   ["vkCreateDirectFBSurfaceEXT", "vkGetPhysicalDeviceDirectFBPresentationSupportEXT"])
+		# temporary workaround for extensions that are marked only for vulkan api in xml while
+		# they are need by vulkan_json_data.hpp and vulkan_json_parser.hpp in vulkansc
+		if self.apiName == "vulkansc":
+			deviceDiagnosticCheckpoints = [e for e in self.notSupportedExtensions if e.name == "VK_NV_device_diagnostic_checkpoints"]
+			if len(deviceDiagnosticCheckpoints):
+				deviceDiagnosticCheckpoints = deviceDiagnosticCheckpoints[0]
+				self.extensions.append(deviceDiagnosticCheckpoints)
+				self.notSupportedExtensions.remove(deviceDiagnosticCheckpoints)
+			formatFeatureFlags2 = [e for e in self.notSupportedExtensions if e.name == "VK_KHR_format_feature_flags2"]
+			if len(formatFeatureFlags2):
+				formatFeatureFlags2 = formatFeatureFlags2[0]
+				self.extensions.append(formatFeatureFlags2)
+				self.notSupportedExtensions.remove(formatFeatureFlags2)
 
-		# remove structures and commands added by disabled VK_ANDROID_native_buffer extension;
-		# disabled extensions aren't read but their structures and commands will be in types and commands sections in vk.xml
-		removeExtensionFromApi("VK_ANDROID_native_buffer",
-							   ["VkNativeBufferANDROID", "VkSwapchainImageCreateInfoANDROID",
-								"VkPhysicalDevicePresentationPropertiesANDROID", "VkNativeBufferUsage2ANDROID",
-								"VkSwapchainImageUsageFlagBitsANDROID", "VkSwapchainImageUsageFlagsANDROID"],
-							   ["vkGetSwapchainGrallocUsageANDROID", "vkAcquireImageANDROID",
-								"vkQueueSignalReleaseImageANDROID", "vkGetSwapchainGrallocUsage2ANDROID"])
+		# add new enumerators that were added by extensions to api.enums
+		# we have to do it at the end for SC because some enums are dependent from extensions/api versions
+		# and those dependencies can be checked only after all extensions were read
+		for ext in self.extensions:
+			for requirement in ext.requirementsList:
+				# check if this requirement is supported by current implementation
+				isRequirementSupported = isDependencyMet(requirement.depends, self.extensions)
+				# add enumerator to proper enum from api.enums
+				if isRequirementSupported:
+					for enumerator in requirement.extendedEnums:
+						if enumerator.extends is None:
+							continue
+						# find enum in api.enums
+						matchedEnum = [enum for enum in self.enums if enumerator.extends == enum.name][0]
+						# add enumerator only when it is not already in enum
+						if len([e for e in matchedEnum.enumeratorList if e.name == enumerator.name]) == 0:
+							if enumerator.alias == None:
+								self.addEnumerator(
+										matchedEnum,
+										enumerator.name,
+										enumerator.value,
+										enumerator.offset,
+										enumerator.extnumber if enumerator.extnumber else ext.number,
+										enumerator.bitpos,
+										enumerator.dir)
+							elif not self.addAliasToEnumerator(matchedEnum, enumerator.name, enumerator.alias):
+								# we might not be able to add alias as we might be missing what we are aliasing
+								# this will hapen when aliased enum is added later then definition of alias
+								self.tempAliasesList.append((matchedEnum, enumerator.name, enumerator.alias))
+				else:
+					logging.warning("Skipping requirement in extension %s because dependencies are not met: %s" % (ext.name, requirement.depends))
 
-		# remove empty enums e.g. VkQueryPoolCreateFlagBits, VkDeviceCreateFlagBits
-		enumsToRemove = [enum for enum in self.enums if len(enum.enumeratorList) == 0]
+		# add aliases to enumerators that were defined after alias definition
+		for enum, name, alias in self.tempAliasesList:
+			if not self.addAliasToEnumerator(enum, name, alias):
+				# if enumerator that should be aliased was not found then try to insert it without alias
+				# (this happens for vulkansc as in xml enumerator might be defined in extension that is not supported by sc)
+				def tryToFindEnumValue(searchedName):
+					for nsExt in self.notSupportedExtensions:
+						for r in nsExt.requirementsList:
+							for enumerator in r.extendedEnums:
+								if enumerator.name == searchedName:
+									self.addEnumerator(
+										enum,
+										name,
+										enumerator.value,
+										enumerator.offset,
+										enumerator.extnumber if enumerator.extnumber else ext.number,
+										enumerator.bitpos,
+										enumerator.dir)
+									# there are ~2 cases where alias that is not part of SC still needs to be added for SC
+									self.addAliasToEnumerator(enum, alias, name)
+									return
+				# using function for easy stack unwinding
+				tryToFindEnumValue(alias)
+		self.tempAliasesList = None
+
+		if self.apiName == "vulkan":
+			def removeExtensionFromApi(extName, structureNameList, commandNameList):
+				extObjectList = [e for e in api.extensions if e.name == extName]
+				if len(extObjectList) > 0:
+					api.extensions.remove(extObjectList[0])
+				structObjectList = [ct for ct in api.compositeTypes if ct.name in structureNameList]
+				for s in structObjectList:
+					api.compositeTypes.remove(s)
+				commandObjectList = [f for f in api.functions if f.name in commandNameList]
+				for f in commandObjectList:
+					api.functions.remove(f)
+
+			# remove structures and commands added by VK_EXT_directfb_surface extension
+			removeExtensionFromApi("VK_EXT_directfb_surface",
+								   ["VkDirectFBSurfaceCreateFlagsEXT", "VkDirectFBSurfaceCreateInfoEXT"],
+								   ["vkCreateDirectFBSurfaceEXT", "vkGetPhysicalDeviceDirectFBPresentationSupportEXT"])
+
+			# remove structures and commands added by disabled VK_ANDROID_native_buffer extension;
+			# disabled extensions aren't read but their structures and commands will be in types and commands sections in vk.xml
+			removeExtensionFromApi("VK_ANDROID_native_buffer",
+								   ["VkNativeBufferANDROID", "VkSwapchainImageCreateInfoANDROID",
+									"VkPhysicalDevicePresentationPropertiesANDROID", "VkNativeBufferUsage2ANDROID",
+									"VkSwapchainImageUsageFlagBitsANDROID", "VkSwapchainImageUsageFlagsANDROID"],
+								   ["vkGetSwapchainGrallocUsageANDROID", "vkAcquireImageANDROID",
+									"vkQueueSignalReleaseImageANDROID", "vkGetSwapchainGrallocUsage2ANDROID"])
+
+			# remove empty enums e.g. VkQueryPoolCreateFlagBits, VkDeviceCreateFlagBits
+			enumsToRemove = [enum for enum in self.enums if len(enum.enumeratorList) == 0]
+			for er in enumsToRemove:
+				self.enums.remove(er)
+
+			# add alias for VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR (in vk.xml for this struct alias is defined before struct
+			# where in all other cases it is defined after structure definition)
+			barycentricFeaturesStruct = [c for c in api.compositeTypes if c.name == 'VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR'][0]
+			barycentricFeaturesStruct.aliasList.append('VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV')
+
+		elif self.apiName == "vulkansc":
+			# remove commands that are marked with <remove> tag in SC feature specification;
+			# e.g. there is no vkCreateShaderModule in SC
+			functionsToRemove = []
+			scFeatures = [f for f in self.features if f.api == "vulkansc"][0]
+			for featureRequirement in scFeatures.requirementsList:
+				if featureRequirement.operation == "remove":
+					for removeFun in featureRequirement.commandList:
+						# find function in the list of all functions
+						for fun in self.functions:
+							if removeFun == fun.name:
+								functionsToRemove.append(fun)
+								break
+			for fun in functionsToRemove:
+				self.functions.remove(fun)
+			# sc is based on vk1.2 so we need to check features of vk1.3+
+			# and rename functions and structures that were promoted in
+			# those versions to their previous names (aliases)
+			renamedStructuresDict = {}
+			for feature in self.features:
+				# skip vk versions smaller than 1.3
+				if int(feature.number[-1]) < 3:
+					continue
+				# iterate over all requirements and enums/commands/structs added in them
+				for featureRequirement in feature.requirementsList:
+					for promotedEnumerator in featureRequirement.enumList:
+						# iterate over all enums and find one that was extended
+						for enum in self.enums:
+							if enum.name != promotedEnumerator.extends:
+								continue
+							enumeratorReplaced = False
+							# find enumerator that should have changed name
+							for enumerator in enum.enumeratorList:
+								if enumerator.name != promotedEnumerator.name or len(enumerator.aliasList) == 0:
+									continue
+								# replace enumerator name with its first alias
+								enumerator.name = enumerator.aliasList[0]
+								enumerator.aliasList = enumerator.aliasList[1:]
+								# first member of almost all structures is VkStructureType and in xml that member
+								# has defined value - we need to change those values to versions supported by SC
+								if "STRUCTURE_TYPE" in enumerator.name:
+									for struct in self.compositeTypes:
+										if struct.members[0].values == promotedEnumerator.name:
+											struct.members[0].values = enumerator.name
+											break
+								enumeratorReplaced = True
+								break
+							if enumeratorReplaced:
+								break
+					renamedFunctionsList = []
+					for promotedFun in featureRequirement.commandList:
+						# find promotedFun in list of all functions
+						for fun in self.functions:
+							if fun.name != promotedFun:
+								continue
+							# replace function name with its first alias
+							fun.name = fun.aliasList[0]
+							fun.aliasList = fun.aliasList[1:]
+							# memorize renamed functions
+							renamedFunctionsList.append(fun)
+							break
+					for promotedStruct in featureRequirement.typeList:
+						# find promotedStruct in list of all structures
+						for struct in self.compositeTypes:
+							if struct.name != promotedStruct:
+								continue
+							# skip structures without alias
+							if len(struct.aliasList) == 0:
+								break
+							# replace struct name with its first alias
+							struct.name = struct.aliasList[0]
+							struct.aliasList = struct.aliasList[1:]
+							# memorize all renamed structures
+							renamedStructuresDict[promotedStruct] = struct
+							# check all all renamed functions and make sure that argument types are also renamed
+							for renamedFun in renamedFunctionsList:
+								for arg in renamedFun.arguments:
+									if arg.type == promotedStruct:
+										arg.type = struct.name
+							break
+			# iterate over all renamed structures and make sure that all their attributes are also renamed
+			for newName in renamedStructuresDict:
+				for member in renamedStructuresDict[newName].members:
+					if member.type in renamedStructuresDict:
+						member.type = renamedStructuresDict[member.type].name
+
+		# remove enums that are not part of any vulkan version nor extension
+		# (SC specific enums are in vk.xml without any attribute identifying that they are SC specific; same for enums for disabled extensions)
+		def isEnumUsed(featureList, extensionList, enumName, enumAlias):
+			for feature in featureList:
+				for requirement in feature.requirementsList:
+					for typeName in requirement.typeList:
+						if (typeName == enumName) or (typeName == enumAlias):
+							return True
+			for ext in extensionList:
+				for requirement in ext.requirementsList:
+					for newType in requirement.newTypes:
+						if (newType.name == enumName) or (newType.name == enumAlias):
+							return True
+			return False
+		# do removal using above function
+		enumsToRemove = []
+		for enum in self.enums:
+			if isEnumUsed(self.features, self.extensions, enum.name, enum.alias):
+				continue
+			enumsToRemove.append(enum)
 		for er in enumsToRemove:
 			self.enums.remove(er)
 
-		# add aliases to enumerators that were defined after alias (there are ~10 cases like that in vk.xml)
-		for tmpAliasTouple in self.tempAliasesList:
-			(enum, name, alias) = tmpAliasTouple
-			for e in enum.enumeratorList:
-				if e.name == alias:
-					e.aliasList.append(name)
-					break
-		self.tempAliasesList = None
+		# remove structures that are not part of any vulkan version nor extension
+		# (SC specific structures are in vk.xml without any attribute identifying that they are SC specific)
+		def isStructUsed(featureList, extensionList, structNameList):
+			for feature in featureList:
+				for requirement in feature.requirementsList:
+					for typeName in requirement.typeList:
+						if typeName in structNameList:
+							return True
+			for ext in extensionList:
+				for requirement in ext.requirementsList:
+					for newType in requirement.newTypes:
+						if newType.name in structNameList:
+							return isDependencyMet(requirement.depends, extensionList)
+			return False
 
-		# add alias for VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR (in vk.xml for this struct alias is defined before struct
-		# where in all other cases it is defined after structure definition)
-		barycentricFeaturesStruct = [c for c in api.compositeTypes if c.name == 'VkPhysicalDeviceFragmentShaderBarycentricFeaturesKHR'][0]
-		barycentricFeaturesStruct.aliasList.append('VkPhysicalDeviceFragmentShaderBarycentricFeaturesNV')
+		structsToRemove = []
+		for struct in self.compositeTypes:
+			structNameList = [struct.name] + struct.aliasList
+			if isStructUsed(self.features, self.extensions, structNameList):
+				continue
+			structsToRemove.append(struct)
+		for st in structsToRemove:
+			self.compositeTypes.remove(st)
+
+		# remove commands that are not part of any vulkan version nor extension
+		# (SC specific commands are in vk.xml without any attribute identifying that they are SC specific)
+		def isFunctionUsed(featureList, extensionList, functionNameList):
+			for feature in featureList:
+				for requirement in feature.requirementsList:
+					for commandName in requirement.commandList:
+						if commandName in functionNameList:
+							return True
+			for ext in extensionList:
+				for requirement in ext.requirementsList:
+					for newCommand in requirement.newCommands:
+						if newCommand.name in functionNameList:
+							return isDependencyMet(requirement.depends, extensionList)
+			return False
+
+		functionsToRemove = []
+		for fun in self.functions:
+			functionNameList = [fun.name] + fun.aliasList
+			if isFunctionUsed(self.features, self.extensions, functionNameList):
+				continue
+			functionsToRemove.append(fun)
+		for fun in functionsToRemove:
+			logging.debug("Removing function %s because not used" % (fun.name))
+			self.functions.remove(fun)
+
+		# remove handles that are not part of any vulkan command or structure
+		def isHandleUsed(structList, functionList, handleName):
+			for struct in structList:
+				for member in struct.members:
+					if handleName in member.type:
+						return True
+			for fun in functionList:
+				for arg in fun.arguments:
+					if handleName in arg.type:
+						return True
+			return False
+
+		handlesToRemove = []
+		for h in self.handles:
+			if isHandleUsed(self.compositeTypes, self.functions, h.name):
+				continue
+			handlesToRemove.append(h)
+		for h in handlesToRemove:
+			self.handles.remove(h)
 
 		# sort enumerators in enums
 		sortLambda	= lambda enumerator: int(enumerator.bitpos) if enumerator.value is None else int(enumerator.value, 16 if 'x' in enumerator.value else 10)
 		for enum in self.enums:
-			# skip enums that have no items in enumeratorList (e.g. VkQueryPoolCreateFlagBits) or just one item
+			# skip enums that have no items or  just one in enumeratorList (e.g. VkQueryPoolCreateFlagBits)
 			if len(enum.enumeratorList) < 2:
 				continue
 			# construct list of enumerators in which value and bitpos are not None
@@ -781,7 +1113,7 @@ def prefixName (prefix, name):
 	return prefix + name
 
 def parseInt (value):
-	return int(value, 16 if (value[:2] == "0x") else 10)
+	return int(value, 16 if ("0x" in value) else 10)
 
 def getApiVariantIndexByName(variantName):
 	apiVariant = {
@@ -929,7 +1261,7 @@ def genDefinesSrc (apiName, defines):
 		yield line
 	# add VK_API_MAX_FRAMEWORK_VERSION
 	major, minor = api.features[-1].number.split('.')
-	yield f"#define VK_API_MAX_FRAMEWORK_VERSION\tVK{apiName}_API_VERSION_{major}_{minor}"
+	yield f"#define VK{apiName}_API_MAX_FRAMEWORK_VERSION\tVK{apiName}_API_VERSION_{major}_{minor}"
 
 def genHandlesSrc (handles):
 	def genLines (handles):
@@ -960,11 +1292,11 @@ def genHandlesSrc (handles):
 	for line in indentLines(genLines(handles)):
 		yield line
 
-def writeBasicTypes (apiName, api, filename):
+def writeBasicTypes (api, filename):
 
 	def gen ():
 
-		for line in genDefinesSrc(apiName, api.defines):
+		for line in genDefinesSrc("SC" if api.apiName == "vulkansc" else "", api.defines):
 			yield line
 		yield ""
 
@@ -973,7 +1305,9 @@ def writeBasicTypes (apiName, api, filename):
 		yield ""
 
 		for enum in api.enums:
-			if len(enum.enumeratorList) == 0:
+			# skip empty enums only for vulkan
+			# vulkan_json_data.hpp and vulkan_json_parser.hpp in SC need many empty enums
+			if len(enum.enumeratorList) == 0 and api.apiName == "vulkan":
 				continue
 			if enum.type == "bitmask":
 				if enum.bitwidth == "32":
@@ -1150,38 +1484,111 @@ def writeFunctionPointers (api, filename, functionTypes):
 
 	writeInlFile(filename, INL_HEADER, indentLines(FunctionsYielder()))
 
+def getPromotedFunctions (api):
+	apiNum = 0 if api.apiName == "vulkan" else 1
+	promotedFunctions = collections.defaultdict(lambda: list())
+	for feature in api.features:
+		versionSplit = feature.name.split('_')
+		apiMajor = int(versionSplit[-2])
+		apiMinor = int(versionSplit[-1])
+		apiPrefix = '_'.join(versionSplit[:-2])
+		if apiNum == 0 and apiPrefix != 'VK_VERSION':
+			continue
+		if apiNum == 1 and apiPrefix == 'VK_VERSION':
+			# Map of "standard" Vulkan versions to VulkanSC version.
+			stdToSCMap = {
+				(1, 0):	(1, 0),
+				(1, 1): (1, 0),
+				(1, 2): (1, 0),
+			}
+			mapKey = (apiMajor, apiMinor)
+			if mapKey not in stdToSCMap:
+				continue
+			(apiMajor, apiMinor) = stdToSCMap[mapKey]
+		apituple = (apiNum, apiMajor, apiMinor)
+		for featureRequirement in feature.requirementsList:
+			for promotedFun in featureRequirement.commandList:
+				promotedFunctions[promotedFun].append(apituple)
+	return promotedFunctions
+
 def writeInitFunctionPointers (api, filename, functionTypes, cond = None):
+	promotedFunctions = getPromotedFunctions(api) if Function.TYPE_DEVICE in functionTypes else None
 	def makeInitFunctionPointers ():
 		for function in api.functions:
 			if function.getType() in functionTypes and (cond == None or cond(function)):
+				condition = ''
+				if function.getType() == Function.TYPE_DEVICE:
+					versionCheck = ''
+					if function.name in promotedFunctions:
+						for versionTuple in promotedFunctions[function.name]:
+							if len(versionCheck) > 0:
+								versionCheck += ' || '
+							versionCheck = 'usedApiVersion >= VK_MAKE_API_VERSION(%s, %s, %s, 0)' % versionTuple
+					if len(versionCheck) > 0:
+						condition = f"if ({versionCheck})\n    "
 				interfaceName		= getInterfaceName(function.name)
 				functionTypeName	= getFunctionTypeName(function.name)
-				yield f"m_vk.{interfaceName}\t= ({functionTypeName})\tGET_PROC_ADDR(\"{function.name}\");"
+				yield f"{condition}m_vk.{interfaceName} = ({functionTypeName}) GET_PROC_ADDR(\"{function.name}\");"
 				for alias in function.aliasList:
 					yield f"if (!m_vk.{interfaceName})"
-					yield f"    m_vk.{interfaceName}\t= ({functionTypeName})\tGET_PROC_ADDR(\"{alias}\");"
+					yield f"    m_vk.{interfaceName} = ({functionTypeName}) GET_PROC_ADDR(\"{alias}\");"
 					if function.getType() == Function.TYPE_INSTANCE and function.arguments[0].type == "VkPhysicalDevice":
 						interfaceName		= getInterfaceName(alias)
 						functionTypeName	= getFunctionTypeName(alias)
-						yield f"m_vk.{interfaceName}\t= ({functionTypeName})\tGET_PROC_ADDR(\"{alias}\");"
+						yield f"m_vk.{interfaceName} = ({functionTypeName}) GET_PROC_ADDR(\"{alias}\");"
 
-	lines = [line.replace('    ', '\t') for line in indentLines(makeInitFunctionPointers())]
+	lines = makeInitFunctionPointers()
 	writeInlFile(filename, INL_HEADER, lines)
 
+# List pre filled manually with commands forbidden for computation only implementations
+computeOnlyForbiddenCommands = [
+	"destroyRenderPass",
+	"createRenderPass2",
+	"createRenderPass",
+	"createGraphicsPipelines"
+]
+
+computeOnlyRestrictedCommands = {
+	"createComputePipelines"	: "\t\tfor (deUint32 i=0; i<createInfoCount; ++i)\n\t\t\tif ((pCreateInfos[i].stage.stage & VK_SHADER_STAGE_ALL_GRAPHICS) != 0) THROW_NOT_SUPPORTED_COMPUTE_ONLY();",
+	"createBuffer"				: "\t\tif ((pCreateInfo->usage & ( VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT )) !=0) THROW_NOT_SUPPORTED_COMPUTE_ONLY();",
+}
+
 def writeFuncPtrInterfaceImpl (api, filename, functionTypes, className):
+
+	# populate compute only forbidden commands
+	for fun in api.functions:
+		if "graphics" in fun.queuesList and "compute" not in fun.queuesList:
+			# remove the 'vk' prefix and change the first character of the remaining string to lowercase
+			commandName = fun.name[2:3].lower() + fun.name[3:]
+			computeOnlyForbiddenCommands.append(commandName)
+
+			# if the command has an alias, also add it
+			for alias_name in fun.aliasList:
+				alias_name_without_vk = alias_name[2:3].lower() + alias_name[3:]
+				computeOnlyForbiddenCommands.append(alias_name_without_vk)
+
 	def makeFuncPtrInterfaceImpl ():
 		for function in api.functions:
 			if function.getType() in functionTypes:
 				yield ""
 				yield "%s %s::%s (%s) const" % (function.returnType, className, getInterfaceName(function.name), argListToStr(function.arguments))
 				yield "{"
+				# Check for compute only forbidden commands
+				if getInterfaceName(function.name) in computeOnlyForbiddenCommands:
+					yield "	if( m_computeOnlyMode ) THROW_NOT_SUPPORTED_COMPUTE_ONLY();"
+				# Check for compute only restricted commands
+				if getInterfaceName(function.name) in computeOnlyRestrictedCommands:
+					yield "\tif( m_computeOnlyMode )"
+					yield "\t{"
+					yield computeOnlyRestrictedCommands[getInterfaceName(function.name)]
+					yield "\t}"
 				if function.name == "vkEnumerateInstanceVersion":
 					yield "	if (m_vk.enumerateInstanceVersion)"
 					yield "		return m_vk.enumerateInstanceVersion(pApiVersion);"
 					yield ""
 					yield "	*pApiVersion = VK_API_VERSION_1_0;"
 					yield "	return VK_SUCCESS;"
-				elif function.getType() == Function.TYPE_INSTANCE and function.arguments[0].type == "VkPhysicalDevice" and len(function.aliasList) > 0:
+				elif function.getType() == Function.TYPE_INSTANCE and function.arguments[0].type == "VkPhysicalDevice" and len(function.aliasList) > 0 and getInterfaceName(function.name) in getInterfaceName(function.aliasList[0]):
 					yield "	vk::VkPhysicalDeviceProperties props;"
 					yield "	m_vk.getPhysicalDeviceProperties(physicalDevice, &props);"
 					yield "	if (props.apiVersion >= VK_API_VERSION_1_1)"
@@ -1271,24 +1678,35 @@ def writeFuncPtrInterfaceSCImpl (api, filename, functionTypes, className):
 		"VkDeviceAddress"	: "return 0u;",
 		"uint64_t"			: "return 0u;",
 	}
+
 	def makeFuncPtrInterfaceStatisticsImpl ():
 		for function in api.functions:
-			if function.getType() in functionTypes and not function.isAlias:
+			if function.getType() in functionTypes:
+				ifaceName = getInterfaceName(function.name)
 				yield ""
-				yield "%s %s::%s (%s) const" % (function.returnType, className, getInterfaceName(function), argListToStr(function.arguments))
+				yield "%s %s::%s (%s) const" % (function.returnType, className, ifaceName, argListToStr(function.arguments))
 				yield "{"
-				if ( getInterfaceName(function) in normFuncs ) or ( getInterfaceName(function) in statFuncs ):
+				# Check for compute only forbidden commands
+				if ifaceName in computeOnlyForbiddenCommands:
+					yield "\tif( m_computeOnlyMode ) THROW_NOT_SUPPORTED_COMPUTE_ONLY();"
+				# Check for compute only restricted commands
+				if ifaceName in computeOnlyRestrictedCommands:
+					yield "\tif( m_computeOnlyMode )"
+					yield "\t{"
+					yield computeOnlyRestrictedCommands[ifaceName]
+					yield "\t}"
+				if ( ifaceName in normFuncs ) or ( ifaceName in statFuncs ):
 					yield "\tstd::lock_guard<std::mutex> lock(functionMutex);"
-				if getInterfaceName(function) != "getDeviceProcAddr" :
+				if ifaceName != "getDeviceProcAddr" :
 					yield "\tif (m_normalMode)"
-				if getInterfaceName(function) in normFuncs :
-					yield "%s" % ( normFuncs[getInterfaceName(function)] )
+				if ifaceName in normFuncs :
+					yield "%s" % ( normFuncs[ifaceName] )
 				else:
-					yield "\t\t%sm_vk.%s(%s);" % ("return " if function.returnType != "void" else "", getInterfaceName(function), ", ".join(a.name for a in function.arguments))
-				if getInterfaceName(function) in statFuncs :
+					yield "\t\t%sm_vk.%s(%s);" % ("return " if function.returnType != "void" else "", ifaceName, ", ".join(a.name for a in function.arguments))
+				if ifaceName in statFuncs :
 					yield "\telse"
-					yield "%s" % ( statFuncs[getInterfaceName(function)] )
-				elif getInterfaceName(function)[:3] == "cmd" :
+					yield "%s" % ( statFuncs[ifaceName] )
+				elif ifaceName[:3] == "cmd" :
 					yield "\telse"
 					yield "\t\tincreaseCommandBufferSize(commandBuffer, 0u);"
 				if function.returnType in statReturns:
@@ -1354,6 +1772,8 @@ def writeStrUtilImpl (api, filename):
 					if bitmask.requires == enum.name or bitmask.bitvalues == enum.name:
 						foundBitmask = bitmask
 						break
+				if foundBitmask == None:
+					continue
 				savedBitmasks.append(foundBitmask.name)
 				bitSize = "64" if foundBitmask.type == "VkFlags64" else "32"
 				yield ""
@@ -1361,8 +1781,12 @@ def writeStrUtilImpl (api, filename):
 				yield "{"
 				yield "\tstatic const tcu::Format::BitDesc s_desc[] ="
 				yield "\t{"
-				for line in indentLines([f"\t\ttcu::Format::BitDesc({e.name},\t\"{e.name}\")," for e in enum.enumeratorList]):
-					yield line
+				if len(enum.enumeratorList) == 0:
+					# some bitfields in SC have no items
+					yield f"\t\ttcu::Format::BitDesc(0, \"0\")"
+				else:
+					for line in indentLines([f"\t\ttcu::Format::BitDesc({e.name},\t\"{e.name}\")," for e in enum.enumeratorList]):
+						yield line
 				yield "\t};"
 				yield f"\treturn tcu::Format::Bitfield<{bitSize}>(value, DE_ARRAY_BEGIN(s_desc), DE_ARRAY_END(s_desc));"
 				yield "}"
@@ -1394,11 +1818,10 @@ def writeStrUtilImpl (api, filename):
 					valFmt = "getCharPtrStr(value.%s)" % member.name
 				elif member.type == PLATFORM_TYPE_NAMESPACE + "::Win32LPCWSTR":
 					valFmt = "getWStr(value.%s)" % member.name
-				elif len(member.arraySizeList) > 0:
-					singleDimensional = len(member.arraySizeList) == 1
+				elif len(member.arraySizeList) == 1:
 					if member.name in ["extensionName", "deviceName", "layerName", "description"]:
 						valFmt = "(const char*)value.%s" % member.name
-					elif singleDimensional and (member.type == 'char' or member.type == 'uint8_t'):
+					elif member.type == 'char' or member.type == 'uint8_t':
 						newLine = "'\\n' << "
 						valFmt	= "tcu::formatArray(tcu::Format::HexIterator<%s>(DE_ARRAY_BEGIN(value.%s)), tcu::Format::HexIterator<%s>(DE_ARRAY_END(value.%s)))" % (member.type, member.name, member.type, member.name)
 					else:
@@ -1409,6 +1832,18 @@ def writeStrUtilImpl (api, filename):
 						newLine = "'\\n' << "
 						valFmt	= "tcu::formatArray(DE_ARRAY_BEGIN(value.%s), %s)" % (member.name, endIter)
 					memberName = member.name
+				elif len(member.arraySizeList) > 1:
+					yield f"\ts << \"\\t{member.name} = \" << '\\n';"
+					dim = 0
+					index = ''
+					dimensionCount = len(member.arraySizeList)
+					while dim < dimensionCount-1:
+						yield f"\tfor(deUint32 i{dim} = 0 ; i{dim} < {member.arraySizeList[dim]} ; ++i{dim})"
+						index += f"[i{dim}]"
+						dim +=1
+					yield f"\t\ts << tcu::formatArray(DE_ARRAY_BEGIN(value.{member.name}{index}), DE_ARRAY_END(value.{member.name}{index})) << '\\n';"
+					# move to next member
+					continue
 				else:
 					valFmt = "value.%s" % member.name
 				yield ("\ts << \"\\t%s = \" << " % memberName) + newLine + valFmt + " << '\\n';"
@@ -1579,6 +2014,7 @@ def writeNullDriverImpl (api, filename):
 				"vkGetPhysicalDeviceExternalBufferPropertiesKHR",
 				"vkGetPhysicalDeviceImageFormatProperties2KHR",
 				"vkGetMemoryAndroidHardwareBufferANDROID",
+				"vkCreateShadersEXT",
 			]
 
 		specialFuncs		= [f for f in api.functions if f.name in specialFuncNames]
@@ -1600,10 +2036,13 @@ def writeNullDriverImpl (api, filename):
 			yield "{"
 			yield "\tDE_UNREF(%s);" % function.arguments[-2].name
 
-			if getHandle(objectType).type == "VK_DEFINE_NON_DISPATCHABLE_HANDLE":
-				yield "\tVK_NULL_RETURN((*%s = allocateNonDispHandle<%s, %s>(%s)));" % (function.arguments[-1].name, objectType[2:], objectType, argsStr)
+			if function.arguments[-1].len != None:
+				yield "\tVK_NULL_RETURN((allocateNonDispHandleArray<%s, %s>(%s, %s)));" % (objectType[2:], objectType, argsStr, function.arguments[-1].name)
 			else:
-				yield "\tVK_NULL_RETURN((*%s = allocateHandle<%s, %s>(%s)));" % (function.arguments[-1].name, objectType[2:], objectType, argsStr)
+				if getHandle(objectType).type == "VK_DEFINE_NON_DISPATCHABLE_HANDLE":
+					yield "\tVK_NULL_RETURN((*%s = allocateNonDispHandle<%s, %s>(%s)));" % (function.arguments[-1].name, objectType[2:], objectType, argsStr)
+				else:
+					yield "\tVK_NULL_RETURN((*%s = allocateHandle<%s, %s>(%s)));" % (function.arguments[-1].name, objectType[2:], objectType, argsStr)
 			yield "}"
 			yield ""
 
@@ -1678,11 +2117,9 @@ def writeTypeUtil (api, filename):
 			"StdVideoH264PpsFlags",
 			"StdVideoDecodeH264PictureInfoFlags",
 			"StdVideoDecodeH264ReferenceInfoFlags",
-			"StdVideoDecodeH264MvcElementFlags",
 			"StdVideoEncodeH264SliceHeaderFlags",
 			"StdVideoEncodeH264PictureInfoFlags",
 			"StdVideoEncodeH264ReferenceInfoFlags",
-			"StdVideoEncodeH264RefMgmtFlags",
 			"StdVideoEncodeH264ReferenceInfoFlags",
 			"StdVideoH265HrdFlags",
 			"StdVideoH265VpsFlags",
@@ -1692,12 +2129,12 @@ def writeTypeUtil (api, filename):
 			"StdVideoDecodeH265PictureInfoFlags",
 			"StdVideoDecodeH265ReferenceInfoFlags",
 			"StdVideoEncodeH265PictureInfoFlags",
-			"StdVideoEncodeH265SliceSegmentHeaderFlags",
-			"StdVideoEncodeH265ReferenceModificationFlags",
 			"StdVideoEncodeH265ReferenceInfoFlags",
 			"StdVideoEncodeH265SliceSegmentHeaderFlags",
 			"StdVideoH265ProfileTierLevelFlags",
 			"StdVideoH265ShortTermRefPicSetFlags",
+			"StdVideoEncodeH264ReferenceListsInfoFlags",
+			"StdVideoEncodeH265ReferenceListsInfoFlags",
 		])
 
 	def isSimpleStruct (type):
@@ -1724,6 +2161,9 @@ def writeTypeUtil (api, filename):
 	def gen ():
 		for type in api.compositeTypes:
 			if not isSimpleStruct(type):
+				continue
+
+			if "StdVideoAV1" in type.name or "StdVideoDecodeAV1" in type.name:
 				continue
 
 			name = type.name[2:] if type.name[:2].lower() == "vk" else type.name
@@ -1760,7 +2200,7 @@ def writeDriverIds(api, filename):
 
 	writeInlFile(filename, INL_HEADER, driverIdsString)
 
-def writeSupportedExtensions(apiName, api, filename):
+def writeSupportedExtensions(api, filename):
 
 	def writeExtensionsForVersions(map):
 		result = []
@@ -1776,6 +2216,7 @@ def writeSupportedExtensions(apiName, api, filename):
 
 		return result
 
+	isSC			= api.apiName == 'vulkansc'
 	instanceMap		= {}
 	deviceMap		= {}
 
@@ -1789,7 +2230,7 @@ def writeSupportedExtensions(apiName, api, filename):
 		minor		= int(ext.promotedto[-1])
 		currVersion = "VK_API_VERSION_" + ext.promotedto[-3:]
 		# VulkanSC is based on Vulkan 1.2. Any Vulkan version greater than 1.2 should be excluded
-		if apiName=='SC' and major==1 and minor>2:
+		if isSC and major==1 and minor>2:
 			continue
 		if ext.type == 'instance':
 			list = instanceMap.get(currVersion)
@@ -1799,7 +2240,7 @@ def writeSupportedExtensions(apiName, api, filename):
 			deviceMap[currVersion] = list + [ext] if list else [ext]
 
 	# add list of extensions missing in Vulkan SC specification
-	if apiName == 'SC':
+	if isSC:
 		for extensionName, data in api.additionalExtensionData:
 			# make sure that this extension was registered
 			if 'register_extension' not in data.keys():
@@ -1808,25 +2249,28 @@ def writeSupportedExtensions(apiName, api, filename):
 			# note that register_extension section is also required for partialy promoted extensions like VK_EXT_extended_dynamic_state2
 			# but those extensions should not fill 'core' tag
 			match = re.match("(\d).(\d).(\d).(\d)", data['register_extension']['core'])
-			if match != None:
-				currVersion = Version([int(match.group(1)), int(match.group(2)), int(match.group(3)), int(match.group(4))])
-				ext = Extension(extensionName, 0, 0, 0, 0, 0, 0, 0, 0, 0)
-				if currVersion.api==0 and currVersion.major==1 and currVersion.minor>2:
-					continue
-				if data['register_extension']['type'] == 'instance':
-					list = instanceMap.get(currVersion)
-					instanceMap[currVersion] = list + [ext] if list else [ext]
-				else:
-					list = deviceMap.get(currVersion)
-					deviceMap[currVersion] = list + [ext] if list else [ext]
+			if match == None:
+				continue
+			major = int(match.group(2))
+			minor = int(match.group(3))
+			if major==1 and minor>2:
+				continue
+			currVersion = f"VK_API_VERSION_{major}_{minor}"
+			ext = Extension(extensionName, 0, 0, 0, 0, 0, 0, 0)
+			if data['register_extension']['type'] == 'instance':
+				list = instanceMap.get(currVersion)
+				instanceMap[currVersion] = list + [ext] if list else [ext]
+			else:
+				list = deviceMap.get(currVersion)
+				deviceMap[currVersion] = list + [ext] if list else [ext]
 
 	lines = [
 	"",
-	"void getCoreDeviceExtensionsImpl (uint32_t coreVersion, ::std::vector<const char*>&%s)" % (" dst" if len(deviceMap) != 0 or apiName == 'SC' else ""),
+	"void getCoreDeviceExtensionsImpl (uint32_t coreVersion, ::std::vector<const char*>&%s)" % (" dst" if len(deviceMap) != 0 or isSC else ""),
 	"{"] + writeExtensionsForVersions(deviceMap) + [
 	"}",
 	"",
-	"void getCoreInstanceExtensionsImpl (uint32_t coreVersion, ::std::vector<const char*>&%s)" % (" dst" if len(instanceMap) != 0 or apiName == 'SC' else ""),
+	"void getCoreInstanceExtensionsImpl (uint32_t coreVersion, ::std::vector<const char*>&%s)" % (" dst" if len(instanceMap) != 0 or isSC else ""),
 	"{"] + writeExtensionsForVersions(instanceMap) + [
 	"}",
 	""]
@@ -1851,14 +2295,17 @@ def writeExtensionFunctions (api, filename):
 		isFirstWrite = True
 		dg_list = []	# Device groups functions need special casing, as Vulkan 1.0 keeps them in VK_KHR_device_groups whereas 1.1 moved them into VK_KHR_swapchain
 		if functionType == Function.TYPE_INSTANCE:
-			yield 'void getInstanceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)\n{'
+			yield 'void getInstanceExtensionFunctions (uint32_t apiVersion, const std::vector<std::string> vIEP, const std::vector<std::string> vDEP, const std::string extName, ::std::vector<const char*>& functions)\n{'
+			yield '\t(void)vIEP;\n(void)vDEP;'
 			dg_list = ["vkGetPhysicalDevicePresentRectanglesKHR"]
 		elif functionType == Function.TYPE_DEVICE:
-			yield 'void getDeviceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)\n{'
+			yield 'void getDeviceExtensionFunctions (uint32_t apiVersion, const std::vector<std::string> vIEP, const std::vector<std::string> vDEP, const std::string extName, ::std::vector<const char*>& functions)\n{'
+			yield '\t(void)vIEP;\n(void)vDEP;'
 			dg_list = ["vkGetDeviceGroupPresentCapabilitiesKHR", "vkGetDeviceGroupSurfacePresentModesKHR", "vkAcquireNextImage2KHR"]
 		for ext in api.extensions:
-			funcNames = []
+			parsedRequirements = []
 			for requirement in ext.requirementsList:
+				funcNames = []
 				for requiredCommand in requirement.newCommands:
 					commandName = requiredCommand.name
 					# find function that has specified name
@@ -1871,23 +2318,44 @@ def writeExtensionFunctions (api, filename):
 								if aliasName == commandName:
 									func = f
 									break
+							if func:
+								break
 					else:
 						func = funcList[0]
+					if func == None:
+						if api.apiName == "vulkansc":
+							continue
+						# something went wrong, for "vulkan" func should always be found
+						logging.error("%s in %s not valid" % (commandName, ext.name))
+						assert(False)
 					if func.getType() == functionType:
-						# only add functions with same vendor as extension
-						# this is a workaroudn for entrypoints requiring more
-						# than one excetions and lack of the dependency in vk.xml
-						vendor = ext.name.split('_')[1]
-						if func.name.endswith(vendor):
-							funcNames.append(func.name)
+						funcNames.append(commandName)
+				condition = None
+				if requirement.depends is not None:
+					try:
+						condition = transformDependsToCondition(requirement.depends, api, 'checkVersion(%s, %s, apiVersion)', 'extensionIsSupported(%s, "%s")')
+					except Exception as e:
+						if api.apiName != "vulkansc":
+							raise e
+				parsedRequirements.append((requirement.depends, condition, funcNames))
 			if ext.name:
 				yield '\tif (extName == "%s")' % ext.name
 				yield '\t{'
-				for funcName in funcNames:
-					if funcName in dg_list:
-						yield '\t\tif(apiVersion >= VK_API_VERSION_1_1) functions.push_back("%s");' % funcName
-					else:
-						yield '\t\tfunctions.push_back("%s");' % funcName
+				for depends, condition, funcNames in parsedRequirements:
+					if len(funcNames) == 0:
+						continue
+					indent = '\t\t'
+					if depends is not None:
+						yield '\t\t// Dependencies: %s' % depends
+						yield '\t\tif (%s) {' % condition
+						indent = '\t\t\t'
+					for funcName in funcNames:
+						if funcName in dg_list:
+							yield '%sif(apiVersion >= VK_API_VERSION_1_1) functions.push_back("%s");' % (indent, funcName)
+						else:
+							yield '%sfunctions.push_back("%s");' % (indent, funcName)
+					if depends is not None:
+						yield '\t\t}'
 				if ext.name == "VK_KHR_device_group":
 					for dg_func in dg_list:
 						yield '\t\tif(apiVersion < VK_API_VERSION_1_1) functions.push_back("%s");' % dg_func
@@ -1898,7 +2366,28 @@ def writeExtensionFunctions (api, filename):
 			yield '\tDE_FATAL("Extension name not found");'
 			yield '}'
 
+	def genHelperFunctions():
+		yield 'bool checkVersion(deUint32 major, deUint32 minor, const uint32_t testedApiVersion)'
+		yield '{'
+		yield '\tuint32_t testedMajor = VK_API_VERSION_MAJOR(testedApiVersion);'
+		yield '\tuint32_t testedMinor = VK_API_VERSION_MINOR(testedApiVersion);'
+		yield '\t// return true when tested api version is greater'
+		yield '\t// or equal to version represented by two uints'
+		yield '\tif (major == testedMajor)'
+		yield '\t\treturn minor <= testedMinor;'
+		yield '\treturn major < testedMajor;'
+		yield '}\n'
+		yield 'bool extensionIsSupported(const std::vector<std::string> extNames, const std::string& ext)'
+		yield '{'
+		yield '\tfor (const std::string& supportedExtension : extNames)'
+		yield '\t{'
+		yield '\t\tif (supportedExtension == ext) return true;'
+		yield '\t}'
+		yield '\treturn false;'
+		yield '}\n'
+
 	lines = ['']
+	lines.extend(genHelperFunctions())
 	for line in writeExtensionFunctions(Function.TYPE_INSTANCE):
 		lines += [line]
 	lines += ['']
@@ -1946,10 +2435,14 @@ def writeCoreFunctionalities(api, filename):
 			# search for data of this function in all functions list
 			functionData = None
 			for f in api.functions:
-				if functionName == f.name:
+				if functionName == f.name or functionName in f.aliasList:
 					functionData = f
 					break
-			assert(functionData != None)
+			if functionData == None:
+				if api.apiName == "vulkansc":
+					continue
+				# something went wrong, for "vulkan" functionData should always be found
+				assert(False)
 			# add line coresponding to this function
 			functionLines.append('\tapis[{0}].push_back(FunctionInfo("' + functionName + '",\t' + functionOriginValues[functionData.getType()] + '));')
 		# functions for every api version should also include all functions from previous versions
@@ -1961,6 +2454,7 @@ def writeCoreFunctionalities(api, filename):
 	writeInlFile(filename, INL_HEADER, lines)
 
 def camelToSnake(name):
+	name = re.sub('([a-z])([23])D([A-Z])', r'\1_\2d\3', name)
 	name = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
 	return re.sub('([a-z0-9])([A-Z])', r'\1_\2', name).lower()
 
@@ -2013,7 +2507,7 @@ def writeDeviceFeatures2(api, filename):
 								# check if extension was promoted to vulkan version or other extension
 								if 'VK_VERSION' in extension.promotedto:
 									versionSplit = extension.promotedto.split('_')
-									structureDetail.api		= 0					# TODO handle this for Vulkan SC
+									structureDetail.api		= 0 if api.apiName == "vulkan" else 1
 									structureDetail.major	= versionSplit[-2]
 									structureDetail.minor	= versionSplit[-1]
 								else:
@@ -2021,6 +2515,7 @@ def writeDeviceFeatures2(api, filename):
 							raise StructureFoundContinueToNextOne
 		except StructureFoundContinueToNextOne:
 			continue
+	structureDetailToRemove = []
 	for structureDetail in testedStructureDetail:
 		if structureDetail.major is not None:
 			continue
@@ -2030,13 +2525,19 @@ def writeDeviceFeatures2(api, filename):
 		for feature in api.features:
 			for requirement in feature.requirementsList:
 				if structureName in requirement.typeList:
-					versionSplit = feature.name.split('_')
-					structureDetail.api		= 0							# TODO handle this for Vulkan SC
-					structureDetail.major	= versionSplit[-2]
-					structureDetail.minor	= versionSplit[-1]
+					if api.apiName == "vulkansc" and int(feature.number[-1]) > 2:
+						structureDetailToRemove.append(structureDetail)
+					else:
+						versionSplit = feature.name.split('_')
+						structureDetail.api		= 0 if api.apiName == "vulkan" else 1
+						structureDetail.major	= versionSplit[-2]
+						structureDetail.minor	= versionSplit[-1]
 					break
 			if structureDetail.major is not None:
 				break
+	# remove structures that should not be tested for given api version
+	for sd in structureDetailToRemove:
+		testedStructureDetail.remove(sd)
 	# generate file content
 	structureDefinitions = []
 	featureEnabledFlags = []
@@ -2059,7 +2560,7 @@ def writeDeviceFeatures2(api, filename):
 			condition = ' ' if condition == '' else condition + ' || '
 			condition += 'context.contextSupports(vk::ApiVersion(' + str(structureDetail.api) + ', ' + str(major) + ', ' + str(structureDetail.minor) + ', 0))'
 		if condition == '':
-			condition = 'true'
+			condition = ' true'
 		condition += ';'
 		nameSpacing = '\t' * int((len(structureName) - 4) / 4)
 		featureEnabledFlags.append('const bool' + nameSpacing + structureDetail.flagName + ' =' + condition)
@@ -2125,27 +2626,28 @@ def writeDeviceFeatures2(api, filename):
 
 	allApiVersions = [f.number for f in api.features]
 	promotedTests = []
-	for feature in api.features:
-		major = feature.number[0]
-		minor = feature.number[-1]
-		promotedFeatures = []
-		if feature.name == 'VK_VERSION_1_0':
-			continue
-		for requirement in feature.requirementsList:
-			for type in requirement.typeList:
-				matchedStructType = re.search(f'VkPhysicalDevice(\w+)Features', type, re.IGNORECASE)
-				matchedCoreStructType = re.search(f'VkPhysicalDeviceVulkan(\d+)Features', type, re.IGNORECASE)
-				if matchedStructType and not matchedCoreStructType:
-					promotedFeatures.append(type)
-		if promotedFeatures:
-			testName = "createDeviceWithPromoted" + feature.number.replace('.', '') + "Structures"
-			promotedTests.append(testName)
-			stream.append("tcu::TestStatus " + testName + " (Context& context)")
-			stream.append("{")
-			stream.append(
-			'	if (!context.contextSupports(vk::ApiVersion(0, ' + major + ', ' + minor + ', 0)))\n'
-			'		TCU_THROW(NotSupportedError, "Vulkan ' + major + '.' + minor + ' is not supported");')
-			stream.append("""
+	if api.apiName == "vulkan":
+		for feature in api.features:
+			major = feature.number[0]
+			minor = feature.number[-1]
+			promotedFeatures = []
+			if feature.name == 'VK_VERSION_1_0':
+				continue
+			for requirement in feature.requirementsList:
+				for type in requirement.typeList:
+					matchedStructType = re.search(f'VkPhysicalDevice(\w+)Features', type, re.IGNORECASE)
+					matchedCoreStructType = re.search(f'VkPhysicalDeviceVulkan(\d+)Features', type, re.IGNORECASE)
+					if matchedStructType and not matchedCoreStructType:
+						promotedFeatures.append(type)
+			if promotedFeatures:
+				testName = "createDeviceWithPromoted" + feature.number.replace('.', '') + "Structures"
+				promotedTests.append(testName)
+				stream.append("tcu::TestStatus " + testName + " (Context& context)")
+				stream.append("{")
+				stream.append(
+				'	if (!context.contextSupports(vk::ApiVersion(0, ' + major + ', ' + minor + ', 0)))\n'
+				'		TCU_THROW(NotSupportedError, "Vulkan ' + major + '.' + minor + ' is not supported");')
+				stream.append("""
 	const PlatformInterface&		platformInterface	= context.getPlatformInterface();
 	const CustomInstance			instance			(createCustomInstanceFromContext(context));
 	const InstanceDriver&			instanceDriver		(instance.getDriver());
@@ -2167,22 +2669,22 @@ def writeDeviceFeatures2(api, filename):
 		&queuePriority,							//pQueuePriorities;
 	};
 """)
-			lastFeature = ''
-			usedFeatures = []
-			for feature in promotedFeatures:
-				for struct in testedStructureDetail:
-					if (struct.instanceName in usedFeatures):
-						continue
-					if feature in struct.nameList:
-						if lastFeature:
-							stream.append("\t" + feature + " " + struct.instanceName + " = initVulkanStructure(&" + lastFeature + ");")
-						else:
-							stream.append("\t" + feature + " " + struct.instanceName + " = initVulkanStructure();")
-						lastFeature = struct.instanceName
-						usedFeatures.append(struct.instanceName)
-						break
-			stream.append("\tVkPhysicalDeviceFeatures2 extFeatures = initVulkanStructure(&" + lastFeature + ");")
-			stream.append("""
+				lastFeature = ''
+				usedFeatures = []
+				for feature in promotedFeatures:
+					for struct in testedStructureDetail:
+						if (struct.instanceName in usedFeatures):
+							continue
+						if feature in struct.nameList:
+							if lastFeature:
+								stream.append("\t" + feature + " " + struct.instanceName + " = initVulkanStructure(&" + lastFeature + ");")
+							else:
+								stream.append("\t" + feature + " " + struct.instanceName + " = initVulkanStructure();")
+							lastFeature = struct.instanceName
+							usedFeatures.append(struct.instanceName)
+							break
+				stream.append("\tVkPhysicalDeviceFeatures2 extFeatures = initVulkanStructure(&" + lastFeature + ");")
+				stream.append("""
 	instanceDriver.getPhysicalDeviceFeatures2 (physicalDevice, &extFeatures);
 
 	const VkDeviceCreateInfo		deviceCreateInfo =
@@ -2200,7 +2702,7 @@ def writeDeviceFeatures2(api, filename):
 	};
 
 	const Unique<VkDevice>			device			(createCustomDevice(context.getTestContext().getCommandLine().isValidationEnabled(), platformInterface, instance, instanceDriver, physicalDevice, &deviceCreateInfo));
-	const DeviceDriver				deviceDriver	(platformInterface, instance, device.get());
+	const DeviceDriver				deviceDriver	(platformInterface, instance, device.get(), context.getUsedApiVersion(), context.getTestContext().getCommandLine());
 	const VkQueue					queue			= getDeviceQueue(deviceDriver, *device, queueFamilyIndex, queueIndex);
 
 	VK_CHECK(deviceDriver.queueWaitIdle(queue));
@@ -2212,9 +2714,9 @@ def writeDeviceFeatures2(api, filename):
 	# function to create tests
 	stream.append("void addSeparateFeatureTests (tcu::TestCaseGroup* testGroup)\n{")
 	for x in testedStructureDetail:
-		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x.instanceName[len('device'):]) + '", "' + x.nameList[0] + '", testPhysicalDeviceFeature' + x.instanceName[len('device'):] + ');')
+		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x.instanceName[len('device'):]) + '", testPhysicalDeviceFeature' + x.instanceName[len('device'):] + ');')
 	for x in promotedTests:
-		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x) + '", "", ' + x + ');')
+		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x) + '", ' + x + ');')
 	stream.append('}\n')
 
 	# write out
@@ -2260,7 +2762,7 @@ def generateDeviceFeaturesOrPropertiesDefs(api, FeaturesOrProperties):
 						structureTypeName = structureType.name
 						break
 				# use data in structextends to skip structures that should not be passed to vkGetPhysicalDeviceProperties(/Features)2 function
-				if structureType.structextends is None or structureExtendsPattern not in structureType.structextends:
+				if structureType is None or structureType.structextends is None or structureExtendsPattern not in structureType.structextends:
 					continue
 				# meke sure that structure was not added earlier - this handles special
 				# cases like VkPhysicalDeviceIDPropertiesKHR added by 3 extensions
@@ -2294,64 +2796,6 @@ def generateDeviceFeaturesOrPropertiesDefs(api, FeaturesOrProperties):
 			matchedStructEnum = re.search(structureEnumPatternNotExtension, ct.members[0].values, re.IGNORECASE)
 			if (matchedStructEnum.group(1) not in foundStructureEnums) and (re.match(structureTypeToSkipPattern, ct.name) == None):
 				defs.append( (matchedStructEnum.group(1), '', '', ct.name, None, None, '0') )
-	return defs
-
-def generateDevicePropertiesDefs(apiName, src):
-	# look for definitions
-	ptrnSType	= r'VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_(\w+)_PROPERTIES(\w*)\s*='
-	matches		= re.findall(ptrnSType, src, re.M)
-	matches		= sorted(matches, key=lambda m: m[0])
-	# hardcoded list of core extensions having properties and missing from Vulkan SC
-	missingVulkanSCExt = \
-		'#define VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME \"VK_KHR_depth_stencil_resolve\"\n' \
-		'#define VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME \"VK_EXT_descriptor_indexing\"\n' \
-		'#define VK_KHR_DRIVER_PROPERTIES_EXTENSION_NAME \"VK_KHR_driver_properties\"\n' \
-		'#define VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME \"VK_KHR_shader_float_controls\"\n' \
-		'#define VK_KHR_MAINTENANCE3_EXTENSION_NAME \"VK_KHR_maintenance3\"\n' \
-		'#define VK_KHR_MULTIVIEW_EXTENSION_NAME   \"VK_KHR_multiview\"\n' \
-		'#define VK_EXT_SAMPLER_FILTER_MINMAX_EXTENSION_NAME \"VK_EXT_sampler_filter_minmax\"\n' \
-		'#define VK_KHR_TIMELINE_SEMAPHORE_EXTENSION_NAME \"VK_KHR_timeline_semaphore\"\n'
-	# construct final list
-	defs = []
-	for sType, sSuffix in matches:
-		# handle special cases
-		if sType in {'VULKAN_1_1', 'VULKAN_1_2', 'VULKAN_1_3', 'VULKAN_SC_1_0', 'GROUP', 'MEMORY_BUDGET', 'MEMORY', 'TOOL'}:
-			continue
-		# there are cases like VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SHADER_CORE_PROPERTIES_2_AMD
-		# where 2 is after PROPERTIES - to handle this we need to split suffix to two parts
-		sVerSuffix = ''
-		sExtSuffix = sSuffix
-		suffixStart = sSuffix.rfind('_')
-		if suffixStart > 0:
-			sVerSuffix = sSuffix[:suffixStart]
-			sExtSuffix = sSuffix[suffixStart:]
-		# handle special case
-		if sType == "ID":
-			structName	= sType
-		else:
-			structName	= re.sub("[_0-9][a-z]", lambda match: match.group(0).upper(), sType.capitalize()).replace('_', '')
-		ptrnStructName		= r'\s*typedef\s+struct\s+(VkPhysicalDevice' + structName + 'Properties' + sSuffix.replace('_', '') + ')'
-		matchStructName		= re.search(ptrnStructName, src, re.M)
-		if matchStructName:
-			extType = sType
-			if apiName == 'SC':
-				if extType == "MAINTENANCE_3":
-					extType = "MAINTENANCE3"
-				elif extType == "MAINTENANCE_4":
-					extType = "MAINTENANCE4"
-				elif extType == "POINT_CLIPPING":
-					extType = "MAINTENANCE2"
-			# end handling special cases
-			ptrnExtensionName	= r'^\s*#define\s+(\w+' + sExtSuffix + '_' + extType + sVerSuffix +'[_0-9]*_EXTENSION_NAME).+$'
-			matchExtensionName	= re.search(ptrnExtensionName, src, re.M)
-			if matchExtensionName is None and apiName=='SC':
-				matchExtensionName	= re.search(ptrnExtensionName, missingVulkanSCExt, re.M)
-			ptrnSpecVersion		= r'^\s*#define\s+(\w+' + sExtSuffix + '_' + extType + sVerSuffix + '[_0-9]*_SPEC_VERSION).+$'
-			matchSpecVersion	= re.search(ptrnSpecVersion, src, re.M)
-			defs.append( (sType, sVerSuffix, sExtSuffix, matchStructName.group(1), \
-							matchExtensionName.group(0)	if matchExtensionName	else None,
-							matchExtensionName.group(1)	if matchExtensionName	else None,
-							matchSpecVersion.group	(1)	if matchSpecVersion		else '0') )
 	return defs
 
 def writeDeviceFeatures(api, dfDefs, filename):
@@ -2416,7 +2860,7 @@ def writeDeviceFeatures(api, dfDefs, filename):
 		extensionNameDefinition = extNameDef
 		if not extensionNameDefinition:
 			extensionNameDefinition = 'DECL{0}_{1}_EXTENSION_NAME'.format((sExtSuffix if sExtSuffix else ''), sType)
-			extensionDefines.append(f'#define {extensionNameDefinition} "not_existent_feature"')
+			extensionDefines.append(f'#define {extensionNameDefinition} "core_feature"')
 		# construct makeFeatureDesc template function definitions
 		sTypeName = "VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_{0}_FEATURES{1}".format(sType, sVerSuffix + sExtSuffix)
 		makeFeatureDescDefinitions.append("template<> FeatureDesc makeFeatureDesc<{0}>(void) " \
@@ -2474,7 +2918,7 @@ def writeDeviceFeatures(api, dfDefs, filename):
 	stream.append('} // vk\n')
 	writeInlFile(filename, INL_HEADER, stream)
 
-def writeDeviceFeatureTest(apiName, api, filename):
+def writeDeviceFeatureTest(api, filename):
 
 	coreFeaturesPattern = re.compile("^VkPhysicalDeviceVulkan([1-9][0-9])Features[0-9]*$")
 	featureItems = []
@@ -2507,21 +2951,16 @@ tcu::TestStatus createDeviceWithUnsupportedFeaturesTest{4} (Context& context)
 	const DeviceFeatures					deviceFeaturesAll		(context.getInstanceInterface(), context.getUsedApiVersion(), physicalDevice, context.getInstanceExtensions(), context.getDeviceExtensions(), DE_TRUE);
 	const VkPhysicalDeviceFeatures2			deviceFeatures2			= deviceFeaturesAll.getCoreFeatures2();
 	int										numErrors				= 0;
-	bool                                                                    isSubProcess                    = context.getTestContext().getCommandLine().isSubProcess();
+	const tcu::CommandLine&					commandLine				= context.getTestContext().getCommandLine();
+	bool									isSubProcess			= context.getTestContext().getCommandLine().isSubProcess();
 {6}
 
 	VkPhysicalDeviceFeatures emptyDeviceFeatures;
 	deMemset(&emptyDeviceFeatures, 0, sizeof(emptyDeviceFeatures));
 
 	// Only non-core extensions will be used when creating the device.
-	vector<const char*>	coreExtensions;
-	getCoreDeviceExtensions(context.getUsedApiVersion(), coreExtensions);
-	vector<string> nonCoreExtensions(removeExtensions(context.getDeviceExtensions(), coreExtensions));
-
-	vector<const char*> extensionNames;
-	extensionNames.reserve(nonCoreExtensions.size());
-	for (const string& extension : nonCoreExtensions)
-		extensionNames.push_back(extension.c_str());
+	const auto& extensionNames = context.getDeviceCreationExtensions();
+	DE_UNREF(extensionNames); // In some cases this is not used.
 
 	if (const void* featuresStruct = findStructureInChain(const_cast<const void*>(deviceFeatures2.pNext), getStructureType<{0}>()))
 	{{
@@ -2530,7 +2969,7 @@ tcu::TestStatus createDeviceWithUnsupportedFeaturesTest{4} (Context& context)
 {1}
 		}};
 		auto* supportedFeatures = reinterpret_cast<const {0}*>(featuresStruct);
-		checkFeatures(vkp, instance, instanceDriver, physicalDevice, {2}, features, supportedFeatures, queueFamilyIndex, queueCount, queuePriority, numErrors, resultCollector, {3}, emptyDeviceFeatures, {5});
+		checkFeatures(vkp, instance, instanceDriver, physicalDevice, {2}, features, supportedFeatures, queueFamilyIndex, queueCount, queuePriority, numErrors, resultCollector, {3}, emptyDeviceFeatures, {5}, context.getUsedApiVersion(), commandLine);
 	}}
 
 	if (numErrors > 0)
@@ -2539,8 +2978,8 @@ tcu::TestStatus createDeviceWithUnsupportedFeaturesTest{4} (Context& context)
 		return tcu::TestStatus(resultCollector.getResult(), resultCollector.getMessage());
 }}
 """
-		additionalParams = ( 'memReservationStatMax, isSubProcess' if apiName == 'SC' else 'isSubProcess' )
-		additionalDefs = ( '	VkDeviceObjectReservationCreateInfo memReservationStatMax = context.getResourceInterface()->getStatMax();' if apiName == 'SC' else '')
+		additionalParams = ( 'memReservationStatMax, isSubProcess' if api.apiName == 'vulkansc' else 'isSubProcess' )
+		additionalDefs = ( '	VkDeviceObjectReservationCreateInfo memReservationStatMax = context.getResourceInterface()->getStatMax();' if apiName == 'vulkansc' else '')
 		featureItems.append(testBlock.format(structureType.name, "\n".join(items), len(items), ("DE_NULL" if coreFeaturesPattern.match(structureType.name) else "&extensionNames"), structureType.name[len('VkPhysicalDevice'):], additionalParams, additionalDefs))
 
 		testFunctions.append("createDeviceWithUnsupportedFeaturesTest" + structureType.name[len('VkPhysicalDevice'):])
@@ -2552,7 +2991,7 @@ void addSeparateUnsupportedFeatureTests (tcu::TestCaseGroup* testGroup)
 {
 """)
 	for x in testFunctions:
-		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x[len('createDeviceWithUnsupportedFeaturesTest'):]) + '", "' + x + '", ' + x + ');')
+		stream.append('\taddFunctionCase(testGroup, "' + camelToSnake(x[len('createDeviceWithUnsupportedFeaturesTest'):]) + '", ' + x + ');')
 	stream.append('}\n')
 
 	writeInlFile(filename, INL_HEADER, stream)
@@ -2688,10 +3127,54 @@ def writeDeviceProperties(api, dpDefs, filename):
 	stream.append('} // vk\n')
 	writeInlFile(filename, INL_HEADER, stream)
 
+UNSUFFIXED_STRUCTURES = [
+	"CornerSampledImage",
+	"ShaderSMBuiltins",
+	"ShadingRateImage",
+	"RayTracing",
+	"RepresentativeFragmentTest",
+	"ComputeShaderDerivatives",
+	"MeshShader",
+	"ShaderImageFootprint",
+	"ExclusiveScissor",
+	"DedicatedAllocationImageAliasing",
+	"CoverageReductionMode",
+	"DeviceGeneratedCommands",
+	"InheritedViewportScissor",
+	"PresentBarrier",
+	"DiagnosticsConfig",
+	"FragmentShadingRateEnums",
+	"RayTracingMotionBlur",
+	"ExternalMemoryRDMA",
+	"CopyMemoryIndirect",
+	"MemoryDecompression",
+	"LinearColorAttachment",
+	"OpticalFlow",
+	"RayTracingInvocationReorder",
+	"DisplacementMicromap"]
+
+def deviceFeaturesOrPropertiesGetter(name):
+	result = name[16:] # Remove VkPhysicalDevice prefix
+	if result[-3:] == "KHR":
+		result = result[0:-3]
+	elif result[-2:] == "NV":
+		suffix = result[-2:]
+		result = result[0:-2]
+		if result[-8:] == "Features":
+			infix = result[-8:]
+			result = result[0:-8]
+		elif result[-10:] == "Properties":
+			infix = result[-10:]
+			result = result[0:-10]
+		if (result in UNSUFFIXED_STRUCTURES):
+			suffix = ""
+		result = result + infix + suffix
+	return result
+
 def genericDeviceFeaturesWriter(dfDefs, pattern, filename):
 	stream = []
 	for _, _, _, extStruct, _, _, _ in dfDefs:
-		nameSubStr = extStruct.replace("VkPhysicalDevice", "").replace("KHR", "").replace("NV", "")
+		nameSubStr = deviceFeaturesOrPropertiesGetter(extStruct)
 		stream.append(pattern.format(extStruct, nameSubStr))
 	writeInlFile(filename, INL_HEADER, indentLines(stream))
 
@@ -2710,9 +3193,7 @@ def writeDeviceFeaturesContextDefs(dfDefs, filename):
 def genericDevicePropertiesWriter(dfDefs, pattern, filename):
 	stream = []
 	for _, _, _, extStruct, _, _, _ in dfDefs:
-		nameSubStr = extStruct.replace("VkPhysicalDevice", "").replace("KHR", "").replace("NV", "")
-		if extStruct == "VkPhysicalDeviceRayTracingPropertiesNV":
-			nameSubStr += "NV"
+		nameSubStr = deviceFeaturesOrPropertiesGetter(extStruct)
 		stream.append(pattern.format(extStruct, nameSubStr))
 	writeInlFile(filename, INL_HEADER, indentLines(stream))
 
@@ -2742,44 +3223,67 @@ def writeMandatoryFeatures(api, filename):
 
 	dictStructs = {}
 	dictData = []
+	extData = []
 	usedFeatureStructs = {}
 	for _, data in api.additionalExtensionData:
-		if 'mandatory_features' not in data.keys():
-			continue
-		# sort to have same results for py2 and py3
-		listStructFeatures = sorted(data['mandatory_features'].items(), key=lambda tup: tup[0])
-		for structure, featuresList in listStructFeatures:
-			for featureData in featuresList:
-				# allow for featureless VKSC only extensions
-				if not 'features' in featureData.keys() or 'requirements' not in featureData.keys():
-					continue
-				requirements = featureData['requirements']
+		if 'mandatory_features' in data.keys():
+			# sort to have same results for py2 and py3
+			listStructFeatures = sorted(data['mandatory_features'].items(), key=lambda tup: tup[0])
+			for structure, featuresList in listStructFeatures:
+				for featureData in featuresList:
+					# allow for featureless VKSC only extensions
+					if not 'features' in featureData.keys() or 'requirements' not in featureData.keys():
+						continue
+					requirements = featureData['requirements']
 
-				mandatory_variant = ''
-				try:
-					mandatory_variant = featureData['mandatory_variant']
-				except KeyError:
 					mandatory_variant = ''
+					try:
+						mandatory_variant = featureData['mandatory_variant']
+					except KeyError:
+						mandatory_variant = ''
 
-				dictData.append( [ structure, featureData['features'], requirements, mandatory_variant] )
+					dictData.append( [ structure, featureData['features'], requirements, mandatory_variant] )
 
-				if structure == 'VkPhysicalDeviceFeatures':
+					if structure == 'VkPhysicalDeviceFeatures':
+						continue
+
+					# if structure is not in dict construct name of variable and add is as a first item
+					if (structure not in dictStructs):
+						dictStructs[structure] = ([structure[2:3].lower() + structure[3:]], mandatory_variant)
+					# add first requirement if it is unique
+					if requirements and (requirements[0] not in dictStructs[structure][0]):
+						dictStructs[structure][0].append(requirements[0])
+
+					usedFeatureStructs[structure] = []
+
+					if requirements:
+						for req in requirements:
+							if '.' in req:
+								req = req.split('.')[0]
+								reqStruct = 'Vk' + req[0].upper() + req[1:]
+								usedFeatureStructs[reqStruct] = []
+
+		if 'mandatory_extensions' in data:
+			mandatoryExtensions = []
+			for mandatoryExt in data['mandatory_extensions']:
+				if 'extension' in mandatoryExt:
+					extName = mandatoryExt.pop('extension')
+					mandatoryExtensions.append((extName, mandatoryExt))
+
+			for extension, extensionData in mandatoryExtensions:
+				# requirements are actually mandatory.
+				if 'requirements' not in extensionData:
 					continue
 
-				# if structure is not in dict construct name of variable and add is as a first item
-				if (structure not in dictStructs):
-					dictStructs[structure] = ([structure[2:3].lower() + structure[3:]], mandatory_variant)
-				# add first requirement if it is unique
-				if requirements and (requirements[0] not in dictStructs[structure][0]):
-					dictStructs[structure][0].append(requirements[0])
+				requirements = extensionData['requirements']
+				mandatory_variant = '' if 'mandatory_variant' not in extensionData else extensionData['mandatory_variant']
+				extData.append((extension, requirements, mandatory_variant))
 
-				usedFeatureStructs[structure] = []
-
-				if requirements:
-					for req in requirements:
-						if '.' in req:
-							reqStruct = 'Vk' + req[0].upper() + req[1:]
-							usedFeatureStructs[reqStruct] = []
+				for req in requirements:
+					if '.' in req:
+						req = req.split('.')[0]
+						reqStruct = 'Vk' + req[0].upper() + req[1:]
+						usedFeatureStructs[reqStruct] = []
 
 	stream.extend(['bool canUseFeaturesStruct (const vector<VkExtensionProperties>& deviceExtensions, uint32_t usedApiVersion, const char* extension)',
 				   '{',
@@ -2825,8 +3329,12 @@ def writeMandatoryFeatures(api, filename):
 
 	structList = sorted(usedFeatureStructs.items(), key=lambda tup: tup[0]) # sort to have same results for py2 and py3
 	apiStructs = list( filter(lambda x : structInAPI(x[0]), structList)) # remove items not defined in current API
+	varVariants = {} # Some variables are going to be declared only for specific variants.
 
 	for structName, extensions in apiStructs:
+		# The variable name will be the structure name without the Vk prefix and starting in lowercase.
+		newVar = structName[2].lower() + structName[3:]
+
 		metaCondition = ''
 		if structName in dictStructs:
 			mandatoryVariantList = dictStructs[structName][1]
@@ -2834,9 +3342,7 @@ def writeMandatoryFeatures(api, filename):
 				mandatoryVariant = mandatoryVariantList[0]
 				metaCondition = 'defined(CTS_USES_' + mandatoryVariant.upper() + ')'
 				stream.append('#if ' + metaCondition)
-
-		# The variable name will be the structure name without the Vk prefix and starting in lowercase.
-		newVar = structName[2].lower() + structName[3:]
+				varVariants[newVar] = mandatoryVariant
 
 		stream.extend(['\tvk::' + structName + ' ' + newVar + ';',
 					'\tdeMemset(&' + newVar + ', 0, sizeof(' + newVar + '));',
@@ -2849,18 +3355,17 @@ def writeMandatoryFeatures(api, filename):
 				canUseCond += 'canUseFeaturesStruct(deviceExtensions, usedApiVersion, "' + extName + '")'
 			canUseCond += ' )'
 			stream.append(canUseCond)
-		else:
+		elif api.apiName == "vulkan" and structName in dictStructs:
 			#reqs = v[0][1:]
-			if structName in dictStructs:
-				reqs = dictStructs[structName][0][1:]
-				cond = 'if ( '
-				for i, req in enumerate(reqs):
-					if i > 0:
-						cond = cond + ' || '
-					if (req.startswith("ApiVersion")):
-						cond = cond + 'context.contextSupports(vk::' + req + ')'
-				cond = cond + ' )'
-				stream.append('\t' + cond)
+			reqs = dictStructs[structName][0][1:]
+			cond = 'if ( '
+			for i, req in enumerate(reqs):
+				if i > 0:
+					cond = cond + ' || '
+				if (req.startswith("ApiVersion")):
+					cond = cond + 'context.contextSupports(vk::' + req + ')'
+			cond = cond + ' )'
+			stream.append('\t' + cond)
 
 		stream.extend(['\t{',
 					   '\t\t' + newVar + '.sType = getStructureType<' + structName + '>();',
@@ -2880,8 +3385,8 @@ def writeMandatoryFeatures(api, filename):
 	for v in dictData:
 		if not structInAPI(v[0]): # remove items not defined in current API ( important for Vulkan SC )
 			continue
-		structType = v[0];
-		structName = 'coreFeatures.features';
+		structType = v[0]
+		structName = 'coreFeatures.features'
 		metaCondition = ''
 		if len(v) == 4 and v[3] != '':
 			# for x in v[3].split('_'):
@@ -2904,7 +3409,12 @@ def writeMandatoryFeatures(api, filename):
 			stream.append('\t' + condition)
 		stream.append('\t{')
 		# Don't need to support an AND case since that would just be another line in the .txt
+		reqMetaCondition = ''
 		if len(v[1]) == 1:
+			# If the req struct type has a mandatory variant we need to add an #ifdef block, unless we're already inside one.
+			if len(metaCondition) == 0 and structName in varVariants:
+				reqMetaCondition = 'defined(CTS_USES_' + varVariants[structName].upper() + ')'
+				stream.append('#if ' + reqMetaCondition)
 			stream.append('\t\tif ( ' + structName + '.' + v[1][0] + ' == VK_FALSE )')
 		else:
 			condition = 'if ( '
@@ -2918,19 +3428,53 @@ def writeMandatoryFeatures(api, filename):
 		stream.extend(['\t\t{',
 					   '\t\t\tlog << tcu::TestLog::Message << "Mandatory feature ' + featureSet + ' not supported" << tcu::TestLog::EndMessage;',
 					   '\t\t\tresult = false;',
-					   '\t\t}',
-					   '\t}'])
+					   '\t\t}'])
+		if reqMetaCondition != '':
+			stream.append('#endif // ' + reqMetaCondition)
+		stream.append('\t}')
 		if metaCondition != '':
 			stream.extend(['#endif // ' + metaCondition[4:],
 						  ''])
 		else:
 			stream.extend([''])
 
+	for extension, requirements, mandatory_variant in extData:
+		metaCondition = ''
+		if mandatory_variant != '':
+			metaCondition = metaCondition + ' || defined(CTS_USES_' + mandatory_variant[0].upper() + ')'
+			stream.extend(['#if ' + metaCondition[4:]])
+		if len(requirements) > 0 :
+			condition = 'if ( '
+			for i, req in enumerate(requirements) :
+				if (req.startswith("ApiVersion")):
+					condition = condition + 'context.contextSupports(vk::' + req + ')'
+				elif '.' in req:
+					condition = condition + req
+				else:
+					condition = condition + 'isExtensionStructSupported(deviceExtensions, RequiredExtension("' + req + '"))'
+				if i+1 < len(requirements) :
+					condition = condition + ' && '
+			condition = condition + ' )'
+			stream.append('\t' + condition)
+		stream.append('\t{')
+		stream.extend(['\t\tif (!(isExtensionStructSupported(deviceExtensions, RequiredExtension("' + extension + '")) || isCoreDeviceExtension(usedApiVersion, "' + extension + '")))',
+					   '\t\t{',
+					   '\t\t\tlog << tcu::TestLog::Message << "Mandatory extension ' + extension + ' not supported" << tcu::TestLog::EndMessage;',
+					   '\t\t\tresult = false;',
+					   '\t\t}',
+					   '\t}'])
+		if metaCondition != '':
+			stream.extend(['#endif // ' + metaCondition[4:],
+						  ''])
+		else:
+			stream.append('')
+
 	stream.append('\treturn result;')
 	stream.append('}\n')
+
 	writeInlFile(filename, INL_HEADER, stream)
 
-def writeExtensionList(apiName, api, filename, extensionType):
+def writeExtensionList(api, filename, extensionType):
 	extensionList = []
 	for extensionName, data in api.additionalExtensionData:
 		# make sure extension name starts with VK_KHR
@@ -2939,10 +3483,14 @@ def writeExtensionList(apiName, api, filename, extensionType):
 		# make sure that this extension was registered
 		if 'register_extension' not in data.keys():
 			continue
+		# skip extensions that are not supported in Vulkan SC
+		if api.apiName == 'vulkansc':
+			if any(ext.name == extensionName for ext in api.notSupportedExtensions):
+				continue
 		# make sure extension is intended for the vulkan variant
 		is_sc_only = False
 
-		if apiName != 'SC':
+		if api.apiName != 'vulkansc':
 			if 'mandatory_features' in data.keys():
 				for structure, listStruct in data['mandatory_features'].items():
 					for featureData in listStruct:
@@ -2969,52 +3517,123 @@ def writeExtensionList(apiName, api, filename, extensionType):
 	stream.append('};\n')
 	writeInlFile(filename, INL_HEADER, stream)
 
+def transformDependsToCondition(depends, api, checkVersionString, checkExtensionString):
+	depList = re.split(r'(\W+)', depends)
+	for idx, depPart in enumerate(depList):
+		if ',' in depPart:
+			depList[idx] = depList[idx].replace(',', ' || ')
+		elif '+' in depPart:
+			depList[idx] = depList[idx].replace('+', ' && ')
+		elif 'VK_' in depPart:
+			if 'VK_VERSION' in depPart:
+				if idx > 0 and ' || ' in depList[idx-1]:
+					# some vk.xml entries include "promoted to" version preceded by logical OR operator in the extension "depends" attribute
+					# script don't rely on this optional information and will find "promoted to" versions for all dependencies of all extensions in the below code
+					# accordingly the one from vk.xml is ignored to avoid redundant isCompatibile() checks
+					depList[idx-1] = depList[idx-1].replace(' || ', '')
+					depList[idx] = ''
+					continue
+				# when dependency is vulkan version then replace it with proper condition
+				depList[idx] = checkVersionString % (depPart[-3], depPart[-1])
+			else:
+				# when dependency is extension check if it was promoted
+				extNotFound = True
+				for dExt in api.extensions:
+					if depPart == dExt.name:
+						depExtVector = 'vDEP' if dExt.type == 'device' else 'vIEP'
+						isSupportedCheck = checkExtensionString % (depExtVector, depPart)
+						if dExt.promotedto is not None:
+							p = dExt.promotedto
+							# check if dependency was promoted to vulkan version or other extension
+							if 'VK_VERSION' in p:
+								depList[idx] = f'({checkVersionString % (p[-3], p[-1])} || {isSupportedCheck})'
+							else:
+								depList[idx] = f'({checkExtensionString % (depExtVector, depPart)} || {isSupportedCheck})'
+						else:
+							depList[idx] = isSupportedCheck
+						extNotFound = False
+						break
+				# for SC when extension was not found try checking also not supported
+				# extensions and see if this extension is part of core
+				if extNotFound and api.apiName == "vulkansc":
+					for dExt in api.notSupportedExtensions:
+						if depPart == dExt.name:
+							p = dExt.promotedto
+							if p is None:
+								break
+							if int(p[-1]) > 2:
+								break
+							extNotFound = False
+							depList[idx] = "true"
+				if extNotFound:
+					assert False, f"{depPart} from dependencies ({depends}) not found"
+	return ''.join(depList)
+
 def writeApiExtensionDependencyInfo(api, filename):
 
-	def isExtensionInCore(ext, apiMajor, apiMinor):
-		if ext.promotedto is None:
-			return False
-		if 'VK_VERSION' not in ext.promotedto:
-			return False
-		extMajor = ext.promotedto[-3]
-		extMinor = ext.promotedto[-1]
-		if apiMajor > extMajor:
-			return True
-		if apiMajor == extMajor and apiMinor >= extMinor:
-			return True
-		return False
+	def genHelperFunctions():
+		yield 'using namespace tcu;'
+		yield 'using ExtPropVect = std::vector<vk::VkExtensionProperties>;'
+		yield 'using IsSupportedFun = bool (*)(const tcu::UVec2&, const ExtPropVect&, const ExtPropVect&);'
+		yield 'using DependencyCheckVect = std::vector<std::pair<const char*, IsSupportedFun> >;\n'
+		yield 'bool isCompatibile(deUint32 major, deUint32 minor, const tcu::UVec2& testedApiVersion)'
+		yield '{'
+		yield '\t// return true when tested api version is greater'
+		yield '\t// or equal to version represented by two uints'
+		yield '\tif (major == testedApiVersion.x())'
+		yield '\t\treturn minor <= testedApiVersion.y();'
+		yield '\treturn major < testedApiVersion.x();'
+		yield '}\n'
+		yield 'bool isSupported(const ExtPropVect& extensions, const char* ext)'
+		yield '{'
+		yield '\treturn isExtensionStructSupported(extensions, vk::RequiredExtension(ext));'
+		yield '}\n'
 
 	def genExtDepArray(extType):
-		yield 'static const std::tuple<deUint32, deUint32, deUint32, const char*, const char*>\t{}ExtensionDependencies[]\t='.format(extType)
-		yield '{'
-		allApiVersions = [f.number for f in api.features]
+		extensionList = []
+		maxExtLength = 0
+		extVector = 'vIEP'
+		othVector = 'vDEP'
+		if extType == 'device':
+			extVector, othVector = othVector, extVector		# swap
 		# iterate over all extension that are of specified type and that have requirements
 		for ext in api.extensions:
 			if ext.type != extType:
 				continue
-			if ext.requiredExtensions is None:
+			if ext.depends is None:
 				continue
-			apiVariant = '0'
-			# iterate over all api versions
-			for apiVersion in allApiVersions:
-				major, minor = apiVersion.split('.')
-				if ext.requiresCore is not None:
-					requiresCoreMajor, requiresCoreMinor = ext.requiresCore.split('.')
-					if major < requiresCoreMajor or  minor < requiresCoreMinor:
-						continue
-				if isExtensionInCore(ext, major, minor):
-					continue
-				# iterate over all requirements and add to the list those that are
-				# applicable for currently processed api version
-				for r in ext.requiredExtensions:
-					# find required extension and make sure it is not part of core for this or previous api version
-					requiredExtensionList = [re for re in api.extensions if re.name == r]
-					if len(requiredExtensionList) > 0:
-						requiredExtension = requiredExtensionList[0]
-						if isExtensionInCore(requiredExtension, major, minor):
-							continue
-					yield '\tstd::make_tuple({}, {}, {}, "{}", "{}"),'.format(apiVariant, major, minor, ext.name, r)
-		yield '};'
+			# memorize extension name and dependencies for future vector generation
+			extensionList.append(ext.name)
+			# memorize max extension name and dependency length
+			maxExtLength = max(maxExtLength, len(ext.name))
+			# generate check function for this extension
+			yield f'bool check_{ext.name}(const tcu::UVec2& v, const ExtPropVect& vIEP, const ExtPropVect& vDEP)'
+			yield '{'
+			# check if extension was promoted; for SC we need to check vulkan version as sc10 is based on vk12
+			if ext.promotedto is not None and 'VK_VERSION' in ext.promotedto:
+				p = ext.promotedto
+				yield f'\tif (isCompatibile({p[-3]}, {p[-1]}, v))'
+				yield '\t\treturn true;\n'
+			else:
+				yield '\tDE_UNREF(v);'
+			# there is a high chance that other vector won't be used
+			yield f'\tDE_UNREF({othVector});'
+			# check if extension is supported
+			yield f'\n\tif (!isSupported({extVector}, "{ext.name}"))'
+			yield '\t\treturn true;\n'
+			# replace dependent extensions/versions with proper conditions
+			finalCondition = transformDependsToCondition(ext.depends, api, 'isCompatibile(%s, %s, v)', 'isSupported(%s, "%s")')
+			yield f'\t// depends attribute in xml: {ext.depends}'
+			yield f'\treturn {finalCondition};'
+			yield '}\n'
+		# save list of all device/instance extensions
+		yield 'static const DependencyCheckVect {}ExtensionDependencies'.format(extType)
+		yield '{'
+		for ext in extensionList:
+			extTabCount = (maxExtLength - len(ext)) / 4
+			eTabs = '\t'*int(round(extTabCount+1.49))
+			yield f'\tstd::make_pair("{ext}",{eTabs}&check_{ext}),'
+		yield '};\n'
 
 	def genApiVersions():
 		yield 'static const std::tuple<deUint32, deUint32, deUint32, deUint32>\treleasedApiVersions[]\t='
@@ -3026,20 +3645,72 @@ def writeApiExtensionDependencyInfo(api, filename):
 			yield '\tstd::make_tuple({}, {}, {}, {}),'.format(version, apiVariant, major, minor)
 		yield '};'
 
+	def parseExtensionDependencies(extDeps, ext):
+		major, minor = 1, 0
+		requiredVerFound = False;
+		# return in case nothing more left to be processed
+		if extDeps is None or extDeps == "":
+			return major, minor, requiredVerFound
+		ungrpPartLen = 0
+		versionPattern = "[A-Z]+_VERSION_([0-9]+)_([0-9]+)"
+		ungroupedPattern = r"^.*?\(+|^.*?$"
+		# look for non-grouped part, it may include the required vulkan version
+		ungroupPart = re.search(ungroupedPattern, extDeps)
+		if ungroupPart is not None and ungroupPart[0].replace(r"(", "") != "":
+			ungrpPartLen = len(ungroupPart[0].replace(r"(", ""))
+			# is specific version explicitly requested?
+			match = re.search(versionPattern, ungroupPart[0])
+			if match is not None:
+				if len(match[0]) != len(extDeps):
+					# there is more than just a version; check if it's accompanied by AND operator(s)
+					ext_pattern = ".*\+*"+versionPattern+"\++.*|.*\++"+versionPattern+"\+*.*"
+					match = re.search(ext_pattern, ungroupPart[0])
+				if match is not None:
+					# specific version is explicitly requested
+					major, minor = int(match[1]), int(match[2])
+					return major, minor, True
+			# no explicit version is requested, continue parsing the remaining part
+			extDeps = extDeps[ungrpPartLen:]
+		groupedPattern = r"(.*)\+|(.*)$"
+		match = re.search(groupedPattern, extDeps)
+		if match is not None and match[0] != "":
+			# groups may include the dependency "promoted to" versions accompanied by OR operator
+			# but they don't include the extension explicit required version; continue parsing the remaining part
+			groupLength = len(match[0])
+			major, minor, requiredVerFound = parseExtensionDependencies(extDeps[groupLength:], ext)
+		return major, minor, requiredVerFound
+
 	def genRequiredCoreVersions():
 		yield 'static const std::tuple<deUint32, deUint32, const char*>\textensionRequiredCoreVersion[]\t ='
 		yield '{'
+		versionPattern = "[A-Z]+_VERSION_([0-9]+)_([0-9]+)"
 		for ext in api.extensions:
 			# skip video extensions
 			if 'vulkan_video_' in ext.name:
 				continue
-			major, minor = '1', '0'
-			if ext.requiresCore is not None:
-				major, minor = ext.requiresCore.split('.')
+			major, minor = 1, 0
+			if ext.depends is not None:
+				major, minor, requiredVerFound = parseExtensionDependencies(ext.depends, ext)
+				if not requiredVerFound:
+					# find all extensions that are dependencies of this one
+					matches = re.findall("VK_\w+", ext.depends, re.M)
+					for m in matches:
+						for de in api.extensions:
+							if de.name == m:
+								if de.depends is not None:
+									# check if the dependency states explicitly the required vulkan version and pick the higher one
+									newMajor, newMinor, requiredVerFound = parseExtensionDependencies(de.depends, de)
+									if requiredVerFound:
+										if newMajor > major:
+											major, minor = newMajor, newMinor
+										elif newMajor == major and newMinor > minor:
+											minor = newMinor
+								break
 			yield '\tstd::make_tuple({}, {}, "{}"),'.format(major, minor, ext.name)
 		yield '};'
 
 	stream = []
+	stream.extend(genHelperFunctions())
 	stream.extend(genExtDepArray('instance'))
 	stream.extend(genExtDepArray('device'))
 	stream.extend(genApiVersions())
@@ -3073,6 +3744,141 @@ def writeEntryPointValidation(api, filename):
 	stream.append('};')
 	writeInlFile(filename, INL_HEADER, stream)
 
+def writeGetDeviceProcAddr(api, filename):
+	testBlockStart = '''tcu::TestStatus		testGetDeviceProcAddr		(Context& context)
+{
+	tcu::TestLog&								log						(context.getTestContext().getLog());
+	const PlatformInterface&					platformInterface		= context.getPlatformInterface();
+	const auto									validationEnabled		= context.getTestContext().getCommandLine().isValidationEnabled();
+	const CustomInstance						instance				(createCustomInstanceFromContext(context));
+	const InstanceDriver&						instanceDriver			= instance.getDriver();
+	const VkPhysicalDevice						physicalDevice			= chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
+	const deUint32								queueFamilyIndex		= 0;
+	const deUint32								queueCount				= 1;
+	const float									queuePriority			= 1.0f;
+	const std::vector<VkQueueFamilyProperties>	queueFamilyProperties	= getPhysicalDeviceQueueFamilyProperties(instanceDriver, physicalDevice);
+
+	const VkDeviceQueueCreateInfo			deviceQueueCreateInfo =
+	{
+		VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,	//  VkStructureType				sType;
+		DE_NULL,									//  const void*					pNext;
+		(VkDeviceQueueCreateFlags)0u,				//  VkDeviceQueueCreateFlags	flags;
+		queueFamilyIndex,							//  deUint32					queueFamilyIndex;
+		queueCount,									//  deUint32					queueCount;
+		&queuePriority,								//  const float*				pQueuePriorities;
+	};
+
+	const VkDeviceCreateInfo				deviceCreateInfo =
+	{
+		VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,		//  VkStructureType					sType;
+		DE_NULL,									//  const void*						pNext;
+		(VkDeviceCreateFlags)0u,					//  VkDeviceCreateFlags				flags;
+		1u,											//  deUint32						queueCreateInfoCount;
+		&deviceQueueCreateInfo,						//  const VkDeviceQueueCreateInfo*	pQueueCreateInfos;
+		0u,											//  deUint32						enabledLayerCount;
+		DE_NULL,									//  const char* const*				ppEnabledLayerNames;
+		0u,											//  deUint32						enabledExtensionCount;
+		DE_NULL,									//  const char* const*				ppEnabledExtensionNames;
+		DE_NULL,									//  const VkPhysicalDeviceFeatures*	pEnabledFeatures;
+	};
+	const Unique<VkDevice>					device			(createCustomDevice(validationEnabled, platformInterface, instance, instanceDriver, physicalDevice, &deviceCreateInfo));
+	const DeviceDriver						deviceDriver	(platformInterface, instance, device.get(), context.getUsedApiVersion(), context.getTestContext().getCommandLine());
+
+	const std::vector<std::string> functions{'''
+	testBlockEnd = '''	};
+
+	bool fail = false;
+	for (const auto& function : functions)
+	{
+		if (deviceDriver.getDeviceProcAddr(device.get(), function.c_str()) != DE_NULL)
+		{
+			fail = true;
+			log << tcu::TestLog::Message << "Function " << function << " is not NULL" << tcu::TestLog::EndMessage;
+		}
+	}
+	if (fail)
+		return tcu::TestStatus::fail("Fail");
+	return tcu::TestStatus::pass("All functions are NULL");
+}
+'''
+
+	def functions(functionType):
+		for ext in api.extensions:
+			for requirement in ext.requirementsList:
+				for requiredCommand in requirement.newCommands:
+					yield '\t\t"' + requiredCommand.name + '",'
+	stream = []
+	stream.append('#include "tcuCommandLine.hpp"')
+	stream.append('#include "vktTestCase.hpp"')
+	stream.append('#include "vkPlatform.hpp"')
+	stream.append('#include "vkDeviceUtil.hpp"')
+	stream.append('#include "vkQueryUtil.hpp"')
+	stream.append('#include "vktCustomInstancesDevices.hpp"')
+	stream.append('#include "vktTestCase.hpp"')
+	stream.append('#include "vktTestCaseUtil.hpp"')
+	stream.append('\nnamespace vkt\n{\n')
+	stream.append('using namespace vk;\n')
+	stream.append(testBlockStart)
+	stream.extend(functions(api))
+	stream.append(testBlockEnd)
+
+	# function to create tests
+	stream.append("void addGetDeviceProcAddrTests (tcu::TestCaseGroup* testGroup)\n{")
+	stream.append('\taddFunctionCase(testGroup, "non_enabled", testGetDeviceProcAddr);')
+	stream.append('}\n')
+	stream.append('}\n')
+
+	writeInlFile(filename, INL_HEADER, stream)
+
+def writeConformanceVersions(filename):
+	# get list of all vulkan/vulkansc tags from git
+	listOfTags = os.popen("git ls-remote -t").read()
+	vkMatches = re.findall("vulkan-cts-(\d).(\d).(\d).(\d)", listOfTags, re.M)
+	scMatches = re.findall("vulkansc-cts-(\d).(\d).(\d).(\d)", listOfTags, re.M)
+	if len(vkMatches) == 0 or len(scMatches) == 0:
+		return
+	# read all text files in doc folder and find withdrawn cts versions (branches)
+	withdrawnVkBranches = set()
+	withdrawnScBranches = set()
+	today = datetime.date.today()
+	for fileName in glob.glob(os.path.join(os.path.dirname(__file__), "..", "doc", "*.txt")):
+		if "withdrawal" not in fileName:
+			continue
+		fileContent	= readFile(fileName)
+		# get date when releases are withdrawn
+		match = re.search(r"(20\d\d)-(\d\d)-(\d\d).+ withdrawn", fileContent, re.IGNORECASE)
+		if match is not None:
+			# check if announcement refers to date in the past
+			if today > datetime.date(int(match[1]), int(match[2]), int(match[3])):
+				# get names of withdrawn branches
+				vkBranchMatches = re.findall("vulkan(\w\w)?-cts-(\d).(\d).(\d).(\d)", fileContent, re.M)
+				for v in vkBranchMatches:
+					selectedSet = withdrawnScBranches if v[0] == "sc" else withdrawnVkBranches
+					selectedSet.add((v[1], v[2], v[3], v[4]))
+	if len(withdrawnVkBranches) == 0:
+		print(f"Warning: unable to read content of doc folder, skipping generation of {os.path.basename(filename)}")
+		return
+	# define helper function that will be used to add entries for both vk and sc
+	def appendToStream(stream, versionsToAdd, maxWithdrawnVersion):
+		addedVersions = set()
+		for v in reversed(versionsToAdd):
+			# add only unique versions; ignore duplicates (e.g. with "-rc1", "-rc2" postfix);
+			# also add versions that are greater then maximal withdrawn version
+			if v in addedVersions or v <= maxWithdrawnVersion:
+				continue
+			addedVersions.add(v)
+			stream.append(f'\tmakeConformanceVersion({v[0]}, {v[1]}, {v[2]}, {v[3]}),')
+	# save array with versions
+	stream = ['static const VkConformanceVersion knownConformanceVersions[]',\
+			  '{',\
+			  '#ifndef CTS_USES_VULKANSC']
+	appendToStream(stream, vkMatches, max(withdrawnVkBranches))
+	stream.append('#else')
+	appendToStream(stream, scMatches, tuple('0'*4) if len(withdrawnScBranches) == 0 else max(withdrawnScBranches))
+	stream.append('#endif // CTS_USES_VULKANSC')
+	stream.append('};')
+	writeInlFile(filename, INL_HEADER, stream)
+
 def parseCmdLineArgs():
 	parser = argparse.ArgumentParser(description = "Generate Vulkan INL files",
 									 formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -3094,28 +3900,18 @@ if __name__ == "__main__":
 	# if argument was specified it is interpreted as a path to which .inl files will be written
 	outputPath = DEFAULT_OUTPUT_DIR[args.api] if args.outdir == '' else args.outdir
 
-	currentDir = os.getcwd()
-	api = API()
+	vkTree = etree.parse(os.path.join(VULKAN_XML_DIR, "vk.xml"))
+	apiName = "vulkansc" if args.api == 'SC' else "vulkan"
+	stripNonmatchingAPIs(vkTree.getroot(), apiName, actuallyDelete = True)
 
-	if args.api == '':
+	# Read vk.xml and generate vulkan headers from it
+	api = API(apiName)
+	api.build(vkTree)
+	api.postProcess()
 
-		# Read vk.xml and generate vulkan headers from it
-		os.chdir(VULKAN_XML_DIR)
-		api.build( etree.parse("vk.xml") )
-		api.build( etree.parse("video.xml") )
-		api.postProcess()
-
-	elif args.api=='SC':
-		# At the moment structure of vk.xml for Vulkan SC is not final.
-		# For time being we will use old version of gen_framework script that
-		# was saved as gen_framework_sc (it still parses vulkan_sc_core.h)
-		os.chdir(os.path.dirname(__file__))
-		pythonExecutable = sys.executable or "python"
-		print("Executing gen_framework_sc.py")
-		execute([pythonExecutable, "gen_framework_sc.py", "--api", "SC"])
-		exit (0)
-
-	os.chdir(currentDir)
+	# Read video.xml
+	if args.api != 'SC':
+		api.build( etree.parse(os.path.join(VULKAN_XML_DIR, "video.xml")) )
 
 	platformFuncs	= [Function.TYPE_PLATFORM]
 	instanceFuncs	= [Function.TYPE_INSTANCE]
@@ -3126,7 +3922,7 @@ if __name__ == "__main__":
 	writeDeviceFeaturesDefaultDeviceDefs	(dfd, os.path.join(outputPath, "vkDeviceFeaturesForDefaultDeviceDefs.inl"))
 	writeDeviceFeaturesContextDecl			(dfd, os.path.join(outputPath, "vkDeviceFeaturesForContextDecl.inl"))
 	writeDeviceFeaturesContextDefs			(dfd, os.path.join(outputPath, "vkDeviceFeaturesForContextDefs.inl"))
-	writeDeviceFeatureTest					(args.api, api, os.path.join(outputPath, "vkDeviceFeatureTest.inl"))
+	writeDeviceFeatureTest					(api, os.path.join(outputPath, "vkDeviceFeatureTest.inl"))
 
 	dpd										= generateDeviceFeaturesOrPropertiesDefs(api, 'Properties')
 	writeDeviceProperties					(api, dpd, os.path.join(outputPath, "vkDeviceProperties.inl"))
@@ -3135,7 +3931,7 @@ if __name__ == "__main__":
 	writeDevicePropertiesContextDefs		(dpd, os.path.join(outputPath, "vkDevicePropertiesForContextDefs.inl"))
 
 	writeHandleType							(api, os.path.join(outputPath, "vkHandleType.inl"))
-	writeBasicTypes							(args.api, api, os.path.join(outputPath, "vkBasicTypes.inl"))
+	writeBasicTypes							(api, os.path.join(outputPath, "vkBasicTypes.inl"))
 	writeCompositeTypes						(api, os.path.join(outputPath, "vkStructTypes.inl"))
 	writeInterfaceDecl						(api, os.path.join(outputPath, "vkVirtualPlatformInterface.inl"),		platformFuncs,	False)
 	writeInterfaceDecl						(api, os.path.join(outputPath, "vkVirtualInstanceInterface.inl"),		instanceFuncs,	False)
@@ -3162,17 +3958,19 @@ if __name__ == "__main__":
 	writeStructTraitsImpl					(api, os.path.join(outputPath, "vkGetStructureTypeImpl.inl"))
 	writeNullDriverImpl						(api, os.path.join(outputPath, "vkNullDriverImpl.inl"))
 	writeTypeUtil							(api, os.path.join(outputPath, "vkTypeUtil.inl"))
-	writeSupportedExtensions				(args.api, api, os.path.join(outputPath, "vkSupportedExtensions.inl"))
+	writeSupportedExtensions				(api, os.path.join(outputPath, "vkSupportedExtensions.inl"))
 	writeCoreFunctionalities				(api, os.path.join(outputPath, "vkCoreFunctionalities.inl"))
 	writeExtensionFunctions					(api, os.path.join(outputPath, "vkExtensionFunctions.inl"))
 	writeDeviceFeatures2					(api, os.path.join(outputPath, "vkDeviceFeatures2.inl"))
 	writeMandatoryFeatures					(api, os.path.join(outputPath, "vkMandatoryFeatures.inl"))
-	writeExtensionList						(args.api, api, os.path.join(outputPath, "vkInstanceExtensions.inl"),	'instance')
-	writeExtensionList						(args.api, api, os.path.join(outputPath, "vkDeviceExtensions.inl"),		'device')
+	writeExtensionList						(api, os.path.join(outputPath, "vkInstanceExtensions.inl"),	'instance')
+	writeExtensionList						(api, os.path.join(outputPath, "vkDeviceExtensions.inl"),	'device')
 	writeDriverIds							(api, os.path.join(outputPath, "vkKnownDriverIds.inl"))
 	writeObjTypeImpl						(api, os.path.join(outputPath, "vkObjTypeImpl.inl"))
 	writeApiExtensionDependencyInfo			(api, os.path.join(outputPath, "vkApiExtensionDependencyInfo.inl"))
 	writeEntryPointValidation				(api, os.path.join(outputPath, "vkEntryPointValidation.inl"))
+	writeGetDeviceProcAddr					(api, os.path.join(outputPath, "vkGetDeviceProcAddr.inl"))
+	writeConformanceVersions				(     os.path.join(outputPath, "vkKnownConformanceVersions.inl"))
 
 	# NOTE: when new files are generated then they should also be added to the
 	# vk-gl-cts\external\vulkancts\framework\vulkan\CMakeLists.txt outputs list

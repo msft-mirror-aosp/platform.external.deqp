@@ -89,6 +89,13 @@ enum OperationName
 	OPERATION_NAME_READ_UBO_FRAGMENT,
 	OPERATION_NAME_READ_UBO_COMPUTE,
 	OPERATION_NAME_READ_UBO_COMPUTE_INDIRECT,
+	OPERATION_NAME_READ_UBO_TEXEL_VERTEX,
+	OPERATION_NAME_READ_UBO_TEXEL_TESSELLATION_CONTROL,
+	OPERATION_NAME_READ_UBO_TEXEL_TESSELLATION_EVALUATION,
+	OPERATION_NAME_READ_UBO_TEXEL_GEOMETRY,
+	OPERATION_NAME_READ_UBO_TEXEL_FRAGMENT,
+	OPERATION_NAME_READ_UBO_TEXEL_COMPUTE,
+	OPERATION_NAME_READ_UBO_TEXEL_COMPUTE_INDIRECT,
 	OPERATION_NAME_READ_SSBO_VERTEX,
 	OPERATION_NAME_READ_SSBO_TESSELLATION_CONTROL,
 	OPERATION_NAME_READ_SSBO_TESSELLATION_EVALUATION,
@@ -168,6 +175,12 @@ public:
 	{
 		return m_context.isDeviceFunctionalitySupported(extension);
 	}
+
+	bool isComputeOnly(void)
+	{
+		return m_context.getTestContext().getCommandLine().isComputeOnly();
+	}
+
 	de::SharedPtr<vk::ResourceInterface>	getResourceInterface	(void) const { return m_context.getResourceInterface(); }
 private:
 	const vkt::Context&				m_context;
@@ -248,7 +261,12 @@ struct Data
 class Operation
 {
 public:
-						Operation		(void) {}
+						Operation		(void)
+							: m_specializedAccess	(false)
+						{}
+						Operation		(const bool	specializedAccess)
+							: m_specializedAccess	(specializedAccess)
+						{}
 	virtual				~Operation		(void) {}
 
 	virtual void		recordCommands	(const vk::VkCommandBuffer cmdBuffer) = 0;	// commands that carry out this operation
@@ -260,6 +278,9 @@ public:
 private:
 						Operation		(const Operation&);
 	Operation&			operator=		(const Operation&);
+
+protected:
+	bool				m_specializedAccess;
 };
 
 // A helper class to init programs and create the operation when context becomes available.
@@ -267,7 +288,12 @@ private:
 class OperationSupport
 {
 public:
-									OperationSupport			(void) {}
+									OperationSupport			(void)
+										: m_specializedAccess	(false)
+									{}
+									OperationSupport			(const bool	specializedAccess)
+										: m_specializedAccess	(specializedAccess)
+									{}
 	virtual							~OperationSupport			(void) {}
 
 	virtual deUint32				getInResourceUsageFlags		(void) const = 0;
@@ -278,14 +304,21 @@ public:
 	virtual de::MovePtr<Operation>	build						(OperationContext& context, Resource& resource) const = 0;
 	virtual de::MovePtr<Operation>	build						(OperationContext& context, Resource& inResource, Resource& outResource) const = 0;
 
+	virtual vk::VkShaderStageFlagBits getShaderStage			(void) { return vk::VK_SHADER_STAGE_FLAG_BITS_MAX_ENUM; }
+
 private:
 									OperationSupport			(const OperationSupport&);
 	OperationSupport&				operator=					(const OperationSupport&);
+
+protected:
+	bool				m_specializedAccess;
 };
 
 bool							isResourceSupported		(const OperationName opName, const ResourceDescription& resourceDesc);
-de::MovePtr<OperationSupport>	makeOperationSupport	(const OperationName opName, const ResourceDescription& resourceDesc);
+bool							isSpecializedAccessFlagSupported	(const OperationName opName);
+de::MovePtr<OperationSupport>	makeOperationSupport	(const OperationName opName, const ResourceDescription& resourceDesc, const bool specializedAccess = false);
 std::string						getOperationName		(const OperationName opName);
+bool							isStageSupported		(const vk::VkShaderStageFlagBits stage, const vk::VkQueueFlags queueFlags);
 
 } // synchronization
 } // vkt

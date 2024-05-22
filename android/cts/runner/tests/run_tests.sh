@@ -44,7 +44,6 @@ JARS="
     compatibility-host-util\
     cts-tradefed\
     ddmlib-prebuilt\
-    hosttestlib\
     CtsDeqpTestCases\
     CtsDeqpRunnerTests\
     tradefed"
