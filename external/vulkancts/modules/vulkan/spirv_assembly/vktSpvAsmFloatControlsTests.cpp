@@ -22,6 +22,7 @@
  *//*--------------------------------------------------------------------*/
 
 
+#include <cstdint>
 #include "vktSpvAsmFloatControlsTests.hpp"
 #include "vktSpvAsmComputeShaderCase.hpp"
 #include "vktSpvAsmGraphicsShaderTestUtil.hpp"
