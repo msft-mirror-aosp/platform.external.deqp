@@ -31,407 +31,377 @@ import subprocess
 import ssl
 import stat
 import platform
+import logging
 
-sys.path.append(os.path.join(os.path.dirname(__file__), "..", "scripts"))
+scriptPath = os.path.join(os.path.dirname(__file__), "..", "scripts")
+sys.path.insert(0, scriptPath)
 
 from ctsbuild.common import *
 
-EXTERNAL_DIR	= os.path.realpath(os.path.normpath(os.path.dirname(__file__)))
+EXTERNAL_DIR = os.path.realpath(os.path.normpath(os.path.dirname(__file__)))
 
-SYSTEM_NAME		= platform.system()
+SYSTEM_NAME = platform.system()
 
 def computeChecksum (data):
-	return hashlib.sha256(data).hexdigest()
+    return hashlib.sha256(data).hexdigest()
 
 def onReadonlyRemoveError (func, path, exc_info):
-	os.chmod(path, stat.S_IWRITE)
-	os.unlink(path)
+    os.chmod(path, stat.S_IWRITE)
+    os.unlink(path)
 
 class Source:
-	def __init__(self, baseDir, extractDir):
-		self.baseDir		= baseDir
-		self.extractDir		= extractDir
+    def __init__(self, baseDir, extractDir):
+        self.baseDir = baseDir
+        self.extractDir = extractDir
 
-	def clean (self):
-		fullDstPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir)
-		# Remove read-only first
-		readonlydir = os.path.join(fullDstPath, ".git")
-		if os.path.exists(readonlydir):
-			shutil.rmtree(readonlydir, onerror = onReadonlyRemoveError)
-		if os.path.exists(fullDstPath):
-			shutil.rmtree(fullDstPath, ignore_errors=False)
+    def clean (self):
+        fullDstPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir)
+        # Remove read-only first
+        readonlydir = os.path.join(fullDstPath, ".git")
+        if os.path.exists(readonlydir):
+            logging.debug("Deleting " + readonlydir)
+            shutil.rmtree(readonlydir, onerror = onReadonlyRemoveError)
+        if os.path.exists(fullDstPath):
+            logging.debug("Deleting " + fullDstPath)
+            shutil.rmtree(fullDstPath, ignore_errors=False)
 
 class SourcePackage (Source):
-	def __init__(self, url, checksum, baseDir, extractDir = "src", postExtract=None):
-		Source.__init__(self, baseDir, extractDir)
-		self.url			= url
-		self.filename		= os.path.basename(self.url)
-		self.checksum		= checksum
-		self.archiveDir		= "packages"
-		self.postExtract	= postExtract
+    def __init__(self, url, checksum, baseDir, extractDir = "src", postExtract=None):
+        Source.__init__(self, baseDir, extractDir)
+        self.url = url
+        self.filename = os.path.basename(self.url)
+        self.checksum = checksum
+        self.archiveDir = "packages"
+        self.postExtract = postExtract
 
-		if SYSTEM_NAME == 'Windows' or SYSTEM_NAME.startswith('CYGWIN') or SYSTEM_NAME.startswith('MINGW'):
-			self.sysNdx = 0
-		elif SYSTEM_NAME == 'Linux':
-			self.sysNdx = 1
-		elif SYSTEM_NAME == 'Darwin':
-			self.sysNdx = 2
-		else:
-			self.sysNdx = -1  # unknown system
+    def clean (self):
+        Source.clean(self)
+        self.removeArchives()
 
-		self.FFmpeg			= "FFmpeg" in url
+    def update (self, cmdProtocol = None, force = False):
+        if not self.isArchiveUpToDate():
+            self.fetchAndVerifyArchive()
 
-	def clean (self):
-		Source.clean(self)
-		self.removeArchives()
+        if self.getExtractedChecksum() != self.checksum:
+            Source.clean(self)
+            self.extract()
+            self.storeExtractedChecksum(self.checksum)
 
-	def update (self, cmdProtocol = None, force = False):
-		if self.sysNdx != 2:
-			if not self.isArchiveUpToDate():
-				self.fetchAndVerifyArchive()
+    def removeArchives (self):
+        archiveDir = os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.archiveDir)
+        if os.path.exists(archiveDir):
+            logging.debug("Deleting " + archiveDir)
+            shutil.rmtree(archiveDir, ignore_errors=False)
 
-			if self.getExtractedChecksum() != self.checksum:
-				Source.clean(self)
-				self.extract()
-				self.storeExtractedChecksum(self.checksum)
+    def isArchiveUpToDate (self):
+        archiveFile = os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.archiveDir, pkg.filename)
+        if os.path.exists(archiveFile):
+            return computeChecksum(readBinaryFile(archiveFile)) == self.checksum
+        else:
+            return False
 
-	def removeArchives (self):
-		archiveDir = os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.archiveDir)
-		if os.path.exists(archiveDir):
-			shutil.rmtree(archiveDir, ignore_errors=False)
+    def getExtractedChecksumFilePath (self):
+        return os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.archiveDir, "extracted")
 
-	def isArchiveUpToDate (self):
-		archiveFile = os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.archiveDir, pkg.filename)
-		if os.path.exists(archiveFile):
-			return computeChecksum(readBinaryFile(archiveFile)) == self.checksum
-		else:
-			return False
+    def getExtractedChecksum (self):
+        extractedChecksumFile = self.getExtractedChecksumFilePath()
 
-	def getExtractedChecksumFilePath (self):
-		return os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.archiveDir, "extracted")
+        if os.path.exists(extractedChecksumFile):
+            return readFile(extractedChecksumFile)
+        else:
+            return None
 
-	def getExtractedChecksum (self):
-		extractedChecksumFile = self.getExtractedChecksumFilePath()
+    def storeExtractedChecksum (self, checksum):
+        checksum_bytes = checksum.encode("utf-8")
+        writeBinaryFile(self.getExtractedChecksumFilePath(), checksum_bytes)
 
-		if os.path.exists(extractedChecksumFile):
-			return readFile(extractedChecksumFile)
-		else:
-			return None
+    def connectToUrl (self, url):
+        result = None
 
-	def storeExtractedChecksum (self, checksum):
-		checksum_bytes = checksum.encode("utf-8")
-		writeBinaryFile(self.getExtractedChecksumFilePath(), checksum_bytes)
+        if sys.version_info < (3, 0):
+            from urllib2 import urlopen
+        else:
+            from urllib.request import urlopen
 
-	def connectToUrl (self, url):
-		result = None
+        if args.insecure:
+            print("Ignoring certificate checks")
+            ssl_context = ssl._create_unverified_context()
+            result = urlopen(url, context=ssl_context)
+        else:
+            result = urlopen(url)
 
-		if sys.version_info < (3, 0):
-			from urllib2 import urlopen
-		else:
-			from urllib.request import urlopen
+        return result
 
-		if args.insecure:
-			print("Ignoring certificate checks")
-			ssl_context = ssl._create_unverified_context()
-			result = urlopen(url, context=ssl_context)
-		else:
-			result = urlopen(url)
+    def fetchAndVerifyArchive (self):
+        print("Fetching %s" % self.url)
 
-		return result
+        req = self.connectToUrl(self.url)
+        data = req.read()
+        checksum = computeChecksum(data)
+        dstPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.archiveDir, self.filename)
 
-	def fetchAndVerifyArchive (self):
-		print("Fetching %s" % self.url)
+        if checksum != self.checksum:
+            raise Exception("Checksum mismatch for %s, expected %s, got %s" % (self.filename, self.checksum, checksum))
 
-		req			= self.connectToUrl(self.url)
-		data		= req.read()
-		checksum	= computeChecksum(data)
-		dstPath		= os.path.join(EXTERNAL_DIR, self.baseDir, self.archiveDir, self.filename)
+        if not os.path.exists(os.path.dirname(dstPath)):
+            os.makedirs(os.path.dirname(dstPath))
 
-		if checksum != self.checksum:
-			raise Exception("Checksum mismatch for %s, expected %s, got %s" % (self.filename, self.checksum, checksum))
+        writeBinaryFile(dstPath, data)
 
-		if not os.path.exists(os.path.dirname(dstPath)):
-			os.mkdir(os.path.dirname(dstPath))
+    def extract (self):
+        print("Extracting %s to %s/%s" % (self.filename, self.baseDir, self.extractDir))
 
-		writeBinaryFile(dstPath, data)
+        srcPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.archiveDir, self.filename)
+        tmpPath = os.path.join(EXTERNAL_DIR, ".extract-tmp-%s" % self.baseDir)
+        dstPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir)
 
-	def extract (self):
-		print("Extracting %s to %s/%s" % (self.filename, self.baseDir, self.extractDir))
+        if self.filename.endswith(".zip"):
+            archive = zipfile.ZipFile(srcPath)
+        else:
+            archive = tarfile.open(srcPath)
 
-		srcPath	= os.path.join(EXTERNAL_DIR, self.baseDir, self.archiveDir, self.filename)
-		tmpPath	= os.path.join(EXTERNAL_DIR, ".extract-tmp-%s" % self.baseDir)
-		dstPath	= os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir)
+        if os.path.exists(tmpPath):
+            shutil.rmtree(tmpPath, ignore_errors=False)
 
-		if self.filename.endswith(".zip"):
-			archive	= zipfile.ZipFile(srcPath)
-		else:
-			archive	= tarfile.open(srcPath)
+        os.mkdir(tmpPath)
 
-		if os.path.exists(tmpPath):
-			shutil.rmtree(tmpPath, ignore_errors=False)
+        archive.extractall(tmpPath)
+        archive.close()
 
-		os.mkdir(tmpPath)
+        extractedEntries = os.listdir(tmpPath)
+        if len(extractedEntries) != 1 or not os.path.isdir(os.path.join(tmpPath, extractedEntries[0])):
+            raise Exception("%s doesn't contain single top-level directory" % self.filename)
 
-		archive.extractall(tmpPath)
-		archive.close()
+        topLevelPath = os.path.join(tmpPath, extractedEntries[0])
 
-		extractedEntries = os.listdir(tmpPath)
-		if len(extractedEntries) != 1 or not os.path.isdir(os.path.join(tmpPath, extractedEntries[0])):
-			raise Exception("%s doesn't contain single top-level directory" % self.filename)
+        if not os.path.exists(dstPath):
+            os.mkdir(dstPath)
 
-		topLevelPath = os.path.join(tmpPath, extractedEntries[0])
+        for entry in os.listdir(topLevelPath):
+            if os.path.exists(os.path.join(dstPath, entry)):
+                raise Exception("%s exists already" % entry)
 
-		if not os.path.exists(dstPath):
-			os.mkdir(dstPath)
+            shutil.move(os.path.join(topLevelPath, entry), dstPath)
 
-		for entry in os.listdir(topLevelPath):
-			if os.path.exists(os.path.join(dstPath, entry)):
-				raise Exception("%s exists already" % entry)
+        shutil.rmtree(tmpPath, ignore_errors=True)
 
-			shutil.move(os.path.join(topLevelPath, entry), dstPath)
-
-		shutil.rmtree(tmpPath, ignore_errors=True)
-
-		if self.postExtract != None:
-			self.postExtract(dstPath)
+        if self.postExtract != None:
+            self.postExtract(dstPath)
 
 class SourceFile (Source):
-	def __init__(self, url, filename, checksum, baseDir, extractDir = "src"):
-		Source.__init__(self, baseDir, extractDir)
-		self.url			= url
-		self.filename		= filename
-		self.checksum		= checksum
+    def __init__(self, url, filename, checksum, baseDir, extractDir = "src"):
+        Source.__init__(self, baseDir, extractDir)
+        self.url = url
+        self.filename = filename
+        self.checksum = checksum
 
-	def update (self, cmdProtocol = None, force = False):
-		if not self.isFileUpToDate():
-			Source.clean(self)
-			self.fetchAndVerifyFile()
+    def update (self, cmdProtocol = None, force = False):
+        if not self.isFileUpToDate():
+            Source.clean(self)
+            self.fetchAndVerifyFile()
 
-	def isFileUpToDate (self):
-		file = os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.extractDir, pkg.filename)
-		if os.path.exists(file):
-			data = readFile(file)
-			return computeChecksum(data.encode('utf-8')) == self.checksum
-		else:
-			return False
+    def isFileUpToDate (self):
+        file = os.path.join(EXTERNAL_DIR, pkg.baseDir, pkg.extractDir, pkg.filename)
+        if os.path.exists(file):
+            data = readFile(file)
+            return computeChecksum(data.encode('utf-8')) == self.checksum
+        else:
+            return False
 
-	def connectToUrl (self, url):
-		result = None
+    def connectToUrl (self, url):
+        result = None
 
-		if sys.version_info < (3, 0):
-			from urllib2 import urlopen
-		else:
-			from urllib.request import urlopen
+        if sys.version_info < (3, 0):
+            from urllib2 import urlopen
+        else:
+            from urllib.request import urlopen
 
-		if args.insecure:
-			print("Ignoring certificate checks")
-			ssl_context = ssl._create_unverified_context()
-			result = urlopen(url, context=ssl_context)
-		else:
-			result = urlopen(url)
+        if args.insecure:
+            print("Ignoring certificate checks")
+            ssl_context = ssl._create_unverified_context()
+            result = urlopen(url, context=ssl_context)
+        else:
+            result = urlopen(url)
 
-		return result
+        return result
 
-	def fetchAndVerifyFile (self):
-		print("Fetching %s" % self.url)
+    def fetchAndVerifyFile (self):
+        print("Fetching %s" % self.url)
 
-		req			= self.connectToUrl(self.url)
-		data		= req.read()
-		checksum	= computeChecksum(data)
-		dstPath		= os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir, self.filename)
+        req = self.connectToUrl(self.url)
+        data = req.read()
+        checksum = computeChecksum(data)
+        dstPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir, self.filename)
 
-		if checksum != self.checksum:
-			raise Exception("Checksum mismatch for %s, expected %s, got %s" % (self.filename, self.checksum, checksum))
+        if checksum != self.checksum:
+            raise Exception("Checksum mismatch for %s, expected %s, got %s" % (self.filename, self.checksum, checksum))
 
-		if not os.path.exists(os.path.dirname(dstPath)):
-			os.mkdir(os.path.dirname(dstPath))
+        if not os.path.exists(os.path.dirname(dstPath)):
+            os.mkdir(os.path.dirname(dstPath))
 
-		writeBinaryFile(dstPath, data)
+        writeBinaryFile(dstPath, data)
 
 class GitRepo (Source):
-	def __init__(self, httpsUrl, sshUrl, revision, baseDir, extractDir = "src", removeTags = [], patch = ""):
-		Source.__init__(self, baseDir, extractDir)
-		self.httpsUrl	= httpsUrl
-		self.sshUrl		= sshUrl
-		self.revision	= revision
-		self.removeTags	= removeTags
-		self.patch		= patch
+    def __init__(self, httpsUrl, sshUrl, revision, baseDir, extractDir = "src", removeTags = [], patch = ""):
+        Source.__init__(self, baseDir, extractDir)
+        self.httpsUrl = httpsUrl
+        self.sshUrl = sshUrl
+        self.revision = revision
+        self.removeTags = removeTags
+        self.patch = patch
 
-	def checkout(self, url, fullDstPath, force):
-		if not os.path.exists(os.path.join(fullDstPath, '.git')):
-			execute(["git", "clone", "--no-checkout", url, fullDstPath])
+    def checkout(self, url, fullDstPath, force):
+        if not os.path.exists(os.path.join(fullDstPath, '.git')):
+            execute(["git", "clone", "--no-checkout", url, fullDstPath])
 
-		pushWorkingDir(fullDstPath)
-		try:
-			for tag in self.removeTags:
-				proc = subprocess.Popen(['git', 'tag', '-l', tag], stdout=subprocess.PIPE)
-				(stdout, stderr) = proc.communicate()
-				if len(stdout) > 0:
-					execute(["git", "tag", "-d",tag])
-			force_arg = ['--force'] if force else []
-			execute(["git", "fetch"] + force_arg + ["--tags", url, "+refs/heads/*:refs/remotes/origin/*"])
-			execute(["git", "checkout"] + force_arg + [self.revision])
+        pushWorkingDir(fullDstPath)
+        print("Directory: " + fullDstPath)
+        try:
+            for tag in self.removeTags:
+                proc = subprocess.Popen(['git', 'tag', '-l', tag], stdout=subprocess.PIPE)
+                (stdout, stderr) = proc.communicate()
+                if len(stdout) > 0:
+                    execute(["git", "tag", "-d",tag])
+            force_arg = ['--force'] if force else []
+            execute(["git", "fetch"] + force_arg + ["--tags", url, "+refs/heads/*:refs/remotes/origin/*"])
+            execute(["git", "checkout"] + force_arg + [self.revision])
 
-			if(self.patch != ""):
-				patchFile = os.path.join(EXTERNAL_DIR, self.patch)
-				execute(["git", "reset", "--hard", "HEAD"])
-				execute(["git", "apply", patchFile])
-		finally:
-			popWorkingDir()
+            if(self.patch != ""):
+                patchFile = os.path.join(EXTERNAL_DIR, self.patch)
+                execute(["git", "reset", "--hard", "HEAD"])
+                execute(["git", "apply", patchFile])
+        finally:
+            popWorkingDir()
 
-	def update (self, cmdProtocol, force = False):
-		fullDstPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir)
-		url         = self.httpsUrl
-		backupUrl   = self.sshUrl
+    def update (self, cmdProtocol, force = False):
+        fullDstPath = os.path.join(EXTERNAL_DIR, self.baseDir, self.extractDir)
+        url         = self.httpsUrl
+        backupUrl   = self.sshUrl
 
-		# If url is none then start with ssh
-		if cmdProtocol == 'ssh' or url == None:
-			url       = self.sshUrl
-			backupUrl = self.httpsUrl
+        # If url is none then start with ssh
+        if cmdProtocol == 'ssh' or url == None:
+            url       = self.sshUrl
+            backupUrl = self.httpsUrl
 
-		try:
-			self.checkout(url, fullDstPath, force)
-		except:
-			if backupUrl != None:
-				self.checkout(backupUrl, fullDstPath, force)
+        try:
+            self.checkout(url, fullDstPath, force)
+        except:
+            if backupUrl != None:
+                self.checkout(backupUrl, fullDstPath, force)
 
 def postExtractLibpng (path):
-	shutil.copy(os.path.join(path, "scripts", "pnglibconf.h.prebuilt"),
-				os.path.join(path, "pnglibconf.h"))
-
-if SYSTEM_NAME == 'Windows' or SYSTEM_NAME.startswith('CYGWIN') or SYSTEM_NAME.startswith('MINGW'):
-    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-05-31-12-34/ffmpeg-n4.4.2-1-g8e98dfc57f-win64-lgpl-shared-4.4.zip"
-    ffmpeg_hash_value = "670df8e9d2ddd5e761459b3538f64b8826566270ef1ed13bcbfc63e73aab3fd9"
-elif SYSTEM_NAME == 'Linux':
-    ffmpeg_url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/autobuild-2022-05-31-12-34/ffmpeg-n4.4.2-1-g8e98dfc57f-linux64-gpl-shared-4.4.tar.xz"
-    ffmpeg_hash_value = "817f8c93ff1ef7ede3dad15b20415d5e366bcd6848844d55046111fd3de827d0"
-elif SYSTEM_NAME == 'Darwin':
-    ffmpeg_url = ""
-    ffmpeg_hash_value = ""
-else:
-    ffmpeg_url = None
-    ffmpeg_hash_value = None
+    shutil.copy(os.path.join(path, "scripts", "pnglibconf.h.prebuilt"),
+                os.path.join(path, "pnglibconf.h"))
 
 PACKAGES = [
-	SourcePackage(
-		"http://zlib.net/fossils/zlib-1.2.13.tar.gz",
-		"b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30",
-		"zlib"),
-	SourcePackage(
-		"http://prdownloads.sourceforge.net/libpng/libpng-1.6.27.tar.gz",
-		"c9d164ec247f426a525a7b89936694aefbc91fb7a50182b198898b8fc91174b4",
-		"libpng",
-		postExtract = postExtractLibpng),
-	SourcePackage(
-		ffmpeg_url,
-		ffmpeg_hash_value,
-		"ffmpeg"),
-	SourceFile(
-		"https://raw.githubusercontent.com/baldurk/renderdoc/v1.1/renderdoc/api/app/renderdoc_app.h",
-		"renderdoc_app.h",
-		"e7b5f0aa5b1b0eadc63a1c624c0ca7f5af133aa857d6a4271b0ef3d0bdb6868e",
-		"renderdoc"),
-	GitRepo(
-		"https://github.com/KhronosGroup/SPIRV-Tools.git",
-		"git@github.com:KhronosGroup/SPIRV-Tools.git",
-		"f98473ceeb1d33700d01e20910433583e5256030",
-		"spirv-tools"),
-	GitRepo(
-		"https://github.com/KhronosGroup/glslang.git",
-		"git@github.com:KhronosGroup/glslang.git",
-		"77417d5c9e0a5d4c79ddd0285d530b45f7259f0d",
-		"glslang",
-		removeTags = ["master-tot"]),
-	GitRepo(
-		"https://github.com/KhronosGroup/SPIRV-Headers.git",
-		"git@github.com:KhronosGroup/SPIRV-Headers.git",
-		"87d5b782bec60822aa878941e6b13c0a9a954c9b",
-		"spirv-headers"),
-	GitRepo(
-		"https://github.com/KhronosGroup/Vulkan-Docs.git",
-		"git@github.com:KhronosGroup/Vulkan-Docs.git",
-		"9a2e576a052a1e65a5d41b593e693ff02745604b",
-		"vulkan-docs"),
-	GitRepo(
-		"https://github.com/google/amber.git",
-		"git@github.com:google/amber.git",
-		"8b145a6c89dcdb4ec28173339dd176fb7b6f43ed",
-		"amber"),
-	GitRepo(
-		"https://github.com/open-source-parsers/jsoncpp.git",
-		"git@github.com:open-source-parsers/jsoncpp.git",
-		"9059f5cad030ba11d37818847443a53918c327b1",
-		"jsoncpp"),
-	GitRepo(
-		"https://github.com/nvpro-samples/vk_video_samples.git",
-		None,
-		"7d68747d3524842afaf050c5e00a10f5b8c07904",
-		"video-parser"),
+    SourcePackage(
+        "https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz",
+        "b3a24de97a8fdbc835b9833169501030b8977031bcb54b3b3ac13740f846ab30",
+        "zlib"),
+    SourcePackage(
+        "http://prdownloads.sourceforge.net/libpng/libpng-1.6.27.tar.gz",
+        "c9d164ec247f426a525a7b89936694aefbc91fb7a50182b198898b8fc91174b4",
+        "libpng",
+        postExtract = postExtractLibpng),
+    SourceFile(
+        "https://raw.githubusercontent.com/baldurk/renderdoc/v1.1/renderdoc/api/app/renderdoc_app.h",
+        "renderdoc_app.h",
+        "e7b5f0aa5b1b0eadc63a1c624c0ca7f5af133aa857d6a4271b0ef3d0bdb6868e",
+        "renderdoc"),
+    GitRepo(
+        "https://github.com/KhronosGroup/SPIRV-Tools.git",
+        "git@github.com:KhronosGroup/SPIRV-Tools.git",
+        "f9184c6501f7e349e0664d281ac93b1db9c1e5ad",
+        "spirv-tools"),
+    GitRepo(
+        "https://github.com/KhronosGroup/glslang.git",
+        "git@github.com:KhronosGroup/glslang.git",
+        "bada5c87ec6db4441db129d8506742c4a72bd610",
+        "glslang",
+        removeTags = ["main-tot"]),
+    GitRepo(
+        "https://github.com/KhronosGroup/SPIRV-Headers.git",
+        "git@github.com:KhronosGroup/SPIRV-Headers.git",
+        "d3c2a6fa95ad463ca8044d7fc45557db381a6a64",
+        "spirv-headers"),
+    GitRepo(
+        "https://github.com/KhronosGroup/Vulkan-Docs.git",
+        "git@github.com:KhronosGroup/Vulkan-Docs.git",
+        "d99193d3fcc4b2a0dacc0a9d7e4951ea611a3e96",
+        "vulkan-docs"),
+    GitRepo(
+        "https://github.com/google/amber.git",
+        "git@github.com:google/amber.git",
+        "8e90b2d2f532bcd4a80069e3f37a9698209a21bc",
+        "amber"),
+    GitRepo(
+        "https://github.com/open-source-parsers/jsoncpp.git",
+        "git@github.com:open-source-parsers/jsoncpp.git",
+        "9059f5cad030ba11d37818847443a53918c327b1",
+        "jsoncpp"),
+    # NOTE: The samples application is not well suited to external
+    # integration, this fork contains the small fixes needed for use
+    # by the CTS.
+    GitRepo(
+        "https://github.com/Igalia/vk_video_samples.git",
+        "git@github.com:Igalia/vk_video_samples.git",
+        "6821adf11eb4f84a2168264b954c170d03237699",
+        "nvidia-video-samples"),
 ]
 
 def parseArgs ():
-	versionsForInsecure = ((2,7,9), (3,4,3))
-	versionsForInsecureStr = ' or '.join(('.'.join(str(x) for x in v)) for v in versionsForInsecure)
+    versionsForInsecure = ((2,7,9), (3,4,3))
+    versionsForInsecureStr = ' or '.join(('.'.join(str(x) for x in v)) for v in versionsForInsecure)
 
-	parser = argparse.ArgumentParser(description = "Fetch external sources")
-	parser.add_argument('--clean', dest='clean', action='store_true', default=False,
-						help='Remove sources instead of fetching')
-	parser.add_argument('--insecure', dest='insecure', action='store_true', default=False,
-						help="Disable certificate check for external sources."
-						" Minimum python version required " + versionsForInsecureStr)
-	parser.add_argument('--protocol', dest='protocol', default='https', choices=['ssh', 'https'],
-						help="Select protocol to checkout git repositories.")
-	parser.add_argument('--force', dest='force', action='store_true', default=False,
-						help="Pass --force to git fetch and checkout commands")
+    parser = argparse.ArgumentParser(description = "Fetch external sources")
+    parser.add_argument('--clean', dest='clean', action='store_true', default=False,
+                        help='Remove sources instead of fetching')
+    parser.add_argument('--insecure', dest='insecure', action='store_true', default=False,
+                        help="Disable certificate check for external sources."
+                        " Minimum python version required " + versionsForInsecureStr)
+    parser.add_argument('--protocol', dest='protocol', default='https', choices=['ssh', 'https'],
+                        help="Select protocol to checkout git repositories.")
+    parser.add_argument('--force', dest='force', action='store_true', default=False,
+                        help="Pass --force to git fetch and checkout commands")
+    parser.add_argument("-v", "--verbose",
+                        dest="verbose",
+                        action="store_true",
+                        help="Enable verbose logging")
+    args = parser.parse_args()
 
-	args = parser.parse_args()
+    if args.insecure:
+        for versionItem in versionsForInsecure:
+            if (sys.version_info.major == versionItem[0]):
+                if sys.version_info < versionItem:
+                    parser.error("For --insecure minimum required python version is " +
+                                versionsForInsecureStr)
+                break;
 
-	if args.insecure:
-		for versionItem in versionsForInsecure:
-			if (sys.version_info.major == versionItem[0]):
-				if sys.version_info < versionItem:
-					parser.error("For --insecure minimum required python version is " +
-								versionsForInsecureStr)
-				break;
-
-	return args
+    return args
 
 def run(*popenargs, **kwargs):
-	process = subprocess.Popen(*popenargs, **kwargs)
+    process = subprocess.Popen(*popenargs, **kwargs)
 
-	try:
-		stdout, stderr = process.communicate(None)
-	except:
-		process.kill()
-		process.wait()
-		raise
+    try:
+        stdout, stderr = process.communicate(None)
+    except:
+        process.kill()
+        process.wait()
+        raise
 
-	retcode = process.poll()
+    retcode = process.poll()
 
-	if retcode:
-		raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
+    if retcode:
+        raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
 
-	return retcode, stdout, stderr
+    return retcode, stdout, stderr
 
 if __name__ == "__main__":
-	# Rerun script with python3 as python2 does not have lzma (xz) decompression support
-	if sys.version_info < (3, 0):
-		if SYSTEM_NAME == 'Windows' or SYSTEM_NAME.startswith('CYGWIN') or SYSTEM_NAME.startswith('MINGW'):
-			cmd = ['py', '-3']
-		elif SYSTEM_NAME == 'Linux':
-			cmd = ['python3']
-		elif SYSTEM_NAME == 'Darwin':
-			cmd = ['python3']
-		else:
-			cmd = None  # unknown system
+    args = parseArgs()
+    initializeLogger(args.verbose)
 
-		cmd = cmd + sys.argv
-		run(cmd)
-	else:
-		args = parseArgs()
-
-		for pkg in PACKAGES:
-			if args.clean:
-				pkg.clean()
-			else:
-				pkg.update(args.protocol, args.force)
+    for pkg in PACKAGES:
+        if args.clean:
+            pkg.clean()
+        else:
+            pkg.update(args.protocol, args.force)

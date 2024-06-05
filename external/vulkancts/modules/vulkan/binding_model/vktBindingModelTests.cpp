@@ -33,6 +33,7 @@
 #include "vktBindingDynamicOffsetTests.hpp"
 #include "vktBindingMutableTests.hpp"
 #include "vktBindingDescriptorBufferTests.hpp"
+#include "vktBindingStagesTests.hpp"
 #endif // CTS_USES_VULKANSC
 
 namespace vkt
@@ -43,32 +44,33 @@ namespace BindingModel
 namespace
 {
 
-void createChildren (tcu::TestCaseGroup* group)
+void createChildren(tcu::TestCaseGroup *group)
 {
-	tcu::TestContext&	testCtx		= group->getTestContext();
+    tcu::TestContext &testCtx = group->getTestContext();
 
-	group->addChild(createShaderAccessTests(testCtx));
-	group->addChild(createDescriptorUpdateTests(testCtx));
-	group->addChild(createDescriptorSetRandomTests(testCtx));
-	group->addChild(createDescriptorCopyTests(testCtx));
-	group->addChild(createBufferDeviceAddressTests(testCtx));
+    group->addChild(createShaderAccessTests(testCtx));
+    group->addChild(createDescriptorUpdateTests(testCtx));
+    group->addChild(createDescriptorSetRandomTests(testCtx));
+    group->addChild(createDescriptorCopyTests(testCtx));
+    group->addChild(createBufferDeviceAddressTests(testCtx));
 #ifndef CTS_USES_VULKANSC
-	group->addChild(createDynamicOffsetTests(testCtx));
-	group->addChild(createDescriptorMutableTests(testCtx));
-	group->addChild(createDescriptorBufferTests(testCtx));
+    group->addChild(createDynamicOffsetTests(testCtx));
+    group->addChild(createDescriptorMutableTests(testCtx));
+    group->addChild(createDescriptorBufferTests(testCtx));
+    group->addChild(createStagesTests(testCtx));
 #endif
 
-	// \todo [2015-07-30 jarkko] .change_binding.{between_renderpasses, within_pass}
-	// \todo [2015-07-30 jarkko] .descriptor_set_chain
-	// \todo [2015-07-30 jarkko] .update_descriptor_set
+    // \todo [2015-07-30 jarkko] .change_binding.{between_renderpasses, within_pass}
+    // \todo [2015-07-30 jarkko] .descriptor_set_chain
+    // \todo [2015-07-30 jarkko] .update_descriptor_set
 }
 
-} // anonymous
+} // namespace
 
-tcu::TestCaseGroup* createTests (tcu::TestContext& testCtx)
+tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &name)
 {
-	return createTestGroup(testCtx, "binding_model", "Resource binding tests", createChildren);
+    return createTestGroup(testCtx, name, createChildren);
 }
 
-} // BindingModel
-} // vkt
+} // namespace BindingModel
+} // namespace vkt

@@ -5,7 +5,7 @@
 
 namespace vk
 {
-template<typename T> VkObjectType getObjectType	(void);
+template<typename T> VkObjectType getObjectType    (void);
 template<> inline VkObjectType	getObjectType<VkInstance>						(void) { return VK_OBJECT_TYPE_INSTANCE;						}
 template<> inline VkObjectType	getObjectType<VkPhysicalDevice>					(void) { return VK_OBJECT_TYPE_PHYSICAL_DEVICE;					}
 template<> inline VkObjectType	getObjectType<VkDevice>							(void) { return VK_OBJECT_TYPE_DEVICE;							}
@@ -45,6 +45,7 @@ template<> inline VkObjectType	getObjectType<VkCuModuleNVX>					(void) { return 
 template<> inline VkObjectType	getObjectType<VkCuFunctionNVX>					(void) { return VK_OBJECT_TYPE_CU_FUNCTION_NVX;					}
 template<> inline VkObjectType	getObjectType<VkOpticalFlowSessionNV>			(void) { return VK_OBJECT_TYPE_OPTICAL_FLOW_SESSION_NV;			}
 template<> inline VkObjectType	getObjectType<VkMicromapEXT>					(void) { return VK_OBJECT_TYPE_MICROMAP_EXT;					}
+template<> inline VkObjectType	getObjectType<VkShaderEXT>						(void) { return VK_OBJECT_TYPE_SHADER_EXT;						}
 template<> inline VkObjectType	getObjectType<VkDisplayKHR>						(void) { return VK_OBJECT_TYPE_DISPLAY_KHR;						}
 template<> inline VkObjectType	getObjectType<VkDisplayModeKHR>					(void) { return VK_OBJECT_TYPE_DISPLAY_MODE_KHR;				}
 template<> inline VkObjectType	getObjectType<VkSurfaceKHR>						(void) { return VK_OBJECT_TYPE_SURFACE_KHR;						}
@@ -53,4 +54,6 @@ template<> inline VkObjectType	getObjectType<VkDebugReportCallbackEXT>			(void) 
 template<> inline VkObjectType	getObjectType<VkDebugUtilsMessengerEXT>			(void) { return VK_OBJECT_TYPE_DEBUG_UTILS_MESSENGER_EXT;		}
 template<> inline VkObjectType	getObjectType<VkVideoSessionKHR>				(void) { return VK_OBJECT_TYPE_VIDEO_SESSION_KHR;				}
 template<> inline VkObjectType	getObjectType<VkVideoSessionParametersKHR>		(void) { return VK_OBJECT_TYPE_VIDEO_SESSION_PARAMETERS_KHR;	}
+template<> inline VkObjectType	getObjectType<VkCudaModuleNV>					(void) { return VK_OBJECT_TYPE_CUDA_MODULE_NV;					}
+template<> inline VkObjectType	getObjectType<VkCudaFunctionNV>					(void) { return VK_OBJECT_TYPE_CUDA_FUNCTION_NV;				}
 }

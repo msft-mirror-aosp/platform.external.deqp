@@ -29,6 +29,7 @@
 #include "vktQueryPoolStatisticsTests.hpp"
 #include "vktQueryPoolPerformanceTests.hpp"
 #include "vktQueryPoolConcurrentTests.hpp"
+#include "vktQueryPoolFragInvocationTests.hpp"
 
 namespace vkt
 {
@@ -38,24 +39,25 @@ namespace QueryPool
 namespace
 {
 
-void createChildren (tcu::TestCaseGroup* queryPoolTests)
+void createChildren(tcu::TestCaseGroup *queryPoolTests)
 {
-	tcu::TestContext&	testCtx		= queryPoolTests->getTestContext();
+    tcu::TestContext &testCtx = queryPoolTests->getTestContext();
 
-	queryPoolTests->addChild(new QueryPoolOcclusionTests(testCtx));
-	queryPoolTests->addChild(new QueryPoolStatisticsTests(testCtx));
+    queryPoolTests->addChild(new QueryPoolOcclusionTests(testCtx));
+    queryPoolTests->addChild(new QueryPoolStatisticsTests(testCtx));
 #ifndef CTS_USES_VULKANSC
-	queryPoolTests->addChild(new QueryPoolPerformanceTests(testCtx));
+    queryPoolTests->addChild(new QueryPoolPerformanceTests(testCtx));
 #endif
-	queryPoolTests->addChild(new QueryPoolConcurrentTests(testCtx));
+    queryPoolTests->addChild(new QueryPoolConcurrentTests(testCtx));
+    queryPoolTests->addChild(createFragInvocationTests(testCtx));
 }
 
-} // anonymous
+} // namespace
 
-tcu::TestCaseGroup* createTests (tcu::TestContext& testCtx)
+tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &name)
 {
-	return createTestGroup(testCtx, "query_pool", "query pool tests", createChildren);
+    return createTestGroup(testCtx, name, createChildren);
 }
 
-} // QueryPool
-} // vkt
+} // namespace QueryPool
+} // namespace vkt
