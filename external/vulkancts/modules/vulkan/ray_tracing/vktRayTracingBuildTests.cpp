@@ -174,7 +174,7 @@ RayTracingBuildTestInstance::~RayTracingBuildTestInstance (void)
 class RayTracingTestCase : public TestCase
 {
 	public:
-							RayTracingTestCase	(tcu::TestContext& context, const char* name, const char* desc, const CaseDef data);
+							RayTracingTestCase	(tcu::TestContext& context, const char* name, const CaseDef data);
 							~RayTracingTestCase	(void);
 
 	virtual	void			initPrograms		(SourceCollections& programCollection) const;
@@ -185,8 +185,8 @@ private:
 	CaseDef					m_data;
 };
 
-RayTracingTestCase::RayTracingTestCase (tcu::TestContext& context, const char* name, const char* desc, const CaseDef data)
-	: vkt::TestCase	(context, name, desc)
+RayTracingTestCase::RayTracingTestCase (tcu::TestContext& context, const char* name, const CaseDef data)
+	: vkt::TestCase	(context, name)
 	, m_data		(data)
 {
 	DE_ASSERT((m_data.width * m_data.height) == (m_data.squaresGroupCount * m_data.geometriesGroupCount * m_data.instancesGroupCount));
@@ -242,7 +242,7 @@ void RayTracingTestCase::initPrograms (SourceCollections& programCollection) con
 		css <<
 			"#version 460 core\n"
 			"#extension GL_EXT_ray_tracing : require\n"
-			"layout(location = 0) rayPayloadInEXT dummyPayload { vec4 dummy; };\n"
+			"layout(location = 0) rayPayloadInEXT vec3 unusedPayload;\n"
 			"layout(r32ui, set = 0, binding = 0) uniform uimage2D result;\n"
 			"void main()\n"
 			"{\n"
@@ -619,7 +619,7 @@ static void buildTest (tcu::TestCaseGroup* testParentGroup, deUint32 threadsCoun
 
 	for (size_t testsNdx = 0; testsNdx < DE_LENGTH_OF_ARRAY(tests); ++testsNdx)
 	{
-		de::MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, tests[testsNdx], ""));
+		de::MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, tests[testsNdx]));
 
 		for (size_t factorNdx = 0; factorNdx < DE_LENGTH_OF_ARRAY(factors); ++factorNdx)
 		for (size_t sizesNdx = 0; sizesNdx < DE_LENGTH_OF_ARRAY(sizes); ++sizesNdx)
@@ -649,7 +649,7 @@ static void buildTest (tcu::TestCaseGroup* testParentGroup, deUint32 threadsCoun
 			if (squaresGroupCount == 0 || geometriesGroupCount == 0 || instancesGroupCount == 0)
 				continue;
 
-			group->addChild(new RayTracingTestCase(testCtx, testName.c_str(), "", caseDef));
+			group->addChild(new RayTracingTestCase(testCtx, testName.c_str(), caseDef));
 		}
 
 		for (size_t factorNdx = 0; factorNdx < DE_LENGTH_OF_ARRAY(factors); ++factorNdx)
@@ -680,7 +680,7 @@ static void buildTest (tcu::TestCaseGroup* testParentGroup, deUint32 threadsCoun
 			if (squaresGroupCount == 0 || geometriesGroupCount == 0 || instancesGroupCount == 0)
 				continue;
 
-			group->addChild(new RayTracingTestCase(testCtx, testName.c_str(), "", caseDef));
+			group->addChild(new RayTracingTestCase(testCtx, testName.c_str(), caseDef));
 		}
 
 		for (size_t factorNdx = 0; factorNdx < DE_LENGTH_OF_ARRAY(factors); ++factorNdx)
@@ -711,7 +711,7 @@ static void buildTest (tcu::TestCaseGroup* testParentGroup, deUint32 threadsCoun
 			if (squaresGroupCount < 2 || geometriesGroupCount < 2 || instancesGroupCount < 2)
 				continue;
 
-			group->addChild(new RayTracingTestCase(testCtx, testName.c_str(), "", caseDef));
+			group->addChild(new RayTracingTestCase(testCtx, testName.c_str(), caseDef));
 		}
 
 		testParentGroup->addChild(group.release());
@@ -720,7 +720,8 @@ static void buildTest (tcu::TestCaseGroup* testParentGroup, deUint32 threadsCoun
 
 tcu::TestCaseGroup*	createBuildTests (tcu::TestContext& testCtx)
 {
-	de::MovePtr<tcu::TestCaseGroup> buildGroup(new tcu::TestCaseGroup(testCtx, "build", "Ray tracing build tests"));
+	// Ray tracing build tests
+	de::MovePtr<tcu::TestCaseGroup> buildGroup(new tcu::TestCaseGroup(testCtx, "build"));
 
 	const deUint32	threads[]	= { 0, 1, 2, 3, 4, 8, std::numeric_limits<deUint32>::max() };
 
@@ -749,7 +750,7 @@ tcu::TestCaseGroup*	createBuildTests (tcu::TestContext& testCtx)
 				groupDesc = "Compare results of run with acceleration structures build on CPU and using host threading";
 			}
 
-			de::MovePtr<tcu::TestCaseGroup> groupGpuCpuHt(new tcu::TestCaseGroup(testCtx, groupName.c_str(), groupDesc.c_str()));
+			de::MovePtr<tcu::TestCaseGroup> groupGpuCpuHt(new tcu::TestCaseGroup(testCtx, groupName.c_str()));
 			buildTest(groupGpuCpuHt.get(), threadCount, deviceBuild);
 			buildGroup->addChild(groupGpuCpuHt.release());
 		};

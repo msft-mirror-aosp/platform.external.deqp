@@ -62,6 +62,7 @@ typedef enum qpTestResult_e
 	QP_TEST_RESULT_CRASH,					/*!< Crash occurred in test execution.													*/
 	QP_TEST_RESULT_TIMEOUT,					/*!< Timeout occurred in test execution.												*/
 	QP_TEST_RESULT_WAIVER,					/*!< Status code reported by waived test.												*/
+	QP_TEST_RESULT_DEVICE_LOST,				/*!< Test caused a Device Lost error													*/
 
 	QP_TEST_RESULT_LAST
 } qpTestResult;
@@ -197,6 +198,7 @@ typedef struct qpEglConfigInfo_s
 	int							transparentRedValue;
 	int							transparentGreenValue;
 	int							transparentBlueValue;
+	deBool						recordableAndroid;
 } qpEglConfigInfo;
 
 

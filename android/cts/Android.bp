@@ -26,7 +26,7 @@ filegroup {
     name: "deqp_main_caselists",
     srcs: [
         "main/*.txt",
-        "main/vk-*/*.txt",
+        "main/vk-*/**/*.txt",
     ],
     path: "main",
 }
@@ -45,7 +45,7 @@ java_test_host {
     // Tag this module as a cts test artifact
     test_suites: [
         "cts",
-        "vts10",
+        "mcts",
         "general-tests",
         "mts",
         "automotive-general-tests",

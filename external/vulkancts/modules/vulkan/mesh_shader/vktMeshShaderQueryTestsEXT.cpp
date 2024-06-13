@@ -326,8 +326,8 @@ public:
 class MeshQueryCase : public vkt::TestCase
 {
 public:
-					MeshQueryCase	(tcu::TestContext& testCtx, const std::string& name, const std::string& description, TestParams&& params)
-						: vkt::TestCase	(testCtx, name, description)
+					MeshQueryCase	(tcu::TestContext& testCtx, const std::string& name, TestParams&& params)
+						: vkt::TestCase	(testCtx, name)
 						, m_params		(std::move(params))
 						{}
 	virtual			~MeshQueryCase	(void) {}
@@ -428,7 +428,7 @@ void MeshQueryCase::initPrograms (vk::SourceCollections &programCollection) cons
 		<< "    const float pixWidth = 2.0 / float(colCount);\n"
 		<< "    const float pixHeight = 2.0 / float(rowCount);\n"
 		<< "    const float horDelta = pixWidth / 4.0;\n"
-		<< "    const float verDelta = pixHeight / 4.0;\n"
+		<< "    const float verDelta = (pixHeight * 3.0) / 8.0;\n"
 		<< "\n"
 		<< "    const uint DrawIndex = " << (m_params.useTaskShader ? "td.drawIndex" : "uint(gl_DrawID)") << ";\n"
 		<< "    const uint currentWGIndex = (" << (m_params.useTaskShader ? "2u * td.branch[min(gl_LocalInvocationIndex, " + std::to_string(kTaskLocalInvocations - 1u) + ")] + " : "") << "gl_WorkGroupID.x + gl_WorkGroupID.y + gl_WorkGroupID.z);\n"
@@ -459,7 +459,7 @@ void MeshQueryCase::initPrograms (vk::SourceCollections &programCollection) cons
 	case GeometryType::LINES:
 		mesh
 			<< "        gl_MeshVerticesEXT[firstVert + 0].gl_Position = vec4(xCenter - horDelta, yCenter, 0.0, 1.0);\n"
-			<< "        gl_MeshVerticesEXT[firstVert + 1].gl_Position = vec4(xCenter + horDelta, yCenter, 0.0, 1.0);\n"
+			<< "        gl_MeshVerticesEXT[firstVert + 1].gl_Position = vec4(xCenter + horDelta, yCenter - verDelta, 0.0, 1.0);\n"
 			<< "        gl_PrimitiveLineIndicesEXT[col] = uvec2(firstVert, firstVert + 1);\n"
 			;
 		break;
@@ -520,8 +520,12 @@ void MeshQueryCase::checkSupport (Context& context) const
 	checkTaskMeshShaderSupportEXT(context, m_params.useTaskShader/*requireTask*/, true/*requireMesh*/);
 
 	const auto& meshFeatures = context.getMeshShaderFeaturesEXT();
-	if (!meshFeatures.meshShaderQueries)
-		TCU_THROW(NotSupportedError, "meshShaderQueries not supported");
+
+	if (!m_params.queryTypes.empty())
+	{
+		if (!meshFeatures.meshShaderQueries)
+			TCU_THROW(NotSupportedError, "meshShaderQueries not supported");
+	}
 
 	if (m_params.areQueriesInherited())
 		context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_INHERITED_QUERIES);
@@ -1325,7 +1329,7 @@ using GroupPtr = de::MovePtr<tcu::TestCaseGroup>;
 
 tcu::TestCaseGroup* createMeshShaderQueryTestsEXT (tcu::TestContext& testCtx)
 {
-	GroupPtr queryGroup (new tcu::TestCaseGroup(testCtx, "query", "Mesh Shader Query Tests"));
+	GroupPtr queryGroup (new tcu::TestCaseGroup(testCtx, "query"));
 
 	const struct
 	{
@@ -1333,6 +1337,7 @@ tcu::TestCaseGroup* createMeshShaderQueryTestsEXT (tcu::TestContext& testCtx)
 		const char*				name;
 	} queryCombinations[] =
 	{
+		{ {},																					"no_queries"		},
 		{ { QueryType::PRIMITIVES },															"prim_query"		},
 		{ { QueryType::TASK_INVOCATIONS },														"task_invs_query"	},
 		{ { QueryType::MESH_INVOCATIONS },														"mesh_invs_query"	},
@@ -1467,39 +1472,52 @@ tcu::TestCaseGroup* createMeshShaderQueryTestsEXT (tcu::TestContext& testCtx)
 
 	for (const auto& queryCombination : queryCombinations)
 	{
-		const bool hasPrimitivesQuery = de::contains(queryCombination.queryTypes.begin(), queryCombination.queryTypes.end(), QueryType::PRIMITIVES);
+		const bool noQueries			= queryCombination.queryTypes.empty();
+		const bool hasPrimitivesQuery	= de::contains(queryCombination.queryTypes.begin(), queryCombination.queryTypes.end(), QueryType::PRIMITIVES);
 
-		GroupPtr queryCombinationGroup (new tcu::TestCaseGroup(testCtx, queryCombination.name, ""));
+		GroupPtr queryCombinationGroup (new tcu::TestCaseGroup(testCtx, queryCombination.name));
 
 		for (const auto& geometryCase : geometryCases)
 		{
+			if (noQueries && geometryCase.geometry != GeometryType::LINES)
+				continue;
+
 			const bool nonTriangles = (geometryCase.geometry != GeometryType::TRIANGLES);
 
 			// For cases without primitive queries, skip non-triangle geometries.
-			if (!hasPrimitivesQuery && nonTriangles)
+			if (!hasPrimitivesQuery && !noQueries && nonTriangles)
 				continue;
 
-			GroupPtr geometryCaseGroup (new tcu::TestCaseGroup(testCtx, geometryCase.name, ""));
+			GroupPtr geometryCaseGroup (new tcu::TestCaseGroup(testCtx, geometryCase.name));
 
 			for (const auto& resetType : resetTypes)
 			{
-				GroupPtr resetTypeGroup (new tcu::TestCaseGroup(testCtx, resetType.name, ""));
+				if (noQueries && resetType.resetCase != ResetCase::NONE)
+					continue;
+
+				GroupPtr resetTypeGroup (new tcu::TestCaseGroup(testCtx, resetType.name));
 
 				for (const auto& accessMethod : accessMethods)
 				{
+					if (noQueries && accessMethod.accessMethod != AccessMethod::COPY)
+						continue;
+
 					// Get + reset after access is not a valid combination (queries will be accessed after submission).
 					if (accessMethod.accessMethod == AccessMethod::GET && resetType.resetCase == ResetCase::AFTER_ACCESS)
 						continue;
 
-					GroupPtr accessMethodGroup (new tcu::TestCaseGroup(testCtx, accessMethod.name, ""));
+					GroupPtr accessMethodGroup (new tcu::TestCaseGroup(testCtx, accessMethod.name));
 
 					for (const auto& waitCase : waitCases)
 					{
+						if (noQueries && waitCase.waitFlag)
+							continue;
+
 						// Wait and reset before access is not valid (the query would never finish).
 						if (resetType.resetCase == ResetCase::BEFORE_ACCESS && waitCase.waitFlag)
 							continue;
 
-						GroupPtr waitCaseGroup (new tcu::TestCaseGroup(testCtx, waitCase.name, ""));
+						GroupPtr waitCaseGroup (new tcu::TestCaseGroup(testCtx, waitCase.name));
 
 						for (const auto& drawCall : drawCalls)
 						{
@@ -1507,23 +1525,29 @@ tcu::TestCaseGroup* createMeshShaderQueryTestsEXT (tcu::TestContext& testCtx)
 							if (drawCall.drawCallType != DrawCallType::DIRECT && nonTriangles)
 								continue;
 
-							GroupPtr drawCallGroup (new tcu::TestCaseGroup(testCtx, drawCall.name, ""));
+							GroupPtr drawCallGroup (new tcu::TestCaseGroup(testCtx, drawCall.name));
 
 							for (const auto& resultSize : resultSizes)
 							{
+								if (noQueries && resultSize.use64Bits)
+									continue;
+
 								// Explicitly remove some combinations with non-triangles, just to reduce the number of tests.
 								if (resultSize.use64Bits && nonTriangles)
 									continue;
 
-								GroupPtr resultSizeGroup (new tcu::TestCaseGroup(testCtx, resultSize.name, ""));
+								GroupPtr resultSizeGroup (new tcu::TestCaseGroup(testCtx, resultSize.name));
 
 								for (const auto& availabilityCase : availabilityCases)
 								{
+									if (noQueries && availabilityCase.availabilityFlag)
+										continue;
+
 									// Explicitly remove some combinations with non-triangles, just to reduce the number of tests.
 									if (availabilityCase.availabilityFlag && nonTriangles)
 										continue;
 
-									GroupPtr availabilityCaseGroup (new tcu::TestCaseGroup(testCtx, availabilityCase.name, ""));
+									GroupPtr availabilityCaseGroup (new tcu::TestCaseGroup(testCtx, availabilityCase.name));
 
 									for (const auto& blockCase : blockCases)
 									{
@@ -1531,22 +1555,25 @@ tcu::TestCaseGroup* createMeshShaderQueryTestsEXT (tcu::TestContext& testCtx)
 										if (blockCase.drawBlocks.size() <= 1 && nonTriangles)
 											continue;
 
-										GroupPtr blockCaseGroup (new tcu::TestCaseGroup(testCtx, blockCase.name, ""));
+										GroupPtr blockCaseGroup (new tcu::TestCaseGroup(testCtx, blockCase.name));
 
 										for (const auto& taskShaderCase : taskShaderCases)
 										{
-											GroupPtr taskShaderCaseGroup (new tcu::TestCaseGroup(testCtx, taskShaderCase.name, ""));
+											GroupPtr taskShaderCaseGroup (new tcu::TestCaseGroup(testCtx, taskShaderCase.name));
 
 											for (const auto& orderingCase : orderingCases)
 											{
-												GroupPtr orderingCaseGroup (new tcu::TestCaseGroup(testCtx, orderingCase.name, ""));
+												if (noQueries && !orderingCase.insideRenderPass)
+													continue;
+
+												GroupPtr orderingCaseGroup (new tcu::TestCaseGroup(testCtx, orderingCase.name));
 
 												for (const auto& multiViewCase : multiViewCases)
 												{
 													if (multiViewCase.multiView && !orderingCase.insideRenderPass)
 														continue;
 
-													GroupPtr multiViewGroup (new tcu::TestCaseGroup(testCtx, multiViewCase.name, ""));
+													GroupPtr multiViewGroup (new tcu::TestCaseGroup(testCtx, multiViewCase.name));
 
 													for (const auto& cmdBufferType : cmdBufferTypes)
 													{
@@ -1569,7 +1596,7 @@ tcu::TestCaseGroup* createMeshShaderQueryTestsEXT (tcu::TestContext& testCtx)
 														if (params.areQueriesInherited() && params.hasPrimitivesQuery())
 															continue;
 
-														multiViewGroup->addChild(new MeshQueryCase(testCtx, cmdBufferType.name, "", std::move(params)));
+														multiViewGroup->addChild(new MeshQueryCase(testCtx, cmdBufferType.name, std::move(params)));
 													}
 
 													orderingCaseGroup->addChild(multiViewGroup.release());
