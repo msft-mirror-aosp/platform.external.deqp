@@ -165,7 +165,17 @@ echo "Regenerating inl files"
 rm -rf external/glslang/src/
 # Some files seem to be left over in vulkan-docs when hopping between branches
 git -C external/vulkan-docs/src/ clean -fd
-python3 scripts/check_build_sanity.py -r gen-inl-files > /dev/null
+
+if grep -q -e "--skip-post-checks" "scripts/check_build_sanity.py"; then
+    skip_diff_check=" --skip-post-checks "
+else
+    skip_diff_check=""
+fi
+
+python3 scripts/check_build_sanity.py -r gen-inl-files $skip_diff_check > /dev/null
+if [ -z "$skip_diff_check" ]; then
+    echo "It is expected that the previous lines report: Exception: Failed to execute '['git', 'diff', '--exit-code']', got 1"
+fi
 # This file is not being regenerated but its output will be slightly different.
 # Much faster to just fix it here than to regenerate mustpass
 sed -b -i '4,15s/\t/    /g' external/vulkancts/mustpass/AndroidTest.xml
