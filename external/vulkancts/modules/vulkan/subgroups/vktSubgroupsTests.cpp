@@ -40,6 +40,7 @@
 #ifndef CTS_USES_VULKANSC
 #include "vktSubgroupsPartitionedTests.hpp"
 #include "vktSubgroupUniformControlFlowTests.hpp"
+#include "vktSubgroupsQuadControlTests.hpp"
 #endif // CTS_USES_VULKANSC
 #include "vktSubgroupsMultipleDispatchesUniformSubgroupSizeTests.hpp"
 #include "vktTestGroupUtil.hpp"
@@ -76,15 +77,16 @@ void createChildren(tcu::TestCaseGroup* subgroupsTests)
 	subgroupsTests->addChild(createSubgroupsSizeControlTests(testCtx));
 #ifndef CTS_USES_VULKANSC
 	subgroupsTests->addChild(createSubgroupUniformControlFlowTests(testCtx));
+	subgroupsTests->addChild(createSubgroupsQuadControlTests(testCtx));
 #endif // CTS_USES_VULKANSC
 }
 
 } // anonymous
 
-tcu::TestCaseGroup* createTests(tcu::TestContext& testCtx)
+tcu::TestCaseGroup* createTests(tcu::TestContext& testCtx, const std::string& name)
 {
 	return createTestGroup(
-			   testCtx, "subgroups", "Subgroups tests", createChildren);
+			   testCtx, name.c_str(), createChildren);
 }
 
 } // subgroups

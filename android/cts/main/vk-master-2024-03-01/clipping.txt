@@ -1,3 +1,0 @@
-dEQP-VK.clipping.clip_volume.clipped.large_points
-dEQP-VK.clipping.clip_volume.clipped.wide_lines_axis_aligned
-dEQP-VK.clipping.clip_volume.clipped.wide_lines_diagonal

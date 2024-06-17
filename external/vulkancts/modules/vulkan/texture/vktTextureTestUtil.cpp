@@ -59,19 +59,6 @@ namespace texture
 namespace util
 {
 
-deUint32 findQueueFamilyIndexWithCaps (const InstanceInterface& vkInstance, VkPhysicalDevice physicalDevice, VkQueueFlags requiredCaps)
-{
-	const std::vector<VkQueueFamilyProperties>	queueProps	= getPhysicalDeviceQueueFamilyProperties(vkInstance, physicalDevice);
-
-	for (size_t queueNdx = 0; queueNdx < queueProps.size(); queueNdx++)
-	{
-		if ((queueProps[queueNdx].queueFlags & requiredCaps) == requiredCaps)
-			return (deUint32)queueNdx;
-	}
-
-	TCU_THROW(NotSupportedError, "No matching queue found");
-}
-
 struct ShaderParameters {
 	float		bias;				//!< User-supplied bias.
 	float		ref;				//!< Reference value for shadow lookups.
@@ -499,21 +486,6 @@ void TextureBinding::updateTextureViewMipLevels (deUint32 baseLevel, deUint32 ma
 	m_textureImageView		= createImageView(vkd, m_device, &viewParams);
 }
 
-static
-std::vector<std::string> removeExtensions (const std::vector<std::string>& a, const std::vector<const char*>& b)
-{
-	std::vector<std::string>	res;
-	std::set<std::string>		removeExts	(b.begin(), b.end());
-
-	for (std::vector<std::string>::const_iterator aIter = a.begin(); aIter != a.end(); ++aIter)
-	{
-		if (!de::contains(removeExts, *aIter))
-			res.push_back(*aIter);
-	}
-
-	return res;
-}
-
 Move<VkDevice> createRobustBufferAccessDevice (Context& context, const VkPhysicalDeviceFeatures2* enabledFeatures2)
 {
 	const float queuePriority = 1.0f;
@@ -531,15 +503,7 @@ Move<VkDevice> createRobustBufferAccessDevice (Context& context, const VkPhysica
 
 	// \note Extensions in core are not explicitly enabled even though
 	//		 they are in the extension list advertised to tests.
-    std::vector<const char*>	extensionPtrs;
-	std::vector<const char*>	coreExtensions;
-	getCoreDeviceExtensions(context.getUsedApiVersion(), coreExtensions);
-    std::vector<std::string>	nonCoreExtensions(removeExtensions(context.getDeviceExtensions(), coreExtensions));
-
-	extensionPtrs.resize(nonCoreExtensions.size());
-
-	for (size_t ndx = 0; ndx < nonCoreExtensions.size(); ++ndx)
-		extensionPtrs[ndx] = nonCoreExtensions[ndx].c_str();
+	const auto& extensionPtrs = context.getDeviceCreationExtensions();
 
 	const VkDeviceCreateInfo		deviceParams =
 	{
@@ -549,10 +513,10 @@ Move<VkDevice> createRobustBufferAccessDevice (Context& context, const VkPhysica
 		1u,										// deUint32							queueCreateInfoCount;
 		&queueParams,							// const VkDeviceQueueCreateInfo*	pQueueCreateInfos;
 		0u,										// deUint32							enabledLayerCount;
-		DE_NULL,								// const char* const*				ppEnabledLayerNames;
-		(deUint32)extensionPtrs.size(),			// deUint32							enabledExtensionCount;
-		(extensionPtrs.empty() ? DE_NULL : &extensionPtrs[0]),	// const char* const*				ppEnabledExtensionNames;
-		DE_NULL									// const VkPhysicalDeviceFeatures*	pEnabledFeatures;
+		nullptr,								// const char* const*				ppEnabledLayerNames;
+		de::sizeU32(extensionPtrs),				// deUint32							enabledExtensionCount;
+		de::dataOrNull(extensionPtrs),			// const char* const*				ppEnabledExtensionNames;
+		nullptr									// const VkPhysicalDeviceFeatures*	pEnabledFeatures;
 	};
 
 	return createCustomDevice(context.getTestContext().getCommandLine().isValidationEnabled(), context.getPlatformInterface(),

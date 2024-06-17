@@ -32,7 +32,13 @@
 #include "vktRayQueryDirectionTests.hpp"
 #include "vktRayQueryBarycentricCoordinatesTests.hpp"
 #include "vktRayQueryNonUniformArgsTests.hpp"
+#include "vktRayQueryMultipleRayQueries.hpp"
 #include "vktRayQueryOpacityMicromapTests.hpp"
+#include "vktRayQueryPositionFetchTests.hpp"
+#include "vktRayQueryStressTests.hpp"
+
+
+
 
 #include "deUniquePtr.hpp"
 
@@ -43,9 +49,9 @@ namespace vkt
 namespace RayQuery
 {
 
-tcu::TestCaseGroup*	createTests (tcu::TestContext& testCtx)
+tcu::TestCaseGroup*	createTests (tcu::TestContext& testCtx, const std::string& name)
 {
-	de::MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, "ray_query", "Ray query tests"));
+	de::MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, name.c_str()));
 
 	group->addChild(createBuiltinTests(testCtx));
 	group->addChild(createTraversalControlTests(testCtx));
@@ -61,6 +67,9 @@ tcu::TestCaseGroup*	createTests (tcu::TestContext& testCtx)
 	group->addChild(createNonUniformArgsTests(testCtx));
 	group->addChild(addHelperInvocationsTests(testCtx));
 	group->addChild(createOpacityMicromapTests(testCtx));
+	group->addChild(createPositionFetchTests(testCtx));
+	group->addChild(createMultipleRayQueryTests(testCtx));
+	group->addChild(createRayQueryStressTests(testCtx));
 
 	return group.release();
 }
