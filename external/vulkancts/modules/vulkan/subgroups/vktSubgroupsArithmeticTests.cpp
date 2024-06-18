@@ -195,16 +195,18 @@ string getTestSrc (const CaseDefinition& caseDef)
 {
 	const string indexVars = getIndexVars(caseDef);
 
-	return	"  uvec4 mask = subgroupBallot(true);\n"
+	string shader = "  uvec4 mask = subgroupBallot(true);\n"
 			+ indexVars +
 			"  " + subgroups::getFormatNameForGLSL(caseDef.format) + " ref = "
 			+ getIdentity(caseDef.op, caseDef.format) + ";\n"
 			"  tempRes = 0;\n"
+			"  uint identityOnly = 0x3\n;"
 			"  for (uint index = start; index < end; index++)\n"
 			"  {\n"
 			"    if (subgroupBallotBitExtract(mask, index))\n"
 			"    {\n"
 			"      ref = " + getOpOperation(caseDef.op, caseDef.format, "ref", "data[index]") + ";\n"
+			"      identityOnly &= ~0x1;\n"
 			"    }\n"
 			"  }\n"
 			"  tempRes = " + getCompare(caseDef.op, caseDef.format, "ref", getOpTypeName(caseDef.op, caseDef.scanType) + "(data[gl_SubgroupInvocationID])") + " ? 0x1 : 0;\n"
@@ -217,6 +219,7 @@ string getTestSrc (const CaseDefinition& caseDef)
 			"      if (subgroupBallotBitExtract(mask, index))\n"
 			"      {\n"
 			"        ref = " + getOpOperation(caseDef.op, caseDef.format, "ref", "data[index]") + ";\n"
+			"        identityOnly &= ~0x2;\n"
 			"      }\n"
 			"    }\n"
 			"    tempRes |= " + getCompare(caseDef.op, caseDef.format, "ref", getOpTypeName(caseDef.op, caseDef.scanType) + "(data[gl_SubgroupInvocationID])") + " ? 0x2 : 0;\n"
@@ -225,6 +228,13 @@ string getTestSrc (const CaseDefinition& caseDef)
 			"  {\n"
 			"    tempRes |= 0x2;\n"
 			"  }\n";
+
+	// Can't test max or min identity as they are +/-inf, which the SPIR-V
+	// compiler is allowed to assume don't occur in the program
+	if (caseDef.op == OPERATOR_MIN || caseDef.op == OPERATOR_MAX)
+		shader += "  tempRes |= identityOnly;\n";
+
+	return shader;
 }
 
 void initFrameBufferPrograms (SourceCollections& programCollection, CaseDefinition caseDef)
@@ -446,14 +456,14 @@ namespace subgroups
 {
 TestCaseGroup* createSubgroupsArithmeticTests (TestContext& testCtx)
 {
-	de::MovePtr<TestCaseGroup>	group				(new TestCaseGroup(testCtx, "arithmetic", "Subgroup arithmetic category tests"));
+	de::MovePtr<TestCaseGroup>	group				(new TestCaseGroup(testCtx, "arithmetic"));
 
-	de::MovePtr<TestCaseGroup>	graphicGroup		(new TestCaseGroup(testCtx, "graphics", "Subgroup arithmetic category tests: graphics"));
-	de::MovePtr<TestCaseGroup>	computeGroup		(new TestCaseGroup(testCtx, "compute", "Subgroup arithmetic category tests: compute"));
-	de::MovePtr<TestCaseGroup>	framebufferGroup	(new TestCaseGroup(testCtx, "framebuffer", "Subgroup arithmetic category tests: framebuffer"));
+	de::MovePtr<TestCaseGroup>	graphicGroup		(new TestCaseGroup(testCtx, "graphics"));
+	de::MovePtr<TestCaseGroup>	computeGroup		(new TestCaseGroup(testCtx, "compute"));
+	de::MovePtr<TestCaseGroup>	framebufferGroup	(new TestCaseGroup(testCtx, "framebuffer"));
 #ifndef CTS_USES_VULKANSC
-	de::MovePtr<TestCaseGroup>	raytracingGroup		(new TestCaseGroup(testCtx, "ray_tracing", "Subgroup arithmetic category tests: ray tracing"));
-	de::MovePtr<TestCaseGroup>	meshGroup			(new TestCaseGroup(testCtx, "mesh", "Subgroup arithmetic category tests: mesh"));
+	de::MovePtr<TestCaseGroup>	raytracingGroup		(new TestCaseGroup(testCtx, "ray_tracing"));
+	de::MovePtr<TestCaseGroup>	meshGroup			(new TestCaseGroup(testCtx, "mesh"));
 #endif // CTS_USES_VULKANSC
 
 	const VkShaderStageFlags	fbStages[]			=
@@ -521,7 +531,7 @@ TestCaseGroup* createSubgroupsArithmeticTests (TestContext& testCtx)
 						DE_FALSE						//  deBool				requires16BitUniformBuffer;
 					};
 
-					addFunctionCaseWithPrograms(computeGroup.get(), testName, "", supportedCheck, initPrograms, test, caseDef);
+					addFunctionCaseWithPrograms(computeGroup.get(), testName,supportedCheck, initPrograms, test, caseDef);
 				}
 
 #ifndef CTS_USES_VULKANSC
@@ -543,7 +553,7 @@ TestCaseGroup* createSubgroupsArithmeticTests (TestContext& testCtx)
 							DE_FALSE						//  deBool				requires16BitUniformBuffer;
 						};
 
-						addFunctionCaseWithPrograms(meshGroup.get(), testName, "", supportedCheck, initPrograms, test, caseDef);
+						addFunctionCaseWithPrograms(meshGroup.get(), testName,supportedCheck, initPrograms, test, caseDef);
 					}
 				}
 #endif // CTS_USES_VULKANSC
@@ -561,7 +571,7 @@ TestCaseGroup* createSubgroupsArithmeticTests (TestContext& testCtx)
 						DE_FALSE						//  deBool				requires16BitUniformBuffer;
 					};
 
-					addFunctionCaseWithPrograms(graphicGroup.get(), name, "", supportedCheck, initPrograms, test, caseDef);
+					addFunctionCaseWithPrograms(graphicGroup.get(), name, supportedCheck, initPrograms, test, caseDef);
 				}
 
 				for (int stageIndex = 0; stageIndex < DE_LENGTH_OF_ARRAY(fbStages); ++stageIndex)
@@ -579,7 +589,7 @@ TestCaseGroup* createSubgroupsArithmeticTests (TestContext& testCtx)
 					};
 					const string			testName	= name + "_" + getShaderStageName(caseDef.shaderStage);
 
-					addFunctionCaseWithPrograms(framebufferGroup.get(), testName, "", supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
+					addFunctionCaseWithPrograms(framebufferGroup.get(), testName,supportedCheck, initFrameBufferPrograms, noSSBOtest, caseDef);
 				}
 			}
 		}
@@ -625,7 +635,7 @@ TestCaseGroup* createSubgroupsArithmeticTests (TestContext& testCtx)
 					};
 					const string			name	= de::toLower(getOpTypeName(op, st)) + "_" + formatName;
 
-					addFunctionCaseWithPrograms(raytracingGroup.get(), name, "", supportedCheck, initPrograms, test, caseDef);
+					addFunctionCaseWithPrograms(raytracingGroup.get(), name, supportedCheck, initPrograms, test, caseDef);
 				}
 			}
 		}
