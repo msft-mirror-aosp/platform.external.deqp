@@ -67,6 +67,7 @@ static const string					defaultVertexShader					=
 static const string					fragmentShaderTemplate				=
 	"#version 300 es\n"
 	"precision highp float;\n"
+	"precision highp int;\n"
 	"out vec4 my_FragColor;\n"
 	"${TEST_GLOBALS}"
 	"void main()\n"
@@ -374,7 +375,7 @@ NumberParsingCase::IterateResult NumberParsingCase::iterate(void)
 
 	const std::vector<glu::VertexArrayBinding> vertexArrays =
 	{
-		glu::va::Float("vPosition", 2, positions.size(), 0, positions.data()),
+		glu::va::Float("vPosition", 2, (int)positions.size(), 0, positions.data()),
 	};
 
 	gl.useProgram(program.getProgram());

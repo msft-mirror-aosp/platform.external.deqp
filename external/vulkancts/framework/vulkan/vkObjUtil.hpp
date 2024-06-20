@@ -42,10 +42,12 @@ Move<VkPipeline> makeComputePipeline (const DeviceInterface&					vk,
 									  const VkDevice							device,
 									  const VkPipelineLayout					pipelineLayout,
 									  const VkPipelineCreateFlags				pipelineFlags,
+									  const void*								pipelinePNext,
 									  const VkShaderModule						shaderModule,
 									  const VkPipelineShaderStageCreateFlags	shaderFlags,
 									  const VkSpecializationInfo*				specializationInfo = DE_NULL,
-									  const VkPipelineCache						pipelineCache = DE_NULL);
+									  const VkPipelineCache						pipelineCache = DE_NULL,
+									  const uint32_t							subgroupSize = 0);
 
 Move<VkPipeline> makeComputePipeline (const DeviceInterface&	vk,
 									  VkDevice					device,
@@ -143,7 +145,8 @@ Move<VkRenderPass> makeRenderPass (const DeviceInterface&				vk,
 								   const VkImageLayout					finalLayoutDepthStencil		= VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
 								   const VkImageLayout					subpassLayoutColor			= VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
 								   const VkImageLayout					subpassLayoutDepthStencil	= VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-								   const VkAllocationCallbacks* const	allocationCallbacks			= DE_NULL);
+								   const VkAllocationCallbacks* const	allocationCallbacks			= nullptr,
+								   const void*							pNext						= nullptr);
 
 Move<VkImageView> makeImageView (const DeviceInterface&					vk,
 								 const VkDevice							vkDevice,

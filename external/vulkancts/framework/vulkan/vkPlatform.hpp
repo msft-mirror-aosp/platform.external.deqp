@@ -33,8 +33,8 @@
 	#include <vector>
 	#include <map>
 	#include "vkResourceInterface.hpp"
-#include "tcuCommandLine.hpp"
 #endif // CTS_USES_VULKANSC
+#include "tcuCommandLine.hpp"
 
 namespace tcu
 {
@@ -123,7 +123,9 @@ class DeviceDriver : public DeviceInterface
 public:
 						DeviceDriver		(const PlatformInterface&			platformInterface,
 											 VkInstance							instance,
-											 VkDevice							device);
+											 VkDevice							device,
+											 uint32_t							usedApiVersion,
+											 const tcu::CommandLine&			cmdLine);
 	virtual				~DeviceDriver		(void);
 
 #include "vkConcreteDeviceInterface.inl"
@@ -141,6 +143,7 @@ protected:
 #include "vkDeviceFunctionPointers.inl"
 	};
 
+	bool		m_computeOnlyMode;
 	Functions	m_vk;
 };
 
@@ -160,7 +163,8 @@ public:
 																			 const tcu::CommandLine&						cmdLine,
 																			 de::SharedPtr<vk::ResourceInterface>			resourceInterface,
 																			 const VkPhysicalDeviceVulkanSC10Properties&	physicalDeviceVulkanSC10Properties,
-																			 const VkPhysicalDeviceProperties&				physicalDeviceProperties);
+																			 const VkPhysicalDeviceProperties&				physicalDeviceProperties,
+																			 const uint32_t									usedApiVersion);
 	virtual								~DeviceDriverSC						(void);
 
 #include "vkConcreteDeviceInterface.inl"
@@ -369,6 +373,7 @@ private:
 };
 
 #endif // CTS_USES_VULKANSC
+#define THROW_NOT_SUPPORTED_COMPUTE_ONLY() TCU_THROW(NotSupportedError, "Not compute-only")
 
 // Single device driver pointer type which will differ in SC and non-SC mode helping clearing the code
 #ifndef CTS_USES_VULKANSC
@@ -392,8 +397,6 @@ public:
 	enum LibraryType
 	{
 		LIBRARY_TYPE_VULKAN						= 0,
-		LIBRARY_TYPE_VULKAN_VIDEO_DECODE_PARSER,
-
 		LIBRARY_TYPE_LAST
 	};
 
