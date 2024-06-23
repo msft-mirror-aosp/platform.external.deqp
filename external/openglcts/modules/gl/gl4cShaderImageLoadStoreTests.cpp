@@ -3795,7 +3795,7 @@ class BasicAllTargetsAtomic : public ShaderImageLoadStoreBase
 		   << FormatEnumToString(internalformat) << ") coherent uniform " << TypePrefix<T>()
 		   << "imageCube g_image_cube;" NL "layout(" << FormatEnumToString(internalformat) << ") coherent uniform "
 		   << TypePrefix<T>()
-		   << "imageCube g_image_cube_array;" NL "void main() {" NL "  o_color = vec4(0.0, 1.0, 0.0, 1.0);" NL
+		   << "imageCubeArray g_image_cube_array;" NL "void main() {" NL "  o_color = vec4(0.0, 1.0, 0.0, 1.0);" NL
 			  "  ivec2 coord = ivec2(gl_FragCoord.xy);"
 
 			NL "  if (imageAtomicAdd(g_image_cube, ivec3(coord, 0), 2) != 0) o_color = vec4(1.0, 0.0, 0.0, 1.0);" NL
@@ -5550,6 +5550,8 @@ class AdvancedSyncImageAccess2 : public ShaderImageLoadStoreBase
 
 		glUniform4f(glGetUniformLocation(m_store_program, "g_color"), 0.0f, 1.0f, 0.0f, 1.0f);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+		glMemoryBarrier(GL_TEXTURE_FETCH_BARRIER_BIT);
 
 		glClear(GL_COLOR_BUFFER_BIT);
 		glBindTexture(GL_TEXTURE_2D, m_texture);
