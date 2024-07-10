@@ -235,11 +235,18 @@ private:
 	de::Random						m_random;		// Used to generate random offsets.
 	deUint32						m_infoCount;	// How many infos have we appended so far?
 	std::vector<deUint8>			m_dataVec;		// Data vector in generic form.
+	bool							m_finalized;	// Finished appending data.
 
 	// Are draws indexed and using the offset member of VkMultiDrawIndexedInfoEXT?
 	static bool indexedWithOffset (DrawType drawType, const tcu::Maybe<VertexOffsetType>& offsetType)
 	{
 		return (drawType == DrawType::INDEXED && *offsetType != VertexOffsetType::CONSTANT_PACK);
+	}
+
+	// Are draws indexed and packed?
+	static bool indexedPacked(DrawType drawType, const tcu::Maybe<VertexOffsetType> &offsetType)
+	{
+		return (drawType == DrawType::INDEXED && *offsetType == VertexOffsetType::CONSTANT_PACK);
 	}
 
 	// Size in bytes for the base structure used with the given draw type.
@@ -275,14 +282,16 @@ public:
 		, m_random		(seed)
 		, m_infoCount	(0u)
 		, m_dataVec		()
+		, m_finalized	(false)
 	{
 		// estimatedInfoCount is used to avoid excessive reallocation.
-		if (estimatedInfoCount > 0u)
-			m_dataVec.reserve(estimatedInfoCount * entrySize());
+		m_dataVec.reserve((estimatedInfoCount + 1u) * entrySize());
 	}
 
 	void addDrawInfo (deUint32 first, deUint32 count, deInt32 offset)
 	{
+		DE_ASSERT(!m_finalized);
+
 		std::vector<deUint8> entry(entrySize(), 0);
 
 		if (indexedWithOffset(m_drawType, m_offsetType))
@@ -301,13 +310,34 @@ public:
 		++m_infoCount;
 	}
 
+	void finalize()
+	{
+		if (indexedPacked(m_drawType, m_offsetType) && m_infoCount > 0u)
+		{
+			// VUID-vkCmdDrawMultiIndexedEXT-drawCount-04940 says:
+			// If drawCount is greater than zero, pIndexInfo must be a valid pointer to memory containing one or more
+			// valid instances of VkMultiDrawIndexedInfoEXT structures
+			//
+			// This means if infoCount is greater than zero, we need to have enough bytes in the buffer so that reading
+			// a VkMultiDrawIndexedInfoEXT structure (12 bytes) at the last offset does not produce an OOB read. As
+			// we've been packing data in the buffer using smaller VkMultiDrawInfoEXT structures, we need 4 extra bytes
+			// at the end to make these tests legal.
+			std::vector<uint8_t> extraData(sizeof(int32_t), 0);
+			std::copy(begin(extraData), end(extraData), std::back_inserter(m_dataVec));
+		}
+
+		m_finalized = true;
+	}
+
 	deUint32 drawInfoCount () const
 	{
+		DE_ASSERT(m_finalized);
 		return m_infoCount;
 	}
 
 	const void* drawInfoData () const
 	{
+		DE_ASSERT(m_finalized);
 		return m_dataVec.data();
 	}
 
@@ -997,6 +1027,7 @@ tcu::TestStatus MultiDrawInstance::iterate (void)
 			vertexIndex += verticesPerDraw;
 		}
 	}
+	drawInfos.finalize();
 
 	beginCommandBuffer(vkd, cmdBuffer);
 
