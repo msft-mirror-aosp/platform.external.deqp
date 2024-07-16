@@ -115,7 +115,7 @@ void UniformIntegerFunctionCase::init(void)
 tcu::TestNode::IterateResult UniformIntegerFunctionCase::iterate(void)
 {
     int32_t result;
-    int comparison;
+    int32_t comparison; // A bool in the shader, but we must use a 32-bit type to copy out into.
     vector<void *> outputPointers(2);
 
     outputPointers[0] = &result;
