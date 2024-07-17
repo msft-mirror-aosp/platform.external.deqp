@@ -4309,9 +4309,9 @@ tcu::TestStatus createDeviceWithPromoted11Structures (Context& context)
 	const CustomInstance			instance			(createCustomInstanceFromContext(context));
 	const InstanceDriver&			instanceDriver		(instance.getDriver());
 	const VkPhysicalDevice			physicalDevice		= chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
-	const deUint32					queueFamilyIndex	= 0;
-	const deUint32					queueCount			= 1;
-	const deUint32					queueIndex			= 0;
+	const uint32_t					queueFamilyIndex	= 0;
+	const uint32_t					queueCount			= 1;
+	const uint32_t					queueIndex			= 0;
 	const float						queuePriority		= 1.0f;
 
 	const vector<VkQueueFamilyProperties> queueFamilyProperties = getPhysicalDeviceQueueFamilyProperties(instanceDriver, physicalDevice);
@@ -4368,9 +4368,9 @@ tcu::TestStatus createDeviceWithPromoted12Structures (Context& context)
 	const CustomInstance			instance			(createCustomInstanceFromContext(context));
 	const InstanceDriver&			instanceDriver		(instance.getDriver());
 	const VkPhysicalDevice			physicalDevice		= chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
-	const deUint32					queueFamilyIndex	= 0;
-	const deUint32					queueCount			= 1;
-	const deUint32					queueIndex			= 0;
+	const uint32_t					queueFamilyIndex	= 0;
+	const uint32_t					queueCount			= 1;
+	const uint32_t					queueIndex			= 0;
 	const float						queuePriority		= 1.0f;
 
 	const vector<VkQueueFamilyProperties> queueFamilyProperties = getPhysicalDeviceQueueFamilyProperties(instanceDriver, physicalDevice);
@@ -4434,9 +4434,9 @@ tcu::TestStatus createDeviceWithPromoted13Structures (Context& context)
 	const CustomInstance			instance			(createCustomInstanceFromContext(context));
 	const InstanceDriver&			instanceDriver		(instance.getDriver());
 	const VkPhysicalDevice			physicalDevice		= chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
-	const deUint32					queueFamilyIndex	= 0;
-	const deUint32					queueCount			= 1;
-	const deUint32					queueIndex			= 0;
+	const uint32_t					queueFamilyIndex	= 0;
+	const uint32_t					queueCount			= 1;
+	const uint32_t					queueIndex			= 0;
 	const float						queuePriority		= 1.0f;
 
 	const vector<VkQueueFamilyProperties> queueFamilyProperties = getPhysicalDeviceQueueFamilyProperties(instanceDriver, physicalDevice);
