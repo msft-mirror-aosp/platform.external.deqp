@@ -49,6 +49,8 @@ bool						isScaledFormat				(VkFormat format);
 bool						isDepthStencilFormat		(VkFormat format);
 bool						isCompressedFormat			(VkFormat format);
 bool						isSrgbFormat				(VkFormat format);
+bool						isPaddedFormat				(VkFormat format);
+bool						isAlphaOnlyFormat			(VkFormat format);
 
 bool						is64BitIntegerFormat		(VkFormat format);
 
@@ -139,13 +141,14 @@ struct PlanarFormatDescription
 	}
 };
 
-class ImageWithBuffer {
+class ImageWithBuffer
+{
 	std::unique_ptr<ImageWithMemory>	image;
 	Move<vk::VkImageView>				imageView;
 	std::unique_ptr<BufferWithMemory>	buffer;
 	VkDeviceSize						size;
 
-	public:
+public:
 	ImageWithBuffer(
 			const DeviceInterface&		vkd,
 			const VkDevice				device,
@@ -257,6 +260,7 @@ void	copyBufferToImage						(const DeviceInterface&							vk,
 												 vk::VkImage									destImage,
 												 VkImageLayout									destImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 												 VkPipelineStageFlags							destImageDstStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+												 VkAccessFlags									destImageDstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 												const VkCommandPool*							externalCommandPool = DE_NULL,
 												 deUint32										baseMipLevel = 0);
 
@@ -271,6 +275,7 @@ void	copyBufferToImage						(const DeviceInterface&							vk,
 												 VkImage										destImage,
 												 VkImageLayout									destImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 												 VkPipelineStageFlags							destImageDstStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+												 VkAccessFlags									destImageDstAccessMask = VK_ACCESS_SHADER_READ_BIT,
 												 deUint32										baseMipLevel = 0);
 
 /*--------------------------------------------------------------------*//*!
@@ -287,7 +292,7 @@ void	copyImageToBuffer						(const DeviceInterface&							vk,
 												 deUint32										numLayers = 1u,
 												 VkImageAspectFlags								barrierAspect = VK_IMAGE_ASPECT_COLOR_BIT,
 												 VkImageAspectFlags								copyAspect = VK_IMAGE_ASPECT_COLOR_BIT,
-												 VkPipelineStageFlags							srcMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
+												 VkPipelineStageFlags							srcStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT);
 
 void	copyImageToBuffer						(const DeviceInterface&							vk,
 												 vk::VkCommandBuffer							cmdBuffer,
