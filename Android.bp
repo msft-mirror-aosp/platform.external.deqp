@@ -378,8 +378,7 @@ android_test {
 filegroup {
     name: "deqp_binary_incremental_test_lists",
     srcs: [
-        "android/cts/main/gles3-incremental-deqp.txt",
-        "android/cts/main/vk-incremental-deqp.txt",
+        "android/cts/main/*-incremental-deqp*.txt",
     ],
     path: "android/cts/main",
 }
