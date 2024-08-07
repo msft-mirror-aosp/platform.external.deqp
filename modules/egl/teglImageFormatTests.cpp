@@ -659,27 +659,27 @@ bool GLESImageApi::RenderTexture2DArray::invokeGLES(GLESImageApi &api, MovePtr<U
     GLU_CHECK_GLW_CALL(gl, texParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE));
     GLU_CHECK_GLW_CALL(gl, texParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE));
 
-    const char *const vertexShader = "#version 320 es\n"
+    const char *const vertexShader = "#version 300 es\n"
                                      "precision highp int;\n"
                                      "precision highp float;\n"
                                      "layout(location = 0) in vec2 pos_in;\n"
-                                     "layout(location = 0) out vec2 texcoord_out;\n"
+                                     "out vec2 texcoord;\n"
                                      "void main()\n"
                                      "{\n"
                                      "    gl_Position = vec4(pos_in, -0.1, 1.0);\n"
-                                     "    texcoord_out = vec2((pos_in.x + 1.0) * 0.5, (pos_in.y + 1.0) * 0.5);\n"
+                                     "    texcoord = vec2((pos_in.x + 1.0) * 0.5, (pos_in.y + 1.0) * 0.5);\n"
                                      "}\n";
 
-    const char *const fragmentShader = "#version 320 es\n"
+    const char *const fragmentShader = "#version 300 es\n"
                                        "precision highp int;\n"
                                        "precision highp float;\n"
-                                       "layout(location = 0) in vec2 texcoords_in;\n"
+                                       "in vec2 texcoord;\n"
                                        "layout(location = 0) out vec4 color_out;\n"
-                                       "uniform layout(binding=0) highp sampler2DArray tex_sampler;\n"
+                                       "uniform highp sampler2DArray tex_sampler;\n"
                                        "void main()\n"
                                        "{\n"
                                        // Samples layer 1.
-                                       "    color_out = texture(tex_sampler, vec3(texcoords_in, 1));\n"
+                                       "    color_out = texture(tex_sampler, vec3(texcoord, 1));\n"
                                        "}\n";
 
     Program program(gl, vertexShader, fragmentShader);
