@@ -23,7 +23,6 @@
 		<Configuration caseListFile="egl-main-2022-03-01.txt" commandLine="--deqp-gl-config-name=rgba8888d24s8ms0 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-watchdog=enable" name="main-2022-03-01"/>
 		<Configuration caseListFile="egl-main-2023-03-01.txt" commandLine="--deqp-gl-config-name=rgba8888d24s8ms0 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-watchdog=enable" name="main-2023-03-01"/>
 		<Configuration caseListFile="egl-main-2024-03-01.txt" commandLine="--deqp-gl-config-name=rgba8888d24s8ms0 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-watchdog=enable" name="main-2024-03-01"/>
-		<Configuration caseListFile="egl-main-risky.txt" commandLine="--deqp-gl-config-name=rgba8888d24s8ms0 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-watchdog=enable" name="main-risky"/>
 	</TestPackage>
 	<TestPackage name="dEQP-GLES2">
 		<Configuration caseListFile="gles2-main-2020-03-01.txt" commandLine="--deqp-gl-config-name=rgba8888d24s8ms0 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-watchdog=enable" name="main-2020-03-01"/>
