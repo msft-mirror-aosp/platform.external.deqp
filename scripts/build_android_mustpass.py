@@ -58,8 +58,7 @@ VULKAN_MODULE = getModuleByName("dEQP-VK")
 MAIN_EGL_COMMON_FILTERS = [include("egl-main.txt"),
                                    exclude("egl-test-issues.txt"),
                                    exclude("egl-manual-robustness.txt"),
-                                   exclude("egl-driver-issues.txt"),
-                                   exclude("egl-temp-excluded.txt")]
+                                   exclude("egl-driver-issues.txt")]
 
 # Android CTS is not using EGL test list for year 2021
 MAIN_EGL_PKG = Package(module = EGL_MODULE, configurations = [
@@ -91,14 +90,6 @@ MAIN_EGL_PKG = Package(module = EGL_MODULE, configurations = [
                       required = True,
                       filters = MAIN_EGL_COMMON_FILTERS + [exclude("egl-main-2020-03-01.txt", "egl-main-2022-03-01.txt", "egl-main-2023-03-01.txt")],
                       runtime = "5m"),
-        # Risky subset
-        Configuration(name = "main-risky",
-                      glconfig = "rgba8888d24s8ms0",
-                      rotation = "unspecified",
-                      surfacetype = "window",
-                      required = True,
-                      filters = [include("egl-temp-excluded.txt")],
-                      runtime = "2m"),
 
         # Note: There are no incremental deqp testlists for EGL since these tests do not work with
         # deqp-binary.
@@ -108,7 +99,6 @@ MAIN_GLES2_COMMON_FILTERS = [
         include("gles2-main.txt"),
         exclude("gles2-test-issues.txt"),
         exclude("gles2-failures.txt"),
-        exclude("gles2-temp-excluded.txt"),
     ]
 MAIN_GLES2_PKG = Package(module = GLES2_MODULE, configurations = [
         Configuration(name = "main-2020-03-01",
@@ -160,7 +150,6 @@ MAIN_GLES3_COMMON_FILTERS = [
         exclude("gles3-driver-issues.txt"),
         exclude("gles3-test-issues.txt"),
         exclude("gles3-spec-issues.txt"),
-        exclude("gles3-temp-excluded.txt"),
         exclude("gles3-waivers.txt"),
     ]
 MAIN_GLES3_PKG = Package(module = GLES3_MODULE, configurations = [
@@ -260,7 +249,6 @@ MAIN_GLES31_COMMON_FILTERS = [
         exclude("gles31-driver-issues.txt"),
         exclude("gles31-test-issues.txt"),
         exclude("gles31-spec-issues.txt"),
-        exclude("gles31-temp-excluded.txt"),
         exclude("gles31-waivers.txt"),
     ]
 MAIN_GLES31_PKG = Package(module = GLES31_MODULE, configurations = [
@@ -354,7 +342,6 @@ MAIN_VULKAN_FILTERS = [
         exclude("vk-excluded-tests.txt"),
         exclude("vk-test-issues.txt"),
         exclude("vk-waivers.txt"),
-        exclude("vk-temp-excluded.txt"),
     ]
 MAIN_VULKAN_PKG = Package(module = VULKAN_MODULE, configurations = [
         Configuration(name = "main-2019-03-01",
