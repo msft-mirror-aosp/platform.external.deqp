@@ -35,7 +35,10 @@ license {
     ],
 }
 
-build = ["AndroidGen.bp"]
+build = [
+    "AndroidGen.bp",
+    "AndroidKhronosCTSGen.bp",
+]
 
 // Used by Amber.
 // Amber includes "vkDefs.h".
@@ -281,11 +284,101 @@ cc_test {
     ],
 }
 
+cc_library_shared {
+    name: "libkhronosopenglcts",
+    defaults: ["khronoscts_default"],
+
+    srcs: [
+        "framework/platform/android/tcuAndroidMain.cpp",
+        "framework/platform/android/tcuAndroidJNI.cpp",
+        "framework/platform/android/tcuAndroidPlatformCapabilityQueryJNI.cpp",
+        "framework/platform/android/tcuTestLogParserJNI.cpp",
+        "external/openglcts/modules/runner/glcAndroidMain.cpp",
+        "external/openglcts/modules/glcTestPackageEntry.cpp",
+        "modules/gles2/tes2TestPackageEntry.cpp",
+        "modules/gles3/tes3TestPackageEntry.cpp",
+        "modules/gles31/tes31TestPackageEntry.cpp",
+        "modules/egl/teglTestPackageEntry.cpp",
+        "modules/internal/ditTestPackageEntry.cpp",
+    ],
+
+    local_include_dirs: [
+        "external/openglcts/modules/runner",
+        "external/openglcts/modules",
+        "framework/platform/android",
+        "modules/gles2",
+        "modules/gles3",
+        "modules/gles31",
+        "modules/egl",
+        "modules/internal",
+    ],
+
+    static_libs: [
+        "libkhronoscts_common",
+        "libkhronoscts_modules_gles",
+        "libkhronoscts_openglcts",
+        "libkhronoscts_vulkancts",
+        "libkhronoscts_platform",
+    ],
+}
+
+cc_defaults {
+    name: "khronoscts_default",
+
+    defaults: [
+        "khronosctscompilationflag_default",
+    ],
+
+    shared_libs: [
+        "libEGL",
+        "libGLESv2",
+        "libandroid",
+        "liblog",
+        "libm",
+        "libc",
+        "libz",
+        "libdl",
+    ],
+
+    static_libs: [
+        "libpng_ndk",
+        "deqp_glslang_glslang",
+        "deqp_glslang_OSDependent",
+        "deqp_glslang_MachineIndependent",
+        "deqp_glslang_GenericCodeGen",
+        "deqp_glslang_SPIRV",
+        "deqp_glslang_SPVRemapper",
+        "deqp_spirv-tools",
+        "deqp_amber",
+    ],
+}
+
+android_test {
+    name: "org.khronos.gl_cts",
+
+    srcs: ["android/openglcts/src/**/*.java"],
+    manifest: "android/openglcts/AndroidManifest.xml",
+
+    asset_dirs: [
+        "data",
+        "external/openglcts/data/",
+        "external/graphicsfuzz/data",
+        "external/vulkancts/data",
+    ],
+
+    jni_libs: ["libkhronosopenglcts"],
+    compile_multilib: "both",
+
+    sdk_version: "test_current",
+
+    min_sdk_version: "31",
+    target_sdk_version: "34",
+}
+
 filegroup {
     name: "deqp_binary_incremental_test_lists",
     srcs: [
-        "android/cts/main/gles3-incremental-deqp.txt",
-        "android/cts/main/vk-incremental-deqp.txt",
+        "android/cts/main/*-incremental-deqp*.txt",
     ],
     path: "android/cts/main",
 }
@@ -312,4 +405,12 @@ filegroup {
         "external/graphicsfuzz/data/**/*",
     ],
     path: "external/graphicsfuzz/data",
+}
+
+filegroup {
+    name: "khronos_cts_gles_caselists",
+    srcs: [
+        "external/openglcts/data/gl_cts/data/mustpass/**/*.txt",
+    ],
+    path: "external/openglcts/data/",
 }
