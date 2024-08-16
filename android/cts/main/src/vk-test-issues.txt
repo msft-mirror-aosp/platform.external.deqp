@@ -13,3 +13,22 @@ dEQP-VK.memory_model.shared.16bit.nested_structs_arrays.2
 
 # b/339132161: Possible Qualcomm bug causes flakines in test
 dEQP-VK.pipeline.monolithic.timestamp.calibrated.*
+
+# b/353150529: This test is failing on several drivers and was disabled as a result: https://gitlab.freedesktop.org/mesa/mesa/-/issues/10733
+dEQP-GLES31.functional.texture.border_clamp.range_clamp.linear_float_color
+
+# b/349530950 some reconvergence tests use too much memory for 32b devices (~3.5GiB)
+# more Khronos-side fixes are in progress for this, but we need a quick solution
+# for Android 15 CTS.
+dEQP-VK.reconvergence.subgroup_uniform_control_flow_elect.compute.nesting4.0.40
+dEQP-VK.reconvergence.subgroup_uniform_control_flow_ballot.compute.nesting4.7.10
+dEQP-VK.reconvergence.subgroup_uniform_control_flow_ballot.compute.nesting4.7.38
+dEQP-VK.reconvergence.workgroup_uniform_control_flow_elect.compute.nesting4.0.40
+dEQP-VK.reconvergence.workgroup_uniform_control_flow_elect.compute.nesting4.7.10
+dEQP-VK.reconvergence.workgroup_uniform_control_flow_elect.compute.nesting4.7.38
+dEQP-VK.reconvergence.subgroup_uniform_control_flow_elect.compute.nesting4.7.10
+dEQP-VK.reconvergence.subgroup_uniform_control_flow_elect.compute.nesting4.7.38
+dEQP-VK.reconvergence.subgroup_uniform_control_flow_ballot.compute.nesting4.0.40
+dEQP-VK.reconvergence.workgroup_uniform_control_flow_ballot.compute.nesting4.0.40
+dEQP-VK.reconvergence.workgroup_uniform_control_flow_ballot.compute.nesting4.7.10
+dEQP-VK.reconvergence.workgroup_uniform_control_flow_ballot.compute.nesting4.7.38
