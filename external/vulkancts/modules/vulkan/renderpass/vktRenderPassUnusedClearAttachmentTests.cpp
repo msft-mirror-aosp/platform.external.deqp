@@ -946,7 +946,10 @@ void UnusedClearAttachmentTestInstance::createCommandBuffer (const DeviceInterfa
 	}
 
 	vk.cmdBindPipeline(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_graphicsPipeline);
-	vk.cmdClearAttachments(*m_cmdBuffer, static_cast<deUint32>(clearAttachments.size()), (clearAttachments.empty() ? DE_NULL : clearAttachments.data()), 1u, &clearRect);
+	if (!clearAttachments.empty())
+	{
+		vk.cmdClearAttachments(*m_cmdBuffer, static_cast<deUint32>(clearAttachments.size()), clearAttachments.data(), 1u, &clearRect);
+	}
 
 	if (m_testParams.renderingType == RENDERING_TYPE_DYNAMIC_RENDERING)
 		vk.cmdEndRendering(*m_cmdBuffer);
