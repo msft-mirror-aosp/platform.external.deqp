@@ -30,6 +30,14 @@ public class BatchRunConfiguration {
     private final String mSurfaceType;
     private final boolean mRequired;
 
+    // Added for sub-class KhronosCTSBatchRunConfiguration
+    public BatchRunConfiguration() {
+        mGlConfig = "";
+        mRotation = "";
+        mSurfaceType = "";
+        mRequired = false;
+    }
+
     public BatchRunConfiguration(String glConfig, String rotation,
                                  String surfaceType, boolean required) {
         mGlConfig = glConfig;
