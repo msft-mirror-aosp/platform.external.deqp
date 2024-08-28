@@ -1444,12 +1444,9 @@ void SharedColorbufferClearsTest::render(sglr::Context &context, Surface &dst)
     }
 
     // Multiple framebuffers sharing the colorbuffer
-    uint32_t fbos[3];
-    context.genFramebuffers(3, fbos);
-
     for (int fbo = 1; fbo <= 3; fbo++)
     {
-        context.bindFramebuffer(GL_FRAMEBUFFER, fbos[fbo]);
+        context.bindFramebuffer(GL_FRAMEBUFFER, fbo);
 
         if (getConfig().colorbufferType == GL_TEXTURE_2D)
             context.framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorbuffer, 0);
@@ -1457,7 +1454,7 @@ void SharedColorbufferClearsTest::render(sglr::Context &context, Surface &dst)
             context.framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, colorbuffer);
     }
 
-    context.bindFramebuffer(GL_FRAMEBUFFER, fbos[0]);
+    context.bindFramebuffer(GL_FRAMEBUFFER, 1);
 
     // Check completeness
     {
@@ -1473,7 +1470,7 @@ void SharedColorbufferClearsTest::render(sglr::Context &context, Surface &dst)
 
     context.enable(GL_SCISSOR_TEST);
 
-    context.bindFramebuffer(GL_FRAMEBUFFER, fbos[1]);
+    context.bindFramebuffer(GL_FRAMEBUFFER, 2);
     context.clearColor(0.6f, 0.0f, 0.0f, 1.0f);
     context.scissor(10, 10, 64, 64);
     context.clear(GL_COLOR_BUFFER_BIT);
@@ -1481,12 +1478,12 @@ void SharedColorbufferClearsTest::render(sglr::Context &context, Surface &dst)
     context.scissor(60, 60, 40, 20);
     context.clear(GL_COLOR_BUFFER_BIT);
 
-    context.bindFramebuffer(GL_FRAMEBUFFER, fbos[2]);
+    context.bindFramebuffer(GL_FRAMEBUFFER, 3);
     context.clearColor(0.0f, 0.0f, 0.6f, 1.0f);
     context.scissor(20, 20, 100, 10);
     context.clear(GL_COLOR_BUFFER_BIT);
 
-    context.bindFramebuffer(GL_FRAMEBUFFER, fbos[0]);
+    context.bindFramebuffer(GL_FRAMEBUFFER, 1);
     context.clearColor(0.6f, 0.0f, 0.6f, 1.0f);
     context.scissor(20, 20, 5, 100);
     context.clear(GL_COLOR_BUFFER_BIT);
@@ -1507,8 +1504,6 @@ void SharedColorbufferClearsTest::render(sglr::Context &context, Surface &dst)
     }
     else
         context.readPixels(dst, 0, 0, width, height);
-
-    context.deleteFramebuffers(3, fbos);
 }
 
 class SharedDepthbufferTest : public FboRenderCase
