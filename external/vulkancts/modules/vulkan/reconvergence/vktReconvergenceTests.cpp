@@ -1629,7 +1629,7 @@ tcu::TestStatus ReconvergenceTestInstance::iterate (void)
 	const deUint32 invocationStride = 128;
 
 	if (subgroupSize > 64)
-		TCU_THROW(TestError, "Subgroup size greater than 64 not handled.");
+		TCU_THROW(NotSupportedError, "Subgroup size greater than 64 not handled.");
 
 	RandomProgram program(m_data);
 	program.generateRandomProgram();
