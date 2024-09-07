@@ -139,7 +139,7 @@ MAIN_GLES2_PKG = Package(module = GLES2_MODULE, configurations = [
 
         # Incremental deqp baseline
         Configuration(name = "incremental-deqp-baseline",
-                      filters = [include("gles2-main-2020-03-01.txt")],
+                      filters = [include("gles2-main-2020-03-01.txt"), exclude("gles2-incremental-deqp-excluded.txt")],
                       runtime = "5m",
                       runByDefault = False),
     ])
@@ -238,7 +238,7 @@ MAIN_GLES3_PKG = Package(module = GLES3_MODULE, configurations = [
                       runtime = "5m",
                       runByDefault = False),
         Configuration(name = "incremental-deqp-baseline",
-                      filters = [include("gles3-main-2020-03-01.txt")],
+                      filters = [include("gles3-main-2020-03-01.txt"), exclude("gles3-incremental-deqp-excluded.txt")],
                       runtime = "5m",
                       runByDefault = False),
     ])
