@@ -21,11 +21,6 @@ import com.drawelements.deqp.runner.BatchRunConfiguration;
 import com.android.tradefed.config.OptionClass;
 import com.android.tradefed.result.ITestInvocationListener;
 import com.android.tradefed.device.DeviceNotAvailableException;
-import com.android.tradefed.log.LogUtil.CLog;
-import com.android.tradefed.metrics.proto.MetricMeasurement.Metric;
-import com.android.tradefed.result.ByteArrayInputStreamSource;
-import com.android.tradefed.result.LogDataType;
-import com.android.tradefed.result.TestDescription;
 import com.android.tradefed.util.AbiUtils;
 import com.android.tradefed.util.FileUtil;
 import com.android.tradefed.util.RunInterruptedException;
@@ -42,22 +37,22 @@ import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Pattern;
 import java.util.Set;
-
-import javax.annotation.Nullable;
-
+import com.android.tradefed.metrics.proto.MetricMeasurement.Metric;
+import com.android.tradefed.log.LogUtil.CLog;
+import com.android.tradefed.result.ByteArrayInputStreamSource;
+import com.android.tradefed.result.LogDataType;
+import com.android.tradefed.result.TestDescription;
+import java.util.regex.Pattern;
 
 @OptionClass(alias="khronos-gl-cts-test-runner")
 public class KhronosCTSRunner extends DeqpTestRunner {
-    @Nullable
     private List<String> mTestRunParams = null;
 
     private static final String KHRONOS_CTS_ONDEVICE_PKG = "org.khronos.gl_cts";
 
     private static final String TEST_ID_NAME = "KhronosGLCTS";
 
-    @Nullable
     private Map<TestDescription, Set<KhronosCTSBatchRunConfiguration>> mTestInstances = null;
 
     private final KhronosCTSTestInstanceResultListener mInstanceListener = new KhronosCTSTestInstanceResultListener();
@@ -681,15 +676,7 @@ public class KhronosCTSRunner extends DeqpTestRunner {
         return new KhronosCTSBatchRunConfiguration(runConfigParam);
     }
 
-    private void generateTestInstanceWithTestRunParameters(List<String> testRunParamLists) {
-        if (mTestInstances != null) {
-            throw new AssertionError("Re-load of tests not supported");
-        }
-
-        // Note: This is specifically a LinkedHashMap to guarantee that tests
-        // are iterated in the insertion order.
-        mTestInstances = new LinkedHashMap<>();
-
+    private void generateTestInstanceWithTestRunParameters(List<String> testRunParamLists, Map<TestDescription, Set<KhronosCTSBatchRunConfiguration>> testInstancesExperiment) {
         final String testRunParamArgCaseListResource = "--deqp-caselist-resource";
         for (String testRunParam : testRunParamLists){
             CLog.i("Debug testRunParam is %s", testRunParam);
@@ -708,7 +695,7 @@ public class KhronosCTSRunner extends DeqpTestRunner {
             String runParam = testRunParam.substring(indexOfCaseListFileEnd+1);
             KhronosCTSBatchRunConfiguration runConfig = parseRunParam(runParam);
             CLog.i("Debug runConfig is %s", runConfig.getId());
-            LoadTestsFromCaselistResource(caseListFileName, runConfig, mTestInstances);
+            LoadTestsFromCaselistResource(caseListFileName, runConfig, testInstancesExperiment);
         }
     }
 
@@ -774,11 +761,8 @@ public class KhronosCTSRunner extends DeqpTestRunner {
         setupTestEnvironment(KHRONOS_CTS_ONDEVICE_PKG);
         try {
             mDeviceRecovery.setDevice(mDevice);
-
             // run the activity to retrieve the test run params first
-            if (mTestRunParams == null) {
-                runGetTestsParamsActivity();
-            }
+            runGetTestsParamsActivity();
 
             // sanity check runGetTestsParamsActivity completed successfully
             if (mTestRunParams == null || mTestRunParams.isEmpty())
@@ -787,12 +771,15 @@ public class KhronosCTSRunner extends DeqpTestRunner {
                 throw new RuntimeException("Failed to load test run parameters, abort the rest of tests");
             }
 
-            if (mTestInstances == null) {
-                generateTestInstanceWithTestRunParameters(mTestRunParams);
+            if (mTestInstances != null) {
+                throw new AssertionError("Re-load of tests experiment not supported");
             }
 
+            // generate test instances map with the mTestRunParams
+            mTestInstances = new LinkedHashMap<>();
+            generateTestInstanceWithTestRunParameters(mTestRunParams, mTestInstances);
+            CLog.e("Debug total test to run: %d", mTestInstances.size());
             mRemainingTests = new HashSet<>(mTestInstances.keySet());
-            CLog.d("Debug total test to run: %d", mRemainingTests.size());
 
         } catch (Exception ex) {
             CLog.e("Exception while generating test run parameters: %s", ex.getMessage());
@@ -803,13 +790,8 @@ public class KhronosCTSRunner extends DeqpTestRunner {
         listener.testRunStarted(getId(), mRemainingTests.size());
 
         try {
-            if (mRemainingTests.isEmpty()) {
-                CLog.d("No tests to run");
-            } else {
-                getInstanceListener().setSink(listener);
-                runTests();
-            }
-
+            getInstanceListener().setSink(listener);
+            runTests();
         } catch (Exception ex) {
             // Platform is not behaving correctly, for example crashing when trying to create
             // a window. Instead of silently failing, signal failure by leaving the rest of the

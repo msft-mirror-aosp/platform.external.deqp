@@ -23,16 +23,13 @@ package {
 
 java_test_host {
     name: "KhronosCTSTestCases",
-    test_suites: ["general-tests"],
     team: "trendy_team_android_gpu",
     srcs: ["runner/src/**/*.java"],
     libs: [
         "cts-tradefed",
         "compatibility-host-util",
         "tradefed",
-    ],
-    static_libs: [
-        "CtsDeqpTestCasesJavaHostLib",
+        "CtsDeqpTestCases",
     ],
     per_testcase_directory: true,
     data: [
