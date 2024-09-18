@@ -7,7 +7,8 @@ dEQP-VK.wsi.macos.*
 
 # Vulkan Video extensions are not supported on Android
 # https://source.android.com/docs/compatibility/13/android-13-cdd#7142_vulkan
-dEQP-VK.video.*
+#    Note (chrisforbes): these are actually excluded at build time now.
+# dEQP-VK.video.*
 
 # Other platform specific tests
 dEQP-VK.api.image_compression_control.swapchain.macos.*

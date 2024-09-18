@@ -49,7 +49,7 @@ add_subdirectory(reconvergence)
 add_subdirectory(mesh_shader)
 add_subdirectory(fragment_shading_barycentric)
 add_subdirectory(sc)
-add_subdirectory(video)
+#add_subdirectory(video)
 
 include_directories(
 	api
@@ -98,7 +98,7 @@ include_directories(
 	reconvergence
 	mesh_shader
 	fragment_shading_barycentric
-	video
+#	video
 	${DEQP_INL_DIR}
 	sc
 	)
@@ -170,7 +170,7 @@ set(DEQP_VK_LIBS
 	deqp-vk-reconvergence
 	deqp-vk-mesh-shader
 	deqp-vk-fragment-shading-barycentric
-	deqp-vk-video
+#	deqp-vk-video
 	)
 
 set(DEQP_VKSC_LIBS
