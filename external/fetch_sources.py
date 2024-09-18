@@ -322,10 +322,10 @@ PACKAGES = [
         "c9d164ec247f426a525a7b89936694aefbc91fb7a50182b198898b8fc91174b4",
         "libpng",
         postExtract = postExtractLibpng),
-    SourcePackage(
-        ffmpeg_url,
-        ffmpeg_hash_value,
-        "ffmpeg"),
+#    SourcePackage(
+#        ffmpeg_url,
+#        ffmpeg_hash_value,
+#        "ffmpeg"),
     SourceFile(
         "https://raw.githubusercontent.com/baldurk/renderdoc/v1.1/renderdoc/api/app/renderdoc_app.h",
         "renderdoc_app.h",
