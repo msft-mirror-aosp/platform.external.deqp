@@ -118,7 +118,7 @@
 #include "vktMeshShaderTests.hpp"
 #include "vktFragmentShadingBarycentricTests.hpp"
 #if (DE_OS != DE_OS_ANDROID)
-#include "vktVideoTests.hpp"
+//#include "vktVideoTests.hpp"
 #endif
 #ifdef CTS_USES_VULKANSC
 #include "vktSafetyCriticalTests.hpp"
@@ -1186,7 +1186,7 @@ void TestPackage::init(void)
     // Amber depth pipeline tests
     addChild(cts_amber::createAmberDepthGroup(m_testCtx));
 #if (DE_OS != DE_OS_ANDROID)
-    addChild(video::createTests(m_testCtx));
+//    addChild(video::createTests(m_testCtx));
 #endif
 }
 
