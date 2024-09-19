@@ -100,6 +100,12 @@ dEQP-VK.api.descriptor_set.descriptor_set_layout_lifetime.graphics
 dEQP-VK.api.descriptor_set.descriptor_set_layout_lifetime.compute
 dEQP-VK.api.descriptor_set.descriptor_set_layout.empty_set.normal
 dEQP-VK.api.descriptor_set.descriptor_set_layout.empty_set.push_descriptor
+dEQP-VK.api.external.semaphore.sync_fd.signal_export_import_wait_temporary
+dEQP-VK.api.external.memory.android_hardware_buffer.suballocated.buffer.info
+dEQP-VK.api.external.memory.android_hardware_buffer.suballocated.buffer.bind_export_import_bind
+dEQP-VK.api.external.memory.android_hardware_buffer.dedicated.image.info
+dEQP-VK.api.external.memory.android_hardware_buffer.dedicated.image.bind_export_import_bind
+dEQP-VK.api.external.fence.sync_fd.signal_export_import_wait_temporary
 dEQP-VK.api.info.format_properties.r4g4_unorm_pack8
 dEQP-VK.api.info.format_properties.r4g4b4a4_unorm_pack16
 dEQP-VK.api.info.format_properties.b4g4r4a4_unorm_pack16
