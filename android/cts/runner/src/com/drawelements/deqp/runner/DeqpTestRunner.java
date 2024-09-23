@@ -1402,6 +1402,12 @@ public class DeqpTestRunner
             IncrementalDeqpPreparer.INCREMENTAL_DEQP_ATTRIBUTE_NAME);
     }
 
+    private boolean isIncrementalDeqpBaselineRun() {
+        IBuildInfo buildInfo = mBuildHelper.getBuildInfo();
+        return buildInfo.getBuildAttributes().containsKey(
+            IncrementalDeqpPreparer.INCREMENTAL_DEQP_BASELINE_ATTRIBUTE_NAME);
+    }
+
     private boolean isSupportedRunConfiguration(BatchRunConfiguration runConfig)
         throws DeviceNotAvailableException, CapabilityQueryFailureException {
         // orientation support
@@ -2268,6 +2274,11 @@ public class DeqpTestRunner
         // Note: This is specifically a LinkedHashMap to guarantee that tests
         // are iterated in the insertion order.
         mTestInstances = new LinkedHashMap<>();
+
+        // When the baseline mode for incremental dEQP is enabled, skip all tests to run.
+        if (isIncrementalDeqpBaselineRun()) {
+            return;
+        }
 
         try {
             File testlist = new File(mBuildHelper.getTestsDir(), mCaselistFile);
