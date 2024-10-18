@@ -2364,24 +2364,6 @@ public class DeqpTestRunner
         }
 
         try {
-            if (isIncrementalDeqpRun()) {
-                for (String testFile : mIncrementalDeqpIncludeFiles) {
-                    CLog.d("Read incremental dEQP include file '%s'", testFile);
-                    File file = new File(mBuildHelper.getTestsDir(), testFile);
-                    if (!file.isFile()) {
-                        // Find file in sub directory if no matching file in the
-                        // first layer of testdir.
-                        file = FileUtil.findFile(mBuildHelper.getTestsDir(),
-                                                 testFile);
-                        if (file == null || !file.isFile()) {
-                            throw new FileNotFoundException(
-                                "Cannot find incremental dEQP include file: " +
-                                testFile);
-                        }
-                    }
-                    readFile(mIncrementalDeqpIncludeTests, file);
-                }
-            }
             for (String filterFile : mIncludeFilterFiles) {
                 CLog.d("Read include filter file '%s'", filterFile);
                 File file = new File(mBuildHelper.getTestsDir(), filterFile);
@@ -2438,6 +2420,36 @@ public class DeqpTestRunner
             }
         }
         CLog.i("Num tests after filtering: %d", mTestInstances.size());
+    }
+
+    /**
+     * Loads incremental dEQP tests into mIncrementalDeqpIncludeTests.
+     */
+    private void loadIncrementalDeqpTests() {
+        if (isIncrementalDeqpRun()) {
+            try {
+                for (String testFile : mIncrementalDeqpIncludeFiles) {
+                    CLog.d("Read incremental dEQP include file '%s'", testFile);
+                    File file = new File(mBuildHelper.getTestsDir(), testFile);
+                    if (!file.isFile()) {
+                        // Find file in sub directory if no matching file in the
+                        // first layer of testdir.
+                        file = FileUtil.findFile(mBuildHelper.getTestsDir(),
+                            testFile);
+                        if (file == null || !file.isFile()) {
+                            throw new FileNotFoundException(
+                                "Cannot find incremental dEQP include file: " +
+                                    testFile);
+                        }
+                    }
+                    readFile(mIncrementalDeqpIncludeTests, file);
+                }
+            } catch (FileNotFoundException e) {
+                throw new HarnessRuntimeException(
+                    "Cannot read incremental dEQP list file." + e,
+                    TestErrorIdentifier.TEST_ABORTED);
+            }
+        }
     }
 
     /**
@@ -2513,6 +2525,9 @@ public class DeqpTestRunner
         if (mTestInstances == null) {
             loadTests();
         }
+        // Loads the incremental dEQP tests separately since isIncrementalDeqpRun() is not ready in
+        // split().
+        loadIncrementalDeqpTests();
 
         mRemainingTests = new HashSet<>(mTestInstances.keySet());
         long startTime = System.currentTimeMillis();
