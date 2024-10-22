@@ -1,4 +1,5 @@
 package {
+    default_team: "trendy_team_android_gpu",
     default_applicable_licenses: ["external_deqp_license"],
 }
 
