@@ -1422,6 +1422,22 @@ public class DeqpTestRunner
             IncrementalDeqpPreparer.INCREMENTAL_DEQP_BASELINE_ATTRIBUTE_NAME);
     }
 
+    private boolean isIncrementalDeqpTrustedBuildRun() {
+        IBuildInfo buildInfo = mBuildHelper.getBuildInfo();
+        return buildInfo.getBuildAttributes().containsKey(
+            IncrementalDeqpPreparer.INCREMENTAL_DEQP_TRUSTED_BUILD_ATTRIBUTE_NAME);
+    }
+
+    /**
+     * Checks if the runner should ignore dEQP tests completely and report nothing.
+     */
+    private boolean shouldBypassTestExecutionAndReporting() {
+        // When the baseline/trusted build mode for incremental dEQP is enabled, the run is for dEQP
+        // dependencies verification/collection and should be done by the dEQP binary. There is no
+        // need to run dEQP tests by the runner.
+        return isIncrementalDeqpBaselineRun() || isIncrementalDeqpTrustedBuildRun();
+    }
+
     private boolean isSupportedRunConfiguration(BatchRunConfiguration runConfig)
         throws DeviceNotAvailableException, CapabilityQueryFailureException {
         // orientation support
@@ -2349,8 +2365,7 @@ public class DeqpTestRunner
         // are iterated in the insertion order.
         mTestInstances = new LinkedHashMap<>();
 
-        // When the baseline mode for incremental dEQP is enabled, skip all tests to run.
-        if (isIncrementalDeqpBaselineRun()) {
+        if (shouldBypassTestExecutionAndReporting()) {
             return;
         }
 
@@ -2540,7 +2555,10 @@ public class DeqpTestRunner
         // split().
         loadIncrementalDeqpTests();
 
-        mRemainingTests = new HashSet<>(mTestInstances.keySet());
+        mRemainingTests = new HashSet<>();
+        if (!shouldBypassTestExecutionAndReporting()) {
+            mRemainingTests.addAll(mTestInstances.keySet());
+        }
         long startTime = System.currentTimeMillis();
         listener.testRunStarted(getId(), mRemainingTests.size());
 
