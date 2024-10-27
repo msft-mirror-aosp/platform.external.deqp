@@ -1159,6 +1159,50 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.verify(mockListener);
     }
 
+    public void testRun_incrementalDeqpTrustedBuild() throws Exception {
+        final TestDescription[] testIds = {
+            new TestDescription("dEQP-GLES3.group1", "no"),
+            new TestDescription("dEQP-GLES3.group1", "nope"),
+            new TestDescription("dEQP-GLES3.group1", "nottoday"),
+            new TestDescription("dEQP-GLES3.group2", "banned"),
+            new TestDescription("dEQP-GLES3.group2", "notrecognized"),
+            new TestDescription("dEQP-GLES3.group2", "-2"),
+        };
+
+        List<TestDescription> allTests = new ArrayList<TestDescription>();
+        for (TestDescription id : testIds) {
+            allTests.add(id);
+        }
+
+        DeqpTestRunner deqpTest =
+            buildGlesTestRunner(3, 0, allTests, mTestsDir);
+
+        HashMap attributes = new HashMap<>();
+        attributes.put(IncrementalDeqpPreparer.INCREMENTAL_DEQP_TRUSTED_BUILD_ATTRIBUTE_NAME,
+            "");
+        IFolderBuildInfo mockBuildInfo =
+            EasyMock.createMock(IFolderBuildInfo.class);
+        EasyMock.expect(mockBuildInfo.getBuildAttributes())
+            .andReturn(attributes)
+            .atLeastOnce();
+        CompatibilityBuildHelper helper =
+            new BuildHelperMock(mockBuildInfo, mTestsDir);
+        deqpTest.setBuildHelper(helper);
+        EasyMock.replay(mockBuildInfo);
+
+        ITestInvocationListener mockListener =
+            EasyMock.createStrictMock(ITestInvocationListener.class);
+        mockListener.testRunStarted(getTestId(deqpTest), 0);
+        EasyMock.expectLastCall().once();
+        mockListener.testRunEnded(EasyMock.anyLong(),
+            EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        EasyMock.replay(mockListener);
+        deqpTest.run(mockListener);
+        EasyMock.verify(mockListener);
+    }
+
     /**
      * Test running a unexecutable test.
      */
