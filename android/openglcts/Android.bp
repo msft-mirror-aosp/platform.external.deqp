@@ -36,8 +36,10 @@ java_test_host {
     ],
     per_testcase_directory: true,
     data: [
-        ":org.khronos.gl_cts",
         ":deqp_binary_data",
         ":khronos_cts_gles_caselists",
+    ],
+    device_common_data: [
+        ":org.khronos.gl_cts",
     ],
 }
