@@ -19,7 +19,6 @@ import com.android.compatibility.common.tradefed.build.CompatibilityBuildHelper;
 import com.android.compatibility.common.tradefed.targetprep.IncrementalDeqpPreparer;
 import com.android.ddmlib.IDevice;
 import com.android.ddmlib.IShellOutputReceiver;
-import com.android.tradefed.build.IBuildInfo;
 import com.android.tradefed.build.IFolderBuildInfo;
 import com.android.tradefed.config.ConfigurationException;
 import com.android.tradefed.config.OptionSetter;
@@ -43,7 +42,6 @@ import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -1115,6 +1113,94 @@ public class DeqpTestRunnerTest extends TestCase {
 
         EasyMock.verify(mockListener);
         EasyMock.verify(mockDevice, mockIDevice);
+    }
+
+    public void testRun_incrementalDeqpBaseline() throws Exception {
+        final TestDescription[] testIds = {
+            new TestDescription("dEQP-GLES3.group1", "no"),
+            new TestDescription("dEQP-GLES3.group1", "nope"),
+            new TestDescription("dEQP-GLES3.group1", "nottoday"),
+            new TestDescription("dEQP-GLES3.group2", "banned"),
+            new TestDescription("dEQP-GLES3.group2", "notrecognized"),
+            new TestDescription("dEQP-GLES3.group2", "-2"),
+        };
+
+        List<TestDescription> allTests = new ArrayList<TestDescription>();
+        for (TestDescription id : testIds) {
+            allTests.add(id);
+        }
+
+        DeqpTestRunner deqpTest =
+            buildGlesTestRunner(3, 0, allTests, mTestsDir);
+
+        HashMap attributes = new HashMap<>();
+        attributes.put(IncrementalDeqpPreparer.INCREMENTAL_DEQP_BASELINE_ATTRIBUTE_NAME,
+            "");
+        IFolderBuildInfo mockBuildInfo =
+            EasyMock.createMock(IFolderBuildInfo.class);
+        EasyMock.expect(mockBuildInfo.getBuildAttributes())
+            .andReturn(attributes)
+            .atLeastOnce();
+        CompatibilityBuildHelper helper =
+            new BuildHelperMock(mockBuildInfo, mTestsDir);
+        deqpTest.setBuildHelper(helper);
+        EasyMock.replay(mockBuildInfo);
+
+        ITestInvocationListener mockListener =
+            EasyMock.createStrictMock(ITestInvocationListener.class);
+        mockListener.testRunStarted(getTestId(deqpTest), 0);
+        EasyMock.expectLastCall().once();
+        mockListener.testRunEnded(EasyMock.anyLong(),
+            EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        EasyMock.replay(mockListener);
+        deqpTest.run(mockListener);
+        EasyMock.verify(mockListener);
+    }
+
+    public void testRun_incrementalDeqpTrustedBuild() throws Exception {
+        final TestDescription[] testIds = {
+            new TestDescription("dEQP-GLES3.group1", "no"),
+            new TestDescription("dEQP-GLES3.group1", "nope"),
+            new TestDescription("dEQP-GLES3.group1", "nottoday"),
+            new TestDescription("dEQP-GLES3.group2", "banned"),
+            new TestDescription("dEQP-GLES3.group2", "notrecognized"),
+            new TestDescription("dEQP-GLES3.group2", "-2"),
+        };
+
+        List<TestDescription> allTests = new ArrayList<TestDescription>();
+        for (TestDescription id : testIds) {
+            allTests.add(id);
+        }
+
+        DeqpTestRunner deqpTest =
+            buildGlesTestRunner(3, 0, allTests, mTestsDir);
+
+        HashMap attributes = new HashMap<>();
+        attributes.put(IncrementalDeqpPreparer.INCREMENTAL_DEQP_TRUSTED_BUILD_ATTRIBUTE_NAME,
+            "");
+        IFolderBuildInfo mockBuildInfo =
+            EasyMock.createMock(IFolderBuildInfo.class);
+        EasyMock.expect(mockBuildInfo.getBuildAttributes())
+            .andReturn(attributes)
+            .atLeastOnce();
+        CompatibilityBuildHelper helper =
+            new BuildHelperMock(mockBuildInfo, mTestsDir);
+        deqpTest.setBuildHelper(helper);
+        EasyMock.replay(mockBuildInfo);
+
+        ITestInvocationListener mockListener =
+            EasyMock.createStrictMock(ITestInvocationListener.class);
+        mockListener.testRunStarted(getTestId(deqpTest), 0);
+        EasyMock.expectLastCall().once();
+        mockListener.testRunEnded(EasyMock.anyLong(),
+            EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        EasyMock.replay(mockListener);
+        deqpTest.run(mockListener);
+        EasyMock.verify(mockListener);
     }
 
     /**
