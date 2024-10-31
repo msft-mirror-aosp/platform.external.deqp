@@ -23,18 +23,23 @@ package {
 
 java_test_host {
     name: "KhronosCTSTestCases",
+    test_suites: ["general-tests"],
     team: "trendy_team_android_gpu",
     srcs: ["runner/src/**/*.java"],
     libs: [
         "cts-tradefed",
         "compatibility-host-util",
         "tradefed",
-        "CtsDeqpTestCases",
+    ],
+    static_libs: [
+        "CtsDeqpTestCasesJavaHostLib",
     ],
     per_testcase_directory: true,
     data: [
-        ":org.khronos.gl_cts",
         ":deqp_binary_data",
         ":khronos_cts_gles_caselists",
+    ],
+    device_common_data: [
+        ":org.khronos.gl_cts",
     ],
 }
