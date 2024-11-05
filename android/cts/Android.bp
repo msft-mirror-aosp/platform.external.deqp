@@ -58,12 +58,14 @@ java_test_host {
 
     per_testcase_directory: true,
     data: [
-        ":com.drawelements.deqp",
         ":deqp_binary_data",
         ":deqp_binary_data_vulkancts",
         ":deqp_binary_data_graphicsfuzz",
         ":deqp_main_caselists",
         ":deqp_angle_exclude_caselists",
+    ],
+    device_common_data: [
+        ":com.drawelements.deqp",
     ],
     data_device_bins_both: [
         "deqp-binary",
