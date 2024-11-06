@@ -464,6 +464,10 @@ void RobustnessExtsTestCase::checkSupport(Context& context) const
 		(!features2.features.shaderStorageImageReadWithoutFormat || !features2.features.shaderStorageImageWriteWithoutFormat))
 		TCU_THROW(NotSupportedError, "shaderStorageImageReadWithoutFormat or shaderStorageImageWriteWithoutFormat not supported");
 
+	if ((m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER || m_data.descriptorType == VK_DESCRIPTOR_TYPE_STORAGE_IMAGE) &&
+		!m_data.formatQualifier && formatIsR64(m_data.format))
+		TCU_THROW(NotSupportedError, "R64 formats are not covered by shaderStorageImageReadWithoutFormat/shaderStorageImageWriteWithoutFormat");
+
 	if (m_data.pushDescriptor)
 		context.requireDeviceFunctionality("VK_KHR_push_descriptor");
 
