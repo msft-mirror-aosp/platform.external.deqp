@@ -1956,7 +1956,7 @@ def writeRefUtilImpl (api, filename):
 
             yield "Move<%s> %s (%s)" % (function.objectType, function.name, argListToStr(function.ifaceArgs + function.arguments))
             yield "{"
-            yield "\t%s object = 0;" % function.objectType
+            yield "\t%s object = VK_NULL_HANDLE;" % function.objectType
             yield "\tVK_CHECK(vk.%s(%s));" % (function.name, ", ".join([a.name for a in function.arguments] + ["&object"]))
             yield "\treturn Move<%s>(check<%s>(object), Deleter<%s>(%s));" % (function.objectType, function.objectType, function.objectType, deleterArgsString)
             yield "}"
@@ -3980,7 +3980,7 @@ if __name__ == "__main__":
     writeApiExtensionDependencyInfo            (api, os.path.join(outputPath, "vkApiExtensionDependencyInfo.inl"))
     writeEntryPointValidation                (api, os.path.join(outputPath, "vkEntryPointValidation.inl"))
     writeGetDeviceProcAddr                    (api, os.path.join(outputPath, "vkGetDeviceProcAddr.inl"))
-    writeConformanceVersions                (     os.path.join(outputPath, "vkKnownConformanceVersions.inl"))
+    #writeConformanceVersions                (     os.path.join(outputPath, "vkKnownConformanceVersions.inl"))
 
     # NOTE: when new files are generated then they should also be added to the
     # vk-gl-cts\external\vulkancts\framework\vulkan\CMakeLists.txt outputs list

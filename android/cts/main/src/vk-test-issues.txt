@@ -33,3 +33,5 @@ dEQP-VK.reconvergence.workgroup_uniform_control_flow_ballot.compute.nesting4.7.3
 # b/365448887: Test uses excessive memory in some drivers; doesn't fit in some low-end parts
 dEQP-VK.memory.pipeline_barrier.host_write_index_buffer.1048576
 
+# Issue 4894
+dEQP-VK.image.extended_usage_bit_compatibility.image_format_list.*
