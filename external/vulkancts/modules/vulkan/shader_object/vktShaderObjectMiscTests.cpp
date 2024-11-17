@@ -133,8 +133,8 @@ tcu::TestStatus ShaderObjectMiscInstance::iterate(void)
         m_context.getInstanceInterface(), m_context.getPhysicalDevice(), m_context.getDeviceExtensions());
     const bool tessellationSupported = m_context.getDeviceFeatures().tessellationShader;
     const bool geometrySupported     = m_context.getDeviceFeatures().geometryShader;
-    const bool taskSupported         = m_context.getMeshShaderFeatures().taskShader;
-    const bool meshSupported         = m_context.getMeshShaderFeatures().meshShader;
+    const bool taskSupported         = m_context.getMeshShaderFeaturesEXT().taskShader;
+    const bool meshSupported         = m_context.getMeshShaderFeaturesEXT().meshShader;
 
     vk::VkFormat colorAttachmentFormat = vk::VK_FORMAT_R8G8B8A8_UNORM;
     const auto subresourceRange        = vk::makeImageSubresourceRange(vk::VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u);
@@ -722,8 +722,9 @@ void ShaderObjectStateInstance::createDevice(void)
     eds3Features.pNext             = DE_NULL;
     viFeatures.pNext               = DE_NULL;
 
-    vk::VkPhysicalDeviceFeatures2 features2 = vk::initVulkanStructure();
-    void *pNext                             = &dynamicRenderingFeatures;
+    vk::VkPhysicalDeviceFeatures2 features2           = vk::initVulkanStructure();
+    features2.features.vertexPipelineStoresAndAtomics = VK_TRUE;
+    void *pNext                                       = &dynamicRenderingFeatures;
 
     const float queuePriority                  = 1.0f;
     std::vector<const char *> deviceExtensions = {"VK_KHR_dynamic_rendering"};
@@ -1272,8 +1273,8 @@ tcu::TestStatus ShaderObjectStateInstance::iterate(void)
     const vk::VkRect2D renderArea = vk::makeRect2D(0, 0, 32, 32);
     vk::VkExtent3D extent         = {renderArea.extent.width, renderArea.extent.height, 1};
 
-    const bool taskSupported = m_context.getMeshShaderFeatures().taskShader;
-    const bool meshSupported = m_context.getMeshShaderFeatures().meshShader;
+    const bool taskSupported = m_context.getMeshShaderFeaturesEXT().taskShader;
+    const bool meshSupported = m_context.getMeshShaderFeaturesEXT().meshShader;
 
     const vk::VkImageCreateInfo createInfo = {
         vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, // VkStructureType            sType
@@ -2024,6 +2025,9 @@ void ShaderObjectStateCase::checkSupport(Context &context) const
     else
         context.requireDeviceFunctionality("VK_KHR_dynamic_rendering");
 
+    if (!context.getDeviceFeatures().vertexPipelineStoresAndAtomics)
+        TCU_THROW(NotSupportedError, "vertexPipelineStoresAndAtomics not supported");
+
     if (m_params.logicOp)
     {
         context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_LOGIC_OP);
@@ -2375,8 +2379,8 @@ tcu::TestStatus ShaderObjectUnusedBuiltinInstance::iterate(void)
         m_context.getInstanceInterface(), m_context.getPhysicalDevice(), m_context.getDeviceExtensions());
     const bool tessellationSupported = m_context.getDeviceFeatures().tessellationShader;
     const bool geometrySupported     = m_context.getDeviceFeatures().geometryShader;
-    const bool taskSupported         = m_context.getMeshShaderFeatures().taskShader;
-    const bool meshSupported         = m_context.getMeshShaderFeatures().meshShader;
+    const bool taskSupported         = m_context.getMeshShaderFeaturesEXT().taskShader;
+    const bool meshSupported         = m_context.getMeshShaderFeaturesEXT().meshShader;
 
     vk::VkFormat colorAttachmentFormat = vk::VK_FORMAT_R8G8B8A8_UNORM;
     const auto subresourceRange        = makeImageSubresourceRange(vk::VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u);
@@ -2714,8 +2718,8 @@ tcu::TestStatus ShaderObjectTessellationModesInstance::iterate(void)
         m_context.getInstanceInterface(), m_context.getPhysicalDevice(), m_context.getDeviceExtensions());
     const bool tessellationSupported = m_context.getDeviceFeatures().tessellationShader;
     const bool geometrySupported     = m_context.getDeviceFeatures().geometryShader;
-    const bool taskSupported         = m_context.getMeshShaderFeatures().taskShader;
-    const bool meshSupported         = m_context.getMeshShaderFeatures().meshShader;
+    const bool taskSupported         = m_context.getMeshShaderFeaturesEXT().taskShader;
+    const bool meshSupported         = m_context.getMeshShaderFeaturesEXT().meshShader;
 
     vk::VkFormat colorAttachmentFormat = vk::VK_FORMAT_R8G8B8A8_UNORM;
     const auto subresourceRange        = makeImageSubresourceRange(vk::VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u);
