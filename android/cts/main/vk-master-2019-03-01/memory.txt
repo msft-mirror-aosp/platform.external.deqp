@@ -66,7 +66,6 @@ dEQP-VK.memory.pipeline_barrier.host_write_vertex_buffer.1048576_vertex_buffer_s
 dEQP-VK.memory.pipeline_barrier.host_write_index_buffer.1024
 dEQP-VK.memory.pipeline_barrier.host_write_index_buffer.8192
 dEQP-VK.memory.pipeline_barrier.host_write_index_buffer.65536
-dEQP-VK.memory.pipeline_barrier.host_write_index_buffer.1048576
 dEQP-VK.memory.pipeline_barrier.host_write_uniform_buffer.1024
 dEQP-VK.memory.pipeline_barrier.host_write_uniform_buffer.8192
 dEQP-VK.memory.pipeline_barrier.host_write_uniform_buffer.65536
