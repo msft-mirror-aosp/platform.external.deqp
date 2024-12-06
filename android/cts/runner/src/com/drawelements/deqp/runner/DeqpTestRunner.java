@@ -176,6 +176,10 @@ public class DeqpTestRunner
             description = "Load list of excludes from the files given.")
     private List<String> mExcludeFilterFiles = new ArrayList<>();
     @Option(
+        name = "enable-incremental-deqp",
+        description = "enables incremental dEQP to load and run specific tests.")
+    private boolean mEnableIncrementalDeqp = false;
+    @Option(
         name = "incremental-deqp-include-file",
         description =
             "Load list of includes from the files given for incremental dEQP.")
@@ -2326,24 +2330,29 @@ public class DeqpTestRunner
             return;
         }
 
+        List<String> caseListFiles = new ArrayList<>();
+        if (mEnableIncrementalDeqp) {
+            caseListFiles.addAll(mIncrementalDeqpIncludeFiles);
+        } else {
+            caseListFiles.add(mCaselistFile);
+        }
         try {
-            File testlist = new File(mBuildHelper.getTestsDir(), mCaselistFile);
-            if (!testlist.isFile()) {
-                // Finding file in sub directory if no matching file in the
-                // first layer of testdir.
-                testlist = FileUtil.findFile(mBuildHelper.getTestsDir(),
-                                             mCaselistFile);
-                if (testlist == null || !testlist.isFile()) {
-                    throw new FileNotFoundException(
-                        "Cannot find deqp test list file: " + mCaselistFile);
+            for (String caseListFile : caseListFiles) {
+                File testlist = new File(mBuildHelper.getTestsDir(), caseListFile);
+                if (!testlist.isFile()) {
+                    // Finding file in sub directory if no matching file in the
+                    // first layer of testdir.
+                    testlist = FileUtil.findFile(mBuildHelper.getTestsDir(), caseListFile);
+                    if (testlist == null || !testlist.isFile()) {
+                        throw new FileNotFoundException(
+                            "Cannot find deqp test list file: " + caseListFile);
+                    }
                 }
+                addTestsToInstancesMap(testlist, mConfigName, mScreenRotation, mSurfaceType,
+                                       mConfigRequired, mTestInstances);
             }
-            addTestsToInstancesMap(testlist, mConfigName, mScreenRotation,
-                                   mSurfaceType, mConfigRequired,
-                                   mTestInstances);
         } catch (FileNotFoundException e) {
-            throw new RuntimeException("Cannot read deqp test list file: " +
-                                       mCaselistFile);
+            throw new RuntimeException("Cannot read deqp test list file. " + e);
         }
 
         try {
@@ -2628,6 +2637,7 @@ public class DeqpTestRunner
         destination.mCollectTestsOnly = source.mCollectTestsOnly;
         destination.mAngle = source.mAngle;
         destination.mDisableWatchdog = source.mDisableWatchdog;
+        destination.mEnableIncrementalDeqp = source.mEnableIncrementalDeqp;
         destination.mIncrementalDeqpIncludeFiles =
             new ArrayList<>(source.mIncrementalDeqpIncludeFiles);
         destination.mForceDeqpLevel = source.mForceDeqpLevel;
