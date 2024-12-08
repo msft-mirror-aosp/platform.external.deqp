@@ -61,7 +61,6 @@ import org.easymock.IMocksControl;
  * Unit tests for {@link DeqpTestRunner}.
  */
 public class DeqpTestRunnerTest extends TestCase {
-    private static final String NAME = "dEQP-GLES3";
     private static final IAbi ABI = new Abi("armeabi-v7a", "32");
     private static final String APP_DIR = "/sdcard/";
     private static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
@@ -70,8 +69,6 @@ public class DeqpTestRunnerTest extends TestCase {
         "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
     private static final String QUERY_INSTRUMENTATION_NAME =
         "com.drawelements.deqp/com.drawelements.deqp.platformutil.DeqpPlatformCapabilityQueryInstrumentation";
-    private static final String DEQP_ONDEVICE_APK = "com.drawelements.deqp.apk";
-    private static final String DEQP_ONDEVICE_PKG = "com.drawelements.deqp";
     private static final String ONLY_LANDSCAPE_FEATURES =
         "feature:" + DeqpTestRunner.FEATURE_LANDSCAPE;
     private static final String ALL_FEATURES =
@@ -949,236 +946,26 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.verify(mockListener);
     }
 
-    public void testRun_incrementalDeqp() throws Exception {
-        final String output =
-            "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=2014.x\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseId\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=0xcafebabe\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=targetName\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=android\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginSession\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.incremental-deqp.should-run-1\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.incremental-deqp.should-run-2\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.incremental-deqp.should-run-3\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndSession\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_CODE: 0\r\n";
+    public void testRun_incrementalDeqpAttributeSet() throws Exception {
         final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.non-incremental-deqp",
-                                "should-skip-1"),
-            new TestDescription("dEQP-GLES3.non-incremental-deqp",
-                                "should-skip-2"),
-            new TestDescription("dEQP-GLES3.non-incremental-deqp",
-                                "should-skip-3"),
-            new TestDescription("dEQP-GLES3.incremental-deqp", "should-run-1"),
-            new TestDescription("dEQP-GLES3.incremental-deqp", "should-run-2"),
-            new TestDescription("dEQP-GLES3.incremental-deqp", "should-run-3"),
+            new TestDescription("dEQP-GLES3.group1", "no"),
+            new TestDescription("dEQP-GLES3.group1", "nope"),
+            new TestDescription("dEQP-GLES3.group1", "nottoday"),
+            new TestDescription("dEQP-GLES3.group2", "banned"),
+            new TestDescription("dEQP-GLES3.group2", "notrecognized"),
+            new TestDescription("dEQP-GLES3.group2", "-2"),
         };
 
         List<TestDescription> allTests = new ArrayList<TestDescription>();
         for (TestDescription id : testIds) {
             allTests.add(id);
         }
-
-        List<TestDescription> activeTests = new ArrayList<TestDescription>();
-        activeTests.add(testIds[3]);
-        activeTests.add(testIds[4]);
-        activeTests.add(testIds[5]);
 
         DeqpTestRunner deqpTest =
             buildGlesTestRunner(3, 0, allTests, mTestsDir);
 
         HashMap attributes = new HashMap<>();
         attributes.put(IncrementalDeqpPreparer.INCREMENTAL_DEQP_ATTRIBUTE_NAME,
-                       "");
-        IFolderBuildInfo mockBuildInfo =
-            EasyMock.createMock(IFolderBuildInfo.class);
-        EasyMock.expect(mockBuildInfo.getBuildAttributes())
-            .andReturn(attributes)
-            .atLeastOnce();
-        CompatibilityBuildHelper helper =
-            new BuildHelperMock(mockBuildInfo, mTestsDir);
-        deqpTest.setBuildHelper(helper);
-        deqpTest.addIncrementalDeqpIncludeTests(
-            Arrays.asList("dEQP-GLES3.incremental-deqp.should-run-1",
-                          "dEQP-GLES3.incremental-deqp.should-run-2",
-                          "dEQP-GLES3.incremental-deqp.should-run-3"));
-        EasyMock.replay(mockBuildInfo);
-
-        String testTrie =
-            "{dEQP-GLES3{incremental-deqp{should-run-1,should-run-2,should-run-3}}}";
-
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-        int version = 3 << 16;
-        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
-            .andReturn(Integer.toString(version))
-            .atLeastOnce();
-
-        expectRenderConfigQuery(mockDevice, 3, 0);
-
-        String commandLine = String.format(
-            "--deqp-caselist-file=%s --deqp-gl-config-name=rgba8888d24s8 "
-                + "--deqp-screen-rotation=unspecified "
-                + "--deqp-surface-type=window "
-                + "--deqp-log-images=disable "
-                + "--deqp-watchdog=enable",
-            APP_DIR + CASE_LIST_FILE_NAME);
-
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
-                                        commandLine, output);
-
-        mockListener.testRunStarted(getTestId(deqpTest), testIds.length);
-        EasyMock.expectLastCall().once();
-
-        // Expect the calls twice: setupTestEnvironment() and
-        // teardownTestEnvironment()
-        EasyMock
-            .expect(mockDevice.executeShellCommand(EasyMock.eq(
-                "settings delete global angle_gl_driver_selection_pkgs")))
-            .andReturn("")
-            .once();
-        EasyMock
-            .expect(mockDevice.executeShellCommand(EasyMock.eq(
-                "settings delete global angle_gl_driver_selection_values")))
-            .andReturn("")
-            .once();
-        EasyMock
-            .expect(mockDevice.executeShellCommand(EasyMock.eq(
-                "settings delete global angle_gl_driver_selection_pkgs")))
-            .andReturn("")
-            .once();
-        EasyMock
-            .expect(mockDevice.executeShellCommand(EasyMock.eq(
-                "settings delete global angle_gl_driver_selection_values")))
-            .andReturn("")
-            .once();
-
-        for (int i = 0; i < testIds.length; i++) {
-            mockListener.testStarted(EasyMock.eq(testIds[i]));
-            EasyMock.expectLastCall().once();
-
-            mockListener.testEnded(EasyMock.eq(testIds[i]),
-                                   EasyMock.<HashMap<String, Metric>>notNull());
-
-            EasyMock.expectLastCall().once();
-        }
-
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
-    }
-
-    public void testRun_incrementalDeqpBaseline() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.group1", "no"),
-            new TestDescription("dEQP-GLES3.group1", "nope"),
-            new TestDescription("dEQP-GLES3.group1", "nottoday"),
-            new TestDescription("dEQP-GLES3.group2", "banned"),
-            new TestDescription("dEQP-GLES3.group2", "notrecognized"),
-            new TestDescription("dEQP-GLES3.group2", "-2"),
-        };
-
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
-
-        DeqpTestRunner deqpTest =
-            buildGlesTestRunner(3, 0, allTests, mTestsDir);
-
-        HashMap attributes = new HashMap<>();
-        attributes.put(IncrementalDeqpPreparer.INCREMENTAL_DEQP_BASELINE_ATTRIBUTE_NAME,
-            "");
-        IFolderBuildInfo mockBuildInfo =
-            EasyMock.createMock(IFolderBuildInfo.class);
-        EasyMock.expect(mockBuildInfo.getBuildAttributes())
-            .andReturn(attributes)
-            .atLeastOnce();
-        CompatibilityBuildHelper helper =
-            new BuildHelperMock(mockBuildInfo, mTestsDir);
-        deqpTest.setBuildHelper(helper);
-        EasyMock.replay(mockBuildInfo);
-
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        mockListener.testRunStarted(getTestId(deqpTest), 0);
-        EasyMock.expectLastCall().once();
-        mockListener.testRunEnded(EasyMock.anyLong(),
-            EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockListener);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener);
-    }
-
-    public void testRun_incrementalDeqpTrustedBuild() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.group1", "no"),
-            new TestDescription("dEQP-GLES3.group1", "nope"),
-            new TestDescription("dEQP-GLES3.group1", "nottoday"),
-            new TestDescription("dEQP-GLES3.group2", "banned"),
-            new TestDescription("dEQP-GLES3.group2", "notrecognized"),
-            new TestDescription("dEQP-GLES3.group2", "-2"),
-        };
-
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
-
-        DeqpTestRunner deqpTest =
-            buildGlesTestRunner(3, 0, allTests, mTestsDir);
-
-        HashMap attributes = new HashMap<>();
-        attributes.put(IncrementalDeqpPreparer.INCREMENTAL_DEQP_TRUSTED_BUILD_ATTRIBUTE_NAME,
             "");
         IFolderBuildInfo mockBuildInfo =
             EasyMock.createMock(IFolderBuildInfo.class);
