@@ -44,8 +44,8 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -122,16 +122,28 @@ public class DeqpTestRunnerTest extends TestCase {
 
     private static DeqpTestRunner
     buildGlesTestRunner(int majorVersion, int minorVersion,
-                        Collection<TestDescription> tests, File testsDir)
+        Collection<TestDescription> tests, File testsDir)
+        throws ConfigurationException, IOException {
+        return buildGlesTestRunner(majorVersion, minorVersion, tests, testsDir, false,
+                                   new ArrayList<TestDescription>());
+    }
+
+    private static DeqpTestRunner
+    buildGlesTestRunner(int majorVersion, int minorVersion, Collection<TestDescription> tests,
+                        File testsDir, boolean incrementalDeqpEnabled,
+                        Collection<TestDescription> incrementalTests)
         throws ConfigurationException, IOException {
 
         StringWriter testlist = new StringWriter();
         for (TestDescription test : tests) {
-            testlist.write(test.getClassName() + "." + test.getTestName() +
-                           "\n");
+            testlist.write(test.getClassName() + "." + test.getTestName() + "\n");
         }
-        return buildGlesTestRunner(majorVersion, minorVersion,
-                                   testlist.toString(), testsDir);
+        StringWriter incrementalTestlist = new StringWriter();
+        for (TestDescription test : incrementalTests) {
+            incrementalTestlist.write(test.getClassName() + "." + test.getTestName() + "\n");
+        }
+        return buildGlesTestRunner(majorVersion, minorVersion, testlist.toString(), testsDir,
+                                   incrementalDeqpEnabled, incrementalTestlist.toString());
     }
 
     private static CompatibilityBuildHelper getMockBuildHelper(File testsDir) {
@@ -145,25 +157,34 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private static DeqpTestRunner
-    buildGlesTestRunner(int majorVersion, int minorVersion, String testlist,
-                        File testsDir)
+    buildGlesTestRunner(int majorVersion, int minorVersion, String testlist, File testsDir,
+                        boolean incrementalDeqpEnabled, String incrementalTestlist)
         throws ConfigurationException, IOException {
 
         DeqpTestRunner runner = new DeqpTestRunner();
         OptionSetter setter = new OptionSetter(runner);
 
         String deqpPackage =
-            "dEQP-GLES" + Integer.toString(majorVersion) +
+            "dEQP-GLES" + majorVersion +
             (minorVersion > 0 ? Integer.toString(minorVersion) : "");
 
         final File caselistsFile = new File(testsDir, "gles3-caselist.txt");
         FileUtil.writeToFile(testlist, caselistsFile);
+
+        if (!incrementalTestlist.isEmpty()) {
+            final File incrementalCaselistsFile = new File(testsDir,
+                "gles3-incremental-caselist.txt");
+            FileUtil.writeToFile(incrementalTestlist, incrementalCaselistsFile);
+            setter.setOptionValue(
+                "incremental-deqp-include-file", incrementalCaselistsFile.getName());
+        }
 
         setter.setOptionValue("deqp-package", deqpPackage);
         setter.setOptionValue("deqp-gl-config-name", "rgba8888d24s8");
         setter.setOptionValue("deqp-caselist-file", caselistsFile.getName());
         setter.setOptionValue("deqp-screen-rotation", "unspecified");
         setter.setOptionValue("deqp-surface-type", "window");
+        setter.setOptionValue("enable-incremental-deqp", String.valueOf(incrementalDeqpEnabled));
         runner.setAbi(ABI);
         runner.setBuildHelper(getMockBuildHelper(testsDir));
 
@@ -988,6 +1009,153 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.replay(mockListener);
         deqpTest.run(mockListener);
         EasyMock.verify(mockListener);
+    }
+
+    public void testRun_incrementalDeqpEnabled() throws Exception {
+        final String output =
+            "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=2014.x\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseId\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=0xcafebabe\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=targetName\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=android\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginSession\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
+                +
+                "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.incremental-deqp.should-run-1\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
+                +
+                "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.incremental-deqp.should-run-2\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
+                +
+                "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.incremental-deqp.should-run-3\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_STATUS: dEQP-EventType=EndSession\r\n"
+                + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                + "INSTRUMENTATION_CODE: 0\r\n";
+        final TestDescription[] testIds = {
+            new TestDescription("dEQP-GLES3.non-incremental-deqp",
+                "should-skip-1"),
+            new TestDescription("dEQP-GLES3.non-incremental-deqp",
+                "should-skip-2"),
+            new TestDescription("dEQP-GLES3.non-incremental-deqp",
+                "should-skip-3"),
+            new TestDescription("dEQP-GLES3.incremental-deqp", "should-run-1"),
+            new TestDescription("dEQP-GLES3.incremental-deqp", "should-run-2"),
+            new TestDescription("dEQP-GLES3.incremental-deqp", "should-run-3"),
+        };
+
+        List<TestDescription> allTests = new ArrayList<>();
+        Collections.addAll(allTests, testIds);
+
+        List<TestDescription> incrementalTests = new ArrayList<>();
+        incrementalTests.add(testIds[3]);
+        incrementalTests.add(testIds[4]);
+        incrementalTests.add(testIds[5]);
+
+        DeqpTestRunner deqpTest =
+            buildGlesTestRunner(3, 0, allTests, mTestsDir, true, incrementalTests);
+
+        String testTrie =
+            "{dEQP-GLES3{incremental-deqp{should-run-1,should-run-2,should-run-3}}}";
+
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        ITestInvocationListener mockListener =
+            EasyMock.createStrictMock(ITestInvocationListener.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+        int version = 3 << 16;
+        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
+            .andReturn(Integer.toString(version))
+            .atLeastOnce();
+
+        expectRenderConfigQuery(mockDevice, 3, 0);
+
+        String commandLine = String.format(
+            "--deqp-caselist-file=%s --deqp-gl-config-name=rgba8888d24s8 "
+                + "--deqp-screen-rotation=unspecified "
+                + "--deqp-surface-type=window "
+                + "--deqp-log-images=disable "
+                + "--deqp-watchdog=enable",
+            APP_DIR + CASE_LIST_FILE_NAME);
+
+        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+            commandLine, output);
+
+        mockListener.testRunStarted(getTestId(deqpTest), incrementalTests.size());
+        EasyMock.expectLastCall().once();
+
+        // Expect the calls twice: setupTestEnvironment() and
+        // teardownTestEnvironment()
+        EasyMock
+            .expect(mockDevice.executeShellCommand(EasyMock.eq(
+                "settings delete global angle_gl_driver_selection_pkgs")))
+            .andReturn("")
+            .once();
+        EasyMock
+            .expect(mockDevice.executeShellCommand(EasyMock.eq(
+                "settings delete global angle_gl_driver_selection_values")))
+            .andReturn("")
+            .once();
+        EasyMock
+            .expect(mockDevice.executeShellCommand(EasyMock.eq(
+                "settings delete global angle_gl_driver_selection_pkgs")))
+            .andReturn("")
+            .once();
+        EasyMock
+            .expect(mockDevice.executeShellCommand(EasyMock.eq(
+                "settings delete global angle_gl_driver_selection_values")))
+            .andReturn("")
+            .once();
+
+        for (TestDescription incrementalTest : incrementalTests) {
+            mockListener.testStarted(EasyMock.eq(incrementalTest));
+            EasyMock.expectLastCall().once();
+
+            mockListener.testEnded(EasyMock.eq(incrementalTest),
+                EasyMock.<HashMap<String, Metric>>notNull());
+
+            EasyMock.expectLastCall().once();
+        }
+
+        mockListener.testRunEnded(EasyMock.anyLong(),
+            EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        EasyMock.replay(mockDevice, mockIDevice);
+        EasyMock.replay(mockListener);
+
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+
+        EasyMock.verify(mockListener);
+        EasyMock.verify(mockDevice, mockIDevice);
     }
 
     /**
