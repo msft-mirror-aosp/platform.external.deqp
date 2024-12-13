@@ -71,3 +71,14 @@ java_test_host {
         "deqp-binary",
     ],
 }
+
+java_library_host {
+    name: "CtsDeqpTestCasesJavaHostLib",
+    srcs: ["runner/src/**/*.java"],
+    libs: [
+        "cts-tradefed",
+        "compatibility-tradefed",
+        "compatibility-host-util",
+        "tradefed",
+    ],
+}
