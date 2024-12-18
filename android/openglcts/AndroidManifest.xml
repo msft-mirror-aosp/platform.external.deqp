@@ -4,7 +4,8 @@
 	      android:versionCode="1"
 	      android:versionName="1.0">
 
-    <application android:label="Khronos OpenGL Conformance Tests">
+    <application android:label="Khronos OpenGL Conformance Tests"
+		android:requestLegacyExternalStorage="true">
         <!-- separate test runner - supports full command line -->
 		<activity android:name="android.app.NativeActivity"
 				  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
@@ -13,9 +14,21 @@
 				  android:exported="true"
 				  android:process=":testercore">
 			<meta-data android:name="android.app.lib_name"
-					   android:value="deqp" />
+					   android:value="khronosopenglcts" />
 			<meta-data android:name="android.app.func_name"
 					   android:value="createTestActivity" />
+		</activity>
+
+		<!-- Activity that exports test run session parameters -->
+		<activity android:name="org.khronos.cts.ES32GetTestParamActivity"
+				  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+				  android:label="ES32 CTS test params"
+				  android:configChanges="orientation|keyboardHidden|screenLayout"
+				  android:exported="true">
+			<meta-data android:name="android.app.lib_name"
+					   android:value="khronosopenglcts" />
+			<meta-data android:name="android.app.func_name"
+					   android:value="createExportES32TestParamActivity" />
 		</activity>
 
 		<!-- CTS activities -->
@@ -24,9 +37,10 @@
 				  android:label="ES2 CTS"
 				  android:configChanges="orientation|keyboardHidden|screenLayout"
 				  android:launchMode="singleTask"
-				  android:exported="true">
+				  android:exported="true"
+				  android:process=":testercore">
 			<meta-data android:name="android.app.lib_name"
-					   android:value="deqp" />
+					   android:value="khronosopenglcts" />
 			<meta-data android:name="android.app.func_name"
 					   android:value="createES2CTSActivity" />
 			<intent-filter>
@@ -39,9 +53,10 @@
 				  android:label="ES3 CTS"
 				  android:configChanges="orientation|keyboardHidden|screenLayout"
 				  android:launchMode="singleTask"
-				  android:exported="true">
+				  android:exported="true"
+				  android:process=":testercore">
 			<meta-data android:name="android.app.lib_name"
-					   android:value="deqp" />
+					   android:value="khronosopenglcts" />
 			<meta-data android:name="android.app.func_name"
 					   android:value="createES3CTSActivity" />
 			<intent-filter>
@@ -54,9 +69,10 @@
 				  android:label="ES3.1 CTS"
 				  android:configChanges="orientation|keyboardHidden|screenLayout"
 				  android:launchMode="singleTask"
-				  android:exported="true">
+				  android:exported="true"
+				  android:process=":testercore">
 			<meta-data android:name="android.app.lib_name"
-					   android:value="deqp" />
+					   android:value="khronosopenglcts" />
 			<meta-data android:name="android.app.func_name"
 					   android:value="createES31CTSActivity" />
 			<intent-filter>
@@ -69,9 +85,10 @@
 				  android:label="ES3.2 CTS"
 				  android:configChanges="orientation|keyboardHidden|screenLayout"
 				  android:launchMode="singleTask"
-				  android:exported="true">
+				  android:exported="true"
+				  android:process=":testercore">
 			<meta-data android:name="android.app.lib_name"
-					   android:value="deqp" />
+					   android:value="khronosopenglcts" />
 			<meta-data android:name="android.app.func_name"
 					   android:value="createES32CTSActivity" />
 			<intent-filter>
@@ -84,9 +101,10 @@
 				  android:label="GL4.5 CTS"
 				  android:configChanges="orientation|keyboardHidden|screenLayout"
 				  android:launchMode="singleTask"
-				  android:exported="true">
+				  android:exported="true"
+				  android:process=":testercore">
 			<meta-data android:name="android.app.lib_name"
-					   android:value="deqp" />
+					   android:value="khronosopenglcts" />
 			<meta-data android:name="android.app.func_name"
 					   android:value="createGL45CTSActivity" />
 			<intent-filter>
@@ -99,9 +117,10 @@
 					android:label="GL4.6 CTS"
 					android:configChanges="orientation|keyboardHidden|screenLayout"
 					android:launchMode="singleTask"
-					android:exported="true">
+					android:exported="true"
+					android:process=":testercore">
 			<meta-data android:name="android.app.lib_name"
-						 android:value="deqp" />
+						 android:value="khronosopenglcts" />
 			<meta-data android:name="android.app.func_name"
 						 android:value="createGL46CTSActivity" />
 			<intent-filter>
@@ -114,4 +133,13 @@
     <uses-feature android:glEsVersion="0x00030001"/>
 	<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 	<uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+	<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+	<uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+	<uses-permission android:name="android.permission.GET_TASKS" />
+	<uses-permission android:name="android.permission.INTERNET" />
+	<uses-permission android:name="android.permission.RUN_INSTRUMENTATION" />
+	<uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+	<instrumentation android:label="KhronosCTS-Instrumentation"
+					 android:name="org.khronos.cts.testercore.KhronosCTSInstrumentation"
+					 android:targetPackage="org.khronos.gl_cts"/>
 </manifest>

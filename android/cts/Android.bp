@@ -45,9 +45,7 @@ java_test_host {
     // Tag this module as a cts test artifact
     test_suites: [
         "cts",
-        "mcts",
         "general-tests",
-        "mts",
         "automotive-general-tests",
     ],
 
@@ -60,14 +58,27 @@ java_test_host {
 
     per_testcase_directory: true,
     data: [
-        ":com.drawelements.deqp",
         ":deqp_binary_data",
         ":deqp_binary_data_vulkancts",
         ":deqp_binary_data_graphicsfuzz",
         ":deqp_main_caselists",
         ":deqp_angle_exclude_caselists",
     ],
+    device_common_data: [
+        ":com.drawelements.deqp",
+    ],
     data_device_bins_both: [
         "deqp-binary",
+    ],
+}
+
+java_library_host {
+    name: "CtsDeqpTestCasesJavaHostLib",
+    srcs: ["runner/src/**/*.java"],
+    libs: [
+        "cts-tradefed",
+        "compatibility-tradefed",
+        "compatibility-host-util",
+        "tradefed",
     ],
 }
