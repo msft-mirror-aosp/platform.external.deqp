@@ -615,10 +615,10 @@ public:
                                         context.getTestContext().getCommandLine()))
         , m_allocator(getDeviceInterface(), getDevice(),
                       getPhysicalDeviceMemoryProperties(context.getInstanceInterface(), m_physicalDevice))
-        , m_pipelineWrapper(context.getInstanceInterface(), context.getDeviceInterface(), m_physicalDevice, getDevice(),
+        , m_pipelineWrapper(context.getInstanceInterface(), getDeviceInterface(), m_physicalDevice, getDevice(),
                             m_context.getDeviceExtensions(), m_pipelineConstructionType, 0u)
-        , m_vertShaderModule(context.getDeviceInterface(), getDevice(), m_context.getBinaryCollection().get("vert"))
-        , m_fragShaderModule(context.getDeviceInterface(), getDevice(), m_context.getBinaryCollection().get("frag"))
+        , m_vertShaderModule(getDeviceInterface(), getDevice(), m_context.getBinaryCollection().get("vert"))
+        , m_fragShaderModule(getDeviceInterface(), getDevice(), m_context.getBinaryCollection().get("frag"))
     {
     }
     virtual ~BindVertexBuffers2Instance(void) = default;
@@ -1343,17 +1343,19 @@ TestInstance *BindVertexBuffers2Case::createInstance(Context &context) const
         vk::VkPhysicalDeviceFeatures2 features2                        = vk::initVulkanStructure();
         vk::VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features = vk::initVulkanStructure();
 #ifndef CTS_USES_VULKANSC
-        vk::VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features   = vk::initVulkanStructure();
-        vk::VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT gplFeatures = vk::initVulkanStructure();
-        vk::VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeatures   = vk::initVulkanStructure();
+        vk::VkPhysicalDeviceMaintenance5FeaturesKHR maintenance5Features      = vk::initVulkanStructure();
+        vk::VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT gplFeatures    = vk::initVulkanStructure();
+        vk::VkPhysicalDeviceDynamicRenderingFeatures dynamicRenderingFeatures = vk::initVulkanStructure();
+        vk::VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeatures      = vk::initVulkanStructure();
 #endif // CTS_USES_VULKANSC
 
         features2.features.robustBufferAccess   = VK_TRUE;
         robustness2Features.robustBufferAccess2 = VK_TRUE;
 #ifndef CTS_USES_VULKANSC
-        maintenance5Features.maintenance5   = VK_TRUE;
-        gplFeatures.graphicsPipelineLibrary = VK_TRUE;
-        shaderObjectFeatures.shaderObject   = VK_TRUE;
+        maintenance5Features.maintenance5         = VK_TRUE;
+        gplFeatures.graphicsPipelineLibrary       = VK_TRUE;
+        dynamicRenderingFeatures.dynamicRendering = VK_TRUE;
+        shaderObjectFeatures.shaderObject         = VK_TRUE;
 #endif // CTS_USES_VULKANSC
 
         const auto addFeatures = vk::makeStructChainAdder(&features2);
@@ -1364,7 +1366,10 @@ TestInstance *BindVertexBuffers2Case::createInstance(Context &context) const
         if (vk::isConstructionTypeLibrary(m_pipelineConstructionType))
             addFeatures(&gplFeatures);
         else if (vk::isConstructionTypeShaderObject(m_pipelineConstructionType))
+        {
+            addFeatures(&dynamicRenderingFeatures);
             addFeatures(&shaderObjectFeatures);
+        }
 #else
         TCU_THROW(NotSupportedError, "VulkanSC does not support VK_EXT_graphics_pipeline_library");
 #endif // CTS_USES_VULKANSC

@@ -124,14 +124,16 @@ Move<VkDevice> createDeviceWithPushDescriptor(const Context &context, const Plat
     VkPhysicalDeviceFeatures features;
     deMemset(&features, 0, sizeof(features));
 
-    vector<string> requiredExtensionsStr                                                  = {"VK_KHR_push_descriptor"};
+    vector<string> requiredExtensionsStr = {"VK_KHR_push_descriptor"};
+    if (params.useMaintenance5)
+        requiredExtensionsStr.push_back("VK_KHR_maintenance5");
     VkPhysicalDeviceGraphicsPipelineLibraryFeaturesEXT graphicsPipelineLibraryFeaturesEXT = initVulkanStructure();
-    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeaturesKHR =
-        initVulkanStructure(&graphicsPipelineLibraryFeaturesEXT);
+    VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamicRenderingFeaturesKHR               = initVulkanStructure();
     VkPhysicalDeviceShaderObjectFeaturesEXT shaderObjectFeaturesEXT = initVulkanStructure(&dynamicRenderingFeaturesKHR);
-    VkPhysicalDeviceFeatures2 features2                             = initVulkanStructure(&shaderObjectFeaturesEXT);
+    VkPhysicalDeviceFeatures2 features2                             = initVulkanStructure();
     if (isConstructionTypeLibrary(params.pipelineConstructionType))
     {
+        features2.pNext = &graphicsPipelineLibraryFeaturesEXT;
         requiredExtensionsStr.push_back("VK_KHR_pipeline_library");
         requiredExtensionsStr.push_back("VK_EXT_graphics_pipeline_library");
         vki.getPhysicalDeviceFeatures2(physicalDevice, &features2);
@@ -140,6 +142,7 @@ Move<VkDevice> createDeviceWithPushDescriptor(const Context &context, const Plat
     }
     else if (isConstructionTypeShaderObject(params.pipelineConstructionType))
     {
+        features2.pNext = &shaderObjectFeaturesEXT;
         if (context.getUsedApiVersion() < VK_API_VERSION_1_3)
             requiredExtensionsStr.push_back("VK_KHR_dynamic_rendering");
         requiredExtensionsStr.push_back("VK_EXT_shader_object");
@@ -968,6 +971,15 @@ void PushDescriptorBufferComputeTestInstance::init(void)
             m_vkd.cmdPushDescriptorSetKHR(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *m_pipelineLayout, 0, 2,
                                           writeDescriptorSets);
             m_vkd.cmdDispatch(*m_cmdBuffer, 1, 1, 1);
+
+            const VkMemoryBarrier barrier = {
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER, // sType
+                nullptr,                          // pNext
+                VK_ACCESS_SHADER_WRITE_BIT,       // srcAccessMask
+                VK_ACCESS_HOST_READ_BIT,          // dstAccessMask
+            };
+            m_vkd.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                                     (VkDependencyFlags)0, 1, &barrier, 0, nullptr, 0, nullptr);
         }
 
         endCommandBuffer(m_vkd, *m_cmdBuffer);
@@ -2432,6 +2444,15 @@ void PushDescriptorImageComputeTestInstance::init(void)
             m_vkd.cmdPushDescriptorSetKHR(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *m_pipelineLayout, 0,
                                           (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data());
             m_vkd.cmdDispatch(*m_cmdBuffer, 1, 1, 1);
+
+            const VkMemoryBarrier barrier = {
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER, // sType
+                nullptr,                          // pNext
+                VK_ACCESS_SHADER_WRITE_BIT,       // srcAccessMask
+                VK_ACCESS_HOST_READ_BIT,          // dstAccessMask
+            };
+            m_vkd.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                                     (VkDependencyFlags)0, 1, &barrier, 0, nullptr, 0, nullptr);
         }
 
         endCommandBuffer(m_vkd, *m_cmdBuffer);
@@ -3480,6 +3501,15 @@ void PushDescriptorTexelBufferComputeTestInstance::init(void)
             m_vkd.cmdPushDescriptorSetKHR(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *m_pipelineLayout, 0,
                                           (uint32_t)writeDescriptorSets.size(), writeDescriptorSets.data());
             m_vkd.cmdDispatch(*m_cmdBuffer, 1, 1, 1);
+
+            const VkMemoryBarrier barrier = {
+                VK_STRUCTURE_TYPE_MEMORY_BARRIER, // sType
+                nullptr,                          // pNext
+                VK_ACCESS_SHADER_WRITE_BIT,       // srcAccessMask
+                VK_ACCESS_HOST_READ_BIT,          // dstAccessMask
+            };
+            m_vkd.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                                     (VkDependencyFlags)0, 1, &barrier, 0, nullptr, 0, nullptr);
         }
 
         endCommandBuffer(m_vkd, *m_cmdBuffer);
