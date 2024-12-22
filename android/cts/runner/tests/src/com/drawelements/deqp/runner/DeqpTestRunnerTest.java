@@ -61,7 +61,6 @@ import org.easymock.IMocksControl;
  * Unit tests for {@link DeqpTestRunner}.
  */
 public class DeqpTestRunnerTest extends TestCase {
-    private static final String NAME = "dEQP-GLES3";
     private static final IAbi ABI = new Abi("armeabi-v7a", "32");
     private static final String APP_DIR = "/sdcard/";
     private static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
@@ -70,8 +69,6 @@ public class DeqpTestRunnerTest extends TestCase {
         "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
     private static final String QUERY_INSTRUMENTATION_NAME =
         "com.drawelements.deqp/com.drawelements.deqp.platformutil.DeqpPlatformCapabilityQueryInstrumentation";
-    private static final String DEQP_ONDEVICE_APK = "com.drawelements.deqp.apk";
-    private static final String DEQP_ONDEVICE_PKG = "com.drawelements.deqp";
     private static final String ONLY_LANDSCAPE_FEATURES =
         "feature:" + DeqpTestRunner.FEATURE_LANDSCAPE;
     private static final String ALL_FEATURES =
