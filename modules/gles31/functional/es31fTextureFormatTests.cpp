@@ -87,9 +87,10 @@ SupportedExtensions checkSupport(const glu::ContextInfo &renderCtxInfoid)
 {
     SupportedExtensions supportedExtensions;
 
-    supportedExtensions.cubeMapArray = renderCtxInfoid.isExtensionSupported("GL_EXT_texture_cube_map_array");
-    supportedExtensions.sRGBR8       = renderCtxInfoid.isExtensionSupported("GL_EXT_texture_sRGB_R8");
-    supportedExtensions.sRGBRG8      = renderCtxInfoid.isExtensionSupported("GL_EXT_texture_sRGB_RG8");
+    supportedExtensions.cubeMapArray = renderCtxInfoid.isExtensionSupported("GL_EXT_texture_cube_map_array") ||
+                                       renderCtxInfoid.isExtensionSupported("GL_ARB_texture_cube_map_array");
+    supportedExtensions.sRGBR8  = renderCtxInfoid.isExtensionSupported("GL_EXT_texture_sRGB_R8");
+    supportedExtensions.sRGBRG8 = renderCtxInfoid.isExtensionSupported("GL_EXT_texture_sRGB_RG8");
 
     return supportedExtensions;
 }
@@ -144,7 +145,7 @@ TextureCubeArrayFormatCase::TextureCubeArrayFormatCase(tcu::TestContext &testCtx
     , m_dataType(dataType)
     , m_size(size)
     , m_depth(depth)
-    , m_texture(DE_NULL)
+    , m_texture(nullptr)
     , m_renderer(renderCtx, testCtx.getLog(), glu::getContextTypeGLSLVersion(renderCtx.getType()), glu::PRECISION_HIGHP)
     , m_curLayerFace(0)
 {
@@ -161,7 +162,7 @@ TextureCubeArrayFormatCase::TextureCubeArrayFormatCase(tcu::TestContext &testCtx
     , m_dataType(GL_NONE)
     , m_size(size)
     , m_depth(depth)
-    , m_texture(DE_NULL)
+    , m_texture(nullptr)
     , m_renderer(renderCtx, testCtx.getLog(), glu::getContextTypeGLSLVersion(renderCtx.getType()), glu::PRECISION_HIGHP)
     , m_curLayerFace(0)
 {
@@ -212,7 +213,7 @@ void TextureCubeArrayFormatCase::init(void)
 void TextureCubeArrayFormatCase::deinit(void)
 {
     delete m_texture;
-    m_texture = DE_NULL;
+    m_texture = nullptr;
 
     m_renderer.clear();
 }
@@ -325,7 +326,7 @@ TextureBufferFormatCase::TextureBufferFormatCase(Context &ctx, glu::RenderContex
     , m_format(internalFormat)
     , m_width(width)
     , m_maxTextureBufferSize(0)
-    , m_texture(DE_NULL)
+    , m_texture(nullptr)
     , m_renderer(renderCtx, ctx.getTestContext().getLog(), glu::getContextTypeGLSLVersion(renderCtx.getType()),
                  glu::PRECISION_HIGHP)
 {
@@ -346,7 +347,8 @@ void TextureBufferFormatCase::init(void)
     const bool supportsES32 = glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::es(3, 2));
 
     if (!supportsES32 && !m_context.getContextInfo().isExtensionSupported("GL_OES_texture_buffer") &&
-        !m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_buffer"))
+        !m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_buffer") &&
+        !m_context.getContextInfo().isExtensionSupported("GL_ARB_texture_buffer_object"))
     {
         TCU_THROW(NotSupportedError, "Texture buffers not supported");
     }
@@ -368,7 +370,7 @@ void TextureBufferFormatCase::init(void)
 void TextureBufferFormatCase::deinit(void)
 {
     delete m_texture;
-    m_texture = DE_NULL;
+    m_texture = nullptr;
 
     m_renderer.clear();
 }
@@ -450,14 +452,15 @@ vector<string> toStringVector(const char *const *str, int numStr)
 
 void TextureFormatTests::init(void)
 {
-    tcu::TestCaseGroup *unsizedGroup     = DE_NULL;
-    tcu::TestCaseGroup *sizedGroup       = DE_NULL;
-    tcu::TestCaseGroup *sizedBufferGroup = DE_NULL;
+    bool isGL45 = glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 5));
+    tcu::TestCaseGroup *unsizedGroup     = nullptr;
+    tcu::TestCaseGroup *sizedGroup       = nullptr;
+    tcu::TestCaseGroup *sizedBufferGroup = nullptr;
     addChild((unsizedGroup = new tcu::TestCaseGroup(m_testCtx, "unsized", "Unsized formats")));
     addChild((sizedGroup = new tcu::TestCaseGroup(m_testCtx, "sized", "Sized formats")));
     addChild((sizedBufferGroup = new tcu::TestCaseGroup(m_testCtx, "buffer", "Sized formats (Buffer)")));
 
-    tcu::TestCaseGroup *sizedCubeArrayGroup = DE_NULL;
+    tcu::TestCaseGroup *sizedCubeArrayGroup = nullptr;
     sizedGroup->addChild(
         (sizedCubeArrayGroup = new tcu::TestCaseGroup(m_testCtx, "cube_array", "Sized formats (2D Array)")));
 
@@ -482,6 +485,9 @@ void TextureFormatTests::init(void)
         string nameBase        = texFormats[formatNdx].name;
         string descriptionBase = string(glu::getTextureFormatName(format)) + ", " + glu::getTypeName(dataType);
 
+        // These formats are illegal in core desktop GL
+        if (isGL45 && (format == GL_ALPHA || format == GL_LUMINANCE || format == GL_LUMINANCE_ALPHA))
+            continue;
         unsizedGroup->addChild(new TextureCubeArrayFormatCase(
             m_testCtx, m_context.getRenderContext(), m_context.getContextInfo(), (nameBase + "_cube_array_pot").c_str(),
             (descriptionBase + ", GL_TEXTURE_CUBE_MAP_ARRAY").c_str(), format, dataType, 64, 12));

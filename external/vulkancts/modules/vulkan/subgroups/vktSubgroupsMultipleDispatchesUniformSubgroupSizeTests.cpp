@@ -77,12 +77,8 @@ tcu::TestStatus MultipleDispatchesUniformSubgroupSizeInstance::iterate(void)
         createShaderModule(vk, device, m_context.getBinaryCollection().get("comp"), 0u);
 
     // The maximum number of invocations in a workgroup.
-    const uint32_t maxLocalSize = m_context.getDeviceProperties().limits.maxComputeWorkGroupSize[0];
-#ifndef CTS_USES_VULKANSC
+    const uint32_t maxLocalSize    = m_context.getDeviceProperties().limits.maxComputeWorkGroupSize[0];
     const uint32_t minSubgroupSize = m_context.getSubgroupSizeControlProperties().minSubgroupSize;
-#else
-    const uint32_t minSubgroupSize = m_context.getSubgroupSizeControlPropertiesEXT().minSubgroupSize;
-#endif // CTS_USES_VULKANSC
 
     // Create a storage buffer to hold the sizes of subgroups.
     const VkDeviceSize bufferSize = (maxLocalSize / minSubgroupSize + 1u) * sizeof(uint32_t);
@@ -105,7 +101,7 @@ tcu::TestStatus MultipleDispatchesUniformSubgroupSizeInstance::iterate(void)
 
     const VkDescriptorSetAllocateInfo allocInfo = {
         VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, // sType
-        DE_NULL,                                        // pNext
+        nullptr,                                        // pNext
         *descriptorPool,                                // descriptorPool
         1u,                                             // descriptorSetCount
         &(*descriptorSetLayout1)                        // pSetLayouts
@@ -140,7 +136,7 @@ tcu::TestStatus MultipleDispatchesUniformSubgroupSizeInstance::iterate(void)
 
         const VkPipelineShaderStageCreateInfo shaderStageCreateInfo = {
             VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,                 // sType
-            DE_NULL,                                                             // pNext
+            nullptr,                                                             // pNext
             VK_PIPELINE_SHADER_STAGE_CREATE_ALLOW_VARYING_SUBGROUP_SIZE_BIT_EXT, // flags
             VK_SHADER_STAGE_COMPUTE_BIT,                                         // stage
             *computeShader,                                                      // module
@@ -150,15 +146,15 @@ tcu::TestStatus MultipleDispatchesUniformSubgroupSizeInstance::iterate(void)
 
         const VkComputePipelineCreateInfo pipelineCreateInfo = {
             VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, // sType
-            DE_NULL,                                        // pNext
+            nullptr,                                        // pNext
             0u,                                             // flags
             shaderStageCreateInfo,                          // stage
             *computePipelineLayout,                         // layout
-            (VkPipeline)0,                                  // basePipelineHandle
+            VK_NULL_HANDLE,                                 // basePipelineHandle
             0u,                                             // basePipelineIndex
         };
 
-        Move<VkPipeline> computePipeline = createComputePipeline(vk, device, (VkPipelineCache)0u, &pipelineCreateInfo);
+        Move<VkPipeline> computePipeline = createComputePipeline(vk, device, VK_NULL_HANDLE, &pipelineCreateInfo);
 
         beginCommandBuffer(vk, *cmdBuffer);
 
@@ -253,13 +249,7 @@ MultipleDispatchesUniformSubgroupSize::MultipleDispatchesUniformSubgroupSize(tcu
 
 void MultipleDispatchesUniformSubgroupSize::checkSupport(Context &context) const
 {
-#ifndef CTS_USES_VULKANSC
-    const VkPhysicalDeviceSubgroupSizeControlFeatures &subgroupSizeControlFeatures =
-        context.getSubgroupSizeControlFeatures();
-#else
-    const VkPhysicalDeviceSubgroupSizeControlFeaturesEXT &subgroupSizeControlFeatures =
-        context.getSubgroupSizeControlFeaturesEXT();
-#endif // CTS_USES_VULKANSC
+    const auto &subgroupSizeControlFeatures = context.getSubgroupSizeControlFeatures();
 
     if (subgroupSizeControlFeatures.subgroupSizeControl == false)
         TCU_THROW(NotSupportedError, "Device does not support varying subgroup sizes");

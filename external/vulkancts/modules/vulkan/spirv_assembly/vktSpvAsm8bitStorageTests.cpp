@@ -99,7 +99,6 @@ struct Capability
 {
     const char *name;
     const char *cap;
-    const char *decor;
     vk::VkDescriptorType dtype;
 };
 
@@ -110,8 +109,8 @@ enum
 };
 
 static const Capability CAPABILITIES[] = {
-    {"storage_buffer", "StorageBuffer8BitAccess", "StorageBuffer", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
-    {"uniform", "UniformAndStorageBuffer8BitAccess", "Block", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
+    {"storage_buffer", "StorageBuffer8BitAccess", VK_DESCRIPTOR_TYPE_STORAGE_BUFFER},
+    {"uniform", "UniformAndStorageBuffer8BitAccess", VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER},
 };
 
 static const StructTestData structData = {7, 11};
@@ -983,10 +982,10 @@ void addCompute8bitStorage32To8Group(tcu::TestCaseGroup *group)
 
                                         "%SSBO32    = OpTypeStruct %${matrix_prefix:opt}${base32}arr\n"
                                         "%SSBO8    = OpTypeStruct %${matrix_prefix:opt}${base8}arr\n"
-                                        "%up_SSBO32 = OpTypePointer ${storage} %SSBO32\n"
-                                        "%up_SSBO8 = OpTypePointer ${storage} %SSBO8\n"
-                                        "%ssbo32    = OpVariable %up_SSBO32 ${storage}\n"
-                                        "%ssbo8    = OpVariable %up_SSBO8 ${storage}\n"
+                                        "%up_SSBO32 = OpTypePointer StorageBuffer %SSBO32\n"
+                                        "%up_SSBO8 = OpTypePointer StorageBuffer %SSBO8\n"
+                                        "%ssbo32    = OpVariable %up_SSBO32 StorageBuffer\n"
+                                        "%ssbo8    = OpVariable %up_SSBO8 StorageBuffer\n"
 
                                         "%id        = OpVariable %uvec3ptr Input\n"
 
@@ -1064,7 +1063,6 @@ void addCompute8bitStorage32To8Group(tcu::TestCaseGroup *group)
             string testName = string(CAPABILITIES[STORAGE_BUFFER_TEST].name) + "_" + cTypes[tyIdx].name;
 
             specs["capability"] = CAPABILITIES[STORAGE_BUFFER_TEST].cap;
-            specs["storage"]    = CAPABILITIES[STORAGE_BUFFER_TEST].decor;
             specs["stride"]     = cTypes[tyIdx].stride;
             specs["base32"]     = cTypes[tyIdx].base32;
             specs["base8"]      = cTypes[tyIdx].base8;
@@ -1106,7 +1104,6 @@ void addCompute8bitUniform8To32Group(tcu::TestCaseGroup *group)
                                         "OpDecorate %SSBO8 Block\n"
                                         "OpMemberDecorate %SSBO32 0 Offset 0\n"
                                         "OpMemberDecorate %SSBO8 0 Offset 0\n"
-                                        "OpDecorate %SSBO8 ${storage}\n"
                                         "OpDecorate %ssbo32 DescriptorSet 0\n"
                                         "OpDecorate %ssbo8 DescriptorSet 0\n"
                                         "OpDecorate %ssbo32 Binding 1\n"
@@ -1216,7 +1213,6 @@ void addCompute8bitUniform8To32Group(tcu::TestCaseGroup *group)
                                                       (numElements / cTypes[tyIdx].componentsCount));
 
             specs["capability"] = CAPABILITIES[UNIFORM_AND_STORAGEBUFFER_TEST].cap;
-            specs["storage"]    = CAPABILITIES[UNIFORM_AND_STORAGEBUFFER_TEST].decor;
             specs["stride"]     = cTypes[tyIdx].stride;
             specs["base32"]     = cTypes[tyIdx].base32;
             specs["base8"]      = cTypes[tyIdx].base8;
@@ -1458,10 +1454,10 @@ void addCompute8bitStorage16To8Group(tcu::TestCaseGroup *group)
 
                                         "%SSBO16    = OpTypeStruct %${matrix_prefix:opt}${base16}arr\n"
                                         "%SSBO8     = OpTypeStruct %${matrix_prefix:opt}${base8}arr\n"
-                                        "%up_SSBO16 = OpTypePointer ${storage} %SSBO16\n"
-                                        "%up_SSBO8  = OpTypePointer ${storage} %SSBO8\n"
-                                        "%ssbo16    = OpVariable %up_SSBO16 ${storage}\n"
-                                        "%ssbo8     = OpVariable %up_SSBO8 ${storage}\n"
+                                        "%up_SSBO16 = OpTypePointer StorageBuffer %SSBO16\n"
+                                        "%up_SSBO8  = OpTypePointer StorageBuffer %SSBO8\n"
+                                        "%ssbo16    = OpVariable %up_SSBO16 StorageBuffer\n"
+                                        "%ssbo8     = OpVariable %up_SSBO8 StorageBuffer\n"
 
                                         "%id        = OpVariable %uvec3ptr Input\n"
 
@@ -1541,7 +1537,6 @@ void addCompute8bitStorage16To8Group(tcu::TestCaseGroup *group)
             string testName = string(CAPABILITIES[STORAGE_BUFFER_TEST].name) + "_" + cTypes[tyIdx].name;
 
             specs["capability"] = CAPABILITIES[STORAGE_BUFFER_TEST].cap;
-            specs["storage"]    = CAPABILITIES[STORAGE_BUFFER_TEST].decor;
             specs["stride"]     = cTypes[tyIdx].stride;
             specs["base16"]     = cTypes[tyIdx].base16;
             specs["base8"]      = cTypes[tyIdx].base8;
@@ -1587,7 +1582,6 @@ void addCompute8bitUniform8To16Group(tcu::TestCaseGroup *group)
                                         "OpDecorate %SSBO8 Block\n"
                                         "OpMemberDecorate %SSBO16 0 Offset 0\n"
                                         "OpMemberDecorate %SSBO8 0 Offset 0\n"
-                                        "OpDecorate %SSBO8 ${storage}\n"
                                         "OpDecorate %ssbo16 DescriptorSet 0\n"
                                         "OpDecorate %ssbo8 DescriptorSet 0\n"
                                         "OpDecorate %ssbo16 Binding 1\n"
@@ -1699,7 +1693,6 @@ void addCompute8bitUniform8To16Group(tcu::TestCaseGroup *group)
                                                       (numElements / cTypes[tyIdx].componentsCount));
 
             specs["capability"] = CAPABILITIES[UNIFORM_AND_STORAGEBUFFER_TEST].cap;
-            specs["storage"]    = CAPABILITIES[UNIFORM_AND_STORAGEBUFFER_TEST].decor;
             specs["stride"]     = cTypes[tyIdx].stride;
             specs["base16"]     = cTypes[tyIdx].base16;
             specs["base8"]      = cTypes[tyIdx].base8;
@@ -2294,9 +2287,9 @@ void addCompute8bitStorageUniform32StructTo8StructGroup(tcu::TestCaseGroup *grou
         "%SSBO_IN       = OpTypeStruct %i32StructArr7\n"
         "%SSBO_OUT      = OpTypeStruct %i8StructArr7\n"
         "%up_SSBOIN     = OpTypePointer Uniform %SSBO_IN\n"
-        "%up_SSBOOUT    = OpTypePointer ${storage} %SSBO_OUT\n"
+        "%up_SSBOOUT    = OpTypePointer StorageBuffer %SSBO_OUT\n"
         "%ssboIN        = OpVariable %up_SSBOIN Uniform\n"
-        "%ssboOUT       = OpVariable %up_SSBOOUT ${storage}\n"
+        "%ssboOUT       = OpVariable %up_SSBOOUT StorageBuffer\n"
         "\n"
         "%id        = OpVariable %uvec3ptr Input\n"
         "%main      = OpFunction %void None %voidf\n"
@@ -2407,7 +2400,6 @@ void addCompute8bitStorageUniform32StructTo8StructGroup(tcu::TestCaseGroup *grou
         vector<int32_t> int32DData = data32bit(SHADERTEMPLATE_STRIDE32BIT_STD140, rnd);
 
         specs["capability"] = CAPABILITIES[STORAGE_BUFFER_TEST].cap;
-        specs["storage"]    = CAPABILITIES[STORAGE_BUFFER_TEST].decor;
         specs["stridei8"]   = getStructShaderComponet(SHADERTEMPLATE_STRIDE8BIT_STD430);
         specs["stridei32"]  = getStructShaderComponet(SHADERTEMPLATE_STRIDE32BIT_STD140);
         specs["8Storage"]   = "StorageBuffer";
@@ -2842,7 +2834,7 @@ void addGraphics8BitStorageUniformInt32To8Group(tcu::TestCaseGroup *testGroup)
             resources.verifyIO = checkUniformsArray<int32_t, int8_t, 1>;
         else
         {
-            resources.verifyIO = DE_NULL;
+            resources.verifyIO = nullptr;
             for (uint32_t numNdx = 0; numNdx < numDataPoints; ++numNdx)
                 outputs[numNdx] = static_cast<int8_t>(0xffff & inputs[numNdx]);
         }

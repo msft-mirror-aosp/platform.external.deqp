@@ -845,7 +845,8 @@ VkResult NvPerFrameDecodeResources::CreateImage(DeviceContext &vkDevCtx, const V
 
             uint32_t baseArrayLayer                  = imageArrayParent ? imageIndex : 0;
             VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, baseArrayLayer, 1};
-            result = VkImageResourceView::Create(vkDevCtx, imageResource, subresourceRange, m_frameDpbImageView);
+            result = VkImageResourceView::Create(vkDevCtx, imageResource, pDpbImageCreateInfo, subresourceRange,
+                                                 m_frameDpbImageView);
 
             if (result != VK_SUCCESS)
             {
@@ -865,7 +866,8 @@ VkResult NvPerFrameDecodeResources::CreateImage(DeviceContext &vkDevCtx, const V
             if (!(useSeparateOutputImage || useLinearOutput))
             {
                 VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, imageIndex, 1};
-                result = VkImageResourceView::Create(vkDevCtx, imageResource, subresourceRange, m_outImageView);
+                result = VkImageResourceView::Create(vkDevCtx, imageResource, pDpbImageCreateInfo, subresourceRange,
+                                                     m_outImageView);
                 if (result != VK_SUCCESS)
                 {
                     return result;
@@ -884,7 +886,8 @@ VkResult NvPerFrameDecodeResources::CreateImage(DeviceContext &vkDevCtx, const V
             }
 
             VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
-            result = VkImageResourceView::Create(vkDevCtx, displayImageResource, subresourceRange, m_outImageView);
+            result = VkImageResourceView::Create(vkDevCtx, displayImageResource, pOutImageCreateInfo, subresourceRange,
+                                                 m_outImageView);
             if (result != VK_SUCCESS)
             {
                 return result;
@@ -1011,28 +1014,41 @@ int32_t NvPerFrameDecodeImageSet::init(DeviceContext &vkDevCtx, const VkVideoPro
     if (useImageViewArray)
     {
         useImageArray = true;
+
+        VkImageFormatProperties imgaeFormatProperties = getPhysicalDeviceImageFormatProperties(
+            vkDevCtx.getInstanceInterface(), vkDevCtx.phys, dpbImageFormat, VK_IMAGE_TYPE_2D, VK_IMAGE_TILING_OPTIMAL,
+            dpbImageUsage, resourcesWithoutProfiles ? VK_IMAGE_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR : 0);
+
+        if (imgaeFormatProperties.maxArrayLayers < numImages)
+        {
+            TCU_THROW(NotSupportedError, "Requested number of array layers is unsupported");
+        }
     }
 
     m_videoProfile.InitFromProfile(pDecodeProfile);
 
     m_queueFamilyIndex = queueFamilyIndex;
 
+    // VUID-VkImageCreateInfoKHR-flags-08329:
+    // DPB images cannot be independant if not created with DECODE_DST
+    const bool dpbProfileIndependant =
+        resourcesWithoutProfiles && ((dpbImageUsage & VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR) != 0);
     // Image create info for the DPBs
-    m_dpbImageCreateInfo.sType       = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    m_dpbImageCreateInfo.pNext       = resourcesWithoutProfiles ? nullptr : m_videoProfile.GetProfileListInfo();
-    m_dpbImageCreateInfo.imageType   = VK_IMAGE_TYPE_2D;
-    m_dpbImageCreateInfo.format      = dpbImageFormat;
-    m_dpbImageCreateInfo.extent      = {maxImageExtent.width, maxImageExtent.height, 1};
-    m_dpbImageCreateInfo.mipLevels   = 1;
-    m_dpbImageCreateInfo.arrayLayers = useImageArray ? numImages : 1;
-    m_dpbImageCreateInfo.samples     = VK_SAMPLE_COUNT_1_BIT;
-    m_dpbImageCreateInfo.tiling      = VK_IMAGE_TILING_OPTIMAL;
-    m_dpbImageCreateInfo.usage       = dpbImageUsage;
-    m_dpbImageCreateInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    m_dpbImageCreateInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    m_dpbImageCreateInfo.pNext                 = dpbProfileIndependant ? nullptr : m_videoProfile.GetProfileListInfo();
+    m_dpbImageCreateInfo.imageType             = VK_IMAGE_TYPE_2D;
+    m_dpbImageCreateInfo.format                = dpbImageFormat;
+    m_dpbImageCreateInfo.extent                = {maxImageExtent.width, maxImageExtent.height, 1};
+    m_dpbImageCreateInfo.mipLevels             = 1;
+    m_dpbImageCreateInfo.arrayLayers           = useImageArray ? numImages : 1;
+    m_dpbImageCreateInfo.samples               = VK_SAMPLE_COUNT_1_BIT;
+    m_dpbImageCreateInfo.tiling                = VK_IMAGE_TILING_OPTIMAL;
+    m_dpbImageCreateInfo.usage                 = dpbImageUsage;
+    m_dpbImageCreateInfo.sharingMode           = VK_SHARING_MODE_EXCLUSIVE;
     m_dpbImageCreateInfo.queueFamilyIndexCount = 1;
     m_dpbImageCreateInfo.pQueueFamilyIndices   = &m_queueFamilyIndex;
     m_dpbImageCreateInfo.initialLayout         = VK_IMAGE_LAYOUT_UNDEFINED;
-    m_dpbImageCreateInfo.flags = resourcesWithoutProfiles ? VK_IMAGE_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR : 0;
+    m_dpbImageCreateInfo.flags = dpbProfileIndependant ? VK_IMAGE_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR : 0;
 
     // Image create info for the output
     if (useSeparateOutputImage || useLinearOutput)
@@ -1070,7 +1086,8 @@ int32_t NvPerFrameDecodeImageSet::init(DeviceContext &vkDevCtx, const VkVideoPro
         // Create an image view that has the same number of layers as the image.
         // In that scenario, while specifying the resource, the API must specifically choose the image layer.
         VkImageSubresourceRange subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, numImages};
-        VkResult result = VkImageResourceView::Create(vkDevCtx, m_imageArray, subresourceRange, m_imageViewArray);
+        VkResult result = VkImageResourceView::Create(vkDevCtx, m_imageArray, &m_dpbImageCreateInfo, subresourceRange,
+                                                      m_imageViewArray);
 
         if (result != VK_SUCCESS)
         {

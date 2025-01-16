@@ -168,7 +168,7 @@ struct TypeTraits<TYPE_DIRECT_DRM>
 struct DirectDrmDisplayInterface : public DisplayInterface<TYPE_DIRECT_DRM>
 {
 public:
-    DirectDrmDisplayInterface(void) : DisplayInterface(DE_NULL)
+    DirectDrmDisplayInterface(void) : DisplayInterface(VK_NULL_HANDLE)
     {
     }
     virtual void initializeDisplay(const InstanceInterface &vki, VkInstance instance, const tcu::CommandLine &cmdLine)
@@ -203,15 +203,15 @@ struct TypeTraits<TYPE_WIN32>
 typedef DisplayInterface<TYPE_WIN32> Win32DisplayInterface;
 typedef WindowInterface<TYPE_WIN32> Win32WindowInterface;
 
-// VK_MVK_macos_surface
+// VK_EXT_metal_surface
 
 template <>
-struct TypeTraits<TYPE_MACOS>
+struct TypeTraits<TYPE_METAL>
 {
-    typedef void *NativeWindowType;
+    typedef pt::CAMetalLayer NativeWindowType;
 };
 
-typedef WindowInterface<TYPE_MACOS> MacOSWindowInterface;
+typedef WindowInterface<TYPE_METAL> MetalWindowInterface;
 
 } // namespace wsi
 } // namespace vk

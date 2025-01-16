@@ -29,6 +29,8 @@
 #include "tcuDefs.hpp"
 #include <deMath.h>
 
+#include <utility>
+
 namespace glcts
 {
 /** Implementation of Test Case 25
@@ -72,7 +74,9 @@ class TessellationShaderVertexSpacing : public TestCaseBase
 {
 public:
     /* Public methods */
-    TessellationShaderVertexSpacing(Context &context, const ExtParameters &extParams);
+    TessellationShaderVertexSpacing(Context &context, const ExtParameters &extParams,
+                                    _tessellation_primitive_mode primitive_mode,
+                                    _tessellation_shader_vertex_spacing vs_mode);
 
     virtual ~TessellationShaderVertexSpacing(void)
     {
@@ -93,7 +97,7 @@ private:
         _tessellation_shader_vertex_spacing vertex_spacing;
 
         std::vector<char> data;
-        float *data_cartesian; /* only used for 'triangles' case */
+        std::vector<float> data_cartesian; /* only used for 'triangles' case */
         unsigned int n_vertices;
 
         /* Constructor. Resets all fields to default values */
@@ -101,10 +105,30 @@ private:
         {
             memset(inner, 0, sizeof(inner));
             memset(outer, 0, sizeof(outer));
-            data_cartesian = 0;
             n_vertices     = 0;
             primitive_mode = TESSELLATION_SHADER_PRIMITIVE_MODE_UNKNOWN;
             vertex_spacing = TESSELLATION_SHADER_VERTEX_SPACING_UNKNOWN;
+        }
+
+        void swap(_run &other)
+        {
+            for (size_t i = 0u; i < de::arrayLength(inner); ++i)
+                std::swap(inner[i], other.inner[i]);
+
+            for (size_t i = 0u; i < de::arrayLength(outer); ++i)
+                std::swap(outer[i], other.outer[i]);
+
+            std::swap(primitive_mode, other.primitive_mode);
+            std::swap(vertex_spacing, other.vertex_spacing);
+            data.swap(other.data);
+            data_cartesian.swap(other.data_cartesian);
+            std::swap(n_vertices, other.n_vertices);
+        }
+
+        // Move constructor: we'll use this to efficiently emplace a copy of one object in the back of a vector.
+        _run(_run &&other) : _run()
+        {
+            this->swap(other);
         }
     } _run;
 
@@ -324,6 +348,9 @@ private:
     glw::GLuint m_vao_id;
     _runs m_runs;
     TessellationShaderUtils *m_utils;
+
+    _tessellation_primitive_mode m_primitive_mode;
+    _tessellation_shader_vertex_spacing m_vs_mode;
 };
 
 } // namespace glcts

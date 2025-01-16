@@ -188,6 +188,11 @@ static const FormatKey s_qcomRenderSRGBR8RG8Formats[] = {
     GL_SRG8_EXT,
 };
 
+static const FormatKey s_extTextureFormatBGRA8888Formats[] = {
+    GL_BGRA,
+    GL_BGRA8_EXT,
+};
+
 static const FormatExtEntry s_esExtFormats[] = {
     {
         "GL_OES_depth_texture",
@@ -286,6 +291,10 @@ static const FormatExtEntry s_esExtFormats[] = {
     {"GL_QCOM_render_sRGB_R8_RG8",
      (uint32_t)(REQUIRED_RENDERABLE | COLOR_RENDERABLE | RENDERBUFFER_VALID | TEXTURE_VALID),
      GLS_ARRAY_RANGE(s_qcomRenderSRGBR8RG8Formats)},
+
+    {"GL_EXT_texture_format_BGRA8888",
+     (uint32_t)(REQUIRED_RENDERABLE | COLOR_RENDERABLE | RENDERBUFFER_VALID | TEXTURE_VALID),
+     GLS_ARRAY_RANGE(s_extTextureFormatBGRA8888Formats)},
 };
 
 Context::Context(TestContext &testCtx, RenderContext &renderCtx, CheckerFactory &factory)
@@ -308,7 +317,7 @@ void Context::addFormats(FormatEntries fmtRange)
 void Context::addExtFormats(FormatExtEntries extRange)
 {
     FboUtil::addExtFormats(m_ctxFormats, extRange, &m_renderCtx);
-    FboUtil::addExtFormats(m_allFormats, extRange, DE_NULL);
+    FboUtil::addExtFormats(m_allFormats, extRange, nullptr);
 }
 
 void TestBase::pass(void)
@@ -612,11 +621,11 @@ ImageFormat TestBase::getDefaultFormat(GLenum attPoint, GLenum bufType) const
 
 Image *makeImage(GLenum bufType, ImageFormat format, GLsizei width, GLsizei height, FboBuilder &builder)
 {
-    Image *image = DE_NULL;
+    Image *image = nullptr;
     switch (bufType)
     {
     case GL_NONE:
-        return DE_NULL;
+        return nullptr;
     case GL_RENDERBUFFER:
         image = &builder.makeConfig<Renderbuffer>();
         break;
@@ -635,7 +644,7 @@ Image *makeImage(GLenum bufType, ImageFormat format, GLsizei width, GLsizei heig
 Attachment *makeAttachment(GLenum bufType, ImageFormat format, GLsizei width, GLsizei height, FboBuilder &builder)
 {
     Image *const imgCfg = makeImage(bufType, format, width, height, builder);
-    Attachment *att     = DE_NULL;
+    Attachment *att     = nullptr;
     GLuint img          = 0;
 
     if (Renderbuffer *rboCfg = dynamic_cast<Renderbuffer *>(imgCfg))
@@ -652,8 +661,8 @@ Attachment *makeAttachment(GLenum bufType, ImageFormat format, GLsizei width, GL
     }
     else
     {
-        DE_ASSERT(imgCfg == DE_NULL);
-        return DE_NULL;
+        DE_ASSERT(imgCfg == nullptr);
+        return nullptr;
     }
     att->imageName = img;
     return att;

@@ -150,7 +150,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
 
     const vk::VkImageCreateInfo createInfo = {
         vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,                // VkStructureType            sType
-        DE_NULL,                                                // const void*                pNext
+        nullptr,                                                // const void*                pNext
         0u,                                                     // VkImageCreateFlags        flags
         vk::VK_IMAGE_TYPE_2D,                                   // VkImageType                imageType
         colorAttachmentFormat,                                  // VkFormat                    format
@@ -162,7 +162,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
         vk::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // VkImageUsageFlags        usage
         vk::VK_SHARING_MODE_EXCLUSIVE, // VkSharingMode            sharingMode
         0,                             // uint32_t                    queueFamilyIndexCount
-        DE_NULL,                       // const uint32_t*            pQueueFamilyIndices
+        nullptr,                       // const uint32_t*            pQueueFamilyIndices
         vk::VK_IMAGE_LAYOUT_UNDEFINED  // VkImageLayout            initialLayout
     };
 
@@ -179,7 +179,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
 
     const vk::VkCommandPoolCreateInfo cmdPoolInfo = {
         vk::VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,      // sType
-        DE_NULL,                                             // pNext
+        nullptr,                                             // pNext
         vk::VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, // flags
         queueFamilyIndex,                                    // queuefamilyindex
     };
@@ -268,24 +268,24 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
 
     const vk::VkPipelineVertexInputStateCreateInfo vertexInputStateParams = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                                       // const void* pNext;
+        nullptr,                                                       // const void* pNext;
         0u,                                                            // VkPipelineVertexInputStateCreateFlags flags;
         0u,                                                            // uint32_t vertexBindingDescriptionCount;
-        DE_NULL, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
+        nullptr, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
         0u,      // uint32_t vertexAttributeDescriptionCount;
-        DE_NULL  // const VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
+        nullptr  // const VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
     };
 
     const vk::VkPipelineTessellationStateCreateInfo tessStateCreateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                                       // const void* pNext;
+        nullptr,                                                       // const void* pNext;
         0u,                                                            // VkPipelineTessellationStateCreateFlags flags;
         4u,                                                            // uint32_t patchControlPoints;
     };
 
     const vk::VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, // VkStructureType                             sType;
-        DE_NULL,                                         // const void*                                 pNext;
+        nullptr,                                         // const void*                                 pNext;
         (vk::VkPipelineInputAssemblyStateCreateFlags)0u, // VkPipelineInputAssemblyStateCreateFlags     flags;
         vk::VK_PRIMITIVE_TOPOLOGY_PATCH_LIST,            // VkPrimitiveTopology                         topology;
         VK_FALSE, // VkBool32                                    primitiveRestartEnable;
@@ -293,7 +293,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
 
     vk::VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, // VkStructureType    sType
-        DE_NULL,                                              // const void*        pNext
+        nullptr,                                              // const void*        pNext
         0u,                                                   // uint32_t            viewMask
         1u,                                                   // uint32_t            colorAttachmentCount
         &colorAttachmentFormat,                               // const VkFormat*    pColorAttachmentFormats
@@ -312,7 +312,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
 
     const vk::VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, // VkStructureType                             sType
-        DE_NULL,                                                   // const void*                                 pNext
+        nullptr,                                                   // const void*                                 pNext
         (vk::VkPipelineViewportStateCreateFlags)0u,                // VkPipelineViewportStateCreateFlags          flags
         createDynamicPipeline ? 0u : 1u, // uint32_t                                    viewportCount
         &viewport,                       // const VkViewport*                           pViewports
@@ -480,15 +480,17 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
 
     const vk::VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                                  // const void* pNext;
+        nullptr,                                                  // const void* pNext;
         (vk::VkPipelineDynamicStateCreateFlags)0u,                // VkPipelineDynamicStateCreateFlags flags;
         static_cast<uint32_t>(dynamicStates.size()),              // uint32_t dynamicStateCount;
         dynamicStates.data(),                                     // const VkDynamicState* pDynamicStates;
     };
     const vk::VkPipelineDynamicStateCreateInfo *pipelineDynamicState =
-        (createDynamicPipeline) ? &dynamicStateCreateInfo : DE_NULL;
+        (createDynamicPipeline) ? &dynamicStateCreateInfo : nullptr;
 
-    const vk::VkDeviceSize bufferSizeBytes = sizeof(uint32_t) * 4;
+    const uint32_t local_size_x            = 16u;
+    const uint32_t dispatch_x_count        = 4u;
+    const vk::VkDeviceSize bufferSizeBytes = sizeof(uint32_t) * dispatch_x_count * local_size_x;
 
     const vk::Unique<vk::VkDescriptorSet> descriptorSet(
         makeDescriptorSet(vk, device, *descriptorPool, *descriptorSetLayout));
@@ -508,25 +510,25 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
     if (m_params.testType == RENDER_PASS_PIPELINE_SHADER_OBJECT ||
         m_params.testType == RENDER_PASS_PIPELINE_SHADER_OBJECT_AFTER_BEGIN)
     {
-        pPipelineRenderingCreateInfo = DE_NULL;
+        pPipelineRenderingCreateInfo = nullptr;
         renderPassHandle             = *renderPass;
     }
 
     const auto pipeline1 = makeGraphicsPipeline(
         vk, device, pipelineLayout.get(), vertShaderModule1.get(), tescShaderModule.get(), teseShaderModule.get(),
         geomShaderModule.get(), fragShaderModule1.get(), renderPassHandle, 0u, &vertexInputStateParams,
-        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, DE_NULL, DE_NULL, DE_NULL,
-        DE_NULL, pipelineDynamicState, pPipelineRenderingCreateInfo);
+        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, nullptr, nullptr, nullptr,
+        nullptr, pipelineDynamicState, pPipelineRenderingCreateInfo);
     const auto pipeline2 = makeGraphicsPipeline(
         vk, device, pipelineLayout.get(), vertShaderModule2.get(), tescShaderModule.get(), teseShaderModule.get(),
         geomShaderModule.get(), fragShaderModule2.get(), renderPassHandle, 0u, &vertexInputStateParams,
-        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, DE_NULL, DE_NULL, DE_NULL,
-        DE_NULL, pipelineDynamicState, pPipelineRenderingCreateInfo);
+        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, nullptr, nullptr, nullptr,
+        nullptr, pipelineDynamicState, pPipelineRenderingCreateInfo);
     const auto pipeline3 = makeGraphicsPipeline(
         vk, device, pipelineLayout.get(), vertShaderModule3.get(), tescShaderModule.get(), teseShaderModule.get(),
         geomShaderModule.get(), fragShaderModule3.get(), renderPassHandle, 0u, &vertexInputStateParams,
-        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, DE_NULL, DE_NULL, DE_NULL,
-        DE_NULL, pipelineDynamicState, pPipelineRenderingCreateInfo);
+        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, nullptr, nullptr, nullptr,
+        nullptr, pipelineDynamicState, pPipelineRenderingCreateInfo);
     const auto computePipeline =
         vk::makeComputePipeline(vk, device, computePipelineLayout.get(), compShaderModule.get());
 
@@ -543,7 +545,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
     vk::beginCommandBuffer(vk, *cmdBuffer, 0u);
 
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          vk::VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0u, 0, DE_NULL, 0, DE_NULL, 1,
+                          vk::VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0u, 0, nullptr, 0, nullptr, 1,
                           &initialBarrier);
 
     if (m_params.testType == RENDER_PASS_PIPELINE_SHADER_OBJECT)
@@ -640,11 +642,11 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
     else if (m_params.testType == COMPUTE_SHADER_OBJECT_MIN_PIPELINE)
     {
         vk.cmdBindDescriptorSets(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout.get(), 0, 1,
-                                 &descriptorSet.get(), 0, DE_NULL);
+                                 &descriptorSet.get(), 0, nullptr);
 
         vk::VkShaderStageFlagBits stages[] = {vk::VK_SHADER_STAGE_COMPUTE_BIT};
         vk.cmdBindShadersEXT(*cmdBuffer, 1, stages, &*compShader);
-        vk.cmdDispatch(*cmdBuffer, 4, 1, 1);
+        vk.cmdDispatch(*cmdBuffer, dispatch_x_count, 1, 1);
 
         vk::beginRendering(vk, *cmdBuffer, *imageView, renderArea, clearValue, vk::VK_IMAGE_LAYOUT_GENERAL,
                            vk::VK_ATTACHMENT_LOAD_OP_CLEAR);
@@ -655,7 +657,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
     else if (m_params.testType == SHADER_OBJECT_COMPUTE_PIPELINE)
     {
         vk.cmdBindDescriptorSets(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout.get(), 0, 1,
-                                 &descriptorSet.get(), 0, DE_NULL);
+                                 &descriptorSet.get(), 0, nullptr);
 
         vk::beginRendering(vk, *cmdBuffer, *imageView, renderArea, clearValue, vk::VK_IMAGE_LAYOUT_GENERAL,
                            vk::VK_ATTACHMENT_LOAD_OP_CLEAR);
@@ -665,7 +667,7 @@ tcu::TestStatus ShaderObjectPipelineInteractionInstance::iterate(void)
         vk::endRendering(vk, *cmdBuffer);
 
         vk.cmdBindPipeline(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_COMPUTE, *computePipeline);
-        vk.cmdDispatch(*cmdBuffer, 4, 1, 1);
+        vk.cmdDispatch(*cmdBuffer, dispatch_x_count, 1, 1);
     }
 
     if (m_params.testType != COMPUTE_SHADER_OBJECT_MIN_PIPELINE && m_params.testType != SHADER_OBJECT_COMPUTE_PIPELINE)
@@ -943,7 +945,7 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
 
     const vk::VkImageCreateInfo createInfo = {
         vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,                // VkStructureType            sType
-        DE_NULL,                                                // const void*                pNext
+        nullptr,                                                // const void*                pNext
         0u,                                                     // VkImageCreateFlags        flags
         vk::VK_IMAGE_TYPE_2D,                                   // VkImageType                imageType
         colorAttachmentFormat,                                  // VkFormat                    format
@@ -955,7 +957,7 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
         vk::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // VkImageUsageFlags        usage
         vk::VK_SHARING_MODE_EXCLUSIVE, // VkSharingMode            sharingMode
         0,                             // uint32_t                    queueFamilyIndexCount
-        DE_NULL,                       // const uint32_t*            pQueueFamilyIndices
+        nullptr,                       // const uint32_t*            pQueueFamilyIndices
         vk::VK_IMAGE_LAYOUT_UNDEFINED  // VkImageLayout            initialLayout
     };
 
@@ -972,7 +974,7 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
 
     const vk::VkCommandPoolCreateInfo cmdPoolInfo = {
         vk::VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,      // sType
-        DE_NULL,                                             // pNext
+        nullptr,                                             // pNext
         vk::VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, // flags
         queueFamilyIndex,                                    // queuefamilyindex
     };
@@ -1054,24 +1056,24 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
 
     const vk::VkPipelineVertexInputStateCreateInfo vertexInputStateParams = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                                       // const void* pNext;
+        nullptr,                                                       // const void* pNext;
         0u,                                                            // VkPipelineVertexInputStateCreateFlags flags;
         0u,                                                            // uint32_t vertexBindingDescriptionCount;
-        DE_NULL, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
+        nullptr, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
         0u,      // uint32_t vertexAttributeDescriptionCount;
-        DE_NULL  // const VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
+        nullptr  // const VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
     };
 
     const vk::VkPipelineTessellationStateCreateInfo tessStateCreateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_TESSELLATION_STATE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                                       // const void* pNext;
+        nullptr,                                                       // const void* pNext;
         0u,                                                            // VkPipelineTessellationStateCreateFlags flags;
         4u,                                                            // uint32_t patchControlPoints;
     };
 
     const vk::VkPipelineInputAssemblyStateCreateInfo pipelineInputAssemblyStateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, // VkStructureType                             sType;
-        DE_NULL,                                         // const void*                                 pNext;
+        nullptr,                                         // const void*                                 pNext;
         (vk::VkPipelineInputAssemblyStateCreateFlags)0u, // VkPipelineInputAssemblyStateCreateFlags     flags;
         topology,                                        // VkPrimitiveTopology                         topology;
         VK_FALSE, // VkBool32                                    primitiveRestartEnable;
@@ -1079,7 +1081,7 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
 
     vk::VkPipelineRenderingCreateInfo pipelineRenderingCreateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO, // VkStructureType    sType
-        DE_NULL,                                              // const void*        pNext
+        nullptr,                                              // const void*        pNext
         0u,                                                   // uint32_t            viewMask
         1u,                                                   // uint32_t            colorAttachmentCount
         &colorAttachmentFormat,                               // const VkFormat*    pColorAttachmentFormats
@@ -1094,7 +1096,7 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
 
     const vk::VkPipelineViewportStateCreateInfo viewportStateCreateInfo = {
         vk::VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, // VkStructureType                             sType
-        DE_NULL,                                                   // const void*                                 pNext
+        nullptr,                                                   // const void*                                 pNext
         (vk::VkPipelineViewportStateCreateFlags)0u,                // VkPipelineViewportStateCreateFlags          flags
         1u,        // uint32_t                                    viewportCount
         &viewport, // const VkViewport*                           pViewports
@@ -1105,8 +1107,8 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
     const auto pipeline = makeGraphicsPipeline(
         vk, device, emptyPipelineLayout.get(), vertShaderModule.get(), tescShaderModule.get(), teseShaderModule.get(),
         geomShaderModule.get(), fragShaderModule.get(), VK_NULL_HANDLE, 0u, &vertexInputStateParams,
-        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, DE_NULL, DE_NULL, DE_NULL,
-        DE_NULL, DE_NULL, &pipelineRenderingCreateInfo);
+        &pipelineInputAssemblyStateInfo, &tessStateCreateInfo, &viewportStateCreateInfo, nullptr, nullptr, nullptr,
+        nullptr, nullptr, &pipelineRenderingCreateInfo);
 
     const vk::VkDeviceSize bufferSizeBytes = sizeof(uint32_t) * 4;
 
@@ -1131,7 +1133,7 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
     vk::beginCommandBuffer(vk, *cmdBuffer, 0u);
 
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          vk::VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0u, 0, DE_NULL, 0, DE_NULL, 1,
+                          vk::VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT, 0u, 0, nullptr, 0, nullptr, 1,
                           &initialBarrier);
 
     vk::beginRendering(vk, *cmdBuffer, *imageView, renderArea, clearValue, vk::VK_IMAGE_LAYOUT_GENERAL,
@@ -1141,7 +1143,7 @@ tcu::TestStatus ShaderObjectStageBindingInstance::iterate(void)
     vk.cmdDraw(*cmdBuffer, 4, 1, 0, 0);
 
     vk.cmdBindDescriptorSets(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout.get(), 0, 1,
-                             &descriptorSet.get(), 0, DE_NULL);
+                             &descriptorSet.get(), 0, nullptr);
     vk::setDefaultShaderObjectDynamicStates(vk, *cmdBuffer, deviceExtensions, topology, false,
                                             !m_context.getExtendedDynamicStateFeaturesEXT().extendedDynamicState);
 

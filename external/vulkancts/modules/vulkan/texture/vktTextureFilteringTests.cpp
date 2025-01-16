@@ -60,7 +60,7 @@ void checkTextureSupport(Context &context, const Texture2DTestCaseParameters &te
         // check if image format supports cubic filtering
         const vk::VkPhysicalDeviceImageViewImageFormatInfoEXT imageViewImageFormatInfo = {
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_IMAGE_VIEW_IMAGE_FORMAT_INFO_EXT, // VkStructureType    sType;
-            DE_NULL,                                                            // void*              pNext;
+            nullptr,                                                            // void*              pNext;
             VK_IMAGE_VIEW_TYPE_2D                                               // VkImageViewType    imageViewType;
         };
 
@@ -77,7 +77,7 @@ void checkTextureSupport(Context &context, const Texture2DTestCaseParameters &te
 
         vk::VkFilterCubicImageViewImageFormatPropertiesEXT cubicImageViewProperties = {
             VK_STRUCTURE_TYPE_FILTER_CUBIC_IMAGE_VIEW_IMAGE_FORMAT_PROPERTIES_EXT, // VkStructureType sType;
-            DE_NULL,                                                               // void* pNext;
+            nullptr,                                                               // void* pNext;
             false,                                                                 // VkBool32 filterCubic;
             false                                                                  // VkBool32 filterCubicMinmax;
         };
@@ -161,6 +161,9 @@ void checkTextureSupport(Context &context, const TextureCubeFilteringTestCasePar
     if (testParameters.format == VK_FORMAT_R10X6G10X6B10X6A10X6_UNORM_4PACK16 &&
         context.getRGBA10X6FormatsFeaturesEXT().formatRgba10x6WithoutYCbCrSampler == VK_FALSE)
         TCU_THROW(NotSupportedError, "formatRgba10x6WithoutYCbCrSampler not supported");
+
+    if (testParameters.seamless == false)
+        context.requireDeviceFunctionality("VK_EXT_non_seamless_cube_map");
 #else
     DE_UNREF(context);
     DE_UNREF(testParameters);
@@ -595,7 +598,7 @@ const char *getFaceDesc(const tcu::CubeFace face)
         return "+Z";
     default:
         DE_ASSERT(false);
-        return DE_NULL;
+        return nullptr;
     }
 }
 
@@ -619,7 +622,7 @@ tcu::TestStatus TextureCubeFilteringTestInstance::iterate(void)
     }
     else
         refParams.samplerType = getSamplerType(texFmt);
-    refParams.sampler.seamlessCubeMap = true;
+    refParams.sampler.seamlessCubeMap = m_testParameters.seamless;
     refParams.lodMode                 = LODMODE_EXACT;
     refParams.colorBias               = fmtInfo.lookupBias;
     refParams.colorScale              = fmtInfo.lookupScale;
@@ -1301,6 +1304,11 @@ void populateTextureFilteringTests(tcu::TestCaseGroup *textureFilteringTests)
          PROGRAM_CUBE_UINT, PROGRAM_2D_ARRAY_UINT, PROGRAM_3D_UINT},
         {"d32_sfloat_s8_uint_stencil", VK_FORMAT_D32_SFLOAT_S8_UINT, VK_IMAGE_ASPECT_STENCIL_BIT, PROGRAM_2D_UINT,
          PROGRAM_CUBE_UINT, PROGRAM_2D_ARRAY_UINT, PROGRAM_3D_UINT}};
+    static const struct
+    {
+        const char *const name;
+        const bool seamless;
+    } seamlessVariants[] = {{"seamless", true}, {"non_seamless", false}};
 
     // 2D texture filtering.
     {
@@ -1534,30 +1542,42 @@ void populateTextureFilteringTests(tcu::TestCaseGroup *textureFilteringTests)
 
             for (int filterNdx = 0; filterNdx < DE_LENGTH_OF_ARRAY(minFilterModes); filterNdx++)
             {
-                const Sampler::FilterMode minFilter = minFilterModes[filterNdx].mode;
-                const bool isMipmap                 = minFilter != Sampler::NEAREST && minFilter != Sampler::LINEAR;
-                const string name                   = minFilterModes[filterNdx].name;
-                TextureCubeFilteringTestCaseParameters testParameters;
+                de::MovePtr<tcu::TestCaseGroup> minfilterGroup(
+                    new tcu::TestCaseGroup(testCtx, minFilterModes[filterNdx].name, ""));
 
-                testParameters.format    = filterableFormatsByType[fmtNdx].format;
-                testParameters.minFilter = minFilter;
-                testParameters.magFilter = isMipmap ? Sampler::LINEAR : minFilter;
-
-                testParameters.wrapS                  = Sampler::REPEAT_GL;
-                testParameters.wrapT                  = Sampler::REPEAT_GL;
-                testParameters.onlySampleFaceInterior = false;
-                testParameters.size                   = 64;
-
-                testParameters.aspectMask = filterableFormatsByType[fmtNdx].aspectMask;
-                testParameters.programs.push_back(filterableFormatsByType[fmtNdx].programCube);
-
-                // Some tests have to be skipped due to the restrictions of the verifiers.
-                if (verifierCanBeUsed(testParameters.format, testParameters.minFilter, testParameters.magFilter))
+                for (int seamlessVariantNDX = 0; seamlessVariantNDX < DE_LENGTH_OF_ARRAY(seamlessVariants);
+                     seamlessVariantNDX++)
                 {
-                    filterGroup->addChild(
-                        new TextureTestCase<TextureCubeFilteringTestInstance>(testCtx, name.c_str(), testParameters));
+                    const Sampler::FilterMode minFilter = minFilterModes[filterNdx].mode;
+                    const bool isMipmap                 = minFilter != Sampler::NEAREST && minFilter != Sampler::LINEAR;
+                    const string name                   = seamlessVariants[seamlessVariantNDX].name;
+                    TextureCubeFilteringTestCaseParameters testParameters;
+
+                    testParameters.format    = filterableFormatsByType[fmtNdx].format;
+                    testParameters.minFilter = minFilter;
+                    testParameters.magFilter = isMipmap ? Sampler::LINEAR : minFilter;
+
+                    testParameters.wrapS                  = Sampler::REPEAT_GL;
+                    testParameters.wrapT                  = Sampler::REPEAT_GL;
+                    testParameters.onlySampleFaceInterior = false;
+                    testParameters.size                   = 64;
+
+                    testParameters.seamless = seamlessVariants[seamlessVariantNDX].seamless;
+
+                    testParameters.aspectMask = filterableFormatsByType[fmtNdx].aspectMask;
+                    testParameters.programs.push_back(filterableFormatsByType[fmtNdx].programCube);
+
+                    // Some tests have to be skipped due to the restrictions of the verifiers.
+                    if (verifierCanBeUsed(testParameters.format, testParameters.minFilter, testParameters.magFilter))
+                    {
+                        minfilterGroup->addChild(new TextureTestCase<TextureCubeFilteringTestInstance>(
+                            testCtx, name.c_str(), testParameters));
+                    }
                 }
+
+                filterGroup->addChild(minfilterGroup.release());
             }
+
             formatsGroup->addChild(filterGroup.release());
         }
 
@@ -1570,24 +1590,36 @@ void populateTextureFilteringTests(tcu::TestCaseGroup *textureFilteringTests)
 
             for (int filterNdx = 0; filterNdx < DE_LENGTH_OF_ARRAY(minFilterModes); filterNdx++)
             {
-                const Sampler::FilterMode minFilter = minFilterModes[filterNdx].mode;
-                const bool isMipmap                 = minFilter != Sampler::NEAREST && minFilter != Sampler::LINEAR;
-                const string name                   = minFilterModes[filterNdx].name;
-                TextureCubeFilteringTestCaseParameters testParameters;
+                de::MovePtr<tcu::TestCaseGroup> minFilterModesGroup(
+                    new tcu::TestCaseGroup(testCtx, minFilterModes[filterNdx].name, ""));
 
-                testParameters.format                 = VK_FORMAT_R8G8B8A8_UNORM;
-                testParameters.minFilter              = minFilter;
-                testParameters.magFilter              = isMipmap ? Sampler::LINEAR : minFilter;
-                testParameters.wrapS                  = Sampler::REPEAT_GL;
-                testParameters.wrapT                  = Sampler::REPEAT_GL;
-                testParameters.onlySampleFaceInterior = false;
-                testParameters.size                   = sizesCube[sizeNdx].size;
+                for (int seamlessVariantNDX = 0; seamlessVariantNDX < DE_LENGTH_OF_ARRAY(seamlessVariants);
+                     seamlessVariantNDX++)
+                {
 
-                testParameters.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                testParameters.programs.push_back(PROGRAM_CUBE_FLOAT);
+                    const Sampler::FilterMode minFilter = minFilterModes[filterNdx].mode;
+                    const bool isMipmap                 = minFilter != Sampler::NEAREST && minFilter != Sampler::LINEAR;
+                    const string name                   = seamlessVariants[seamlessVariantNDX].name;
 
-                filterGroup->addChild(
-                    new TextureTestCase<TextureCubeFilteringTestInstance>(testCtx, name.c_str(), testParameters));
+                    TextureCubeFilteringTestCaseParameters testParameters;
+
+                    testParameters.format                 = VK_FORMAT_R8G8B8A8_UNORM;
+                    testParameters.minFilter              = minFilter;
+                    testParameters.magFilter              = isMipmap ? Sampler::LINEAR : minFilter;
+                    testParameters.wrapS                  = Sampler::REPEAT_GL;
+                    testParameters.wrapT                  = Sampler::REPEAT_GL;
+                    testParameters.onlySampleFaceInterior = false;
+                    testParameters.size                   = sizesCube[sizeNdx].size;
+
+                    testParameters.seamless = seamlessVariants[seamlessVariantNDX].seamless;
+
+                    testParameters.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                    testParameters.programs.push_back(PROGRAM_CUBE_FLOAT);
+
+                    minFilterModesGroup->addChild(
+                        new TextureTestCase<TextureCubeFilteringTestInstance>(testCtx, name.c_str(), testParameters));
+                }
+                filterGroup->addChild(minFilterModesGroup.release());
             }
             sizesGroup->addChild(filterGroup.release());
         }
@@ -1610,22 +1642,32 @@ void populateTextureFilteringTests(tcu::TestCaseGroup *textureFilteringTests)
 
                     for (int wrapTNdx = 0; wrapTNdx < DE_LENGTH_OF_ARRAY(wrapModes); wrapTNdx++)
                     {
-                        const string name = wrapModes[wrapTNdx].name;
-                        TextureCubeFilteringTestCaseParameters testParameters;
+                        de::MovePtr<tcu::TestCaseGroup> wrapTGroup(
+                            new tcu::TestCaseGroup(testCtx, wrapModes[wrapTNdx].name, ""));
 
-                        testParameters.format                 = VK_FORMAT_R8G8B8A8_UNORM;
-                        testParameters.minFilter              = minFilterModes[minFilterNdx].mode;
-                        testParameters.magFilter              = magFilterModes[magFilterNdx].mode;
-                        testParameters.wrapS                  = wrapModes[wrapSNdx].mode;
-                        testParameters.wrapT                  = wrapModes[wrapTNdx].mode;
-                        testParameters.onlySampleFaceInterior = false;
-                        testParameters.size                   = 63;
+                        for (int seamlessVariantNDX = 0; seamlessVariantNDX < DE_LENGTH_OF_ARRAY(seamlessVariants);
+                             seamlessVariantNDX++)
+                        {
+                            const string name = seamlessVariants[seamlessVariantNDX].name;
+                            TextureCubeFilteringTestCaseParameters testParameters;
 
-                        testParameters.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                        testParameters.programs.push_back(PROGRAM_CUBE_FLOAT);
+                            testParameters.format                 = VK_FORMAT_R8G8B8A8_UNORM;
+                            testParameters.minFilter              = minFilterModes[minFilterNdx].mode;
+                            testParameters.magFilter              = magFilterModes[magFilterNdx].mode;
+                            testParameters.wrapS                  = wrapModes[wrapSNdx].mode;
+                            testParameters.wrapT                  = wrapModes[wrapTNdx].mode;
+                            testParameters.onlySampleFaceInterior = false;
+                            testParameters.size                   = 63;
 
-                        wrapSGroup->addChild(new TextureTestCase<TextureCubeFilteringTestInstance>(
-                            testCtx, name.c_str(), testParameters));
+                            testParameters.seamless = seamlessVariants[seamlessVariantNDX].seamless;
+
+                            testParameters.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+                            testParameters.programs.push_back(PROGRAM_CUBE_FLOAT);
+
+                            wrapTGroup->addChild(new TextureTestCase<TextureCubeFilteringTestInstance>(
+                                testCtx, name.c_str(), testParameters));
+                        }
+                        wrapSGroup->addChild(wrapTGroup.release());
                     }
                     magFilterGroup->addChild(wrapSGroup.release());
                 }

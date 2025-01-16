@@ -122,6 +122,10 @@ int32_t ConfigInfo::getAttribute(uint32_t attribute) const
     case EGL_RECORDABLE_ANDROID:
         return recordableAndroid;
 
+    // EGL_EXT_config_select_group
+    case EGL_CONFIG_SELECT_GROUP_EXT:
+        return groupId;
+
     default:
         TCU_THROW(InternalError, "Unknown attribute");
     }
@@ -194,6 +198,13 @@ void queryExtConfigInfo(const eglw::Library &egl, eglw::EGLDisplay display, eglw
     }
     else
         dst->colorComponentType = EGL_COLOR_COMPONENT_TYPE_FIXED_EXT;
+
+    if (hasExtension(egl, display, "EGL_EXT_config_select_group"))
+    {
+        egl.getConfigAttrib(display, config, EGL_CONFIG_SELECT_GROUP_EXT, (EGLint *)&dst->groupId);
+
+        EGLU_CHECK_MSG(egl, "Failed to query EGL_EXT_config_select_group config attribs");
+    }
 }
 
 } // namespace eglu

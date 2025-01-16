@@ -27,6 +27,7 @@
 #include "vktPipelineTests.hpp"
 #include "vktPipelineImageUtil.hpp"
 #include "vktPipelineStencilTests.hpp"
+#include "vktPipelineBinaryTests.hpp"
 #include "vktPipelineBlendTests.hpp"
 #include "vktPipelineDepthTests.hpp"
 #include "vktPipelineDescriptorLimitsTests.hpp"
@@ -75,6 +76,7 @@
 #include "vktPipelineBindVertexBuffers2Tests.hpp"
 #include "vktPipelineRobustnessCacheTests.hpp"
 #include "vktPipelineInputAttributeOffsetTests.hpp"
+#include "vktPipelineEmptyFSTests.hpp"
 #include "vktTestGroupUtil.hpp"
 
 namespace vkt
@@ -141,6 +143,16 @@ void createChildren(tcu::TestCaseGroup *group, PipelineConstructionType pipeline
     group->addChild(createTimestampTests(testCtx, pipelineConstructionType));
 #ifndef CTS_USES_VULKANSC
     group->addChild(createCacheTests(testCtx, pipelineConstructionType));
+    if (isNotShaderObjectVariant)
+    {
+        // pipeline binary reuses cache and creation_feedback tests but it was requested to have them under one group
+        de::MovePtr<tcu::TestCaseGroup> pipelineBinaryTests(new tcu::TestCaseGroup(testCtx, "pipeline_binary"));
+        pipelineBinaryTests = addPipelineBinaryBasicTests(testCtx, pipelineConstructionType, pipelineBinaryTests);
+        pipelineBinaryTests =
+            addPipelineBinaryCreationFeedbackTests(testCtx, pipelineConstructionType, pipelineBinaryTests);
+        pipelineBinaryTests = addPipelineBinaryDedicatedTests(testCtx, pipelineConstructionType, pipelineBinaryTests);
+        group->addChild(pipelineBinaryTests.release());
+    }
     group->addChild(createFramebufferAttachmentTests(testCtx, pipelineConstructionType));
 #endif // CTS_USES_VULKANSC
     group->addChild(createRenderToImageTests(testCtx, pipelineConstructionType));
@@ -201,6 +213,7 @@ void createChildren(tcu::TestCaseGroup *group, PipelineConstructionType pipeline
         // Monolithic pipeline tests
     }
 #endif // CTS_USES_VULKANSC
+    group->addChild(createEmptyFSTests(testCtx, pipelineConstructionType));
 }
 
 } // namespace

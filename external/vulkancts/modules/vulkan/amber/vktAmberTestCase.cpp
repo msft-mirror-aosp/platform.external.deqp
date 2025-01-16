@@ -30,6 +30,7 @@
 #include "deDefs.hpp"
 #include "deUniquePtr.hpp"
 #include "deFilePath.hpp"
+#include "vkPrograms.hpp"
 #include "vktTestCaseUtil.hpp"
 #include "tcuTestLog.hpp"
 #include "vktAmberTestCase.hpp"
@@ -47,7 +48,7 @@ namespace cts_amber
 AmberTestCase::AmberTestCase(tcu::TestContext &testCtx, const char *name, const char *description,
                              const std::string &readFilename)
     : TestCase(testCtx, name)
-    , m_recipe(DE_NULL)
+    , m_recipe(nullptr)
     , m_readFilename(readFilename)
 {
     (void)description;
@@ -71,10 +72,10 @@ static amber::EngineConfig *createEngineConfig(Context &ctx, vk::VkDevice custom
                         ctx.getTestContext().getCommandLine());
     vk.getDeviceQueue(dev, ctx.getUniversalQueueFamilyIndex(), 0, &queue);
 
-    amber::EngineConfig *vkConfig =
-        GetVulkanConfig(ctx.getInstance(), ctx.getPhysicalDevice(), dev, &ctx.getDeviceFeatures(),
-                        &ctx.getDeviceFeatures2(), ctx.getInstanceExtensions(), ctx.getDeviceExtensions(),
-                        ctx.getUniversalQueueFamilyIndex(), queue, ctx.getInstanceProcAddr());
+    amber::EngineConfig *vkConfig = GetVulkanConfig(
+        ctx.getInstance(), ctx.getPhysicalDevice(), dev, &ctx.getDeviceFeatures(), &ctx.getDeviceFeatures2(),
+        &ctx.getDeviceProperties(), &ctx.getDeviceProperties2(), ctx.getInstanceExtensions(), ctx.getDeviceExtensions(),
+        ctx.getUniversalQueueFamilyIndex(), queue, ctx.getInstanceProcAddr());
 
     return vkConfig;
 }
@@ -131,8 +132,53 @@ static bool isFeatureSupported(const vkt::Context &ctx, const std::string &featu
         return ctx.get8BitStorageFeatures().storageBuffer8BitAccess;
     if (feature == "IndexTypeUint8Features.indexTypeUint8")
         return ctx.getIndexTypeUint8Features().indexTypeUint8;
+    if (feature == "RayTracingPipelineFeaturesKHR.rayTracingPipeline")
+        return ctx.getRayTracingPipelineFeatures().rayTracingPipeline;
+    if (feature == "AccelerationStructureFeaturesKHR.accelerationStructure")
+        return ctx.getAccelerationStructureFeatures().accelerationStructure;
+    if (feature == "BufferDeviceAddressFeatures.bufferDeviceAddress")
+        return ctx.getBufferDeviceAddressFeatures().bufferDeviceAddress;
 
     std::string message = std::string("Unexpected feature name: ") + feature;
+    TCU_THROW(InternalError, message.c_str());
+}
+
+// Returns true if the given property is supported by the device.
+// Throws an internal error if the property is not recognized at all.
+static bool isPropertySupported(const vkt::Context &ctx, const std::string &prop)
+{
+    if (prop == "FloatControlsProperties.shaderSignedZeroInfNanPreserveFloat16")
+        return ctx.getFloatControlsProperties().shaderSignedZeroInfNanPreserveFloat16;
+    if (prop == "FloatControlsProperties.shaderSignedZeroInfNanPreserveFloat32")
+        return ctx.getFloatControlsProperties().shaderSignedZeroInfNanPreserveFloat32;
+    if (prop == "FloatControlsProperties.shaderSignedZeroInfNanPreserveFloat64")
+        return ctx.getFloatControlsProperties().shaderSignedZeroInfNanPreserveFloat64;
+    if (prop == "FloatControlsProperties.shaderDenormPreserveFloat16")
+        return ctx.getFloatControlsProperties().shaderDenormPreserveFloat16;
+    if (prop == "FloatControlsProperties.shaderDenormPreserveFloat32")
+        return ctx.getFloatControlsProperties().shaderDenormPreserveFloat32;
+    if (prop == "FloatControlsProperties.shaderDenormPreserveFloat64")
+        return ctx.getFloatControlsProperties().shaderDenormPreserveFloat64;
+    if (prop == "FloatControlsProperties.shaderDenormFlushToZeroFloat16")
+        return ctx.getFloatControlsProperties().shaderDenormFlushToZeroFloat16;
+    if (prop == "FloatControlsProperties.shaderDenormFlushToZeroFloat32")
+        return ctx.getFloatControlsProperties().shaderDenormFlushToZeroFloat32;
+    if (prop == "FloatControlsProperties.shaderDenormFlushToZeroFloat64")
+        return ctx.getFloatControlsProperties().shaderDenormFlushToZeroFloat64;
+    if (prop == "FloatControlsProperties.shaderRoundingModeRTEFloat16")
+        return ctx.getFloatControlsProperties().shaderRoundingModeRTEFloat16;
+    if (prop == "FloatControlsProperties.shaderRoundingModeRTEFloat32")
+        return ctx.getFloatControlsProperties().shaderRoundingModeRTEFloat32;
+    if (prop == "FloatControlsProperties.shaderRoundingModeRTEFloat64")
+        return ctx.getFloatControlsProperties().shaderRoundingModeRTEFloat64;
+    if (prop == "FloatControlsProperties.shaderRoundingModeRTZFloat16")
+        return ctx.getFloatControlsProperties().shaderRoundingModeRTZFloat16;
+    if (prop == "FloatControlsProperties.shaderRoundingModeRTZFloat32")
+        return ctx.getFloatControlsProperties().shaderRoundingModeRTZFloat32;
+    if (prop == "FloatControlsProperties.shaderRoundingModeRTZFloat64")
+        return ctx.getFloatControlsProperties().shaderRoundingModeRTZFloat64;
+
+    std::string message = std::string("Unexpected property name: ") + prop;
     TCU_THROW(InternalError, message.c_str());
 }
 
@@ -194,6 +240,25 @@ void AmberTestCase::checkSupport(Context &ctx) const
         }
     }
 
+    // Check for required properties
+    if (!m_required_properties.empty())
+    {
+        std::string missing;
+        for (const auto &prop : m_required_properties)
+        {
+            if (!isPropertySupported(ctx, prop))
+            {
+                missing += " " + prop;
+            }
+        }
+        if (!missing.empty())
+        {
+            std::string message("Test requires unsupported properties:");
+            message += missing;
+            TCU_THROW(NotSupportedError, message.c_str());
+        }
+    }
+
     for (auto req : m_imageRequirements)
         checkImageSupport(ctx.getInstanceInterface(), ctx.getPhysicalDevice(), req);
 
@@ -219,6 +284,8 @@ public:
 
     amber::Result LoadBufferData(const std::string file_name, amber::BufferDataFileType file_type,
                                  amber::BufferInfo *buffer) const override;
+
+    amber::Result LoadFile(const std::string file_name, std::vector<char> *buffer) const override;
 
     void Log(const std::string & /*message*/) override
     {
@@ -305,6 +372,30 @@ amber::Result Delegate::LoadBufferData(const std::string file_name, amber::Buffe
     return {};
 }
 
+amber::Result Delegate::LoadFile(const std::string file_name, std::vector<char> *buffer) const
+{
+    if (!buffer)
+    {
+        return amber::Result("Buffer pointer is null.");
+    }
+
+    const tcu::Archive &archive = m_testCtx.getArchive();
+    const de::FilePath filePath = de::FilePath(m_path).join(file_name);
+    de::UniquePtr<tcu::Resource> file(archive.getResource(filePath.getPath()));
+    int numBytes = file->getSize();
+    std::vector<uint8_t> bytes(numBytes);
+
+    file->read(bytes.data(), numBytes);
+
+    if (bytes.empty())
+        return amber::Result("Failed to load buffer data " + file_name);
+
+    // Convert uint8_t vector to char vector
+    buffer->assign(bytes.begin(), bytes.end());
+
+    return {};
+}
+
 bool AmberTestCase::parse(const std::string &readFilename)
 {
     std::string script = ShaderSourceProvider::getSource(m_testCtx.getArchive(), readFilename.c_str());
@@ -327,7 +418,7 @@ bool AmberTestCase::parse(const std::string &readFilename)
                                   << r.Error() << "\n"
                                   << tcu::TestLog::EndMessage;
         // TODO(dneto): Enhance Amber to not require this.
-        m_recipe->SetImpl(DE_NULL);
+        m_recipe->SetImpl(nullptr);
         return false;
     }
     return true;
@@ -399,8 +490,41 @@ void AmberTestCase::initPrograms(vk::SourceCollections &programCollection) const
                     << glu::TessellationEvaluationSource(shader.shader_source)
                     << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, spirvVersion, 0u, allowSpirv14);
                 break;
+            case amber::kShaderTypeRayGeneration:
+                programCollection.glslSources.add(shader.shader_name)
+                    << glu::RaygenSource(shader.shader_source)
+                    << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, spirvVersion, 0u, true);
+                break;
+            case amber::kShaderTypeAnyHit:
+                programCollection.glslSources.add(shader.shader_name)
+                    << glu::AnyHitSource(shader.shader_source)
+                    << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, spirvVersion, 0u, true);
+                break;
+            case amber::kShaderTypeClosestHit:
+                programCollection.glslSources.add(shader.shader_name)
+                    << glu::ClosestHitSource(shader.shader_source)
+                    << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, spirvVersion, 0u, true);
+                break;
+            case amber::kShaderTypeMiss:
+                programCollection.glslSources.add(shader.shader_name)
+                    << glu::MissSource(shader.shader_source)
+                    << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, spirvVersion, 0u, true);
+                break;
+            case amber::kShaderTypeIntersection:
+                programCollection.glslSources.add(shader.shader_name)
+                    << glu::IntersectionSource(shader.shader_source)
+                    << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, spirvVersion, 0u, true);
+                break;
+            case amber::kShaderTypeCall:
+                programCollection.glslSources.add(shader.shader_name)
+                    << glu::CallableSource(shader.shader_source)
+                    << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, spirvVersion, 0u, true);
+                break;
             case amber::kShaderTypeMulti:
                 DE_ASSERT(false && "Multi shaders not supported");
+                break;
+            default:
+                DE_ASSERT(false && "Unknown shader");
                 break;
             }
         }
@@ -413,7 +537,7 @@ void AmberTestCase::initPrograms(vk::SourceCollections &programCollection) const
 
 tcu::TestStatus AmberTestInstance::iterate(void)
 {
-    amber::Amber am(DE_NULL);
+    amber::Amber am(nullptr);
     amber::Options amber_options;
     amber::ShaderMap shaderMap;
     amber::Result r;
@@ -457,13 +581,17 @@ tcu::TestStatus AmberTestInstance::iterate(void)
         if (!m_context.getBinaryCollection().contains(shader.shader_name))
             continue;
 
-        size_t len = m_context.getBinaryCollection().get(shader.shader_name).getSize();
+        const vk::ProgramBinary &prog = m_context.getBinaryCollection().get(shader.shader_name);
+
+        prog.setUsed();
+
+        size_t len = prog.getSize();
         /* This is a compiled spir-v binary which must be made of 4-byte words. We
          * are moving into a word sized vector so divide by 4
          */
         std::vector<uint32_t> data;
         data.resize(len >> 2);
-        deMemcpy(data.data(), m_context.getBinaryCollection().get(shader.shader_name).getBinary(), len);
+        deMemcpy(data.data(), prog.getBinary(), len);
 
         shaderMap[shader.shader_name] = data;
     }
@@ -492,6 +620,11 @@ void AmberTestCase::addRequirement(const std::string &requirement)
         m_required_extensions.insert(requirement);
 }
 
+void AmberTestCase::addPropertyRequirement(const std::string &requirement)
+{
+    m_required_properties.insert(requirement);
+}
+
 void AmberTestCase::addImageRequirement(vk::VkImageCreateInfo info)
 {
     m_imageRequirements.push_back(info);
@@ -517,6 +650,7 @@ bool AmberTestCase::validateRequirements()
     const auto &deviceExtensions   = m_recipe->GetRequiredInstanceExtensions();
     const auto &instanceExtensions = m_recipe->GetRequiredDeviceExtensions();
     auto requiredFeatures          = m_recipe->GetRequiredFeatures();
+    auto requiredProperties        = m_recipe->GetRequiredProperties();
 
     for (auto &req : requiredFeatures)
     {
@@ -528,8 +662,10 @@ bool AmberTestCase::validateRequirements()
     allRequirements.insert(begin(deviceExtensions), end(deviceExtensions));
     allRequirements.insert(begin(instanceExtensions), end(instanceExtensions));
     allRequirements.insert(begin(requiredFeatures), end(requiredFeatures));
+    allRequirements.insert(begin(requiredProperties), end(requiredProperties));
 
     std::set<std::string> ctsRequirements = m_required_features;
+    ctsRequirements.insert(begin(m_required_properties), end(m_required_properties));
     ctsRequirements.insert(begin(m_required_extensions), end(m_required_extensions));
 
     if (allRequirements != ctsRequirements)

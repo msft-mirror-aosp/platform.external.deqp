@@ -271,6 +271,8 @@ const char *FboConfig::getFormatName(GLenum format)
         return "rgb";
     case GL_RGBA:
         return "rgba";
+    case GL_BGRA:
+        return "bgra";
     case GL_ALPHA:
         return "alpha";
     case GL_LUMINANCE:
@@ -293,7 +295,7 @@ const char *FboConfig::getFormatName(GLenum format)
         return "stencil_index8";
     default:
         DE_ASSERT(false);
-        return DE_NULL;
+        return nullptr;
     }
 }
 
@@ -454,6 +456,13 @@ static void checkColorFormatSupport(sglr::Context &context, uint32_t sizedFormat
     case GL_R16F:
         if (!isExtensionSupported(context, "GL_EXT_color_buffer_half_float"))
             throw tcu::NotSupportedError("GL_EXT_color_buffer_half_float is not supported");
+        break;
+
+    case GL_BGRA:
+    case GL_BGRA8_EXT:
+        if (!isExtensionSupported(context, "GL_EXT_texture_format_BGRA8888"))
+            throw tcu::NotSupportedError("GL_EXT_texture_format_BGRA8888 is not supported");
+        break;
 
     default:
         break;
@@ -598,7 +607,7 @@ public:
     }
 
     virtual IterateResult iterate(void);
-    virtual void render(sglr::Context &fboContext, Surface &dst) = DE_NULL;
+    virtual void render(sglr::Context &fboContext, Surface &dst) = 0;
 
     const FboConfig &getConfig(void) const
     {
@@ -627,7 +636,7 @@ TestCase::IterateResult FboRenderCase::iterate(void)
     glu::RenderContext &renderCtx         = m_context.getRenderContext();
     const tcu::RenderTarget &renderTarget = m_context.getRenderTarget();
     tcu::TestLog &log                     = m_testCtx.getLog();
-    const char *failReason                = DE_NULL;
+    const char *failReason                = nullptr;
 
     // Position & size for context
     deRandom rnd;
@@ -2135,7 +2144,7 @@ protected:
         {
             ctx.bindTexture(GL_TEXTURE_2D, textures[fboNdx]);
             ctx.texImage2D(GL_TEXTURE_2D, 0, getConfig().colorbufferFormat, fboSizes[fboNdx], fboSizes[fboNdx], 0,
-                           getConfig().colorbufferFormat, GL_UNSIGNED_BYTE, DE_NULL);
+                           getConfig().colorbufferFormat, GL_UNSIGNED_BYTE, nullptr);
             ctx.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
             ctx.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             ctx.texParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -2205,10 +2214,15 @@ void addChildVariants(deqp::gles2::TestCaseGroup *group)
         //        { GL_TEXTURE_2D, GL_ALPHA },
         //        { GL_TEXTURE_2D, GL_LUMINANCE },
         //        { GL_TEXTURE_2D, GL_LUMINANCE_ALPHA },
-        {GL_TEXTURE_2D, GL_RGB},       {GL_TEXTURE_2D, GL_RGBA},    {GL_RENDERBUFFER, GL_RGB565},
-        {GL_RENDERBUFFER, GL_RGB5_A1}, {GL_RENDERBUFFER, GL_RGBA4},
+        {GL_TEXTURE_2D, GL_RGB},
+        {GL_TEXTURE_2D, GL_RGBA},
+        {GL_TEXTURE_2D, GL_BGRA},
+        {GL_RENDERBUFFER, GL_RGB565},
+        {GL_RENDERBUFFER, GL_RGB5_A1},
+        {GL_RENDERBUFFER, GL_RGBA4},
         //        { GL_RENDERBUFFER, GL_RGBA16F },
         //        { GL_RENDERBUFFER, GL_RGB16F }
+        {GL_RENDERBUFFER, GL_BGRA},
     };
     TypeFormatPair depthbufferConfigs[]   = {{GL_NONE, GL_NONE}, {GL_RENDERBUFFER, GL_DEPTH_COMPONENT16}};
     TypeFormatPair stencilbufferConfigs[] = {{GL_NONE, GL_NONE}, {GL_RENDERBUFFER, GL_STENCIL_INDEX8}};

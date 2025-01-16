@@ -96,11 +96,13 @@ struct TestParams
     uint32_t viewCount;
     bool multiViewport;
     bool makeCopy;
+    bool depthEnabled;
     float renderMultiplier;
     VkSampleCountFlagBits colorSamples;
     tcu::UVec2 fragmentArea;
     tcu::UVec2 densityMapSize;
     VkFormat densityMapFormat;
+    VkFormat depthFormat;
     const SharedGroupParams groupParams;
 };
 
@@ -122,7 +124,7 @@ VkDevice getDevice(Context &context)
         // Create a universal queue that supports graphics and compute
         const VkDeviceQueueCreateInfo queueParams{
             VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                    // const void* pNext;
+            nullptr,                                    // const void* pNext;
             0u,                                         // VkDeviceQueueCreateFlags flags;
             context.getUniversalQueueFamilyIndex(),     // uint32_t queueFamilyIndex;
             1u,                                         // uint32_t queueCount;
@@ -232,7 +234,7 @@ void createVertexBuffer(const DeviceInterface &vk, VkDevice vkDevice, const uint
 {
     const VkBufferCreateInfo vertexBufferParams = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,        // VkStructureType sType;
-        DE_NULL,                                     // const void* pNext;
+        nullptr,                                     // const void* pNext;
         0u,                                          // VkBufferCreateFlags flags;
         (VkDeviceSize)(sizeof(T) * vertices.size()), // VkDeviceSize size;
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,           // VkBufferUsageFlags usage;
@@ -260,7 +262,7 @@ void prepareImageAndImageView(const DeviceInterface &vk, VkDevice vkDevice, Simp
 {
     const VkImageCreateInfo imageCreateInfo{
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                             // const void* pNext;
+        nullptr,                             // const void* pNext;
         imageCreateFlags,                    // VkImageCreateFlags flags;
         VK_IMAGE_TYPE_2D,                    // VkImageType imageType;
         format,                              // VkFormat format;
@@ -285,7 +287,7 @@ void prepareImageAndImageView(const DeviceInterface &vk, VkDevice vkDevice, Simp
     // create image view for subsampled image
     const VkImageViewCreateInfo imageViewCreateInfo = {
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                  // const void* pNext;
+        nullptr,                                  // const void* pNext;
         viewFlags,                                // VkImageViewCreateFlags flags;
         *image,                                   // VkImage image;
         viewType,                                 // VkImageViewType viewType;
@@ -381,10 +383,10 @@ RenderPassWrapper<RenderingTypeValue>::RenderPassWrapper(const DeviceInterface &
     , m_vk(vk)
     , m_vkDevice(vkDevice)
     , m_testParams(testParams)
-    , m_subpassBeginInfo(DE_NULL, testParams.groupParams->useSecondaryCmdBuffer ?
+    , m_subpassBeginInfo(nullptr, testParams.groupParams->useSecondaryCmdBuffer ?
                                       VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS :
                                       VK_SUBPASS_CONTENTS_INLINE)
-    , m_subpassEndInfo(DE_NULL)
+    , m_subpassEndInfo(nullptr)
 {
 }
 
@@ -395,7 +397,7 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
     DE_ASSERT(m_testParams.dynamicDensityMap);
 
     std::vector<AttachmentDesc> attachmentDescriptions{{
-        DE_NULL,                                         // const void*                        pNext
+        nullptr,                                         // const void*                        pNext
         (VkAttachmentDescriptionFlags)0,                 // VkAttachmentDescriptionFlags        flags
         m_testParams.densityMapFormat,                   // VkFormat                            format
         VK_SAMPLE_COUNT_1_BIT,                           // VkSampleCountFlagBits            samples
@@ -408,25 +410,25 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
     }};
 
     std::vector<AttachmentRef> colorAttachmentRefs{
-        {DE_NULL, 0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
+        {nullptr, 0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
 
     std::vector<SubpassDesc> subpassDescriptions{{
-        DE_NULL,
+        nullptr,
         (VkSubpassDescriptionFlags)0,                      // VkSubpassDescriptionFlags        flags
         VK_PIPELINE_BIND_POINT_GRAPHICS,                   // VkPipelineBindPoint                pipelineBindPoint
         viewMask,                                          // uint32_t                            viewMask
         0u,                                                // uint32_t                            inputAttachmentCount
-        DE_NULL,                                           // const VkAttachmentReference*        pInputAttachments
+        nullptr,                                           // const VkAttachmentReference*        pInputAttachments
         static_cast<uint32_t>(colorAttachmentRefs.size()), // uint32_t                            colorAttachmentCount
         colorAttachmentRefs.data(),                        // const VkAttachmentReference*        pColorAttachments
-        DE_NULL,                                           // const VkAttachmentReference*        pResolveAttachments
-        DE_NULL, // const VkAttachmentReference*        pDepthStencilAttachment
+        nullptr,                                           // const VkAttachmentReference*        pResolveAttachments
+        nullptr, // const VkAttachmentReference*        pDepthStencilAttachment
         0u,      // uint32_t                            preserveAttachmentCount
-        DE_NULL  // const uint32_t*                    pPreserveAttachments
+        nullptr  // const uint32_t*                    pPreserveAttachments
     }};
 
     std::vector<SubpassDep> subpassDependencies{{
-        DE_NULL,                                            // const void*                pNext
+        nullptr,                                            // const void*                pNext
         0u,                                                 // uint32_t                    srcSubpass
         VK_SUBPASS_EXTERNAL,                                // uint32_t                    dstSubpass
         VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,      // VkPipelineStageFlags        srcStageMask
@@ -438,17 +440,17 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
     }};
 
     const RenderPassCreateInfo renderPassInfo(
-        DE_NULL,                                              // const void*                        pNext
+        nullptr,                                              // const void*                        pNext
         (VkRenderPassCreateFlags)0,                           // VkRenderPassCreateFlags            flags
         static_cast<uint32_t>(attachmentDescriptions.size()), // uint32_t                            attachmentCount
         attachmentDescriptions.data(),                        // const VkAttachmentDescription*    pAttachments
         static_cast<uint32_t>(subpassDescriptions.size()),    // uint32_t                            subpassCount
         subpassDescriptions.data(),                           // const VkSubpassDescription*        pSubpasses
         static_cast<uint32_t>(subpassDependencies.size()),    // uint32_t                            dependencyCount
-        subpassDependencies.empty() ? DE_NULL :
+        subpassDependencies.empty() ? nullptr :
                                       subpassDependencies.data(), // const VkSubpassDependency*        pDependencies
         0u,     // uint32_t                            correlatedViewMaskCount
-        DE_NULL // const uint32_t*                    pCorrelatedViewMasks
+        nullptr // const uint32_t*                    pCorrelatedViewMasks
     );
 
     return renderPassInfo.createRenderPass(m_vk, m_vkDevice);
@@ -458,7 +460,7 @@ template <RenderingType RenderingTypeValue>
 Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduceSubsampledImage(
     uint32_t viewMask, bool makeCopySubpass, bool resampleSubsampled) const
 {
-    const void *constNullPtr            = DE_NULL;
+    const void *constNullPtr            = nullptr;
     uint32_t multisampleAttachmentIndex = 0;
     uint32_t copyAttachmentIndex        = 0;
     uint32_t densityMapAttachmentIndex  = 0;
@@ -468,7 +470,7 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
     std::vector<AttachmentDesc> attachmentDescriptions{
         // Output color attachment
         {
-            DE_NULL,                                 // const void*                        pNext
+            nullptr,                                 // const void*                        pNext
             (VkAttachmentDescriptionFlags)0,         // VkAttachmentDescriptionFlags        flags
             VK_FORMAT_R8G8B8A8_UNORM,                // VkFormat                            format
             m_testParams.colorSamples,               // VkSampleCountFlagBits            samples
@@ -532,41 +534,41 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
     );
 
     std::vector<AttachmentRef> colorAttachmentRefs0{
-        {DE_NULL, 0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
+        {nullptr, 0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
 
     // for multisampled scenario we need to add resolve attachment
     // (for makeCopy scenario it is used in second subpass)
-    AttachmentRef *pResolveAttachments = DE_NULL;
-    AttachmentRef resolveAttachmentRef{DE_NULL, multisampleAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+    AttachmentRef *pResolveAttachments = nullptr;
+    AttachmentRef resolveAttachmentRef{nullptr, multisampleAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
                                        VK_IMAGE_ASPECT_COLOR_BIT};
     if (m_testParams.colorSamples != VK_SAMPLE_COUNT_1_BIT)
         pResolveAttachments = &resolveAttachmentRef;
 
     std::vector<SubpassDesc> subpassDescriptions{{
-        DE_NULL,
+        nullptr,
         (VkSubpassDescriptionFlags)0,                       // VkSubpassDescriptionFlags    flags
         VK_PIPELINE_BIND_POINT_GRAPHICS,                    // VkPipelineBindPoint            pipelineBindPoint
         viewMask,                                           // uint32_t                        viewMask
         0u,                                                 // uint32_t                        inputAttachmentCount
-        DE_NULL,                                            // const VkAttachmentReference*    pInputAttachments
+        nullptr,                                            // const VkAttachmentReference*    pInputAttachments
         static_cast<uint32_t>(colorAttachmentRefs0.size()), // uint32_t                        colorAttachmentCount
         colorAttachmentRefs0.data(),                        // const VkAttachmentReference*    pColorAttachments
-        makeCopySubpass ? DE_NULL : pResolveAttachments,    // const VkAttachmentReference*    pResolveAttachments
-        DE_NULL,                                            // const VkAttachmentReference*    pDepthStencilAttachment
+        makeCopySubpass ? nullptr : pResolveAttachments,    // const VkAttachmentReference*    pResolveAttachments
+        nullptr,                                            // const VkAttachmentReference*    pDepthStencilAttachment
         0u,                                                 // uint32_t                        preserveAttachmentCount
-        DE_NULL                                             // const uint32_t*                pPreserveAttachments
+        nullptr                                             // const uint32_t*                pPreserveAttachments
     }};
 
     std::vector<AttachmentRef> inputAttachmentRefs1{
-        {DE_NULL, 0u, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
+        {nullptr, 0u, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
     std::vector<AttachmentRef> colorAttachmentRefs1{
-        {DE_NULL, copyAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
+        {nullptr, copyAttachmentIndex, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
     std::vector<SubpassDep> subpassDependencies;
 
     if (makeCopySubpass)
     {
         subpassDescriptions.push_back({
-            DE_NULL,
+            nullptr,
             (VkSubpassDescriptionFlags)0,                       // VkSubpassDescriptionFlags    flags
             VK_PIPELINE_BIND_POINT_GRAPHICS,                    // VkPipelineBindPoint            pipelineBindPoint
             viewMask,                                           // uint32_t                        viewMask
@@ -575,9 +577,9 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
             static_cast<uint32_t>(colorAttachmentRefs1.size()), // uint32_t                        colorAttachmentCount
             colorAttachmentRefs1.data(),                        // const VkAttachmentReference*    pColorAttachments
             pResolveAttachments,                                // const VkAttachmentReference*    pResolveAttachments
-            DE_NULL, // const VkAttachmentReference*    pDepthStencilAttachment
+            nullptr, // const VkAttachmentReference*    pDepthStencilAttachment
             0u,      // uint32_t                        preserveAttachmentCount
-            DE_NULL  // const uint32_t*                pPreserveAttachments
+            nullptr  // const uint32_t*                pPreserveAttachments
         });
 
         VkDependencyFlags dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
@@ -617,7 +619,7 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
 
     VkRenderPassFragmentDensityMapCreateInfoEXT renderPassFragmentDensityMap{
         VK_STRUCTURE_TYPE_RENDER_PASS_FRAGMENT_DENSITY_MAP_CREATE_INFO_EXT,
-        DE_NULL,
+        nullptr,
         {densityMapAttachmentIndex, VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT}};
 
     void *renderPassInfoPNext = (void *)&renderPassFragmentDensityMap;
@@ -632,7 +634,7 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassProduc
         static_cast<uint32_t>(subpassDependencies.size()),    // uint32_t                            dependencyCount
         subpassDependencies.data(),                           // const VkSubpassDependency*        pDependencies
         0u,     // uint32_t                            correlatedViewMaskCount
-        DE_NULL // const uint32_t*                    pCorrelatedViewMasks
+        nullptr // const uint32_t*                    pCorrelatedViewMasks
     );
 
     return renderPassInfo.createRenderPass(m_vk, m_vkDevice);
@@ -646,7 +648,7 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassOutput
     std::vector<AttachmentDesc> attachmentDescriptions{
         // output attachment
         {
-            DE_NULL,                                 // const void*                        pNext
+            nullptr,                                 // const void*                        pNext
             (VkAttachmentDescriptionFlags)0,         // VkAttachmentDescriptionFlags        flags
             VK_FORMAT_R8G8B8A8_UNORM,                // VkFormat                            format
             VK_SAMPLE_COUNT_1_BIT,                   // VkSampleCountFlagBits            samples
@@ -660,34 +662,34 @@ Move<VkRenderPass> RenderPassWrapper<RenderingTypeValue>::createRenderPassOutput
     };
 
     std::vector<AttachmentRef> colorAttachmentRefs{
-        {DE_NULL, 0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
+        {nullptr, 0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT}};
 
     std::vector<SubpassDesc> subpassDescriptions{{
-        DE_NULL,
+        nullptr,
         (VkSubpassDescriptionFlags)0,                      // VkSubpassDescriptionFlags        flags
         VK_PIPELINE_BIND_POINT_GRAPHICS,                   // VkPipelineBindPoint                pipelineBindPoint
         0u,                                                // uint32_t                            viewMask
         0u,                                                // uint32_t                            inputAttachmentCount
-        DE_NULL,                                           // const VkAttachmentReference*        pInputAttachments
+        nullptr,                                           // const VkAttachmentReference*        pInputAttachments
         static_cast<uint32_t>(colorAttachmentRefs.size()), // uint32_t                            colorAttachmentCount
         colorAttachmentRefs.data(),                        // const VkAttachmentReference*        pColorAttachments
-        DE_NULL,                                           // const VkAttachmentReference*        pResolveAttachments
-        DE_NULL, // const VkAttachmentReference*        pDepthStencilAttachment
+        nullptr,                                           // const VkAttachmentReference*        pResolveAttachments
+        nullptr, // const VkAttachmentReference*        pDepthStencilAttachment
         0u,      // uint32_t                            preserveAttachmentCount
-        DE_NULL  // const uint32_t*                    pPreserveAttachments
+        nullptr  // const uint32_t*                    pPreserveAttachments
     }};
 
     const RenderPassCreateInfo renderPassInfo(
-        DE_NULL,                                              // const void*                        pNext
+        nullptr,                                              // const void*                        pNext
         (VkRenderPassCreateFlags)0,                           // VkRenderPassCreateFlags            flags
         static_cast<uint32_t>(attachmentDescriptions.size()), // uint32_t                            attachmentCount
         attachmentDescriptions.data(),                        // const VkAttachmentDescription*    pAttachments
         static_cast<uint32_t>(subpassDescriptions.size()),    // uint32_t                            subpassCount
         subpassDescriptions.data(),                           // const VkSubpassDescription*        pSubpasses
         0,                                                    // uint32_t                            dependencyCount
-        DE_NULL,                                              // const VkSubpassDependency*        pDependencies
+        nullptr,                                              // const VkSubpassDependency*        pDependencies
         0u,     // uint32_t                            correlatedViewMaskCount
-        DE_NULL // const uint32_t*                    pCorrelatedViewMasks
+        nullptr // const uint32_t*                    pCorrelatedViewMasks
     );
 
     return renderPassInfo.createRenderPass(m_vk, m_vkDevice);
@@ -719,7 +721,7 @@ Move<VkFramebuffer> createImagelessFrameBuffer(const DeviceInterface &vk, VkDevi
     const uint32_t attachmentCount = static_cast<uint32_t>(attachmentInfo.size());
     const VkFramebufferAttachmentsCreateInfo framebufferAttachmentsCreateInfo{
         VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENTS_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                               // const void* pNext;
+        nullptr,                                               // const void* pNext;
         attachmentCount,                                       // uint32_t attachmentImageInfoCount;
         &attachmentInfo[0] // const VkFramebufferAttachmentImageInfo* pAttachmentImageInfos;
     };
@@ -730,7 +732,7 @@ Move<VkFramebuffer> createImagelessFrameBuffer(const DeviceInterface &vk, VkDevi
         VK_FRAMEBUFFER_CREATE_IMAGELESS_BIT,       // VkFramebufferCreateFlags flags;
         renderPass,                                // VkRenderPass renderPass;
         attachmentCount,                           // uint32_t attachmentCount;
-        DE_NULL,                                   // const VkImageView* pAttachments;
+        nullptr,                                   // const VkImageView* pAttachments;
         size.width,                                // uint32_t width;
         size.height,                               // uint32_t height;
         1u                                         // uint32_t layers;
@@ -759,9 +761,9 @@ void copyBufferToImage(const DeviceInterface &vk, VkDevice device, VkQueue queue
 
     const VkCommandBufferBeginInfo cmdBufferBeginInfo = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType sType;
-        DE_NULL,                                     // const void* pNext;
+        nullptr,                                     // const void* pNext;
         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags flags;
-        (const VkCommandBufferInheritanceInfo *)DE_NULL,
+        nullptr,
     };
 
     const VkBufferImageCopy copyRegion = {
@@ -811,25 +813,24 @@ void copyBufferToImage(const DeviceInterface &vk, VkDevice device, VkQueue queue
 
     VK_CHECK(vk.beginCommandBuffer(*cmdBuffer, &cmdBufferBeginInfo));
     vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0,
-                          0, (const VkMemoryBarrier *)DE_NULL, 1, &preBufferBarrier, 1, &preImageBarrier);
+                          0, nullptr, 1, &preBufferBarrier, 1, &preImageBarrier);
     vk.cmdCopyBufferToImage(*cmdBuffer, buffer, destImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1u, &copyRegion);
     vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, destImageDstStageFlags, (VkDependencyFlags)0, 0,
-                          (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &postImageBarrier);
+                          nullptr, 0, nullptr, 1, &postImageBarrier);
     VK_CHECK(vk.endCommandBuffer(*cmdBuffer));
 
     const VkPipelineStageFlags pipelineStageFlags = VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;
 
     const VkSubmitInfo submitInfo = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO, // VkStructureType sType;
-        DE_NULL,                       // const void* pNext;
+        nullptr,                       // const void* pNext;
         0u,                            // uint32_t waitSemaphoreCount;
-        DE_NULL,                       // const VkSemaphore* pWaitSemaphores;
+        nullptr,                       // const VkSemaphore* pWaitSemaphores;
         &pipelineStageFlags,           // const VkPipelineStageFlags* pWaitDstStageMask;
         1u,                            // uint32_t commandBufferCount;
         &cmdBuffer.get(),              // const VkCommandBuffer* pCommandBuffers;
         0u,                            // uint32_t signalSemaphoreCount;
-        DE_NULL                        // const VkSemaphore* pSignalSemaphores;
+        nullptr                        // const VkSemaphore* pSignalSemaphores;
     };
 
     try
@@ -851,18 +852,18 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
                                        const std::vector<VkRect2D> &scissorVect, const uint32_t subpass,
                                        const VkPipelineMultisampleStateCreateInfo *multisampleStateCreateInfo,
                                        const void *pNext, const bool useDensityMapAttachment,
-                                       const bool useMaintenance5 = false)
+                                       const bool useDepthAttachment, const bool useMaintenance5 = false)
 {
     std::vector<VkPipelineShaderStageCreateInfo> pipelineShaderStageParams(
         2,
         {
             VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, // VkStructureType                        sType
-            DE_NULL,                                             // const void*                            pNext
+            nullptr,                                             // const void*                            pNext
             0u,                                                  // VkPipelineShaderStageCreateFlags        flags
             VK_SHADER_STAGE_VERTEX_BIT,                          // VkShaderStageFlagBits                stage
             vertexShaderModule,                                  // VkShaderModule                        module
             "main",                                              // const char*                            pName
-            DE_NULL // const VkSpecializationInfo*            pSpecializationInfo
+            nullptr // const VkSpecializationInfo*            pSpecializationInfo
         });
     pipelineShaderStageParams[1].stage  = VK_SHADER_STAGE_FRAGMENT_BIT;
     pipelineShaderStageParams[1].module = fragmentShaderModule;
@@ -880,7 +881,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
 
     const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                                   // const void* pNext;
+        nullptr,                                                   // const void* pNext;
         0u,                                                        // VkPipelineVertexInputStateCreateFlags flags;
         1u,                                                        // uint32_t vertexBindingDescriptionCount;
         &vertexInputBindingDescription, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
@@ -891,7 +892,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
 
     const VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateCreateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO, // VkStructureType                            sType
-        DE_NULL,                                                     // const void*                                pNext
+        nullptr,                                                     // const void*                                pNext
         0u,                                                          // VkPipelineInputAssemblyStateCreateFlags    flags
         VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, // VkPrimitiveTopology                        topology
         VK_FALSE                             // VkBool32                                    primitiveRestartEnable
@@ -899,7 +900,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
 
     const VkPipelineViewportStateCreateInfo viewportStateCreateInfo{
         VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO, // VkStructureType                            sType
-        DE_NULL,                                               // const void*                                pNext
+        nullptr,                                               // const void*                                pNext
         (VkPipelineViewportStateCreateFlags)0,                 // VkPipelineViewportStateCreateFlags        flags
         (uint32_t)viewportVect.size(), // uint32_t                                    viewportCount
         viewportVect.data(),           // const VkViewport*                        pViewports
@@ -909,7 +910,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
 
     const VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfoDefault{
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO, // VkStructureType                            sType
-        DE_NULL,                                                    // const void*                                pNext
+        nullptr,                                                    // const void*                                pNext
         0u,                                                         // VkPipelineRasterizationStateCreateFlags    flags
         VK_FALSE,                        // VkBool32                                    depthClampEnable
         VK_FALSE,                        // VkBool32                                    rasterizerDiscardEnable
@@ -925,12 +926,12 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
 
     const VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfoDefault{
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, // VkStructureType                            sType
-        DE_NULL,                                                  // const void*                                pNext
+        nullptr,                                                  // const void*                                pNext
         0u,                                                       // VkPipelineMultisampleStateCreateFlags    flags
         VK_SAMPLE_COUNT_1_BIT, // VkSampleCountFlagBits                    rasterizationSamples
         VK_FALSE,              // VkBool32                                    sampleShadingEnable
         1.0f,                  // float                                    minSampleShading
-        DE_NULL,               // const VkSampleMask*                        pSampleMask
+        nullptr,               // const VkSampleMask*                        pSampleMask
         VK_FALSE,              // VkBool32                                    alphaToCoverageEnable
         VK_FALSE               // VkBool32                                    alphaToOneEnable
     };
@@ -947,17 +948,17 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
 
     const VkPipelineDepthStencilStateCreateInfo depthStencilStateCreateInfoDefault{
         VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO, // VkStructureType                            sType
-        DE_NULL,                                                    // const void*                                pNext
+        nullptr,                                                    // const void*                                pNext
         0u,                                                         // VkPipelineDepthStencilStateCreateFlags    flags
-        VK_FALSE,                    // VkBool32                                    depthTestEnable
-        VK_FALSE,                    // VkBool32                                    depthWriteEnable
-        VK_COMPARE_OP_LESS_OR_EQUAL, // VkCompareOp                                depthCompareOp
-        VK_FALSE,                    // VkBool32                                    depthBoundsTestEnable
-        VK_FALSE,                    // VkBool32                                    stencilTestEnable
-        stencilOpState,              // VkStencilOpState                            front
-        stencilOpState,              // VkStencilOpState                            back
-        0.0f,                        // float                                    minDepthBounds
-        1.0f,                        // float                                    maxDepthBounds
+        useDepthAttachment ? VK_TRUE : VK_FALSE, // VkBool32                                    depthTestEnable
+        useDepthAttachment ? VK_TRUE : VK_FALSE, // VkBool32                                    depthWriteEnable
+        VK_COMPARE_OP_LESS_OR_EQUAL,             // VkCompareOp                                depthCompareOp
+        VK_FALSE,                                // VkBool32                                    depthBoundsTestEnable
+        VK_FALSE,                                // VkBool32                                    stencilTestEnable
+        stencilOpState,                          // VkStencilOpState                            front
+        stencilOpState,                          // VkStencilOpState                            back
+        0.0f,                                    // float                                    minDepthBounds
+        1.0f,                                    // float                                    maxDepthBounds
     };
 
     const std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachmentStates(
@@ -983,7 +984,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
 
     const VkPipelineColorBlendStateCreateInfo colorBlendStateCreateInfoDefault{
         VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO, // VkStructureType                                sType
-        DE_NULL,                           // const void*                                    pNext
+        nullptr,                           // const void*                                    pNext
         0u,                                // VkPipelineColorBlendStateCreateFlags            flags
         VK_FALSE,                          // VkBool32                                        logicOpEnable
         VK_LOGIC_OP_CLEAR,                 // VkLogicOp                                    logicOp
@@ -1002,7 +1003,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
         &pipelineShaderStageParams[0],              // const VkPipelineShaderStageCreateInfo*            pStages
         &vertexInputStateCreateInfo,          // const VkPipelineVertexInputStateCreateInfo*        pVertexInputState
         &inputAssemblyStateCreateInfo,        // const VkPipelineInputAssemblyStateCreateInfo*    pInputAssemblyState
-        DE_NULL,                              // const VkPipelineTessellationStateCreateInfo*        pTessellationState
+        nullptr,                              // const VkPipelineTessellationStateCreateInfo*        pTessellationState
         &viewportStateCreateInfo,             // const VkPipelineViewportStateCreateInfo*            pViewportState
         &rasterizationStateCreateInfoDefault, // const VkPipelineRasterizationStateCreateInfo*    pRasterizationState
         multisampleStateCreateInfo ?
@@ -1010,11 +1011,11 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
             &multisampleStateCreateInfoDefault, // const VkPipelineMultisampleStateCreateInfo*        pMultisampleState
         &depthStencilStateCreateInfoDefault, // const VkPipelineDepthStencilStateCreateInfo*        pDepthStencilState
         &colorBlendStateCreateInfoDefault,   // const VkPipelineColorBlendStateCreateInfo*        pColorBlendState
-        DE_NULL,                             // const VkPipelineDynamicStateCreateInfo*            pDynamicState
+        nullptr,                             // const VkPipelineDynamicStateCreateInfo*            pDynamicState
         pipelineLayout,                      // VkPipelineLayout                                    layout
         renderPass,                          // VkRenderPass                                        renderPass
         subpass,                             // uint32_t                                            subpass
-        DE_NULL,                             // VkPipeline                                        basePipelineHandle
+        VK_NULL_HANDLE,                      // VkPipeline                                        basePipelineHandle
         0                                    // int32_t basePipelineIndex;
     };
 
@@ -1028,7 +1029,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vk, const VkDevice
         pipelineCreateInfo.flags       = 0;
     }
 
-    return createGraphicsPipeline(vk, device, DE_NULL, &pipelineCreateInfo);
+    return createGraphicsPipeline(vk, device, VK_NULL_HANDLE, &pipelineCreateInfo);
 }
 
 class FragmentDensityMapTest : public vkt::TestCase
@@ -1090,6 +1091,10 @@ private:
     Move<VkImage> m_colorCopyImage;
     de::MovePtr<Allocation> m_colorCopyImageAlloc;
     Move<VkImageView> m_colorCopyImageView;
+
+    Move<VkImage> m_depthImage;
+    de::MovePtr<Allocation> m_depthImageAlloc;
+    Move<VkImageView> m_depthImageView;
 
     Move<VkImage> m_colorResolvedImage;
     de::MovePtr<Allocation> m_colorResolvedImageAlloc;
@@ -1312,7 +1317,14 @@ void FragmentDensityMapTest::checkSupport(Context &context) const
     {
         context.requireDeviceFunctionality("VK_KHR_dynamic_rendering");
         if (m_testParams.makeCopy)
+        {
             context.requireDeviceFunctionality("VK_KHR_dynamic_rendering_local_read");
+
+            if ((m_testParams.colorSamples != VK_SAMPLE_COUNT_1_BIT) &&
+                (context.getUsedApiVersion() > VK_MAKE_API_VERSION(0, 1, 3, 0)) &&
+                !context.getDeviceVulkan14Properties().dynamicRenderingLocalReadMultisampledAttachments)
+                TCU_THROW(NotSupportedError, "dynamicRenderingLocalReadMultisampledAttachments not supported");
+        }
     }
 
     if (m_testParams.imagelessFramebuffer)
@@ -1453,8 +1465,14 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
     uint32_t colorImageCreateFlags =
         m_testParams.nonSubsampledImages ? 0u : (uint32_t)VK_IMAGE_CREATE_SUBSAMPLED_BIT_EXT;
     const VkImageSubresourceRange colorSubresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, colorImageLayers};
-    bool isColorImageMultisampled                       = m_testParams.colorSamples != VK_SAMPLE_COUNT_1_BIT;
-    bool isDynamicRendering = m_testParams.groupParams->renderingType == RENDERING_TYPE_DYNAMIC_RENDERING;
+
+    const VkFormat depthImageFormat = m_testParams.depthFormat;
+    VkExtent3D depthImageSize{m_renderSize.x(), m_renderSize.y(), 1};
+    const VkImageSubresourceRange depthSubresourceRange = {VK_IMAGE_ASPECT_DEPTH_BIT, 0u, 1u, 0u, 1};
+
+    bool isColorImageMultisampled = m_testParams.colorSamples != VK_SAMPLE_COUNT_1_BIT;
+    bool isDynamicRendering       = m_testParams.groupParams->renderingType == RENDERING_TYPE_DYNAMIC_RENDERING;
+    bool isDepthEnabled           = m_testParams.depthEnabled;
 
     VkExtent3D outputImageSize{m_renderSize.x(), m_renderSize.y(), 1};
     const VkImageSubresourceRange outputSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u};
@@ -1497,6 +1515,15 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
                                  m_colorCopyImageAlloc, m_colorCopyImageView);
     }
 
+    // Create depth image
+    if (isDepthEnabled)
+    {
+        prepareImageAndImageView(vk, vkDevice, memAlloc, 0u, depthImageFormat, depthImageSize, 1, VK_SAMPLE_COUNT_1_BIT,
+                                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, queueFamilyIndex, 0u,
+                                 VK_IMAGE_VIEW_TYPE_2D, componentMappingRGBA, depthSubresourceRange, m_depthImage,
+                                 m_depthImageAlloc, m_depthImageView);
+    }
+
     // Create output image ( data from subsampled color image will be copied into it using sampler with VK_SAMPLER_CREATE_SUBSAMPLED_BIT_EXT )
     prepareImageAndImageView(vk, vkDevice, memAlloc, 0u, colorImageFormat, outputImageSize, 1u, VK_SAMPLE_COUNT_1_BIT,
                              VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT, queueFamilyIndex,
@@ -1529,13 +1556,13 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
                                          densityMapImageSize.height * densityMapImageLayers;
         const vk::VkBufferCreateInfo stagingBufferCreateInfo{
             vk::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            DE_NULL,
+            nullptr,
             0u,                               // flags
             stagingBufferSize,                // size
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT, // usage
             vk::VK_SHARING_MODE_EXCLUSIVE,    // sharingMode
             0u,                               // queueFamilyCount
-            DE_NULL,                          // pQueueFamilyIndices
+            nullptr,                          // pQueueFamilyIndices
         };
         vk::Move<vk::VkBuffer> stagingBuffer = vk::createBuffer(vk, vkDevice, &stagingBufferCreateInfo);
         const vk::VkMemoryRequirements stagingRequirements =
@@ -1571,7 +1598,7 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
     const struct VkSamplerCreateInfo samplerInfo
     {
         VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,        // sType
-            DE_NULL,                                  // pNext
+            nullptr,                                  // pNext
             (VkSamplerCreateFlags)samplerCreateFlags, // flags
             VK_FILTER_NEAREST,                        // magFilter
             VK_FILTER_NEAREST,                        // minFilter
@@ -1654,7 +1681,7 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
             {
                 return VkFramebufferAttachmentImageInfo{
                     VK_STRUCTURE_TYPE_FRAMEBUFFER_ATTACHMENT_IMAGE_INFO, // VkStructureType sType;
-                    DE_NULL,                                             // const void* pNext;
+                    nullptr,                                             // const void* pNext;
                     createFlags,                                         // VkImageCreateFlags flags;
                     usageFlags,                                          // VkImageUsageFlags usage;
                     extent.width,                                        // uint32_t width;
@@ -1722,12 +1749,12 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
     {
         const VkPipelineLayoutCreateInfo pipelineLayoutParams{
             VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                       // const void* pNext;
+            nullptr,                                       // const void* pNext;
             0u,                                            // VkPipelineLayoutCreateFlags flags;
             0u,                                            // uint32_t setLayoutCount;
-            DE_NULL,                                       // const VkDescriptorSetLayout* pSetLayouts;
+            nullptr,                                       // const VkDescriptorSetLayout* pSetLayouts;
             0u,                                            // uint32_t pushConstantRangeCount;
-            DE_NULL                                        // const VkPushConstantRange* pPushConstantRanges;
+            nullptr                                        // const VkPushConstantRange* pPushConstantRanges;
         };
 
         m_pipelineLayoutNoDescriptors = createPipelineLayout(vk, vkDevice, &pipelineLayoutParams);
@@ -1738,7 +1765,7 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
     {
         m_descriptorSetLayoutOperateOnSubsampledImage =
             DescriptorSetLayoutBuilder()
-                .addSingleSamplerBinding(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, DE_NULL)
+                .addSingleSamplerBinding(VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr)
                 .build(vk, vkDevice);
 
         // Create and bind descriptor set
@@ -1753,7 +1780,7 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
             vk, vkDevice, *m_descriptorPoolOperateOnSubsampledImage, *m_descriptorSetLayoutOperateOnSubsampledImage);
 
         const VkDescriptorImageInfo inputImageInfo = {
-            DE_NULL,                                 // VkSampleri sampler;
+            VK_NULL_HANDLE,                          // VkSampler sampler;
             *m_colorImageView,                       // VkImageView imageView;
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL // VkImageLayout imageLayout;
         };
@@ -1790,7 +1817,7 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
             srcImageView = *m_colorCopyImageView;
 
         const VkDescriptorImageInfo inputImageInfo{
-            DE_NULL,                                 // VkSampleri sampler;
+            VK_NULL_HANDLE,                          // VkSampler sampler;
             srcImageView,                            // VkImageView imageView;
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL // VkImageLayout imageLayout;
         };
@@ -1832,13 +1859,13 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
     {
         const VkPipelineMultisampleStateCreateInfo multisampleStateCreateInfo{
             VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, // VkStructureType                            sType
-            DE_NULL,                                   // const void*                                pNext
+            nullptr,                                   // const void*                                pNext
             (VkPipelineMultisampleStateCreateFlags)0u, // VkPipelineMultisampleStateCreateFlags    flags
             (VkSampleCountFlagBits)
                 m_testParams.colorSamples, // VkSampleCountFlagBits                    rasterizationSamples
             VK_FALSE,                      // VkBool32                                    sampleShadingEnable
             1.0f,                          // float                                    minSampleShading
-            DE_NULL,                       // const VkSampleMask*                        pSampleMask
+            nullptr,                       // const VkSampleMask*                        pSampleMask
             VK_FALSE,                      // VkBool32                                    alphaToCoverageEnable
             VK_FALSE                       // VkBool32                                    alphaToOneEnable
         };
@@ -1876,9 +1903,9 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
         uint32_t colorAttachmentLocations[] = {VK_ATTACHMENT_UNUSED, 0};
         VkFormat colorImageFormats[]        = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
         VkRenderingAttachmentLocationInfoKHR renderingAttachmentLocationInfo{
-            VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO_KHR, DE_NULL, 2, colorAttachmentLocations};
+            VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO_KHR, nullptr, 2, colorAttachmentLocations};
         std::vector<VkPipelineRenderingCreateInfoKHR> renderingCreateInfo(
-            5, {VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR, DE_NULL, m_viewMask, 1u,
+            5, {VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR, nullptr, m_viewMask, 1u,
                 &m_testParams.densityMapFormat, VK_FORMAT_UNDEFINED, VK_FORMAT_UNDEFINED});
         renderingCreateInfo[1].pColorAttachmentFormats = &colorImageFormat;
         renderingCreateInfo[3].pColorAttachmentFormats = &colorImageFormat;
@@ -1895,11 +1922,11 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
             renderingCreateInfo[2].pColorAttachmentFormats = colorImageFormats;
         }
 
-        const void *pNextForProduceDynamicDensityMap = (isDynamicRendering ? &renderingCreateInfo[0] : DE_NULL);
-        const void *pNextForProduceSubsampledImage   = (isDynamicRendering ? &renderingCreateInfo[1] : DE_NULL);
-        const void *pNextForCopySubsampledImage      = (isDynamicRendering ? &renderingCreateInfo[2] : DE_NULL);
-        const void *pNextForUpdateSubsampledImage    = (isDynamicRendering ? &renderingCreateInfo[3] : DE_NULL);
-        const void *pNextForOutputSubsampledImage    = (isDynamicRendering ? &renderingCreateInfo[4] : DE_NULL);
+        const void *pNextForProduceDynamicDensityMap = (isDynamicRendering ? &renderingCreateInfo[0] : nullptr);
+        const void *pNextForProduceSubsampledImage   = (isDynamicRendering ? &renderingCreateInfo[1] : nullptr);
+        const void *pNextForCopySubsampledImage      = (isDynamicRendering ? &renderingCreateInfo[2] : nullptr);
+        const void *pNextForUpdateSubsampledImage    = (isDynamicRendering ? &renderingCreateInfo[3] : nullptr);
+        const void *pNextForOutputSubsampledImage    = (isDynamicRendering ? &renderingCreateInfo[4] : nullptr);
 
         if (testParams.dynamicDensityMap)
             m_graphicsPipelineProduceDynamicDensityMap = buildGraphicsPipeline(
@@ -1912,9 +1939,10 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
                 viewportsProduceDynamicDensityMap,     // const std::vector<VkViewport>&                    viewport
                 dynamicDensityMapRenderArea,           // const std::vector<VkRect2D>&                        scissor
                 0u,                                    // const uint32_t                                    subpass
-                DE_NULL, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
+                nullptr, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
                 pNextForProduceDynamicDensityMap, // const void*                                        pNext
                 isDynamicRendering, // const bool                                        useDensityMapAttachment
+                false,              // const bool                                        useDepthAttachment
                 m_testParams.useMaintenance5); // const bool                                        useMaintenance5
 
         m_graphicsPipelineProduceSubsampledImage = buildGraphicsPipeline(
@@ -1930,6 +1958,7 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
             &multisampleStateCreateInfo, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
             pNextForProduceSubsampledImage, // const void*                                        pNext
             isDynamicRendering,             // const bool                                        useDensityMapAttachment
+            isDepthEnabled,                 // const bool                                        useDepthAttachment
             m_testParams.useMaintenance5);  // const bool                                        useMaintenance5
 
         if (m_testParams.makeCopy)
@@ -1945,7 +1974,8 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
                 1u,                                  // const uint32_t                                    subpass
                 &multisampleStateCreateInfo, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
                 pNextForCopySubsampledImage, // const void*                                        pNext
-                false); // const bool                                        useDensityMapAttachment
+                false,  // const bool                                        useDensityMapAttachment
+                false); // const bool                                        useDepthAttachment
         if (m_testParams.subsampledLoads)
             m_graphicsPipelineUpdateSubsampledImage = buildGraphicsPipeline(
                 vk,                                        // const DeviceInterface&                            vk
@@ -1960,6 +1990,7 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
                 &multisampleStateCreateInfo, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
                 pNextForUpdateSubsampledImage, // const void*                                        pNext
                 isDynamicRendering, // const bool                                        useDensityMapAttachment
+                false,              // const bool                                        useDepthAttachment
                 m_testParams.useMaintenance5); // const bool                                        useMaintenance5
 
         m_graphicsPipelineOutputSubsampledImage = buildGraphicsPipeline(
@@ -1972,9 +2003,10 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
             viewportsOutputSubsampledImage,     // const std::vector<VkViewport>&                    viewport
             outputRenderArea,                   // const std::vector<VkRect2D>&                        scissor
             0u,                                 // const uint32_t                                    subpass
-            DE_NULL, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
+            nullptr, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
             pNextForOutputSubsampledImage, // const void*                                        pNext
-            false);                        // const bool                                        useDensityMapAttachment
+            false,                         // const bool                                        useDensityMapAttachment
+            false);                        // const bool                                        useDepthAttachment
     }
 
     // Create vertex buffers
@@ -2032,7 +2064,7 @@ void FragmentDensityMapTestInstance::drawCopySubsampledImage(VkCommandBuffer cmd
 
     vk.cmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_graphicsPipelineCopySubsampledImage);
     vk.cmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_pipelineLayoutOperateOnSubsampledImage, 0,
-                             1, &m_descriptorSetOperateOnSubsampledImage.get(), 0, DE_NULL);
+                             1, &m_descriptorSetOperateOnSubsampledImage.get(), 0, nullptr);
     vk.cmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertexBuffer.get(), &vertexBufferOffset);
     vk.cmdDraw(cmdBuffer, (uint32_t)m_vertices.size(), 1, 0, 0);
 }
@@ -2044,7 +2076,7 @@ void FragmentDensityMapTestInstance::drawResampleSubsampledImage(VkCommandBuffer
 
     vk.cmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_graphicsPipelineUpdateSubsampledImage);
     vk.cmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_pipelineLayoutOperateOnSubsampledImage, 0,
-                             1, &m_descriptorSetOperateOnSubsampledImage.get(), 0, DE_NULL);
+                             1, &m_descriptorSetOperateOnSubsampledImage.get(), 0, nullptr);
     vk.cmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertexBuffer.get(), &vertexBufferOffset);
     vk.cmdDraw(cmdBuffer, (uint32_t)m_vertices.size(), 1, 0, 0);
 }
@@ -2056,7 +2088,7 @@ void FragmentDensityMapTestInstance::drawOutputSubsampledImage(VkCommandBuffer c
 
     vk.cmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_graphicsPipelineOutputSubsampledImage);
     vk.cmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_pipelineLayoutOutputSubsampledImage, 0, 1,
-                             &m_descriptorSetOutputSubsampledImage.get(), 0, DE_NULL);
+                             &m_descriptorSetOutputSubsampledImage.get(), 0, nullptr);
     vk.cmdBindVertexBuffers(cmdBuffer, 0, 1, &m_vertexBufferOutput.get(), &vertexBufferOffset);
     vk.cmdDraw(cmdBuffer, (uint32_t)m_verticesOutput.size(), 1, 0, 0);
 }
@@ -2070,13 +2102,13 @@ void FragmentDensityMapTestInstance::remapingBeforeCopySubsampledImage(VkCommand
         makeMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_INPUT_ATTACHMENT_READ_BIT);
     vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_DEPENDENCY_BY_REGION_BIT, 1, &memoryBarrier, 0,
-                          DE_NULL, 0, DE_NULL);
+                          nullptr, 0, nullptr);
 
     // color attachment remaping
     uint32_t colorAttachmentLocations[] = {VK_ATTACHMENT_UNUSED, 0};
     VkRenderingAttachmentLocationInfoKHR renderingAttachmentLocationInfo{
-        VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO_KHR, DE_NULL, 2, colorAttachmentLocations};
-    vk.cmdSetRenderingAttachmentLocationsKHR(cmdBuffer, &renderingAttachmentLocationInfo);
+        VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_LOCATION_INFO_KHR, nullptr, 2, colorAttachmentLocations};
+    vk.cmdSetRenderingAttachmentLocations(cmdBuffer, &renderingAttachmentLocationInfo);
 }
 
 void FragmentDensityMapTestInstance::createCommandBufferForRenderpass(RenderPassWrapperBasePtr renderPassWrapper,
@@ -2096,17 +2128,17 @@ void FragmentDensityMapTestInstance::createCommandBufferForRenderpass(RenderPass
     {
         VkCommandBufferInheritanceInfo bufferInheritanceInfo{
             VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO, // VkStructureType sType;
-            DE_NULL,                                           // const void* pNext;
+            nullptr,                                           // const void* pNext;
             *m_renderPassProduceDynamicDensityMap,             // VkRenderPass renderPass;
             0,                                                 // uint32_t subpass;
             *m_framebufferProduceDynamicDensityMap,            // VkFramebuffer framebuffer;
             false,                                             // VkBool32 occlusionQueryEnable;
             0u,                                                // VkQueryControlFlags queryFlags;
-            DE_NULL,                                           // VkQueryPipelineStatisticFlags pipelineStatistics;
+            0,                                                 // VkQueryPipelineStatisticFlags pipelineStatistics;
         };
         const VkCommandBufferBeginInfo commandBufBeginParams{
             VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType sType;
-            DE_NULL,                                     // const void* pNext;
+            nullptr,                                     // const void* pNext;
             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT |
                 VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT, // VkCommandBufferUsageFlags flags;
             &bufferInheritanceInfo};
@@ -2162,14 +2194,14 @@ void FragmentDensityMapTestInstance::createCommandBufferForRenderpass(RenderPass
 
         const VkRenderPassAttachmentBeginInfo renderPassAttachmentBeginInfo{
             VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO, // VkStructureType sType;
-            DE_NULL,                                             // const void* pNext;
+            nullptr,                                             // const void* pNext;
             1u,                                                  // uint32_t attachmentCount;
             &**m_densityMapImageViews[0]                         // const VkImageView* pAttachments;
         };
 
         const VkRenderPassBeginInfo renderPassBeginInfoProduceDynamicDensityMap{
             VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,                                     // VkStructureType sType;
-            m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : DE_NULL, // const void* pNext;
+            m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : nullptr, // const void* pNext;
             *m_renderPassProduceDynamicDensityMap,                                        // VkRenderPass renderPass;
             *m_framebufferProduceDynamicDensityMap,                                       // VkFramebuffer framebuffer;
             dynamicDensityMapRenderArea,                                                  // VkRect2D renderArea;
@@ -2198,14 +2230,14 @@ void FragmentDensityMapTestInstance::createCommandBufferForRenderpass(RenderPass
 
         const VkRenderPassAttachmentBeginInfo renderPassAttachmentBeginInfo{
             VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO,            // VkStructureType sType;
-            DE_NULL,                                                        // const void* pNext;
+            nullptr,                                                        // const void* pNext;
             static_cast<uint32_t>(imageViewsProduceSubsampledImage.size()), // uint32_t attachmentCount;
             imageViewsProduceSubsampledImage.data()                         // const VkImageView* pAttachments;
         };
 
         const VkRenderPassBeginInfo renderPassBeginInfoProduceSubsampledImage{
             VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,                                     // VkStructureType sType;
-            m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : DE_NULL, // const void* pNext;
+            m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : nullptr, // const void* pNext;
             *m_renderPassProduceSubsampledImage,                                          // VkRenderPass renderPass;
             *m_framebufferProduceSubsampledImage,                                         // VkFramebuffer framebuffer;
             colorImageRenderArea,                                                         // VkRect2D renderArea;
@@ -2235,19 +2267,19 @@ void FragmentDensityMapTestInstance::createCommandBufferForRenderpass(RenderPass
         VkImageView pAttachments[] = {*m_colorImageView, **m_densityMapImageViews[1]};
         const VkRenderPassAttachmentBeginInfo renderPassAttachmentBeginInfo{
             VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO, // VkStructureType sType;
-            DE_NULL,                                             // const void* pNext;
+            nullptr,                                             // const void* pNext;
             2u,                                                  // uint32_t attachmentCount;
             pAttachments                                         // const VkImageView* pAttachments;
         };
 
         const VkRenderPassBeginInfo renderPassBeginInfoUpdateSubsampledImage{
             VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,                                     // VkStructureType sType;
-            m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : DE_NULL, // const void* pNext;
+            m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : nullptr, // const void* pNext;
             *m_renderPassUpdateSubsampledImage,                                           // VkRenderPass renderPass;
             *m_framebufferUpdateSubsampledImage,                                          // VkFramebuffer framebuffer;
             makeRect2D(colorImageSize.width, colorImageSize.height),                      // VkRect2D renderArea;
             0u,                                                                           // uint32_t clearValueCount;
-            DE_NULL // const VkClearValue* pClearValues;
+            nullptr // const VkClearValue* pClearValues;
         };
         renderPassWrapper->cmdBeginRenderPass(*m_cmdBuffer, &renderPassBeginInfoUpdateSubsampledImage);
 
@@ -2263,14 +2295,14 @@ void FragmentDensityMapTestInstance::createCommandBufferForRenderpass(RenderPass
     // (subsampled image cannot be copied using vkCmdCopyImageToBuffer)
     const VkRenderPassAttachmentBeginInfo renderPassAttachmentBeginInfo{
         VK_STRUCTURE_TYPE_RENDER_PASS_ATTACHMENT_BEGIN_INFO, // VkStructureType sType;
-        DE_NULL,                                             // const void* pNext;
+        nullptr,                                             // const void* pNext;
         1u,                                                  // uint32_t attachmentCount;
         &*m_outputImageView                                  // const VkImageView* pAttachments;
     };
 
     const VkRenderPassBeginInfo renderPassBeginInfoOutputSubsampledImage{
         VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO,                                     // VkStructureType sType;
-        m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : DE_NULL, // const void* pNext;
+        m_testParams.imagelessFramebuffer ? &renderPassAttachmentBeginInfo : nullptr, // const void* pNext;
         *m_renderPassOutputSubsampledImage,                                           // VkRenderPass renderPass;
         *m_framebufferOutputSubsampledImage,                                          // VkFramebuffer framebuffer;
         outputRenderArea,                                                             // VkRect2D renderArea;
@@ -2363,25 +2395,25 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
 
     const VkRenderingFragmentDensityMapAttachmentInfoEXT densityMap0Attachment{
         VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT, // VkStructureType sType;
-        DE_NULL,                                                              // const void* pNext;
+        nullptr,                                                              // const void* pNext;
         **m_densityMapImageViews[0],                                          // VkImageView imageView;
         VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT                      // VkImageLayout imageLayout;
     };
 
     const VkRenderingFragmentDensityMapAttachmentInfoEXT densityMap1Attachment{
-        VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT, // VkStructureType sType;
-        DE_NULL,                                                              // const void* pNext;
-        m_testParams.subsampledLoads ? **m_densityMapImageViews[1] : DE_NULL, // VkImageView imageView;
-        VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT                      // VkImageLayout imageLayout;
+        VK_STRUCTURE_TYPE_RENDERING_FRAGMENT_DENSITY_MAP_ATTACHMENT_INFO_EXT,        // VkStructureType sType;
+        nullptr,                                                                     // const void* pNext;
+        m_testParams.subsampledLoads ? **m_densityMapImageViews[1] : VK_NULL_HANDLE, // VkImageView imageView;
+        VK_IMAGE_LAYOUT_FRAGMENT_DENSITY_MAP_OPTIMAL_EXT                             // VkImageLayout imageLayout;
     };
 
     const VkRenderingAttachmentInfoKHR dynamicDensityMapColorAttachment{
         VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, // VkStructureType sType;
-        DE_NULL,                                         // const void* pNext;
+        nullptr,                                         // const void* pNext;
         **m_densityMapImageViews[0],                     // VkImageView imageView;
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,        // VkImageLayout imageLayout;
         VK_RESOLVE_MODE_NONE,                            // VkResolveModeFlagBits resolveMode;
-        DE_NULL,                                         // VkImageView resolveImageView;
+        VK_NULL_HANDLE,                                  // VkImageView resolveImageView;
         VK_IMAGE_LAYOUT_UNDEFINED,                       // VkImageLayout resolveImageLayout;
         VK_ATTACHMENT_LOAD_OP_CLEAR,                     // VkAttachmentLoadOp loadOp;
         VK_ATTACHMENT_STORE_OP_STORE,                    // VkAttachmentStoreOp storeOp;
@@ -2390,44 +2422,44 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
 
     VkRenderingInfoKHR dynamicDensityMapRenderingInfo{
         VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
-        DE_NULL,
+        nullptr,
         0u,                                // VkRenderingFlagsKHR flags;
         dynamicDensityMapRenderArea,       // VkRect2D renderArea;
         m_testParams.viewCount,            // uint32_t layerCount;
         m_viewMask,                        // uint32_t viewMask;
         1u,                                // uint32_t colorAttachmentCount;
         &dynamicDensityMapColorAttachment, // const VkRenderingAttachmentInfoKHR* pColorAttachments;
-        DE_NULL,                           // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
-        DE_NULL,                           // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
+        nullptr,                           // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
+        nullptr,                           // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
     };
 
     bool resolveFirstAttachment = isColorImageMultisampled && !m_testParams.makeCopy;
     const VkRenderingAttachmentInfoKHR subsampledImageColorAttachments[2]{
         {
             VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, // VkStructureType sType;
-            DE_NULL,                                         // const void* pNext;
+            nullptr,                                         // const void* pNext;
             *m_colorImageView,                               // VkImageView imageView;
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,        // VkImageLayout imageLayout;
             resolveFirstAttachment ? VK_RESOLVE_MODE_AVERAGE_BIT :
-                                     VK_RESOLVE_MODE_NONE,                // VkResolveModeFlagBits resolveMode;
-            resolveFirstAttachment ? *m_colorResolvedImageView : DE_NULL, // VkImageView resolveImageView;
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,                     // VkImageLayout resolveImageLayout;
-            VK_ATTACHMENT_LOAD_OP_CLEAR,                                  // VkAttachmentLoadOp loadOp;
-            VK_ATTACHMENT_STORE_OP_STORE,                                 // VkAttachmentStoreOp storeOp;
-            attachmentClearValues[0]                                      // VkClearValue clearValue;
+                                     VK_RESOLVE_MODE_NONE,                       // VkResolveModeFlagBits resolveMode;
+            resolveFirstAttachment ? *m_colorResolvedImageView : VK_NULL_HANDLE, // VkImageView resolveImageView;
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,                            // VkImageLayout resolveImageLayout;
+            VK_ATTACHMENT_LOAD_OP_CLEAR,                                         // VkAttachmentLoadOp loadOp;
+            VK_ATTACHMENT_STORE_OP_STORE,                                        // VkAttachmentStoreOp storeOp;
+            attachmentClearValues[0]                                             // VkClearValue clearValue;
         },
         {
             VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, // VkStructureType sType;
-            DE_NULL,                                         // const void* pNext;
+            nullptr,                                         // const void* pNext;
             *m_colorCopyImageView,                           // VkImageView imageView;
             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,        // VkImageLayout imageLayout;
             isColorImageMultisampled ? VK_RESOLVE_MODE_AVERAGE_BIT :
-                                       VK_RESOLVE_MODE_NONE,                // VkResolveModeFlagBits resolveMode;
-            isColorImageMultisampled ? *m_colorResolvedImageView : DE_NULL, // VkImageView resolveImageView;
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,                       // VkImageLayout resolveImageLayout;
-            VK_ATTACHMENT_LOAD_OP_CLEAR,                                    // VkAttachmentLoadOp loadOp;
-            VK_ATTACHMENT_STORE_OP_STORE,                                   // VkAttachmentStoreOp storeOp;
-            attachmentClearValues[0]                                        // VkClearValue clearValue;
+                                       VK_RESOLVE_MODE_NONE,                       // VkResolveModeFlagBits resolveMode;
+            isColorImageMultisampled ? *m_colorResolvedImageView : VK_NULL_HANDLE, // VkImageView resolveImageView;
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,                              // VkImageLayout resolveImageLayout;
+            VK_ATTACHMENT_LOAD_OP_CLEAR,                                           // VkAttachmentLoadOp loadOp;
+            VK_ATTACHMENT_STORE_OP_STORE,                                          // VkAttachmentStoreOp storeOp;
+            attachmentClearValues[0]                                               // VkClearValue clearValue;
         }};
 
     VkRenderingInfoKHR subsampledImageRenderingInfo{
@@ -2439,17 +2471,17 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
         m_viewMask,                      // uint32_t viewMask;
         1u + m_testParams.makeCopy,      // uint32_t colorAttachmentCount;
         subsampledImageColorAttachments, // const VkRenderingAttachmentInfoKHR* pColorAttachments;
-        DE_NULL,                         // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
-        DE_NULL,                         // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
+        nullptr,                         // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
+        nullptr,                         // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
     };
 
     const VkRenderingAttachmentInfoKHR resampleSubsampledImageColorAttachment{
         VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, // VkStructureType sType;
-        DE_NULL,                                         // const void* pNext;
+        nullptr,                                         // const void* pNext;
         *m_colorImageView,                               // VkImageView imageView;
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,        // VkImageLayout imageLayout;
         VK_RESOLVE_MODE_NONE,                            // VkResolveModeFlagBits resolveMode;
-        DE_NULL,                                         // VkImageView resolveImageView;
+        VK_NULL_HANDLE,                                  // VkImageView resolveImageView;
         VK_IMAGE_LAYOUT_UNDEFINED,                       // VkImageLayout resolveImageLayout;
         VK_ATTACHMENT_LOAD_OP_LOAD,                      // VkAttachmentLoadOp loadOp;
         VK_ATTACHMENT_STORE_OP_STORE,                    // VkAttachmentStoreOp storeOp;
@@ -2465,17 +2497,17 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
         m_viewMask,                              // uint32_t viewMask;
         1u,                                      // uint32_t colorAttachmentCount;
         &resampleSubsampledImageColorAttachment, // const VkRenderingAttachmentInfoKHR* pColorAttachments;
-        DE_NULL,                                 // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
-        DE_NULL,                                 // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
+        nullptr,                                 // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
+        nullptr,                                 // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
     };
 
     const VkRenderingAttachmentInfoKHR copySubsampledColorAttachment{
         VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR, // VkStructureType sType;
-        DE_NULL,                                         // const void* pNext;
+        nullptr,                                         // const void* pNext;
         *m_outputImageView,                              // VkImageView imageView;
         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,        // VkImageLayout imageLayout;
         VK_RESOLVE_MODE_NONE,                            // VkResolveModeFlagBits resolveMode;
-        DE_NULL,                                         // VkImageView resolveImageView;
+        VK_NULL_HANDLE,                                  // VkImageView resolveImageView;
         VK_IMAGE_LAYOUT_UNDEFINED,                       // VkImageLayout resolveImageLayout;
         VK_ATTACHMENT_LOAD_OP_CLEAR,                     // VkAttachmentLoadOp loadOp;
         VK_ATTACHMENT_STORE_OP_STORE,                    // VkAttachmentStoreOp storeOp;
@@ -2484,15 +2516,15 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
 
     VkRenderingInfoKHR copySubsampledRenderingInfo{
         VK_STRUCTURE_TYPE_RENDERING_INFO_KHR,
-        DE_NULL,
+        nullptr,
         0u,                             // VkRenderingFlagsKHR flags;
         outputRenderArea,               // VkRect2D renderArea;
         1u,                             // uint32_t layerCount;
         0u,                             // uint32_t viewMask;
         1u,                             // uint32_t colorAttachmentCount;
         &copySubsampledColorAttachment, // const VkRenderingAttachmentInfoKHR* pColorAttachments;
-        DE_NULL,                        // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
-        DE_NULL,                        // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
+        nullptr,                        // const VkRenderingAttachmentInfoKHR* pDepthAttachment;
+        nullptr,                        // const VkRenderingAttachmentInfoKHR* pStencilAttachment;
     };
 
     if (m_testParams.groupParams->useSecondaryCmdBuffer)
@@ -2500,7 +2532,7 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
         const VkFormat colorImageFormat = VK_FORMAT_R8G8B8A8_UNORM;
         VkCommandBufferInheritanceRenderingInfoKHR inheritanceRenderingInfo{
             VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO_KHR, // VkStructureType sType;
-            DE_NULL,                                                         // const void* pNext;
+            nullptr,                                                         // const void* pNext;
             0u,                                                              // VkRenderingFlagsKHR flags;
             m_viewMask,                                                      // uint32_t viewMask;
             1u,                                                              // uint32_t colorAttachmentCount;
@@ -2513,7 +2545,7 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
         const VkCommandBufferInheritanceInfo bufferInheritanceInfo = initVulkanStructure(&inheritanceRenderingInfo);
         VkCommandBufferBeginInfo commandBufBeginParams{
             VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType sType;
-            DE_NULL,                                     // const void* pNext;
+            nullptr,                                     // const void* pNext;
             VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags flags;
             &bufferInheritanceInfo};
 
@@ -2583,11 +2615,6 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
             inheritanceRenderingInfo.rasterizationSamples    = m_testParams.colorSamples;
             vk.beginCommandBuffer(*m_subsampledImageSecCmdBuffer, &commandBufBeginParams);
             drawSubsampledImage(*m_subsampledImageSecCmdBuffer);
-            if (m_testParams.makeCopy)
-            {
-                remapingBeforeCopySubsampledImage(*m_subsampledImageSecCmdBuffer);
-                drawCopySubsampledImage(*m_subsampledImageSecCmdBuffer);
-            }
             endCommandBuffer(vk, *m_subsampledImageSecCmdBuffer);
 
             if (m_testParams.subsampledLoads)
@@ -2613,7 +2640,7 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
             // change layout of density map - after filling it layout was changed
             // to density map optimal but here we want to render values to it
             vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_NONE_KHR,
-                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, DE_NULL, 0, DE_NULL, 1,
+                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1,
                                   &dynamicDensitMapBarrier);
 
             if (m_testParams.groupParams->secondaryCmdBufferCompletelyContainsDynamicRenderpass)
@@ -2628,13 +2655,13 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
 
             // barrier that will change layout of density map
             vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                  VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT, 0, 0, DE_NULL, 0, DE_NULL, 1,
+                                  VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT, 0, 0, nullptr, 0, nullptr, 1,
                                   &densityMapImageBarrier);
         }
 
         // barrier that will change layout of color and resolve attachments
         vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_NONE_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              0, 0, DE_NULL, 0, DE_NULL, 1 + isColorImageMultisampled, cbImageBarrier.data());
+                              0, 0, nullptr, 0, nullptr, 1 + isColorImageMultisampled, cbImageBarrier.data());
 
         // Render subsampled image
         if (m_testParams.groupParams->secondaryCmdBufferCompletelyContainsDynamicRenderpass)
@@ -2663,12 +2690,12 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
 
         // barrier that ensures writing to colour image has completed.
         vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, DE_NULL, 0, DE_NULL, 1u,
+                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1u,
                               &subsampledImageBarrier);
 
         // barrier that will change layout of output image
         vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_NONE_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              0, 0, DE_NULL, 0, DE_NULL, 1, &outputImageBarrier);
+                              0, 0, nullptr, 0, nullptr, 1, &outputImageBarrier);
 
         if (m_testParams.groupParams->secondaryCmdBufferCompletelyContainsDynamicRenderpass)
             vk.cmdExecuteCommands(*m_cmdBuffer, 1u, &*m_outputSubsampledImageSecCmdBuffer);
@@ -2692,7 +2719,7 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
             // change layout of density map - after filling it layout was changed
             // to density map optimal but here we want to render values to it
             vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_NONE_KHR,
-                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, DE_NULL, 0, DE_NULL, 1,
+                                  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1,
                                   &dynamicDensitMapBarrier);
 
             vk.cmdBeginRendering(*m_cmdBuffer, &dynamicDensityMapRenderingInfo);
@@ -2701,7 +2728,7 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
 
             // barrier that will change layout of density map
             vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                  VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT, 0, 0, DE_NULL, 0, DE_NULL, 1,
+                                  VK_PIPELINE_STAGE_FRAGMENT_DENSITY_PROCESS_BIT_EXT, 0, 0, nullptr, 0, nullptr, 1,
                                   &densityMapImageBarrier);
         }
 
@@ -2709,7 +2736,7 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
         if (m_testParams.makeCopy)
             cbImageBarrier[0].newLayout = VK_IMAGE_LAYOUT_RENDERING_LOCAL_READ_KHR;
         vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_NONE_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              0, 0, DE_NULL, 0, DE_NULL, 1 + isColorImageMultisampled + m_testParams.makeCopy,
+                              0, 0, nullptr, 0, nullptr, 1 + isColorImageMultisampled + m_testParams.makeCopy,
                               cbImageBarrier.data());
 
         // Render subsampled image
@@ -2732,12 +2759,12 @@ void FragmentDensityMapTestInstance::createCommandBufferForDynamicRendering(cons
 
         // barrier that ensures writing to colour image has completed.
         vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, DE_NULL, 0, DE_NULL, 1u,
+                              VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1u,
                               &subsampledImageBarrier);
 
         // barrier that will change layout of output image
         vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_NONE_KHR, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                              0, 0, DE_NULL, 0, DE_NULL, 1, &outputImageBarrier);
+                              0, 0, nullptr, 0, nullptr, 1, &outputImageBarrier);
 
         vk.cmdBeginRendering(*m_cmdBuffer, &copySubsampledRenderingInfo);
         drawOutputSubsampledImage(*m_cmdBuffer);
@@ -2898,6 +2925,11 @@ static void createChildren(tcu::TestCaseGroup *fdmTests, const SharedGroupParams
         de::MovePtr<tcu::TestCaseGroup> viewGroup(new tcu::TestCaseGroup(testCtx, view.name.c_str()));
         for (const auto &render : renders)
         {
+            if ((groupParams->renderingType == RENDERING_TYPE_DYNAMIC_RENDERING) && render.makeCopy &&
+                groupParams->useSecondaryCmdBuffer &&
+                (groupParams->secondaryCmdBufferCompletelyContainsDynamicRenderpass == false))
+                continue;
+
             de::MovePtr<tcu::TestCaseGroup> renderGroup(new tcu::TestCaseGroup(testCtx, render.name.c_str()));
             for (const auto &size : sizes)
             {
@@ -2927,11 +2959,13 @@ static void createChildren(tcu::TestCaseGroup *fdmTests, const SharedGroupParams
                             view.viewCount,               // uint32_t viewCount;
                             false,                        // bool multiViewport;
                             render.makeCopy,              // bool makeCopy;
+                            false,                        // bool depthEnabled;
                             size.renderSizeToDensitySize, // float renderMultiplier;
                             sample.samples,               // VkSampleCountFlagBits colorSamples;
                             area,                         // tcu::UVec2 fragmentArea;
                             {16, 16},                     // tcu::UVec2 densityMapSize;
                             VK_FORMAT_R8G8_UNORM,         // VkFormat densityMapFormat;
+                            VK_FORMAT_D16_UNORM,          // VkFormat depthFormat;
                             groupParams                   // SharedGroupParams groupParams;
                         };
 
@@ -2982,6 +3016,49 @@ static void createChildren(tcu::TestCaseGroup *fdmTests, const SharedGroupParams
         fdmTests->addChild(viewGroup.release());
     }
 
+    if (groupParams->renderingType == RENDERING_TYPE_RENDERPASS_LEGACY)
+    {
+        const struct
+        {
+            std::string name;
+            VkFormat format;
+        } depthFormats[] = {{"d16_unorm", VK_FORMAT_D16_UNORM},
+                            {"d32_sfloat", VK_FORMAT_D32_SFLOAT},
+                            {"d24_unorm_s8_uint", VK_FORMAT_D24_UNORM_S8_UINT}};
+
+        de::MovePtr<tcu::TestCaseGroup> depthFormatGroup(new tcu::TestCaseGroup(testCtx, "depth_format"));
+        for (const auto &format : depthFormats)
+        {
+            TestParams params{
+                false,                 // bool dynamicDensityMap;
+                true,                  // bool deferredDensityMap;
+                false,                 // bool nonSubsampledImages;
+                false,                 // bool subsampledLoads;
+                false,                 // bool coarseReconstruction;
+                false,                 // bool imagelessFramebuffer;
+                false,                 // bool useMemoryAccess;
+                false,                 // bool useMaintenance5;
+                1,                     // uint32_t samplersCount;
+                1,                     // uint32_t viewCount;
+                false,                 // bool multiViewport;
+                false,                 // bool makeCopy;
+                true,                  // bool depthEnabled;
+                4.0f,                  // float renderMultiplier;
+                VK_SAMPLE_COUNT_1_BIT, // VkSampleCountFlagBits colorSamples;
+                {2, 2},                // tcu::UVec2 fragmentArea;
+                {16, 16},              // tcu::UVec2 densityMapSize;
+                VK_FORMAT_R8G8_UNORM,  // VkFormat densityMapFormat;
+                format.format,         // VkFormat depthFormat;
+                groupParams            // SharedGroupParams groupParams;
+            };
+            depthFormatGroup->addChild(new FragmentDensityMapTest(testCtx, format.name, params));
+
+            if (groupParams->useSecondaryCmdBuffer)
+                break;
+        }
+        fdmTests->addChild(depthFormatGroup.release());
+    }
+
     const struct
     {
         std::string name;
@@ -3007,11 +3084,13 @@ static void createChildren(tcu::TestCaseGroup *fdmTests, const SharedGroupParams
             1,                     // uint32_t viewCount;
             false,                 // bool multiViewport;
             false,                 // bool makeCopy;
+            false,                 // bool depthEnabled;
             4.0f,                  // float renderMultiplier;
             VK_SAMPLE_COUNT_1_BIT, // VkSampleCountFlagBits colorSamples;
             {2, 2},                // tcu::UVec2 fragmentArea;
             {16, 16},              // tcu::UVec2 densityMapSize;
             VK_FORMAT_R8G8_UNORM,  // VkFormat densityMapFormat;
+            VK_FORMAT_D16_UNORM,   // VkFormat depthFormat;
             groupParams            // SharedGroupParams groupParams;
         };
         propertiesGroup->addChild(new FragmentDensityMapTest(testCtx, sampler.name, params));
@@ -3037,11 +3116,13 @@ static void createChildren(tcu::TestCaseGroup *fdmTests, const SharedGroupParams
             1,                     // uint32_t viewCount;
             false,                 // bool multiViewport;
             false,                 // bool makeCopy;
+            false,                 // bool depthEnabled;
             4.0f,                  // float renderMultiplier;
             VK_SAMPLE_COUNT_1_BIT, // VkSampleCountFlagBits colorSamples;
             {2, 2},                // tcu::UVec2 fragmentArea;
             {16, 16},              // tcu::UVec2 densityMapSize;
             VK_FORMAT_R8G8_UNORM,  // VkFormat densityMapFormat;
+            VK_FORMAT_D16_UNORM,   // VkFormat depthFormat;
             groupParams            // SharedGroupParams groupParams;
         };
         propertiesGroup->addChild(new FragmentDensityMapTest(testCtx, "maintenance5", params));
@@ -3072,11 +3153,13 @@ static void createChildren(tcu::TestCaseGroup *fdmTests, const SharedGroupParams
                 1,                                // uint32_t viewCount;
                 false,                            // bool multiViewport;
                 false,                            // bool makeCopy;
+                false,                            // bool depthEnabled;
                 4.0f,                             // float renderMultiplier;
                 VK_SAMPLE_COUNT_1_BIT,            // VkSampleCountFlagBits colorSamples;
                 {2, 2},                           // tcu::UVec2 fragmentArea;
                 {16, 16},                         // tcu::UVec2 densityMapSize;
                 VK_FORMAT_R8G8_UNORM,             // VkFormat densityMapFormat;
+                VK_FORMAT_D16_UNORM,              // VkFormat depthFormat;
                 SharedGroupParams(new GroupParams // SharedGroupParams groupParams;
                                   {
                                       groupParams->renderingType,        // RenderingType renderingType;
@@ -3115,11 +3198,13 @@ static void createChildren(tcu::TestCaseGroup *fdmTests, const SharedGroupParams
             2,                     // uint32_t viewCount;
             false,                 // bool multiViewport;
             false,                 // bool makeCopy;
+            false,                 // bool depthEnabled;
             4.0f,                  // float renderMultiplier;
             VK_SAMPLE_COUNT_1_BIT, // VkSampleCountFlagBits colorSamples;
             {1, 2},                // tcu::UVec2 fragmentArea;
             {16, 16},              // tcu::UVec2 densityMapSize;
             VK_FORMAT_R8G8_UNORM,  // VkFormat densityMapFormat;
+            VK_FORMAT_D16_UNORM,   // VkFormat depthFormat;
             groupParams            // SharedGroupParams groupParams;
         };
         propertiesGroup->addChild(new FragmentDensityMapTest(testCtx, "subsampled_loads", params));

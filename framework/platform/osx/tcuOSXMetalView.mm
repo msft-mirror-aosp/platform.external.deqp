@@ -18,7 +18,7 @@
  *
  *//*!
  * \file
- * \brief VK_MVK_macos_surface compatible view
+ * \brief VK_EXT_metal_surface compatible view
  *//*--------------------------------------------------------------------*/
 
 #include "tcuOSXMetalView.hpp"
@@ -60,6 +60,11 @@ MetalView::MetalView(int width, int height)
 void MetalView::setSize(int width, int height)
 {
     [(NativeMetalView *)m_view setFrame:NSMakeRect(0, 0, width, height)];
+}
+
+vk::pt::CAMetalLayer MetalView::getLayer() const
+{
+    return vk::pt::CAMetalLayer((void *)[(NativeMetalView *)m_view layer]);
 }
 
 MetalView::~MetalView() { [(NativeMetalView *)m_view release]; }

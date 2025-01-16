@@ -381,7 +381,7 @@ private:
         : m_refCount(0)
         , m_profile(*pVideoProfile)
         , m_devCtx(devCtx)
-        , m_videoSession(VkVideoSessionKHR(0))
+        , m_videoSession(VK_NULL_HANDLE)
     {
         deMemset(&m_createInfo, 0, sizeof(VkVideoSessionCreateInfoKHR));
         m_createInfo.sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_CREATE_INFO_KHR;
@@ -814,6 +814,7 @@ public:
         DeviceContext *context{};
         const VkVideoCoreProfile *profile{};
         size_t framesToCheck{};
+        bool layeredDpb{};
         bool queryDecodeStatus{};
         bool useInlineQueries{};
         bool resourcesWithoutProfiles{};
@@ -909,12 +910,13 @@ public:
 
     DeviceContext *m_deviceContext{};
     VkVideoCoreProfile m_profile{};
-    uint32_t m_framesToCheck{};
+    size_t m_framesToCheck{};
     // Parser fields
     int32_t m_nCurrentPictureID{};
     uint32_t m_dpbSlotsMask{};
     uint32_t m_fieldPicFlagMask{};
     DpbSlots m_dpb;
+    bool m_layeredDpb;
     std::array<int8_t, MAX_FRM_CNT> m_pictureToDpbSlotMap;
     VkFormat m_dpbImageFormat{VK_FORMAT_UNDEFINED};
     VkFormat m_outImageFormat{VK_FORMAT_UNDEFINED};
@@ -947,7 +949,7 @@ public:
     // becomes equal to m_pictureParameterUpdateCount, it will forcibly reset the current picture parameters.
     // This could be more general by taking a modulo formula, or a list of trigger numbers. But it is currently
     // only required for the h264_resolution_change_dpb test plan, so no need for complication.
-    int m_resetPictureParametersFrameTriggerHack{};
+    size_t m_resetPictureParametersFrameTriggerHack{};
     void triggerPictureParameterSequenceCount()
     {
         ++m_pictureParameterUpdateCount;
@@ -1009,7 +1011,7 @@ public:
     void parseNextChunk();
     int getNextFrame(DecodedFrame *pFrame);
     void bufferFrames(int framesToDecode);
-    int getBufferedDisplayCount() const
+    size_t getBufferedDisplayCount() const
     {
         return m_decoder->GetVideoFrameBuffer()->GetDisplayedFrameCount();
     }
@@ -1023,6 +1025,12 @@ public:
     std::shared_ptr<Demuxer> m_demuxer{};
     bool m_eos{false};
 };
+
+shared_ptr<VideoBaseDecoder> createBasicDecoder(DeviceContext *deviceContext, const VkVideoCoreProfile *profile,
+                                                size_t framesToCheck, bool resolutionChange);
+de::MovePtr<vkt::ycbcr::MultiPlaneImageData> getDecodedImageFromContext(DeviceContext &deviceContext,
+                                                                        VkImageLayout layout,
+                                                                        const DecodedFrame *frame);
 
 } // namespace video
 } // namespace vkt

@@ -279,8 +279,8 @@ tcu::TestStatus DeviceExtensionDuplicatesInstance::iterate(void)
 #else
     const vk::InstanceInterface &vki = m_context.getInstanceInterface();
     const VkPhysicalDevice phd       = m_context.getPhysicalDevice();
+    const DeviceInterface &vkd       = m_context.getDeviceInterface();
 #endif // CTS_USES_VULKANSC
-    const DeviceInterface &vkd  = m_context.getDeviceInterface();
     const uint32_t idx          = m_context.getUniversalQueueFamilyIndex();
     const tcu::CommandLine &cmd = m_context.getTestContext().getCommandLine();
     const float qpr             = 1.0f;
@@ -303,7 +303,7 @@ tcu::TestStatus DeviceExtensionDuplicatesInstance::iterate(void)
         &qpr                                        // const float* pQueuePriorities;
     };
 
-    void *pNext = DE_NULL;
+    void *pNext = nullptr;
 #ifdef CTS_USES_VULKANSC
     VkDeviceObjectReservationCreateInfo memReservationInfo =
         m_context.getTestContext().getCommandLine().isSubProcess() ? m_context.getResourceInterface()->getStatMax() :
@@ -335,7 +335,15 @@ tcu::TestStatus DeviceExtensionDuplicatesInstance::iterate(void)
         createUncheckedDevice(cmd.isValidationEnabled(), vki, phd, &deviceCreateInfo, nullptr, &device);
     if (VK_SUCCESS == res && VK_NULL_HANDLE != device)
     {
+// Creating an unchecked device on VKSC CTS requires a call to DeviceDriver::destroyDevice
+// instead of DeviceDriverSC::destroyDevice which would leak a device here.
+#ifdef CTS_USES_VULKANSC
+        DeviceDriver deviceDriver(m_context.getPlatformInterface(), customInstance, device,
+                                  m_context.getUsedApiVersion(), m_context.getTestContext().getCommandLine());
+        deviceDriver.destroyDevice(device, nullptr /*pAllocator*/);
+#else
         vkd.destroyDevice(device, nullptr);
+#endif
     }
 
     auto failMessage = [&]() -> std::string

@@ -129,6 +129,7 @@
 #include "vktSafetyCriticalTests.hpp"
 #endif // CTS_USES_VULKANSC
 #include "vktShaderObjectTests.hpp"
+#include "vktDGCTests.hpp"
 
 #include <vector>
 #include <sstream>
@@ -191,11 +192,11 @@ private:
     tcu::WaiverUtil m_waiverMechanism;
 
     TestInstance *m_instance; //!< Current test case instance
-    std::vector<std::string> m_testsForSubprocess;
     tcu::TestRunStatus m_status;
 
 #ifdef CTS_USES_VULKANSC
     int m_subprocessCount;
+    std::vector<std::string> m_testsForSubprocess;
 
     std::unique_ptr<vksc_server::ipc::Parent> m_parentIPC;
     std::vector<DetailedSubprocessTestCount> m_detailedSubprocessTestCount;
@@ -269,13 +270,13 @@ TestCaseExecutor::TestCaseExecutor(tcu::TestContext &testCtx)
     : m_prebuiltBinRegistry(testCtx.getArchive(), "vulkan/prebuilt")
     , m_library(createLibrary(testCtx))
     , m_renderDoc(testCtx.getCommandLine().isRenderDocEnabled() ? MovePtr<vk::RenderDocUtil>(new vk::RenderDocUtil()) :
-                                                                  MovePtr<vk::RenderDocUtil>(DE_NULL))
+                                                                  MovePtr<vk::RenderDocUtil>(nullptr))
 #if defined CTS_USES_VULKANSC
     , m_resourceInterface(new vk::ResourceInterfaceVKSC(testCtx))
 #else
     , m_resourceInterface(new vk::ResourceInterfaceStandard(testCtx))
 #endif // CTS_USES_VULKANSC
-    , m_instance(DE_NULL)
+    , m_instance(nullptr)
 #if defined CTS_USES_VULKANSC
     , m_subprocessCount(0)
 #endif // CTS_USES_VULKANSC
@@ -359,7 +360,12 @@ TestCaseExecutor::TestCaseExecutor(tcu::TestContext &testCtx)
 
     tcu::SessionInfo sessionInfo(m_deviceProperties.vendorID, m_deviceProperties.deviceID,
                                  m_deviceProperties.deviceName, testCtx.getCommandLine().getInitialCmdLine());
-    m_waiverMechanism.setup(testCtx.getCommandLine().getWaiverFileName(), "dEQP-VK", m_deviceProperties.vendorID,
+#ifdef CTS_USES_VULKANSC
+    const char *testname_prefix = "dEQP-VKSC";
+#else
+    const char *testname_prefix = "dEQP-VK";
+#endif
+    m_waiverMechanism.setup(testCtx.getCommandLine().getWaiverFileName(), testname_prefix, m_deviceProperties.vendorID,
                             m_deviceProperties.deviceID, sessionInfo);
 
 #ifdef CTS_USES_VULKANSC
@@ -438,7 +444,7 @@ void TestCaseExecutor::init(tcu::TestCase *testCase, const std::string &casePath
             m_testsForSubprocess.clear();
             const vk::DeviceInterface &vkd = m_context->getDeviceInterface();
             const vk::DeviceDriverSC *dds  = dynamic_cast<const vk::DeviceDriverSC *>(&vkd);
-            if (dds == DE_NULL)
+            if (dds == nullptr)
                 TCU_THROW(InternalError, "Undefined device driver for Vulkan SC");
             dds->reset();
             m_resourceInterface->resetObjects();
@@ -447,8 +453,8 @@ void TestCaseExecutor::init(tcu::TestCase *testCase, const std::string &casePath
             m_context->getTestContext().getLog().supressLogging(true);
         }
         m_subprocessCount = currentSubprocessCount;
-#endif // CTS_USES_VULKANSC
         m_testsForSubprocess.push_back(casePath);
+#endif // CTS_USES_VULKANSC
     }
 
     m_resourceInterface->initTestCase(casePath);
@@ -538,7 +544,7 @@ void TestCaseExecutor::init(tcu::TestCase *testCase, const std::string &casePath
 void TestCaseExecutor::deinit(tcu::TestCase *testCase)
 {
     delete m_instance;
-    m_instance = DE_NULL;
+    m_instance = nullptr;
 
     if (m_renderDoc)
         m_renderDoc->endFrame(m_context->getInstance());
@@ -549,7 +555,7 @@ void TestCaseExecutor::deinit(tcu::TestCase *testCase)
         collectAndReportDebugMessages(m_context->getDebugReportRecorder(), *m_context);
 #endif // CTS_USES_VULKANSC
 
-    if (testCase != DE_NULL)
+    if (testCase != nullptr)
         logUnusedShaders(testCase);
 
 #ifdef CTS_USES_VULKANSC
@@ -566,7 +572,7 @@ void TestCaseExecutor::deinit(tcu::TestCase *testCase)
             m_testsForSubprocess.clear();
             const vk::DeviceInterface &vkd = m_context->getDeviceInterface();
             const vk::DeviceDriverSC *dds  = dynamic_cast<const vk::DeviceDriverSC *>(&vkd);
-            if (dds == DE_NULL)
+            if (dds == nullptr)
                 TCU_THROW(InternalError, "Undefined device driver for Vulkan SC");
             dds->reset();
             m_resourceInterface->resetObjects();
@@ -597,7 +603,7 @@ void TestCaseExecutor::deinit(tcu::TestCase *testCase)
         VkBool32 unrecordedFaults      = VK_FALSE;
         uint32_t faultCount            = 0;
         VkResult result = vkd.getFaultData(m_context->getDevice(), VK_FAULT_QUERY_BEHAVIOR_GET_AND_CLEAR_ALL_FAULTS,
-                                           &unrecordedFaults, &faultCount, DE_NULL);
+                                           &unrecordedFaults, &faultCount, nullptr);
         if (result != VK_SUCCESS)
         {
             m_context->getTestContext().getLog()
@@ -708,7 +714,7 @@ void TestCaseExecutor::deinitTestPackage(tcu::TestContext &testCtx)
             m_testsForSubprocess.clear();
             const vk::DeviceInterface &vkd = m_context->getDeviceInterface();
             const vk::DeviceDriverSC *dds  = dynamic_cast<const vk::DeviceDriverSC *>(&vkd);
-            if (dds == DE_NULL)
+            if (dds == nullptr)
                 TCU_THROW(InternalError, "Undefined device driver for Vulkan SC");
             dds->reset();
             m_resourceInterface->resetObjects();
@@ -949,7 +955,7 @@ void TestCaseExecutor::runTestsInSubprocess(tcu::TestContext &testCtx)
         {
             std::string err = deProcess_getLastError(process);
             deProcess_destroy(process);
-            process = DE_NULL;
+            process = nullptr;
             TCU_THROW(InternalError, "Error while running subprocess : " + err);
         }
         std::string whole;
@@ -1254,6 +1260,7 @@ void TestPackage::init(void)
     addRootChild("video", m_caseListFilter, video::createTests);
 #endif
     addRootChild("shader_object", m_caseListFilter, ShaderObject::createTests);
+    addRootChild("dgc", m_caseListFilter, DGC::createTests);
 }
 
 void ExperimentalTestPackage::init(void)

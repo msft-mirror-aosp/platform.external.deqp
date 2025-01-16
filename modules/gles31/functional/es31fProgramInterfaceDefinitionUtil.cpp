@@ -313,7 +313,7 @@ public:
     }
     bool operator()(const glu::StructType *type)
     {
-        return type->hasTypeName() && (deStringEqual(m_name, type->getTypeName()) == true);
+        return type->hasTypeName() && strcmp(m_name, type->getTypeName()) == 0;
     }
 
 private:
@@ -1503,6 +1503,21 @@ const char *getUnusedZeroUniformName()
     return "unusedZero";
 }
 
+/**
+ * Name of the unused attribute added by generateProgramInterfaceProgramSources
+ *
+ * A vertex attribute named "noOpt" is added by
+ * generateProgramInterfaceProgramSources.  It is used in expressions to
+ * prevent various program resources from being eliminated by the GLSL
+ * compiler's optimizer.
+ *
+ * \sa deqp::gles31::Functional::ProgramInterfaceDefinition::generateProgramInterfaceProgramSources
+ */
+const char *getNoOptVertexAttribName()
+{
+    return "noOpt";
+}
+
 glu::ProgramSources generateProgramInterfaceProgramSources(const ProgramInterfaceDefinition::Program *program)
 {
     glu::ProgramSources sources;
@@ -1539,6 +1554,10 @@ glu::ProgramSources generateProgramInterfaceProgramSources(const ProgramInterfac
 
         // Use inputs and outputs so that they won't be removed by the optimizer
 
+        if (shader->getType() == glu::SHADERTYPE_VERTEX)
+        {
+            usageBuf << "highp in int " << getNoOptVertexAttribName() << ";\n";
+        }
         usageBuf << "highp uniform vec4 " << getUnusedZeroUniformName()
                  << "; // Default value is vec4(0.0).\n"
                     "highp vec4 readInputs()\n"
@@ -1642,7 +1661,10 @@ glu::ProgramSources generateProgramInterfaceProgramSources(const ProgramInterfac
         // Builtin-outputs that must be written to
 
         if (shader->getType() == glu::SHADERTYPE_VERTEX)
-            usageBuf << "    gl_Position = unusedValue;\n";
+        {
+            // Prevent drivers from moving the store to a subsequent shader stage
+            usageBuf << "    gl_Position = " << getNoOptVertexAttribName() << " == 0 ? unusedValue : vec4(1.0);\n";
+        }
         else if (shader->getType() == glu::SHADERTYPE_GEOMETRY)
             usageBuf << "    gl_Position = unusedValue;\n"
                         "    EmitVertex();\n";

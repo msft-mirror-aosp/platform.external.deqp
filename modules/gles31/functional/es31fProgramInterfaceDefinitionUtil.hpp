@@ -113,7 +113,7 @@ private:
         const glu::InterfaceBlock *block;
         const glu::VariableDeclaration *declaration;
 
-        Data(void) : type(DE_NULL)
+        Data(void) : type(nullptr)
         {
         }
     } m_data;
@@ -224,6 +224,7 @@ std::vector<std::string> getProgramInterfaceResourceList(const ProgramInterfaceD
                                                          ProgramInterface interface);
 std::vector<std::string> getProgramInterfaceBlockMemberResourceList(const glu::InterfaceBlock &interfaceBlock);
 const char *getUnusedZeroUniformName();
+const char *getNoOptVertexAttribName();
 glu::ProgramSources generateProgramInterfaceProgramSources(const ProgramInterfaceDefinition::Program *program);
 bool findProgramVariablePathByPathName(std::vector<ProgramInterfaceDefinition::VariablePathComponent> &typePath,
                                        const ProgramInterfaceDefinition::Program *program, const std::string &pathName,

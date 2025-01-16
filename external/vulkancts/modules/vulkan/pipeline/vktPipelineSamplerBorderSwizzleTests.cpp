@@ -1028,7 +1028,7 @@ tcu::TestStatus BorderSwizzleInstance::iterate(void)
         .setDefaultMultisampleState()
         .setupVertexInputState(&vertexInputInfo)
         .setupPreRasterizationShaderState(viewport, scissor, pipelineLayout, *renderPass, 0u, vertShader)
-        .setupFragmentShaderState(pipelineLayout, *renderPass, 0u, fragShader, DE_NULL, DE_NULL, &specializationInfo)
+        .setupFragmentShaderState(pipelineLayout, *renderPass, 0u, fragShader, nullptr, nullptr, &specializationInfo)
         .setupFragmentOutputState(*renderPass, 0u, &colorBlendInfo)
         .setMonolithicPipelineLayout(pipelineLayout)
         .buildPipeline();
@@ -1241,11 +1241,13 @@ VkClearColorValue getRandomClearColor(VkFormat format, de::Random &rnd, bool use
     VkClearColorValue color;
     deMemset(&color, 0, sizeof(color));
 
-    const auto tcuFormat     = mapVkFormat(format);
-    const auto numComponents = !useStencil ? tcu::getNumUsedChannels(tcuFormat.order) : 1;
-    const auto formatType    = getFormatType(format, useStencil);
+    const auto tcuFormat  = mapVkFormat(format);
+    const auto formatType = getFormatType(format, useStencil);
 
-    for (int i = 0; i < numComponents; ++i)
+    // Always generate all 4 components. Some formats may not use them but that's fine (and actually provides
+    // a little more coverage). Just generating tcuFormat::numComponents is wrong for formats like A8_UNORM,
+    // which generates (C, 0, 0, 0), meaning that the actual border color, in alpha, is always 0.0.
+    for (int i = 0; i < 4; ++i)
     {
         if (formatType == FormatType::SIGNED_INT || formatType == FormatType::UNSIGNED_INT)
         {
