@@ -167,7 +167,7 @@ void colorTexturing(const glw::Functions &gl, float lodBase, float lodBiasSum, f
             }
             else if (levelBase + lod <= q + 0.5f)
             {
-                d1 = ceil(levelBase + lod + 0.5f) - 1;
+                d1 = (int)ceil(levelBase + lod + 0.5f) - 1;
             }
             else
             {
@@ -190,7 +190,7 @@ void colorTexturing(const glw::Functions &gl, float lodBase, float lodBiasSum, f
             }
             else
             {
-                d1 = floor(levelBase + lod);
+                d1 = (int)floor(levelBase + lod);
                 d2 = d1 + 1;
             }
 

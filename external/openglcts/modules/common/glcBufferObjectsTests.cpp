@@ -1091,22 +1091,22 @@ tcu::TestNode::IterateResult BufferObjectsTestElementsCase::run_test()
 
     /* Test four pixels from the pattern, two of them should be white, and two
        black */
-    ReadScreen(gl, windowWidth / 2, 3 * windowHeight / 4 - 1, 1, 1, GL_RGBA, buf);
+    ReadScreen(gl, (GLint)(windowWidth / 2), (GLint)(3 * windowHeight / 4 - 1), 1, 1, GL_RGBA, buf);
     if (abs(buf[0] - 0) > 8 || abs(buf[1] - 0) > 8 || abs(buf[2] - 0) > 8)
         tcu_fail_msg("BufferObjectsTestElementsCase::run_test: ", elementsErrorFmt, .0f, .0f, .0f, buf[0], buf[1],
                      buf[2]);
 
-    ReadScreen(gl, windowWidth / 2, windowHeight / 4, 1, 1, GL_RGBA, buf);
+    ReadScreen(gl, (GLint)(windowWidth / 2), (GLint)(windowHeight / 4), 1, 1, GL_RGBA, buf);
     if (abs(buf[0] - 0) > 8 || abs(buf[1] - 0) > 8 || abs(buf[2] - 0) > 8)
         tcu_fail_msg("BufferObjectsTestElementsCase::run_test: ", elementsErrorFmt, .0f, .0f, .0f, buf[0], buf[1],
                      buf[2]);
 
-    ReadScreen(gl, windowWidth / 4 + 1, windowHeight / 2, 1, 1, GL_RGBA, buf);
+    ReadScreen(gl, (GLint)(windowWidth / 4 + 1), (GLint)(windowHeight / 2), 1, 1, GL_RGBA, buf);
     if (abs(buf[0] - 255) > 8 || abs(buf[1] - 255) > 8 || abs(buf[2] - 255) > 8)
         tcu_fail_msg("BufferObjectsTestElementsCase::run_test: ", elementsErrorFmt, 1.0f, 1.0f, 1.0f, buf[0], buf[1],
                      buf[2]);
 
-    ReadScreen(gl, 3 * windowWidth / 4 - 1, windowHeight / 2, 1, 1, GL_RGBA, buf);
+    ReadScreen(gl, (GLint)(3 * windowWidth / 4 - 1), (GLint)(windowHeight / 2), 1, 1, GL_RGBA, buf);
     if (abs(buf[0] - 255) > 8 || abs(buf[1] - 255) > 8 || abs(buf[2] - 255) > 8)
         tcu_fail_msg("BufferObjectsTestElementsCase::run_test: ", elementsErrorFmt, 1.0f, 1.0f, 1.0f, buf[0], buf[1],
                      buf[2]);
@@ -1175,7 +1175,7 @@ tcu::TestNode::IterateResult BufferObjectsTestMultiTexturingCase::run_test()
     GLfloat windowWidth  = m_window_size[0];
     GLfloat windowHeight = m_window_size[1];
 
-    std::vector<GLubyte> bufColors((windowWidth + 3) / 2 * 4);
+    std::vector<GLubyte> bufColors((int)((windowWidth + 3) / 2 * 4));
 
     int prevPx     = 0;
     int whiteCount = 0;
@@ -1344,7 +1344,7 @@ tcu::TestNode::IterateResult BufferObjectsTestMultiTexturingCase::run_test()
     //--------------------------------------------------------
 
     /* FIXME: This test fails if the width is an odd number */
-    ReadScreen(gl, windowWidth / 4 + 1, 3 * windowHeight / 4 - 3, (windowWidth + 3) / 2, 1, GL_RGBA,
+    ReadScreen(gl, (GLint)(windowWidth / 4 + 1), (GLint)(3 * windowHeight / 4 - 3), (GLint)((windowWidth + 3) / 2), 1, GL_RGBA,
                (GLubyte *)bufColors.data());
 
     prevPx = 1; /* We should start from a black pixel */
@@ -1506,7 +1506,7 @@ tcu::TestNode::IterateResult BufferObjectsTestSubDataCase::run_test()
     auto IsBlack = [](GLubyte *b) { return !b[0] && !b[1] && !b[2]; };
 
     /* The sample is #1. It must not be black */
-    ReadScreen(gl, windowWidth / 2, 2 * windowHeight / 3, 1, 1, GL_RGBA, buf);
+    ReadScreen(gl, (GLint)(windowWidth / 2), (GLint)(2 * windowHeight / 3), 1, 1, GL_RGBA, buf);
     if (IsBlack(buf))
     {
         TCU_FAIL("BufferObjectsTestSubDataCase::run_test: BufferSubData did not replace buffer object data correctly "
@@ -1514,7 +1514,7 @@ tcu::TestNode::IterateResult BufferObjectsTestSubDataCase::run_test()
     }
 
     /* The sample is #2. It must be black */
-    ReadScreen(gl, 2 * windowWidth / 3, windowHeight / 2, 1, 1, GL_RGBA, buf);
+    ReadScreen(gl, (GLint)(2 * windowWidth / 3), (GLint)(windowHeight / 2), 1, 1, GL_RGBA, buf);
     if (!IsBlack(buf))
     {
         TCU_FAIL("BufferObjectsTestSubDataCase::run_test: BufferSubData did not replace buffer object data correctly "
