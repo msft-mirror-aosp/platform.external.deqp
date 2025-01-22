@@ -653,6 +653,10 @@ bool getSupportedImageMemoryRequirements(Context &context, const CaseDef &caseDe
     {
         imageCreationPossible = false;
     }
+    if (imageMemoryRequiements.size == 0)
+    {
+        imageCreationPossible = false;
+    }
 
     return imageCreationPossible;
 }
