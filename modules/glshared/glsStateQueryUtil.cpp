@@ -28,6 +28,8 @@
 #include "glwEnums.hpp"
 #include "deStringUtil.hpp"
 
+#include <cmath>
+
 namespace deqp
 {
 namespace gls
@@ -1084,7 +1086,7 @@ void verifyInteger(tcu::ResultCollector &result, QueriedState &state, int expect
         const glw::GLfloat refValueMax = deInt32ToFloatRoundToPosInf(expected);
 
         if (state.getFloatAccess() < refValueMin || state.getFloatAccess() > refValueMax ||
-            deIsNaN(state.getFloatAccess()))
+            std::isnan(state.getFloatAccess()))
         {
             std::ostringstream buf;
 
@@ -1157,7 +1159,7 @@ void verifyIntegerMin(tcu::ResultCollector &result, QueriedState &state, int min
 
     case DATATYPE_FLOAT:
     {
-        if (state.getFloatAccess() < deInt32ToFloatRoundToNegInf(minValue) || deIsNaN(state.getFloatAccess()))
+        if (state.getFloatAccess() < deInt32ToFloatRoundToNegInf(minValue) || std::isnan(state.getFloatAccess()))
         {
             std::ostringstream buf;
             buf << "Expected greater or equal to " << minValue << ", got " << state.getFloatAccess();
@@ -1211,7 +1213,7 @@ void verifyIntegerMax(tcu::ResultCollector &result, QueriedState &state, int max
 
     case DATATYPE_FLOAT:
     {
-        if (state.getFloatAccess() > deInt32ToFloatRoundToPosInf(maxValue) || deIsNaN(state.getFloatAccess()))
+        if (state.getFloatAccess() > deInt32ToFloatRoundToPosInf(maxValue) || std::isnan(state.getFloatAccess()))
         {
             std::ostringstream buf;
             buf << "Expected less or equal to " << maxValue << ", got " << state.getFloatAccess();
@@ -1346,7 +1348,7 @@ void verifyFloatMin(tcu::ResultCollector &result, QueriedState &state, float min
 
     case DATATYPE_FLOAT:
     {
-        if (state.getFloatAccess() < minValue || deIsNaN(state.getFloatAccess()))
+        if (state.getFloatAccess() < minValue || std::isnan(state.getFloatAccess()))
         {
             std::ostringstream buf;
             buf << "Expected greater or equal to " << minValue << ", got " << state.getFloatAccess();
@@ -1400,7 +1402,7 @@ void verifyFloatMax(tcu::ResultCollector &result, QueriedState &state, float max
 
     case DATATYPE_FLOAT:
     {
-        if (state.getFloatAccess() > maxValue || deIsNaN(state.getFloatAccess()))
+        if (state.getFloatAccess() > maxValue || std::isnan(state.getFloatAccess()))
         {
             std::ostringstream buf;
             buf << "Expected less or equal to " << maxValue << ", got " << state.getFloatAccess();

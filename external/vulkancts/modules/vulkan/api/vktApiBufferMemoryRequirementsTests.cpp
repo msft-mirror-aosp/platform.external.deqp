@@ -497,7 +497,7 @@ void MemoryRequirementsTest::checkSupport(Context &context) const
                     {
                         if (entryCount++)
                             str << std::endl;
-                        str << INFOUSAGE("VK_EXT_video_queue not supported by device");
+                        str << INFOUSAGE("VK_KHR_video_queue not supported by device");
                         msgs[2] = true;
                     }
                     notSupported = true;
@@ -514,7 +514,7 @@ void MemoryRequirementsTest::checkSupport(Context &context) const
                             {
                                 if (entryCount++)
                                     str << std::endl;
-                                str << INFOUSAGE("VK_EXT_video_encode_h264 not supported by device");
+                                str << INFOUSAGE("VK_KHR_video_encode_h264 not supported by device");
                                 msgs[3] = true;
                             }
                             notSupported = true;
@@ -798,12 +798,12 @@ static Move<VkDevice> createProtectedDevice(const Context &context)
 
     VkPhysicalDeviceProtectedMemoryFeatures protectedMemoryFeatures;
     protectedMemoryFeatures.sType           = vk::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES;
-    protectedMemoryFeatures.pNext           = DE_NULL;
+    protectedMemoryFeatures.pNext           = nullptr;
     protectedMemoryFeatures.protectedMemory = VK_TRUE;
 
     VkDeviceQueueCreateInfo queueInfo = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                    // const void* pNext;
+        nullptr,                                    // const void* pNext;
         vk::VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT,   // VkDeviceQueueCreateFlags flags;
         context.getUniversalQueueFamilyIndex(),     // uint32_t queueFamilyIndex;
         1u,                                         // uint32_t queueCount;
@@ -816,10 +816,10 @@ static Move<VkDevice> createProtectedDevice(const Context &context)
         1u,                                   // uint32_t queueCreateInfoCount;
         &queueInfo,                           // const VkDeviceQueueCreateInfo* pQueueCreateInfos;
         0u,                                   // uint32_t enabledLayerCount;
-        DE_NULL,                              // const char* const* ppEnabledLayerNames;
+        nullptr,                              // const char* const* ppEnabledLayerNames;
         0u,                                   // uint32_t enabledExtensionCount;
-        DE_NULL,                              // const char* const* ppEnabledExtensionNames;
-        DE_NULL                               // const VkPhysicalDeviceFeatures* pEnabledFeatures;
+        nullptr,                              // const char* const* ppEnabledExtensionNames;
+        nullptr                               // const VkPhysicalDeviceFeatures* pEnabledFeatures;
     };
     return createCustomDevice(cmdLine.isValidationEnabled(), context.getPlatformInterface(), context.getInstance(),
                               context.getInstanceInterface(), context.getPhysicalDevice(), &deviceInfo);
@@ -891,7 +891,7 @@ TestStatus BufferMemoryRequirementsInstance::iterate(void)
                 {
                     VkPhysicalDeviceMaintenance4PropertiesKHR maintenance4Properties = {
                         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_PROPERTIES_KHR, // VkStructureType sType;
-                        DE_NULL,                                                        // void* pNext;
+                        nullptr,                                                        // void* pNext;
                         0u                                                              // VkDeviceSize maxBufferSize;
                     };
 

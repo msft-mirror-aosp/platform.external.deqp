@@ -97,7 +97,7 @@ public:
 private:
     vk::Move<vk::VkShaderEXT> createShader(const vk::DeviceInterface &vk, const vk::VkDevice device,
                                            vk::VkShaderStageFlagBits stage, const std::string &name,
-                                           const vk::VkDescriptorSetLayout *descriptorSetLayout = DE_NULL);
+                                           const vk::VkDescriptorSetLayout *descriptorSetLayout = nullptr);
     void createDevice(void);
     vk::VkDevice getDevice(void)
     {
@@ -125,7 +125,7 @@ void ShaderObjectBindingDrawInstance::createDevice(void)
 
     vk::VkDeviceQueueCreateInfo queueInfo = {
         vk::VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                        // const void* pNext;
+        nullptr,                                        // const void* pNext;
         0u,                                             // VkDeviceQueueCreateFlags flags;
         0u,                                             // uint32_t queueFamilyIndex;
         1u,                                             // uint32_t queueCount;
@@ -139,10 +139,10 @@ void ShaderObjectBindingDrawInstance::createDevice(void)
         1u,                                       // uint32_t queueCreateInfoCount;
         &queueInfo,                               // const VkDeviceQueueCreateInfo* pQueueCreateInfos;
         0u,                                       // uint32_t enabledLayerCount;
-        DE_NULL,                                  // const char* const* ppEnabledLayerNames;
+        nullptr,                                  // const char* const* ppEnabledLayerNames;
         uint32_t(deviceExtensions.size()),        // uint32_t enabledExtensionCount;
-        (deviceExtensions.empty()) ? DE_NULL : deviceExtensions.data(), // const char* const* ppEnabledExtensionNames;
-        DE_NULL // const VkPhysicalDeviceFeatures* pEnabledFeatures;
+        (deviceExtensions.empty()) ? nullptr : deviceExtensions.data(), // const char* const* ppEnabledExtensionNames;
+        nullptr // const VkPhysicalDeviceFeatures* pEnabledFeatures;
     };
 
     m_customDevice = createCustomDevice(m_context.getTestContext().getCommandLine().isValidationEnabled(),
@@ -158,14 +158,15 @@ vk::Move<vk::VkShaderEXT> ShaderObjectBindingDrawInstance::createShader(
     const bool tessellationSupported = m_context.getDeviceFeatures().tessellationShader;
     const bool geometrySupported     = m_context.getDeviceFeatures().geometryShader;
 
+    auto shaderCreateInfo = vk::makeShaderCreateInfo(stage, binaries.get(name), tessellationSupported,
+                                                     geometrySupported, descriptorSetLayout);
+
     if (m_params.binaryStage == stage)
     {
-        auto shaderCreateInfo = vk::makeShaderCreateInfo(stage, binaries.get(name), tessellationSupported,
-                                                         geometrySupported, descriptorSetLayout);
-        const auto shader     = vk::createShader(vk, device, shaderCreateInfo);
+        const auto shader = vk::createShader(vk, device, shaderCreateInfo);
 
         size_t dataSize;
-        vk.getShaderBinaryDataEXT(device, *shader, &dataSize, DE_NULL);
+        vk.getShaderBinaryDataEXT(device, *shader, &dataSize, nullptr);
         std::vector<uint8_t> data(dataSize);
         vk.getShaderBinaryDataEXT(device, *shader, &dataSize, data.data());
 
@@ -176,9 +177,7 @@ vk::Move<vk::VkShaderEXT> ShaderObjectBindingDrawInstance::createShader(
         return vk::createShader(vk, device, shaderCreateInfo);
     }
 
-    return vk::createShader(vk, device,
-                            vk::makeShaderCreateInfo(stage, binaries.get(name), tessellationSupported,
-                                                     geometrySupported, descriptorSetLayout));
+    return vk::createShader(vk, device, shaderCreateInfo);
 }
 
 void ShaderObjectBindingDrawInstance::setDynamicStates(vk::VkCommandBuffer cmdBuffer, bool tessShader)
@@ -232,7 +231,7 @@ tcu::TestStatus ShaderObjectBindingDrawInstance::iterate(void)
 
     const vk::VkImageCreateInfo createInfo = {
         vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, // VkStructureType            sType
-        DE_NULL,                                 // const void*                pNext
+        nullptr,                                 // const void*                pNext
         0u,                                      // VkImageCreateFlags        flags
         vk::VK_IMAGE_TYPE_2D,                    // VkImageType                imageType
         colorAttachmentFormat,                   // VkFormat                    format
@@ -244,7 +243,7 @@ tcu::TestStatus ShaderObjectBindingDrawInstance::iterate(void)
         vk::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // VkImageUsageFlags        usage
         vk::VK_SHARING_MODE_EXCLUSIVE, // VkSharingMode            sharingMode
         0,                             // uint32_t                    queueFamilyIndexCount
-        DE_NULL,                       // const uint32_t*            pQueueFamilyIndices
+        nullptr,                       // const uint32_t*            pQueueFamilyIndices
         vk::VK_IMAGE_LAYOUT_UNDEFINED  // VkImageLayout            initialLayout
     };
 
@@ -358,9 +357,8 @@ tcu::TestStatus ShaderObjectBindingDrawInstance::iterate(void)
         vk::VK_ACCESS_NONE, vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, vk::VK_IMAGE_LAYOUT_UNDEFINED,
         vk::VK_IMAGE_LAYOUT_GENERAL, **image, subresourceRange);
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (vk::VkDependencyFlags)0u, 0u,
-                          (const vk::VkMemoryBarrier *)DE_NULL, 0u, (const vk::VkBufferMemoryBarrier *)DE_NULL, 1u,
-                          &preImageBarrier);
+                          vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (vk::VkDependencyFlags)0u, 0u, nullptr, 0u,
+                          nullptr, 1u, &preImageBarrier);
 
     if (!m_params.setStateAfter)
         setDynamicStates(*cmdBuffer, tessellationSupported);
@@ -464,7 +462,7 @@ tcu::TestStatus ShaderObjectBindingDrawInstance::iterate(void)
         if (m_params.stage == vk::VK_SHADER_STAGE_GEOMETRY_BIT)
         {
             if (m_params.unbindWithNullpShaders)
-                vk.cmdBindShadersEXT(*cmdBuffer, 1u, &m_params.stage, DE_NULL);
+                vk.cmdBindShadersEXT(*cmdBuffer, 1u, &m_params.stage, nullptr);
             else
                 vk.cmdBindShadersEXT(*cmdBuffer, 1u, &m_params.stage, &nullShader);
         }
@@ -475,7 +473,7 @@ tcu::TestStatus ShaderObjectBindingDrawInstance::iterate(void)
             vk::VkShaderEXT nullShaders[]      = {VK_NULL_HANDLE, VK_NULL_HANDLE};
             vk.cmdSetPrimitiveTopology(*cmdBuffer, vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
             if (m_params.unbindWithNullpShaders)
-                vk.cmdBindShadersEXT(*cmdBuffer, 2u, stages, DE_NULL);
+                vk.cmdBindShadersEXT(*cmdBuffer, 2u, stages, nullptr);
             else
                 vk.cmdBindShadersEXT(*cmdBuffer, 2u, stages, nullShaders);
         }
@@ -495,14 +493,14 @@ tcu::TestStatus ShaderObjectBindingDrawInstance::iterate(void)
     else if (m_params.testType == DISPATCH_DRAW_DISPATCH)
     {
         vk.cmdBindDescriptorSets(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout.get(), 0, 1,
-                                 &descriptorSet1.get(), 0, DE_NULL);
+                                 &descriptorSet1.get(), 0, nullptr);
         vk::VkShaderStageFlagBits computeStage = vk::VK_SHADER_STAGE_COMPUTE_BIT;
         vk.cmdBindShadersEXT(*cmdBuffer, 1u, &computeStage, &*compShader);
         vk.cmdDispatch(*cmdBuffer, 1u, 1u, 1u);
         vk::bindGraphicsShaders(vk, *cmdBuffer, *vertShader, *tescShader, *teseShader, *geomShader, *fragShader,
                                 taskSupported, meshSupported);
         vk.cmdBindDescriptorSets(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_COMPUTE, computePipelineLayout.get(), 0, 1,
-                                 &descriptorSet2.get(), 0, DE_NULL);
+                                 &descriptorSet2.get(), 0, nullptr);
         vk.cmdDispatch(*cmdBuffer, 1u, 1u, 1u);
     }
 
@@ -513,8 +511,7 @@ tcu::TestStatus ShaderObjectBindingDrawInstance::iterate(void)
         vk::makeImageMemoryBarrier(vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, vk::VK_ACCESS_TRANSFER_READ_BIT,
                                    vk::VK_IMAGE_LAYOUT_GENERAL, vk::VK_IMAGE_LAYOUT_GENERAL, **image, subresourceRange);
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                          vk::VK_PIPELINE_STAGE_TRANSFER_BIT, (vk::VkDependencyFlags)0u, 0u,
-                          (const vk::VkMemoryBarrier *)DE_NULL, 0u, (const vk::VkBufferMemoryBarrier *)DE_NULL, 1u,
+                          vk::VK_PIPELINE_STAGE_TRANSFER_BIT, (vk::VkDependencyFlags)0u, 0u, nullptr, 0u, nullptr, 1u,
                           &postImageBarrier);
 
     const vk::VkBufferImageCopy copyRegion = vk::makeBufferImageCopy(extent, subresourceLayers);
@@ -1013,16 +1010,11 @@ tcu::TestStatus ShaderObjectBindingInstance::iterate(void)
                                                                                                      VK_NULL_HANDLE,
                                         bindFrag ? *fragShader : VK_NULL_HANDLE,
                                         bindComp ? *compShader : VK_NULL_HANDLE,
-                                        bindMesh ? *meshShader : VK_NULL_HANDLE,
-                                        bindTask ? *taskShader : VK_NULL_HANDLE,
+                                        (bindMesh && meshShaderFeatures.meshShader) ? *meshShader : VK_NULL_HANDLE,
+                                        (bindTask && meshShaderFeatures.taskShader) ? *taskShader : VK_NULL_HANDLE,
                                     };
-                                    uint32_t count = 6u;
-                                    if (meshShaderFeatures.meshShader)
-                                        ++count;
-                                    if (meshShaderFeatures.taskShader)
-                                        ++count;
                                     vk::beginCommandBuffer(vk, *cmdBuffer);
-                                    vk.cmdBindShadersEXT(*cmdBuffer, count, stages.data(), shaders.data());
+                                    vk.cmdBindShadersEXT(*cmdBuffer, 8u, stages.data(), shaders.data());
                                     vk::endCommandBuffer(vk, *cmdBuffer);
                                     vk::submitCommandsAndWait(vk, device, queue, *cmdBuffer);
                                 }
@@ -1048,7 +1040,7 @@ tcu::TestStatus ShaderObjectBindingInstance::iterate(void)
             vk::VK_SHADER_STAGE_TASK_BIT_EXT,
         };
         vk::beginCommandBuffer(vk, *cmdBuffer);
-        vk.cmdBindShadersEXT(*cmdBuffer, (uint32_t)stages.size(), stages.data(), DE_NULL);
+        vk.cmdBindShadersEXT(*cmdBuffer, (uint32_t)stages.size(), stages.data(), nullptr);
         vk::endCommandBuffer(vk, *cmdBuffer);
         vk::submitCommandsAndWait(vk, device, queue, *cmdBuffer);
     }
@@ -1092,7 +1084,7 @@ tcu::TestStatus MeshShaderObjectBindingInstance::iterate(void)
 
     const vk::VkImageCreateInfo createInfo = {
         vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, // VkStructureType            sType
-        DE_NULL,                                 // const void*                pNext
+        nullptr,                                 // const void*                pNext
         0u,                                      // VkImageCreateFlags        flags
         vk::VK_IMAGE_TYPE_2D,                    // VkImageType                imageType
         colorAttachmentFormat,                   // VkFormat                    format
@@ -1104,7 +1096,7 @@ tcu::TestStatus MeshShaderObjectBindingInstance::iterate(void)
         vk::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // VkImageUsageFlags        usage
         vk::VK_SHARING_MODE_EXCLUSIVE, // VkSharingMode            sharingMode
         0,                             // uint32_t                    queueFamilyIndexCount
-        DE_NULL,                       // const uint32_t*            pQueueFamilyIndices
+        nullptr,                       // const uint32_t*            pQueueFamilyIndices
         vk::VK_IMAGE_LAYOUT_UNDEFINED  // VkImageLayout            initialLayout
     };
 
@@ -1175,16 +1167,15 @@ tcu::TestStatus MeshShaderObjectBindingInstance::iterate(void)
         vk::VK_ACCESS_NONE, vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, vk::VK_IMAGE_LAYOUT_UNDEFINED,
         vk::VK_IMAGE_LAYOUT_GENERAL, **image, subresourceRange);
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                          vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (vk::VkDependencyFlags)0u, 0u,
-                          (const vk::VkMemoryBarrier *)DE_NULL, 0u, (const vk::VkBufferMemoryBarrier *)DE_NULL, 1u,
-                          &preImageBarrier);
+                          vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (vk::VkDependencyFlags)0u, 0u, nullptr, 0u,
+                          nullptr, 1u, &preImageBarrier);
 
     vk::beginRendering(vk, *cmdBuffer, *imageView, renderArea, clearValue, vk::VK_IMAGE_LAYOUT_GENERAL,
                        vk::VK_ATTACHMENT_LOAD_OP_CLEAR);
     vk::setDefaultShaderObjectDynamicStates(vk, *cmdBuffer, deviceExtensions, vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
                                             true);
     vk.cmdBindDescriptorSets(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout.get(), 0, 1,
-                             &descriptorSet.get(), 0, DE_NULL);
+                             &descriptorSet.get(), 0, nullptr);
 
     std::vector<vk::VkShaderStageFlagBits> nullStages = {
         vk::VK_SHADER_STAGE_VERTEX_BIT,
@@ -1221,8 +1212,7 @@ tcu::TestStatus MeshShaderObjectBindingInstance::iterate(void)
     vk::VkBufferMemoryBarrier shaderBufferBarrier = vk::makeBufferMemoryBarrier(
         vk::VK_ACCESS_SHADER_WRITE_BIT, vk::VK_ACCESS_SHADER_WRITE_BIT, *outputBuffer, 0u, bufferSizeBytes);
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, vk::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-                          (vk::VkDependencyFlags)0u, 0u, (const vk::VkMemoryBarrier *)DE_NULL, 1u, &shaderBufferBarrier,
-                          0u, (const vk::VkImageMemoryBarrier *)DE_NULL);
+                          (vk::VkDependencyFlags)0u, 0u, nullptr, 1u, &shaderBufferBarrier, 0u, nullptr);
 
     vk::beginRendering(vk, *cmdBuffer, *imageView, renderArea, clearValue, vk::VK_IMAGE_LAYOUT_GENERAL,
                        vk::VK_ATTACHMENT_LOAD_OP_LOAD);
@@ -1238,14 +1228,12 @@ tcu::TestStatus MeshShaderObjectBindingInstance::iterate(void)
         vk::makeImageMemoryBarrier(vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, vk::VK_ACCESS_TRANSFER_READ_BIT,
                                    vk::VK_IMAGE_LAYOUT_GENERAL, vk::VK_IMAGE_LAYOUT_GENERAL, **image, subresourceRange);
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                          vk::VK_PIPELINE_STAGE_TRANSFER_BIT, (vk::VkDependencyFlags)0u, 0u,
-                          (const vk::VkMemoryBarrier *)DE_NULL, 0u, (const vk::VkBufferMemoryBarrier *)DE_NULL, 1u,
+                          vk::VK_PIPELINE_STAGE_TRANSFER_BIT, (vk::VkDependencyFlags)0u, 0u, nullptr, 0u, nullptr, 1u,
                           &postImageBarrier);
     vk::VkBufferMemoryBarrier bufferBarrier = vk::makeBufferMemoryBarrier(
         vk::VK_ACCESS_SHADER_WRITE_BIT, vk::VK_ACCESS_HOST_READ_BIT, *outputBuffer, 0u, bufferSizeBytes);
     vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, vk::VK_PIPELINE_STAGE_HOST_BIT,
-                          (vk::VkDependencyFlags)0u, 0u, (const vk::VkMemoryBarrier *)DE_NULL, 1u, &bufferBarrier, 0u,
-                          (const vk::VkImageMemoryBarrier *)DE_NULL);
+                          (vk::VkDependencyFlags)0u, 0u, nullptr, 1u, &bufferBarrier, 0u, nullptr);
     vk::endCommandBuffer(vk, *cmdBuffer);
 
     submitCommandsAndWait(vk, device, queue, cmdBuffer.get());
@@ -1483,6 +1471,604 @@ void ShaderObjectBindingCase::initPrograms(vk::SourceCollections &programCollect
     }
 }
 
+enum UnbindTestType
+{
+    UNBIND_VTG,
+    UNBIND_TASK_MESH,
+    UNBIND_MESH_DRAW_VERTEX,
+};
+
+struct UnbindParams
+{
+    UnbindTestType testType;
+};
+
+class ShaderObjectUnbindInstance : public vkt::TestInstance
+{
+public:
+    ShaderObjectUnbindInstance(Context &context, const UnbindParams &params)
+        : vkt::TestInstance(context)
+        , m_params(params)
+    {
+    }
+    virtual ~ShaderObjectUnbindInstance(void)
+    {
+    }
+
+    tcu::TestStatus iterate(void) override;
+
+private:
+    UnbindParams m_params;
+};
+
+tcu::TestStatus ShaderObjectUnbindInstance::iterate(void)
+{
+    const vk::DeviceInterface &vk   = m_context.getDeviceInterface();
+    const vk::VkDevice device       = m_context.getDevice();
+    const vk::VkQueue queue         = m_context.getUniversalQueue();
+    const uint32_t queueFamilyIndex = m_context.getUniversalQueueFamilyIndex();
+    auto &alloc                     = m_context.getDefaultAllocator();
+    const auto deviceExtensions     = vk::removeUnsupportedShaderObjectExtensions(
+        m_context.getInstanceInterface(), m_context.getPhysicalDevice(), m_context.getDeviceExtensions());
+    const bool tessellationSupported = m_context.getDeviceFeatures().tessellationShader;
+    const bool geometrySupported     = m_context.getDeviceFeatures().geometryShader;
+    const bool taskSupported         = m_context.getMeshShaderFeatures().taskShader;
+    const bool meshSupported         = m_context.getMeshShaderFeatures().meshShader;
+    tcu::TestLog &log                = m_context.getTestContext().getLog();
+
+    const vk::Move<vk::VkCommandPool> cmdPool(vk::createCommandPool(vk, device, 0u, queueFamilyIndex));
+    const vk::Move<vk::VkCommandBuffer> cmdBuffer(
+        vk::allocateCommandBuffer(vk, device, *cmdPool, vk::VK_COMMAND_BUFFER_LEVEL_PRIMARY));
+
+    vk::VkFormat colorAttachmentFormat = vk::VK_FORMAT_R8G8B8A8_UNORM;
+    const auto subresourceRange        = makeImageSubresourceRange(vk::VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u);
+
+    const vk::VkImageCreateInfo createInfo = {
+        vk::VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, // VkStructureType            sType
+        nullptr,                                 // const void*                pNext
+        0u,                                      // VkImageCreateFlags        flags
+        vk::VK_IMAGE_TYPE_2D,                    // VkImageType                imageType
+        colorAttachmentFormat,                   // VkFormat                    format
+        {32, 32, 1},                             // VkExtent3D                extent
+        1u,                                      // uint32_t                    mipLevels
+        1u,                                      // uint32_t                    arrayLayers
+        vk::VK_SAMPLE_COUNT_1_BIT,               // VkSampleCountFlagBits    samples
+        vk::VK_IMAGE_TILING_OPTIMAL,             // VkImageTiling            tiling
+        vk::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | vk::VK_IMAGE_USAGE_TRANSFER_SRC_BIT, // VkImageUsageFlags        usage
+        vk::VK_SHARING_MODE_EXCLUSIVE, // VkSharingMode            sharingMode
+        0,                             // uint32_t                    queueFamilyIndexCount
+        nullptr,                       // const uint32_t*            pQueueFamilyIndices
+        vk::VK_IMAGE_LAYOUT_UNDEFINED  // VkImageLayout            initialLayout
+    };
+
+    de::MovePtr<vk::ImageWithMemory> image = de::MovePtr<vk::ImageWithMemory>(
+        new vk::ImageWithMemory(vk, device, alloc, createInfo, vk::MemoryRequirement::Any));
+    const auto imageView =
+        vk::makeImageView(vk, device, **image, vk::VK_IMAGE_VIEW_TYPE_2D, colorAttachmentFormat, subresourceRange);
+    const vk::VkRect2D renderArea = vk::makeRect2D(0, 0, 32, 32);
+
+    const vk::VkDeviceSize colorOutputBufferSize =
+        renderArea.extent.width * renderArea.extent.height * tcu::getPixelSize(vk::mapVkFormat(colorAttachmentFormat));
+    de::MovePtr<vk::BufferWithMemory> colorOutputBuffer = de::MovePtr<vk::BufferWithMemory>(new vk::BufferWithMemory(
+        vk, device, alloc, makeBufferCreateInfo(colorOutputBufferSize, vk::VK_BUFFER_USAGE_TRANSFER_DST_BIT),
+        vk::MemoryRequirement::HostVisible));
+
+    const vk::Unique<vk::VkDescriptorSetLayout> descriptorSetLayout(
+        vk::DescriptorSetLayoutBuilder()
+            .addSingleBinding(vk::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, vk::VK_SHADER_STAGE_MESH_BIT_EXT)
+            .build(vk, device));
+
+    const vk::Unique<vk::VkDescriptorPool> descriptorPool(
+        vk::DescriptorPoolBuilder()
+            .addType(vk::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER)
+            .build(vk, device, vk::VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1u));
+
+    const vk::VkDeviceSize bufferSizeBytes = sizeof(uint32_t) * 4;
+    const vk::Unique<vk::VkDescriptorSet> descriptorSet(
+        makeDescriptorSet(vk, device, *descriptorPool, *descriptorSetLayout));
+    const vk::BufferWithMemory outputBuffer(
+        vk, device, alloc, vk::makeBufferCreateInfo(bufferSizeBytes, vk::VK_BUFFER_USAGE_STORAGE_BUFFER_BIT),
+        vk::MemoryRequirement::HostVisible);
+
+    const vk::VkDescriptorBufferInfo descriptorInfo =
+        vk::makeDescriptorBufferInfo(*outputBuffer, 0ull, bufferSizeBytes);
+    vk::DescriptorSetUpdateBuilder()
+        .writeSingle(*descriptorSet, vk::DescriptorSetUpdateBuilder::Location::binding(0u),
+                     vk::VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &descriptorInfo)
+        .update(vk, device);
+
+    de::MovePtr<vk::BufferWithMemory> indexBuffer;
+    if (m_params.testType == UNBIND_MESH_DRAW_VERTEX)
+    {
+        uint32_t indices[] = {
+            0, 1, 2, 3, 0xFFFFFFFFu, 4, 5,
+        };
+
+        const auto indexDataSize   = static_cast<vk::VkDeviceSize>(sizeof(uint32_t) * 7u);
+        const auto indexBufferInfo = vk::makeBufferCreateInfo(indexDataSize, vk::VK_BUFFER_USAGE_INDEX_BUFFER_BIT);
+
+        indexBuffer = de::MovePtr<vk::BufferWithMemory>(
+            new vk::BufferWithMemory(vk, device, alloc, indexBufferInfo, vk::MemoryRequirement::HostVisible));
+
+        auto &bufferAlloc = indexBuffer->getAllocation();
+        auto dst          = reinterpret_cast<char *>(bufferAlloc.getHostPtr());
+
+        deMemcpy(dst, indices, indexDataSize);
+        vk::flushAlloc(vk, device, bufferAlloc);
+    }
+
+    const auto pipelineLayout = makePipelineLayout(vk, device, *descriptorSetLayout);
+
+    const auto &binaries = m_context.getBinaryCollection();
+    const auto vertShader =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_VERTEX_BIT, binaries.get("vert"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto vertShader2 =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_VERTEX_BIT, binaries.get("vert_offset"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto tescShader =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT, binaries.get("tesc"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto teseShader =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, binaries.get("tese"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto geomShader =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_GEOMETRY_BIT, binaries.get("geom"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto fragShader =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_FRAGMENT_BIT, binaries.get("frag_white"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto taskShader =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_TASK_BIT_EXT, binaries.get("task"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto meshShader =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_MESH_BIT_EXT, binaries.get("mesh"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+    const auto fragShader2 =
+        vk::createShader(vk, device,
+                         vk::makeShaderCreateInfo(vk::VK_SHADER_STAGE_FRAGMENT_BIT, binaries.get("frag_red"),
+                                                  tessellationSupported, geometrySupported, &*descriptorSetLayout));
+
+    vk::beginCommandBuffer(vk, *cmdBuffer);
+
+    vk::VkImageMemoryBarrier preImageBarrier = vk::makeImageMemoryBarrier(
+        vk::VK_ACCESS_NONE, vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, vk::VK_IMAGE_LAYOUT_UNDEFINED,
+        vk::VK_IMAGE_LAYOUT_GENERAL, **image, subresourceRange);
+    vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                          vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (vk::VkDependencyFlags)0u, 0u, nullptr, 0u,
+                          nullptr, 1u, &preImageBarrier);
+
+    if (m_params.testType == UNBIND_VTG)
+    {
+        vk::setDefaultShaderObjectDynamicStates(vk, *cmdBuffer, deviceExtensions,
+                                                vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, true);
+        // Bind graphics shaders
+        vk::bindGraphicsShaders(vk, *cmdBuffer, *vertShader, *tescShader, *teseShader, *geomShader, *fragShader,
+                                taskSupported, meshSupported);
+        // Unbind VTG
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_VERTEX_BIT,
+                vk::VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+                vk::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+                vk::VK_SHADER_STAGE_GEOMETRY_BIT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 4u, stages, shaders);
+        }
+        // Bind task and mesh shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_TASK_BIT_EXT,
+                vk::VK_SHADER_STAGE_MESH_BIT_EXT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                *taskShader,
+                *meshShader,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 2, stages, shaders);
+        }
+        // Unbind VTG again
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_VERTEX_BIT,
+                vk::VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
+                vk::VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT,
+                vk::VK_SHADER_STAGE_GEOMETRY_BIT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 4u, stages, shaders);
+        }
+    }
+    else if (m_params.testType == UNBIND_TASK_MESH)
+    {
+        vk::setDefaultShaderObjectDynamicStates(vk, *cmdBuffer, deviceExtensions,
+                                                vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, false);
+        vk::bindNullRasterizationShaders(vk, *cmdBuffer, m_context.getDeviceFeatures());
+        // Bind task, mesh and fragment shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_TASK_BIT_EXT,
+                vk::VK_SHADER_STAGE_MESH_BIT_EXT,
+                vk::VK_SHADER_STAGE_FRAGMENT_BIT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                *taskShader,
+                *meshShader,
+                *fragShader,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 3, stages, shaders);
+        }
+        // Unbind task shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_TASK_BIT_EXT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                VK_NULL_HANDLE,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 1, stages, shaders);
+        }
+        // Unbind mesh shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_MESH_BIT_EXT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                VK_NULL_HANDLE,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 1, stages, shaders);
+        }
+        // Bind vertex shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_VERTEX_BIT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                *vertShader,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 1, stages, shaders);
+        }
+    }
+    else if (m_params.testType == UNBIND_MESH_DRAW_VERTEX)
+    {
+        vk::setDefaultShaderObjectDynamicStates(vk, *cmdBuffer, deviceExtensions,
+                                                vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, false);
+        vk.cmdSetPrimitiveTopology(*cmdBuffer, vk::VK_PRIMITIVE_TOPOLOGY_LINE_LIST);
+        vk.cmdSetPrimitiveRestartEnable(*cmdBuffer, VK_FALSE);
+        vk::bindNullRasterizationShaders(vk, *cmdBuffer, m_context.getDeviceFeatures());
+        // Bind task, mesh and fragment shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_TASK_BIT_EXT,
+                vk::VK_SHADER_STAGE_MESH_BIT_EXT,
+                vk::VK_SHADER_STAGE_FRAGMENT_BIT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                *taskShader,
+                *meshShader,
+                *fragShader,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 3, stages, shaders);
+        }
+        vk.cmdSetPrimitiveTopology(*cmdBuffer, vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP);
+        vk.cmdSetPrimitiveRestartEnable(*cmdBuffer, VK_TRUE);
+    }
+
+    vk.cmdBindDescriptorSets(*cmdBuffer, vk::VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout.get(), 0, 1,
+                             &descriptorSet.get(), 0, nullptr);
+
+    const vk::VkClearValue clearValue = vk::makeClearValueColor({0.0f, 0.0f, 0.0f, 1.0f});
+    vk::beginRendering(vk, *cmdBuffer, *imageView, renderArea, clearValue, vk::VK_IMAGE_LAYOUT_GENERAL,
+                       vk::VK_ATTACHMENT_LOAD_OP_CLEAR);
+    if (m_params.testType == UNBIND_VTG)
+    {
+        vk.cmdDrawMeshTasksEXT(*cmdBuffer, 1, 1, 1);
+    }
+    else if (m_params.testType == UNBIND_TASK_MESH)
+    {
+        vk.cmdDraw(*cmdBuffer, 4, 1, 0, 0);
+    }
+    else if (m_params.testType == UNBIND_MESH_DRAW_VERTEX)
+    {
+        vk.cmdDrawMeshTasksEXT(*cmdBuffer, 1, 1, 1);
+        // Unbind task and mesh shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_TASK_BIT_EXT,
+                vk::VK_SHADER_STAGE_MESH_BIT_EXT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                VK_NULL_HANDLE,
+                VK_NULL_HANDLE,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 2, stages, shaders);
+        }
+        // Bind vertex shader
+        {
+            vk::VkShaderStageFlagBits stages[] = {
+                vk::VK_SHADER_STAGE_VERTEX_BIT,
+                vk::VK_SHADER_STAGE_FRAGMENT_BIT,
+            };
+            vk::VkShaderEXT shaders[] = {
+                *vertShader2,
+                *fragShader2,
+            };
+            vk.cmdBindShadersEXT(*cmdBuffer, 2, stages, shaders);
+        }
+        const auto indexType = vk::VK_INDEX_TYPE_UINT32;
+        vk.cmdBindIndexBuffer(*cmdBuffer, indexBuffer->get(), 0, indexType);
+        vk.cmdDrawIndexed(*cmdBuffer, 7, 1, 0, 0, 0);
+    }
+    vk::endRendering(vk, *cmdBuffer);
+
+    vk::VkImageMemoryBarrier postImageBarrier =
+        vk::makeImageMemoryBarrier(vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, vk::VK_ACCESS_TRANSFER_READ_BIT,
+                                   vk::VK_IMAGE_LAYOUT_GENERAL, vk::VK_IMAGE_LAYOUT_GENERAL, **image, subresourceRange);
+    vk.cmdPipelineBarrier(*cmdBuffer, vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+                          vk::VK_PIPELINE_STAGE_TRANSFER_BIT, (vk::VkDependencyFlags)0u, 0u, nullptr, 0u, nullptr, 1u,
+                          &postImageBarrier);
+
+    const vk::VkBufferImageCopy copyRegion = {
+        0u, // VkDeviceSize bufferOffset;
+        0u, // uint32_t bufferRowLength;
+        0u, // uint32_t bufferImageHeight;
+        {
+            vk::VK_IMAGE_ASPECT_COLOR_BIT,                     // VkImageAspectFlags aspect;
+            0u,                                                // uint32_t mipLevel;
+            0u,                                                // uint32_t baseArrayLayer;
+            1u,                                                // uint32_t layerCount;
+        },                                                     // VkImageSubresourceLayers imageSubresource;
+        {0, 0, 0},                                             // VkOffset3D imageOffset;
+        {renderArea.extent.width, renderArea.extent.height, 1} // VkExtent3D imageExtent;
+    };
+    vk.cmdCopyImageToBuffer(*cmdBuffer, **image, vk::VK_IMAGE_LAYOUT_GENERAL, **colorOutputBuffer, 1u, &copyRegion);
+
+    vk::endCommandBuffer(vk, *cmdBuffer);
+    submitCommandsAndWait(vk, device, queue, cmdBuffer.get());
+    tcu::ConstPixelBufferAccess resultBuffer = tcu::ConstPixelBufferAccess(
+        vk::mapVkFormat(colorAttachmentFormat), renderArea.extent.width, renderArea.extent.height, 1,
+        (const void *)colorOutputBuffer->getAllocation().getHostPtr());
+
+    const tcu::Vec4 white = tcu::Vec4(1.0f, 1.0f, 1.0f, 1.0f);
+    const tcu::Vec4 red   = tcu::Vec4(1.0f, 0.0f, 0.0f, 1.0f);
+    const tcu::Vec4 black = tcu::Vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    const int32_t width   = resultBuffer.getWidth();
+    const int32_t height  = resultBuffer.getHeight();
+    const int32_t offset  = 8u;
+
+    if (m_params.testType == UNBIND_VTG)
+    {
+        for (int32_t j = 0; j < height; ++j)
+        {
+            for (int32_t i = 0; i < width; ++i)
+            {
+                const tcu::Vec4 color = resultBuffer.getPixel(i, j).asFloat();
+                if (color != white)
+                {
+                    log << tcu::TestLog::Message << "Color at (" << i << ", " << j
+                        << ") is expected to be (1.0, 1.0, 1.0, 1.0), but was (" << color << ")"
+                        << tcu::TestLog::EndMessage;
+                    return tcu::TestStatus::fail("Fail");
+                }
+            }
+        }
+        {
+            const vk::Allocation &outputBufferAllocation = outputBuffer.getAllocation();
+            invalidateAlloc(vk, device, outputBufferAllocation);
+
+            const uint32_t *bufferPtr = static_cast<uint32_t *>(outputBufferAllocation.getHostPtr());
+
+            if (bufferPtr[0] != 0u || bufferPtr[1] != 1u || bufferPtr[2] != 2u || bufferPtr[3] != 3u)
+            {
+                log << tcu::TestLog::Message << "Buffer values were expected to be [0, 1, 2, 3], but were["
+                    << bufferPtr[0] << ", " << bufferPtr[1] << ", " << bufferPtr[2] << ", " << bufferPtr[3] << ", "
+                    << "]" << tcu::TestLog::EndMessage;
+                return tcu::TestStatus::fail("Fail");
+            }
+        }
+    }
+    else if (m_params.testType == UNBIND_TASK_MESH)
+    {
+        for (int32_t j = 0; j < height; ++j)
+        {
+            for (int32_t i = 0; i < width; ++i)
+            {
+                const tcu::Vec4 color = resultBuffer.getPixel(i, j).asFloat();
+                if (i >= offset && i < width - offset && j >= offset && j < height - offset)
+                {
+                    if (color != white)
+                    {
+                        log << tcu::TestLog::Message << "Color at (" << i << ", " << j
+                            << ") is expected to be (1.0, 1.0, 1.0, 1.0), but was (" << color << ")"
+                            << tcu::TestLog::EndMessage;
+                        return tcu::TestStatus::fail("Fail");
+                    }
+                }
+                else
+                {
+                    if (color != black)
+                    {
+                        log << tcu::TestLog::Message << "Color at (" << i << ", " << j
+                            << ") is expected to be (0.0, 0.0, 0.0, 0.0), but was (" << color << ")"
+                            << tcu::TestLog::EndMessage;
+                        return tcu::TestStatus::fail("Fail");
+                    }
+                }
+            }
+        }
+    }
+    else if (m_params.testType == UNBIND_MESH_DRAW_VERTEX)
+    {
+        for (int32_t j = 0; j < height; ++j)
+        {
+            for (int32_t i = 0; i < width; ++i)
+            {
+                const tcu::Vec4 color = resultBuffer.getPixel(i, j).asFloat();
+                if (i >= offset && i < width - offset && j >= offset && j < height - offset)
+                {
+                    if (color != red)
+                    {
+                        log << tcu::TestLog::Message << "Color at (" << i << ", " << j
+                            << ") is expected to be (1.0, 1.0, 1.0, 1.0), but was (" << color << ")"
+                            << tcu::TestLog::EndMessage;
+                        return tcu::TestStatus::fail("Fail");
+                    }
+                }
+                else
+                {
+                    if (color != white)
+                    {
+                        log << tcu::TestLog::Message << "Color at (" << i << ", " << j
+                            << ") is expected to be (1.0, 1.0, 1.0, 1.0), but was (" << color << ")"
+                            << tcu::TestLog::EndMessage;
+                        return tcu::TestStatus::fail("Fail");
+                    }
+                }
+            }
+        }
+        {
+            const vk::Allocation &outputBufferAllocation = outputBuffer.getAllocation();
+            invalidateAlloc(vk, device, outputBufferAllocation);
+
+            const uint32_t *bufferPtr = static_cast<uint32_t *>(outputBufferAllocation.getHostPtr());
+
+            if (bufferPtr[0] != 0u || bufferPtr[1] != 1u || bufferPtr[2] != 2u || bufferPtr[3] != 3u)
+            {
+                log << tcu::TestLog::Message << "Buffer values were expected to be [0, 1, 2, 3], but were["
+                    << bufferPtr[0] << ", " << bufferPtr[1] << ", " << bufferPtr[2] << ", " << bufferPtr[3] << ", "
+                    << "]" << tcu::TestLog::EndMessage;
+                return tcu::TestStatus::fail("Fail");
+            }
+        }
+    }
+
+    return tcu::TestStatus::pass("pass");
+}
+
+class ShaderObjectUnbindCase : public vkt::TestCase
+{
+public:
+    ShaderObjectUnbindCase(tcu::TestContext &testCtx, const std::string &name, const UnbindParams &params)
+        : vkt::TestCase(testCtx, name)
+        , m_params(params)
+    {
+    }
+    virtual ~ShaderObjectUnbindCase(void)
+    {
+    }
+
+    void checkSupport(vkt::Context &context) const override;
+    virtual void initPrograms(vk::SourceCollections &programCollection) const override;
+    TestInstance *createInstance(Context &context) const override
+    {
+        return new ShaderObjectUnbindInstance(context, m_params);
+    }
+
+private:
+    UnbindParams m_params;
+};
+
+void ShaderObjectUnbindCase::checkSupport(Context &context) const
+{
+    context.requireDeviceFunctionality("VK_EXT_shader_object");
+    context.requireDeviceFunctionality("VK_EXT_mesh_shader");
+    const auto &features = context.getMeshShaderFeaturesEXT();
+    if (!features.taskShader)
+        TCU_THROW(NotSupportedError, "Task shaders not supported");
+    if (!features.meshShader)
+        TCU_THROW(NotSupportedError, "Mesh shaders not supported");
+}
+
+void ShaderObjectUnbindCase::initPrograms(vk::SourceCollections &programCollection) const
+{
+    vk::addBasicShaderObjectShaders(programCollection);
+
+    std::stringstream vert_offset;
+    std::stringstream task;
+    std::stringstream mesh;
+    std::stringstream frag_white;
+    std::stringstream frag_red;
+
+    vert_offset << "#version 450\n"
+                << "void main() {\n"
+                << "    vec2 pos = vec2(float(gl_VertexIndex & 1), float((gl_VertexIndex >> 1) & 1));\n"
+                << "    if (gl_VertexIndex > 4) {\n"
+                << "        pos.x += 0.2f;\n"
+                << "    }\n"
+                << "    gl_Position = vec4(pos - 0.5f, 0.0f, 1.0f);\n"
+                << "}\n";
+
+    task << "#version 450\n"
+         << "#extension GL_EXT_mesh_shader : enable\n"
+         << "layout (local_size_x=1, local_size_y=1, local_size_z=1) in;\n"
+         << "void main ()\n"
+         << "{\n"
+         << "    EmitMeshTasksEXT(1u, 1u, 1u);\n"
+         << "}\n";
+
+    mesh << "#version 460\n"
+         << "#extension GL_EXT_mesh_shader : require\n"
+         << "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
+         << "layout(max_vertices = 3) out;\n"
+         << "layout(max_primitives = 1) out;\n"
+         << "layout(triangles) out;\n"
+         << "layout(set = 0, binding = 0) buffer Output {\n"
+         << "    uint values[4];\n"
+         << "} buffer_out;\n\n"
+         << "void main() {\n"
+         << "      SetMeshOutputsEXT(3, 1);\n"
+         << "      gl_MeshVerticesEXT[0].gl_Position = vec4(-1.0, -1.0, 0.0f, 1.0f);\n"
+         << "      gl_MeshVerticesEXT[1].gl_Position = vec4( 3.0, -1.0, 0.0f, 1.0f);\n"
+         << "      gl_MeshVerticesEXT[2].gl_Position = vec4(-1.0,  3.0, 0.0f, 1.0f);\n"
+         << "      gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);\n"
+         << "      buffer_out.values[0] = 0u;\n"
+         << "      buffer_out.values[1] = 1u;\n"
+         << "      buffer_out.values[2] = 2u;\n"
+         << "      buffer_out.values[3] = 3u;\n"
+         << "}\n";
+
+    frag_white << "#version 450\n"
+               << "layout (location=0) out vec4 outColor;\n"
+               << "void main() {\n"
+               << "    outColor = vec4(1.0f);\n"
+               << "}\n";
+
+    frag_red << "#version 450\n"
+             << "layout (location=0) out vec4 outColor;\n"
+             << "void main() {\n"
+             << "    outColor = vec4(1.0f, 0.0f, 0.0f, 1.0f);\n"
+             << "}\n";
+
+    programCollection.glslSources.add("vert_offset") << glu::VertexSource(vert_offset.str());
+    programCollection.glslSources.add("task")
+        << glu::TaskSource(task.str())
+        << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_4, 0u, true);
+    programCollection.glslSources.add("mesh")
+        << glu::MeshSource(mesh.str())
+        << vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_4, 0u, true);
+    programCollection.glslSources.add("frag_white") << glu::FragmentSource(frag_white.str());
+    programCollection.glslSources.add("frag_red") << glu::FragmentSource(frag_red.str());
+}
+
 } // namespace
 
 tcu::TestCaseGroup *createShaderObjectBindingTests(tcu::TestContext &testCtx)
@@ -1512,6 +2098,7 @@ tcu::TestCaseGroup *createShaderObjectBindingTests(tcu::TestContext &testCtx)
         {vk::VK_SHADER_STAGE_FRAGMENT_BIT, "frag"},
     };
     params.testType = SWAP;
+
     for (const auto &stage : stageTest)
     {
         params.stage         = stage.stage;
@@ -1601,6 +2188,14 @@ tcu::TestCaseGroup *createShaderObjectBindingTests(tcu::TestContext &testCtx)
     bindingGroup->addChild(new ShaderObjectBindingCase(testCtx, "bindings", bindingParams));
     bindingParams.useMeshShaders = true;
     bindingGroup->addChild(new ShaderObjectBindingCase(testCtx, "bindings_mesh_shaders", bindingParams));
+
+    UnbindParams unbindParams;
+    unbindParams.testType = UNBIND_VTG;
+    bindingGroup->addChild(new ShaderObjectUnbindCase(testCtx, "unbind_vtg", unbindParams));
+    unbindParams.testType = UNBIND_TASK_MESH;
+    bindingGroup->addChild(new ShaderObjectUnbindCase(testCtx, "unbind_task_mesh", unbindParams));
+    unbindParams.testType = UNBIND_MESH_DRAW_VERTEX;
+    bindingGroup->addChild(new ShaderObjectUnbindCase(testCtx, "unbind_mesh_draw_vertex", unbindParams));
 
     return bindingGroup.release();
 }

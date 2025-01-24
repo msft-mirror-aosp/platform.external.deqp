@@ -67,9 +67,9 @@ tcu::TestStatus createInstanceTest(Context &context)
 {
     tcu::TestLog &log = context.getTestContext().getLog();
     tcu::ResultCollector resultCollector(log);
-    const char *appNames[]       = {"appName",   DE_NULL,      "", "app, name", "app(\"name\"", "app~!@#$%^&*()_+name",
+    const char *appNames[]       = {"appName",   nullptr,      "", "app, name", "app(\"name\"", "app~!@#$%^&*()_+name",
                                     "app\nName", "app\r\nName"};
-    const char *engineNames[]    = {"engineName",   DE_NULL,          "",
+    const char *engineNames[]    = {"engineName",   nullptr,          "",
                                     "engine. name", "engine\"(name)", "eng~!@#$%^&*()_+name",
                                     "engine\nName", "engine\r\nName"};
     const int patchNumbers[]     = {0, 1, 2, 3, 4, 5, 13, 4094, 4095};
@@ -83,7 +83,7 @@ tcu::TestStatus createInstanceTest(Context &context)
     {
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
+            nullptr,                            // const void* pNext;
             appNames[appNameNdx],               // const char* pAppName;
             0u,                                 // uint32_t appVersion;
             "engineName",                       // const char* pEngineName;
@@ -99,7 +99,7 @@ tcu::TestStatus createInstanceTest(Context &context)
     {
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
+            nullptr,                            // const void* pNext;
             "appName",                          // const char* pAppName;
             0u,                                 // uint32_t appVersion;
             engineNames[engineNameNdx],         // const char* pEngineName;
@@ -115,7 +115,7 @@ tcu::TestStatus createInstanceTest(Context &context)
     {
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
+            nullptr,                            // const void* pNext;
             "appName",                          // const char* pAppName;
             appVersions[appVersionNdx],         // uint32_t appVersion;
             "engineName",                       // const char* pEngineName;
@@ -131,7 +131,7 @@ tcu::TestStatus createInstanceTest(Context &context)
     {
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
+            nullptr,                            // const void* pNext;
             "appName",                          // const char* pAppName;
             0u,                                 // uint32_t appVersion;
             "engineName",                       // const char* pEngineName;
@@ -150,14 +150,13 @@ tcu::TestStatus createInstanceTest(Context &context)
     for (int patchVersion = 0; patchVersion < DE_LENGTH_OF_ARRAY(patchNumbers); patchVersion++)
     {
         const VkApplicationInfo appInfo = {
-            VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
-            "appName",                          // const char* pAppName;
-            0u,                                 // uint32_t appVersion;
-            "engineName",                       // const char* pEngineName;
-            0u,                                 // uint32_t engineVersion;
-            VK_MAKE_API_VERSION(variantNum, majorNum, minorNum,
-                                patchNumbers[patchVersion]), // uint32_t apiVersion;
+            VK_STRUCTURE_TYPE_APPLICATION_INFO,                                              // VkStructureType sType;
+            nullptr,                                                                         // const void* pNext;
+            "appName",                                                                       // const char* pAppName;
+            0u,                                                                              // uint32_t appVersion;
+            "engineName",                                                                    // const char* pEngineName;
+            0u,                                                                              // uint32_t engineVersion;
+            VK_MAKE_API_VERSION(variantNum, majorNum, minorNum, patchNumbers[patchVersion]), // uint32_t apiVersion;
         };
 
         appInfos.push_back(appInfo);
@@ -167,7 +166,7 @@ tcu::TestStatus createInstanceTest(Context &context)
     {
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
+            nullptr,                            // const void* pNext;
             "appName",                          // const char* pAppName;
             0u,                                 // uint32_t appVersion;
             "engineName",                       // const char* pEngineName;
@@ -184,13 +183,13 @@ tcu::TestStatus createInstanceTest(Context &context)
         const VkApplicationInfo &appInfo              = appInfos[appInfoNdx];
         const VkInstanceCreateInfo instanceCreateInfo = {
             VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                // const void* pNext;
+            nullptr,                                // const void* pNext;
             (VkInstanceCreateFlags)0u,              // VkInstanceCreateFlags flags;
             &appInfo,                               // const VkApplicationInfo* pAppInfo;
             0u,                                     // uint32_t layerCount;
-            DE_NULL,                                // const char*const* ppEnabledLayernames;
+            nullptr,                                // const char*const* ppEnabledLayernames;
             0u,                                     // uint32_t extensionCount;
-            DE_NULL,                                // const char*const* ppEnabledExtensionNames;
+            nullptr,                                // const char*const* ppEnabledExtensionNames;
         };
 
         log << TestLog::Message << "Creating instance with appInfo: " << appInfo << TestLog::EndMessage;
@@ -241,7 +240,7 @@ tcu::TestStatus createInstanceWithInvalidApiVersionTest(Context &context)
     {
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO,      // VkStructureType sType;
-            DE_NULL,                                 // const void* pNext;
+            nullptr,                                 // const void* pNext;
             "appName",                               // const char* pAppName;
             0u,                                      // uint32_t appVersion;
             "engineName",                            // const char* pEngineName;
@@ -250,13 +249,13 @@ tcu::TestStatus createInstanceWithInvalidApiVersionTest(Context &context)
         };
         const VkInstanceCreateInfo instanceCreateInfo = {
             VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                // const void* pNext;
+            nullptr,                                // const void* pNext;
             (VkInstanceCreateFlags)0u,              // VkInstanceCreateFlags flags;
             &appInfo,                               // const VkApplicationInfo* pAppInfo;
             0u,                                     // uint32_t layerCount;
-            DE_NULL,                                // const char*const* ppEnabledLayernames;
+            nullptr,                                // const char*const* ppEnabledLayernames;
             0u,                                     // uint32_t extensionCount;
-            DE_NULL,                                // const char*const* ppEnabledExtensionNames;
+            nullptr,                                // const char*const* ppEnabledExtensionNames;
         };
 
         log << TestLog::Message << "API version reported by enumerateInstanceVersion: " << apiVersion
@@ -264,7 +263,7 @@ tcu::TestStatus createInstanceWithInvalidApiVersionTest(Context &context)
 
         {
             UncheckedInstance instance;
-            const VkResult result = createUncheckedInstance(context, &instanceCreateInfo, DE_NULL, &instance);
+            const VkResult result = createUncheckedInstance(context, &instanceCreateInfo, nullptr, &instance);
 
 #ifdef CTS_USES_VULKANSC
             if (invalidApiVersions[apiVersionNdx].variantNum == apiVersion.variantNum)
@@ -327,13 +326,13 @@ tcu::TestStatus createInstanceWithNullApplicationInfoTest(Context &context)
 
     const VkInstanceCreateInfo instanceCreateInfo = {
         VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         (VkInstanceCreateFlags)0u,              // VkInstanceCreateFlags flags;
-        DE_NULL,                                // const VkApplicationInfo* pAppInfo;
+        nullptr,                                // const VkApplicationInfo* pAppInfo;
         0u,                                     // uint32_t layerCount;
-        DE_NULL,                                // const char*const* ppEnabledLayernames;
+        nullptr,                                // const char*const* ppEnabledLayernames;
         0u,                                     // uint32_t extensionCount;
-        DE_NULL,                                // const char*const* ppEnabledExtensionNames;
+        nullptr,                                // const char*const* ppEnabledExtensionNames;
     };
 
     log << TestLog::Message << "Creating instance with NULL pApplicationInfo" << TestLog::EndMessage;
@@ -358,7 +357,7 @@ tcu::TestStatus createInstanceWithUnsupportedExtensionsTest(Context &context)
     const uint32_t apiVersion       = context.getUsedApiVersion();
     const VkApplicationInfo appInfo = {
         VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-        DE_NULL,                            // const void* pNext;
+        nullptr,                            // const void* pNext;
         "appName",                          // const char* pAppName;
         0u,                                 // uint32_t appVersion;
         "engineName",                       // const char* pEngineName;
@@ -368,11 +367,11 @@ tcu::TestStatus createInstanceWithUnsupportedExtensionsTest(Context &context)
 
     const VkInstanceCreateInfo instanceCreateInfo = {
         VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         (VkInstanceCreateFlags)0u,              // VkInstanceCreateFlags flags;
         &appInfo,                               // const VkApplicationInfo* pAppInfo;
         0u,                                     // uint32_t layerCount;
-        DE_NULL,                                // const char*const* ppEnabledLayernames;
+        nullptr,                                // const char*const* ppEnabledLayernames;
         DE_LENGTH_OF_ARRAY(enabledExtensions),  // uint32_t extensionCount;
         enabledExtensions,                      // const char*const* ppEnabledExtensionNames;
     };
@@ -384,7 +383,7 @@ tcu::TestStatus createInstanceWithUnsupportedExtensionsTest(Context &context)
 
     {
         UncheckedInstance instance;
-        const VkResult result = createUncheckedInstance(context, &instanceCreateInfo, DE_NULL, &instance);
+        const VkResult result = createUncheckedInstance(context, &instanceCreateInfo, nullptr, &instance);
 
         if (result == VK_ERROR_EXTENSION_NOT_PRESENT)
         {
@@ -482,7 +481,7 @@ tcu::TestStatus createInstanceWithExtensionNameAbuseTest(Context &context)
 
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
+            nullptr,                            // const void* pNext;
             "appName",                          // const char* pAppName;
             0u,                                 // uint32_t appVersion;
             "engineName",                       // const char* pEngineName;
@@ -492,18 +491,18 @@ tcu::TestStatus createInstanceWithExtensionNameAbuseTest(Context &context)
 
         const VkInstanceCreateInfo instanceCreateInfo = {
             VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                // const void* pNext;
+            nullptr,                                // const void* pNext;
             (VkInstanceCreateFlags)0u,              // VkInstanceCreateFlags flags;
             &appInfo,                               // const VkApplicationInfo* pAppInfo;
             0u,                                     // uint32_t layerCount;
-            DE_NULL,                                // const char*const* ppEnabledLayernames;
+            nullptr,                                // const char*const* ppEnabledLayernames;
             1u,                                     // uint32_t extensionCount;
             extensionList,                          // const char*const* ppEnabledExtensionNames;
         };
 
         {
             UncheckedInstance instance;
-            const VkResult result = createUncheckedInstance(context, &instanceCreateInfo, DE_NULL, &instance);
+            const VkResult result = createUncheckedInstance(context, &instanceCreateInfo, nullptr, &instance);
 
             if (result != VK_ERROR_EXTENSION_NOT_PRESENT)
                 failCount++;
@@ -532,7 +531,7 @@ tcu::TestStatus createInstanceWithLayerNameAbuseTest(Context &context)
 
         const VkApplicationInfo appInfo = {
             VK_STRUCTURE_TYPE_APPLICATION_INFO, // VkStructureType sType;
-            DE_NULL,                            // const void* pNext;
+            nullptr,                            // const void* pNext;
             "appName",                          // const char* pAppName;
             0u,                                 // uint32_t appVersion;
             "engineName",                       // const char* pEngineName;
@@ -542,25 +541,25 @@ tcu::TestStatus createInstanceWithLayerNameAbuseTest(Context &context)
 
         const VkInstanceCreateInfo instanceCreateInfo = {
             VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                // const void* pNext;
+            nullptr,                                // const void* pNext;
             (VkInstanceCreateFlags)0u,              // VkInstanceCreateFlags flags;
             &appInfo,                               // const VkApplicationInfo* pAppInfo;
             1u,                                     // uint32_t layerCount;
             layerList,                              // const char*const* ppEnabledLayernames;
             0u,                                     // uint32_t extensionCount;
-            DE_NULL,                                // const char*const* ppEnabledExtensionNames;
+            nullptr,                                // const char*const* ppEnabledExtensionNames;
         };
 
         {
             VkInstance instance = (VkInstance)0;
             const VkResult result =
-                platformInterface.createInstance(&instanceCreateInfo, DE_NULL /*pAllocator*/, &instance);
+                platformInterface.createInstance(&instanceCreateInfo, nullptr /*pAllocator*/, &instance);
             const bool gotInstance = !!instance;
 
             if (instance)
             {
                 const InstanceDriver instanceIface(platformInterface, instance);
-                instanceIface.destroyInstance(instance, DE_NULL /*pAllocator*/);
+                instanceIface.destroyInstance(instance, nullptr /*pAllocator*/);
             }
 
             if (result != VK_ERROR_LAYER_NOT_PRESENT)
@@ -614,7 +613,7 @@ tcu::TestStatus enumerateDevicesAllocLeakTest(Context &context)
             ++allocationRecords;
             break;
         case AllocationCallbackRecord::TYPE_FREE:
-            if (record.data.free.mem != DE_NULL)
+            if (record.data.free.mem != nullptr)
                 --allocationRecords;
             break;
         default:
@@ -646,14 +645,14 @@ tcu::TestStatus createDeviceTest(Context &context)
 
     const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         (VkDeviceQueueCreateFlags)0u,
         queueFamilyIndex, //queueFamilyIndex;
         queueCount,       //queueCount;
         &queuePriority,   //pQueuePriorities;
     };
 
-    void *pNext = DE_NULL;
+    void *pNext = nullptr;
 #ifdef CTS_USES_VULKANSC
     VkDeviceObjectReservationCreateInfo memReservationInfo = context.getTestContext().getCommandLine().isSubProcess() ?
                                                                  context.getResourceInterface()->getStatMax() :
@@ -673,10 +672,10 @@ tcu::TestStatus createDeviceTest(Context &context)
         1,                      //queueRecordCount;
         &deviceQueueCreateInfo, //pRequestedQueues;
         0,                      //layerCount;
-        DE_NULL,                //ppEnabledLayerNames;
+        nullptr,                //ppEnabledLayerNames;
         0,                      //extensionCount;
-        DE_NULL,                //ppEnabledExtensionNames;
-        DE_NULL,                //pEnabledFeatures;
+        nullptr,                //ppEnabledExtensionNames;
+        nullptr,                //pEnabledFeatures;
     };
 
     const Unique<VkDevice> device(createCustomDevice(context.getTestContext().getCommandLine().isValidationEnabled(),
@@ -704,7 +703,7 @@ tcu::TestStatus createMultipleDevicesTest(Context &context)
     const PlatformInterface &platformInterface = context.getPlatformInterface();
 
     vector<CustomInstance> instances;
-    vector<VkDevice> devices(numDevices, (VkDevice)DE_NULL);
+    vector<VkDevice> devices(numDevices, VK_NULL_HANDLE);
 
     try
     {
@@ -723,14 +722,14 @@ tcu::TestStatus createMultipleDevicesTest(Context &context)
             const float queuePriority                           = 1.0f;
             const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
                 VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                DE_NULL,
+                nullptr,
                 (VkDeviceQueueCreateFlags)0u, //flags;
                 queueFamilyIndex,             //queueFamilyIndex;
                 queueCount,                   //queueCount;
                 &queuePriority,               //pQueuePriorities;
             };
 
-            void *pNext = DE_NULL;
+            void *pNext = nullptr;
 #ifdef CTS_USES_VULKANSC
             VkDeviceObjectReservationCreateInfo memReservationInfo =
                 context.getTestContext().getCommandLine().isSubProcess() ?
@@ -751,15 +750,15 @@ tcu::TestStatus createMultipleDevicesTest(Context &context)
                 1,                      //queueRecordCount;
                 &deviceQueueCreateInfo, //pRequestedQueues;
                 0,                      //layerCount;
-                DE_NULL,                //ppEnabledLayerNames;
+                nullptr,                //ppEnabledLayerNames;
                 0,                      //extensionCount;
-                DE_NULL,                //ppEnabledExtensionNames;
-                DE_NULL,                //pEnabledFeatures;
+                nullptr,                //ppEnabledExtensionNames;
+                nullptr,                //pEnabledFeatures;
             };
 
             const VkResult result =
                 createUncheckedDevice(context.getTestContext().getCommandLine().isValidationEnabled(), instanceDriver,
-                                      physicalDevice, &deviceCreateInfo, DE_NULL /*pAllocator*/, &devices[deviceNdx]);
+                                      physicalDevice, &deviceCreateInfo, nullptr /*pAllocator*/, &devices[deviceNdx]);
 
             if (result != VK_SUCCESS)
             {
@@ -785,11 +784,11 @@ tcu::TestStatus createMultipleDevicesTest(Context &context)
     {
         for (int deviceNdx = (int)devices.size() - 1; deviceNdx >= 0; deviceNdx--)
         {
-            if (devices[deviceNdx] != (VkDevice)DE_NULL)
+            if (devices[deviceNdx] != VK_NULL_HANDLE)
             {
                 DeviceDriver deviceDriver(platformInterface, instances[deviceNdx], devices[deviceNdx],
                                           context.getUsedApiVersion(), context.getTestContext().getCommandLine());
-                deviceDriver.destroyDevice(devices[deviceNdx], DE_NULL /*pAllocator*/);
+                deviceDriver.destroyDevice(devices[deviceNdx], nullptr /*pAllocator*/);
             }
         }
 
@@ -798,11 +797,11 @@ tcu::TestStatus createMultipleDevicesTest(Context &context)
 
     for (int deviceNdx = (int)devices.size() - 1; deviceNdx >= 0; deviceNdx--)
     {
-        if (devices[deviceNdx] != (VkDevice)DE_NULL)
+        if (devices[deviceNdx] != VK_NULL_HANDLE)
         {
             DeviceDriver deviceDriver(platformInterface, instances[deviceNdx], devices[deviceNdx],
                                       context.getUsedApiVersion(), context.getTestContext().getCommandLine());
-            deviceDriver.destroyDevice(devices[deviceNdx], DE_NULL /*pAllocator*/);
+            deviceDriver.destroyDevice(devices[deviceNdx], nullptr /*pAllocator*/);
         }
     }
 
@@ -813,7 +812,7 @@ tcu::TestStatus createDeviceWithUnsupportedExtensionsTest(Context &context)
 {
     tcu::TestLog &log                          = context.getTestContext().getLog();
     const PlatformInterface &platformInterface = context.getPlatformInterface();
-    const CustomInstance instance(createCustomInstanceFromContext(context, DE_NULL, false));
+    const CustomInstance instance(createCustomInstanceFromContext(context, nullptr, false));
     const InstanceDriver &instanceDriver(instance.getDriver());
     const char *enabledExtensions[] = {"VK_UNSUPPORTED_EXTENSION", "THIS_IS_NOT_AN_EXTENSION", "VK_DONT_SUPPORT_ME"};
     const VkPhysicalDevice physicalDevice =
@@ -821,14 +820,14 @@ tcu::TestStatus createDeviceWithUnsupportedExtensionsTest(Context &context)
     const float queuePriority                           = 1.0f;
     const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         (VkDeviceQueueCreateFlags)0u,
         0,              //queueFamilyIndex;
         1,              //queueCount;
         &queuePriority, //pQueuePriorities;
     };
 
-    void *pNext = DE_NULL;
+    void *pNext = nullptr;
 #ifdef CTS_USES_VULKANSC
     VkDeviceObjectReservationCreateInfo memReservationInfo = context.getTestContext().getCommandLine().isSubProcess() ?
                                                                  context.getResourceInterface()->getStatMax() :
@@ -848,10 +847,10 @@ tcu::TestStatus createDeviceWithUnsupportedExtensionsTest(Context &context)
         1,                                     //queueRecordCount;
         &deviceQueueCreateInfo,                //pRequestedQueues;
         0,                                     //layerCount;
-        DE_NULL,                               //ppEnabledLayerNames;
+        nullptr,                               //ppEnabledLayerNames;
         DE_LENGTH_OF_ARRAY(enabledExtensions), //extensionCount;
         enabledExtensions,                     //ppEnabledExtensionNames;
-        DE_NULL,                               //pEnabledFeatures;
+        nullptr,                               //pEnabledFeatures;
     };
 
     log << TestLog::Message << "Enabled extensions are: " << TestLog::EndMessage;
@@ -860,17 +859,17 @@ tcu::TestStatus createDeviceWithUnsupportedExtensionsTest(Context &context)
         log << TestLog::Message << enabledExtensions[ndx] << TestLog::EndMessage;
 
     {
-        VkDevice device = (VkDevice)0;
+        VkDevice device = VK_NULL_HANDLE;
         const VkResult result =
             createUncheckedDevice(context.getTestContext().getCommandLine().isValidationEnabled(), instanceDriver,
-                                  physicalDevice, &deviceCreateInfo, DE_NULL /*pAllocator*/, &device);
+                                  physicalDevice, &deviceCreateInfo, nullptr /*pAllocator*/, &device);
         const bool gotDevice = !!device;
 
         if (device)
         {
             const DeviceDriver deviceIface(platformInterface, instance, device, context.getUsedApiVersion(),
                                            context.getTestContext().getCommandLine());
-            deviceIface.destroyDevice(device, DE_NULL /*pAllocator*/);
+            deviceIface.destroyDevice(device, nullptr /*pAllocator*/);
         }
 
         if (result == VK_ERROR_EXTENSION_NOT_PRESENT)
@@ -916,7 +915,7 @@ tcu::TestStatus createDeviceWithVariousQueueCountsTest(Context &context)
         for (uint32_t queueCount = 1; queueCount <= maxQueueCount; queueCount += queueCountDiff)
         {
             const VkDeviceQueueCreateInfo queueCreateInfo = {VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                                                             DE_NULL,
+                                                             nullptr,
                                                              (VkDeviceQueueCreateFlags)0u,
                                                              queueFamilyNdx,
                                                              queueCount,
@@ -929,7 +928,7 @@ tcu::TestStatus createDeviceWithVariousQueueCountsTest(Context &context)
     for (size_t testNdx = 0; testNdx < deviceQueueCreateInfos.size(); testNdx++)
     {
         const VkDeviceQueueCreateInfo &queueCreateInfo = deviceQueueCreateInfos[testNdx];
-        void *pNext                                    = DE_NULL;
+        void *pNext                                    = nullptr;
 #ifdef CTS_USES_VULKANSC
         VkDeviceObjectReservationCreateInfo memReservationInfo =
             context.getTestContext().getCommandLine().isSubProcess() ? context.getResourceInterface()->getStatMax() :
@@ -949,10 +948,10 @@ tcu::TestStatus createDeviceWithVariousQueueCountsTest(Context &context)
             1,                //queueRecordCount;
             &queueCreateInfo, //pRequestedQueues;
             0,                //layerCount;
-            DE_NULL,          //ppEnabledLayerNames;
+            nullptr,          //ppEnabledLayerNames;
             0,                //extensionCount;
-            DE_NULL,          //ppEnabledExtensionNames;
-            DE_NULL,          //pEnabledFeatures;
+            nullptr,          //ppEnabledExtensionNames;
+            nullptr,          //pEnabledFeatures;
         };
 
         const Unique<VkDevice> device(
@@ -999,13 +998,13 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
         chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
     const vector<float> queuePriorities(1, 1.0f);
     const VkQueueGlobalPriorityEXT globalPriorities[] = {
-        VK_QUEUE_GLOBAL_PRIORITY_LOW_EXT, VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT, VK_QUEUE_GLOBAL_PRIORITY_HIGH_EXT,
-        VK_QUEUE_GLOBAL_PRIORITY_REALTIME_EXT};
+        VK_QUEUE_GLOBAL_PRIORITY_LOW_KHR, VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR, VK_QUEUE_GLOBAL_PRIORITY_HIGH_KHR,
+        VK_QUEUE_GLOBAL_PRIORITY_REALTIME_KHR};
 
 #ifndef CTS_USES_VULKANSC
     uint32_t queueFamilyPropertyCount = ~0u;
 
-    instanceDriver.getPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, DE_NULL);
+    instanceDriver.getPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
     TCU_CHECK(queueFamilyPropertyCount > 0);
 
     std::vector<VkQueueFamilyProperties2> queueFamilyProperties2(queueFamilyPropertyCount);
@@ -1016,7 +1015,7 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
         for (uint32_t ndx = 0; ndx < queueFamilyPropertyCount; ndx++)
         {
             globalPriorityProperties[ndx].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_KHR;
-            globalPriorityProperties[ndx].pNext = DE_NULL;
+            globalPriorityProperties[ndx].pNext = nullptr;
             queueFamilyProperties2[ndx].sType   = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
             queueFamilyProperties2[ndx].pNext   = &globalPriorityProperties[ndx];
         }
@@ -1030,9 +1029,9 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
     if (useKhrGlobalPriority)
         enabledExtensions = {"VK_KHR_global_priority"};
 
-    VkPhysicalDeviceGlobalPriorityQueryFeaturesEXT globalPriorityQueryFeatures{
+    VkPhysicalDeviceGlobalPriorityQueryFeatures globalPriorityQueryFeatures{
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_EXT, //sType;
-        DE_NULL,                                                              //pNext;
+        nullptr,                                                              //pNext;
         VK_TRUE                                                               //globalPriorityQuery;
     };
 #else
@@ -1048,8 +1047,8 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
     for (VkQueueGlobalPriorityEXT globalPriority : globalPriorities)
     {
         const VkDeviceQueueGlobalPriorityCreateInfoEXT queueGlobalPriority = {
-            VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_EXT, //sType;
-            DE_NULL,                                                        //pNext;
+            VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_KHR, //sType;
+            nullptr,                                                        //pNext;
             globalPriority                                                  //globalPriority;
         };
 
@@ -1062,7 +1061,7 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
             queuePriorities.data()                      //pQueuePriorities;
         };
 
-        void *pNext = DE_NULL;
+        void *pNext = nullptr;
 #ifdef CTS_USES_VULKANSC
         VkDeviceObjectReservationCreateInfo memReservationInfo =
             context.getTestContext().getCommandLine().isSubProcess() ? context.getResourceInterface()->getStatMax() :
@@ -1074,7 +1073,7 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
         sc10Features.pNext                              = pNext;
         pNext                                           = &sc10Features;
 #else
-        pNext = useKhrGlobalPriority ? &globalPriorityQueryFeatures : DE_NULL;
+        pNext = useKhrGlobalPriority ? &globalPriorityQueryFeatures : nullptr;
 #endif // CTS_USES_VULKANSC
 
         const VkDeviceCreateInfo deviceCreateInfo = {
@@ -1084,13 +1083,13 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
             1,                                    //queueRecordCount;
             &queueCreateInfo,                     //pRequestedQueues;
             0,                                    //layerCount;
-            DE_NULL,                              //ppEnabledLayerNames;
+            nullptr,                              //ppEnabledLayerNames;
             (uint32_t)enabledExtensions.size(),   //extensionCount;
             enabledExtensions.data(),             //ppEnabledExtensionNames;
-            DE_NULL,                              //pEnabledFeatures;
+            nullptr,                              //pEnabledFeatures;
         };
 
-        const bool mayBeDenied = globalPriority > VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT;
+        const bool mayBeDenied = globalPriority > VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_KHR;
 #ifndef CTS_USES_VULKANSC
         const bool mustFail =
             useKhrGlobalPriority &&
@@ -1112,7 +1111,7 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
             TCU_CHECK(!!queue);
 
             result = deviceDriver.queueWaitIdle(queue);
-            if (result == VK_ERROR_NOT_PERMITTED_EXT && mayBeDenied)
+            if (result == VK_ERROR_NOT_PERMITTED_KHR && mayBeDenied)
             {
                 continue;
             }
@@ -1142,7 +1141,7 @@ tcu::TestStatus createDeviceWithGlobalPriorityTest(Context &context, bool useKhr
         }
         catch (const Error &error)
         {
-            if ((error.getError() == VK_ERROR_NOT_PERMITTED_EXT && mayBeDenied)
+            if ((error.getError() == VK_ERROR_NOT_PERMITTED_KHR && mayBeDenied)
 #ifndef CTS_USES_VULKANSC
                 || (error.getError() == VK_ERROR_INITIALIZATION_FAILED && mustFail)
 #endif // CTS_USES_VULKANSC
@@ -1187,7 +1186,7 @@ bool isValidGlobalPriority(VkQueueGlobalPriorityEXT priority)
 void checkGlobalPriorityProperties(const VkQueueFamilyGlobalPriorityPropertiesEXT &properties)
 {
     TCU_CHECK(properties.priorityCount > 0);
-    TCU_CHECK(properties.priorityCount <= VK_MAX_GLOBAL_PRIORITY_SIZE_KHR);
+    TCU_CHECK(properties.priorityCount <= VK_MAX_GLOBAL_PRIORITY_SIZE);
     TCU_CHECK(isValidGlobalPriority(properties.priorities[0]));
 
     for (uint32_t ndx = 1; ndx < properties.priorityCount; ndx++)
@@ -1213,7 +1212,7 @@ tcu::TestStatus createDeviceWithQueriedGlobalPriorityTest(Context &context, bool
     const vector<float> queuePriorities(1, 1.0f);
     uint32_t queueFamilyPropertyCount = ~0u;
 
-    instanceDriver.getPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, DE_NULL);
+    instanceDriver.getPhysicalDeviceQueueFamilyProperties2(physicalDevice, &queueFamilyPropertyCount, nullptr);
     TCU_CHECK(queueFamilyPropertyCount > 0);
 
     std::vector<VkQueueFamilyProperties2> queueFamilyProperties2(queueFamilyPropertyCount);
@@ -1222,7 +1221,7 @@ tcu::TestStatus createDeviceWithQueriedGlobalPriorityTest(Context &context, bool
     for (uint32_t ndx = 0; ndx < queueFamilyPropertyCount; ndx++)
     {
         globalPriorityProperties[ndx].sType = VK_STRUCTURE_TYPE_QUEUE_FAMILY_GLOBAL_PRIORITY_PROPERTIES_EXT;
-        globalPriorityProperties[ndx].pNext = DE_NULL;
+        globalPriorityProperties[ndx].pNext = nullptr;
         queueFamilyProperties2[ndx].sType   = VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
         queueFamilyProperties2[ndx].pNext   = &globalPriorityProperties[ndx];
     }
@@ -1246,14 +1245,14 @@ tcu::TestStatus createDeviceWithQueriedGlobalPriorityTest(Context &context, bool
 
         for (VkQueueGlobalPriorityEXT globalPriority : globalPriorities)
         {
-            const VkPhysicalDeviceGlobalPriorityQueryFeaturesEXT globalPriorityQueryFeatures = {
+            const VkPhysicalDeviceGlobalPriorityQueryFeatures globalPriorityQueryFeatures = {
                 VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_GLOBAL_PRIORITY_QUERY_FEATURES_EXT, //sType;
-                DE_NULL,                                                              //pNext;
+                nullptr,                                                              //pNext;
                 VK_TRUE                                                               //globalPriorityQuery;
             };
             const VkDeviceQueueGlobalPriorityCreateInfoEXT queueGlobalPriorityCreateInfo = {
                 VK_STRUCTURE_TYPE_DEVICE_QUEUE_GLOBAL_PRIORITY_CREATE_INFO_EXT, //sType;
-                DE_NULL,                                                        //pNext;
+                nullptr,                                                        //pNext;
                 globalPriority,                                                 //globalPriority;
             };
             const VkDeviceQueueCreateInfo queueCreateInfo = {
@@ -1271,10 +1270,10 @@ tcu::TestStatus createDeviceWithQueriedGlobalPriorityTest(Context &context, bool
                 1,                                    //queueRecordCount;
                 &queueCreateInfo,                     //pRequestedQueues;
                 0,                                    //layerCount;
-                DE_NULL,                              //ppEnabledLayerNames;
+                nullptr,                              //ppEnabledLayerNames;
                 (uint32_t)enabledExtensions.size(),   //extensionCount;
                 enabledExtensions.data(),             //ppEnabledExtensionNames;
-                DE_NULL,                              //pEnabledFeatures;
+                nullptr,                              //pEnabledFeatures;
             };
             const bool mayBeDenied = globalPriority > VK_QUEUE_GLOBAL_PRIORITY_MEDIUM_EXT;
             const bool mustFail =
@@ -1338,7 +1337,7 @@ tcu::TestStatus createDeviceFeatures2Test(Context &context)
     VkPhysicalDeviceFeatures2 enabledFeatures;
     const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         (VkDeviceQueueCreateFlags)0u,
         queueFamilyIndex,
         queueCount,
@@ -1365,15 +1364,15 @@ tcu::TestStatus createDeviceFeatures2Test(Context &context)
         1,
         &deviceQueueCreateInfo,
         0u,
-        DE_NULL,
+        nullptr,
         0,
-        DE_NULL,
-        DE_NULL,
+        nullptr,
+        nullptr,
     };
 
     // Populate enabledFeatures
     enabledFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    enabledFeatures.pNext = DE_NULL;
+    enabledFeatures.pNext = nullptr;
 
     vki.getPhysicalDeviceFeatures2(physicalDevice, &enabledFeatures);
 
@@ -1435,7 +1434,7 @@ void checkFeatures(const PlatformInterface &vkp, const VkInstance &instance, con
         auto *structBase              = reinterpret_cast<StructureBase *>(&structCopy);
         VkStructureType structureType = reinterpret_cast<const StructureBase *>(supportedFeatures)->sType;
         structBase->sType             = structureType;
-        structBase->pNext             = DE_NULL;
+        structBase->pNext             = nullptr;
 
         VkPhysicalDeviceFeatures physicalDeviceFeaturesCopy = defaultPhysicalDeviceFeatures;
 
@@ -1560,7 +1559,7 @@ void checkFeatures(const PlatformInterface &vkp, const VkInstance &instance, con
 
         const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
             VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // sType
-            DE_NULL,                                    // pNext
+            nullptr,                                    // pNext
             (VkDeviceQueueCreateFlags)0u,               // flags
             queueFamilyIndex,                           // queueFamilyIndex
             queueCount,                                 // queueCount
@@ -1593,15 +1592,15 @@ void checkFeatures(const PlatformInterface &vkp, const VkInstance &instance, con
             1,                                                                             // queueCreateInfoCount
             &deviceQueueCreateInfo,                                                        // pQueueCreateInfos
             0u,                                                                            // enabledLayerCount
-            DE_NULL,                                                                       // ppEnabledLayerNames
-            static_cast<uint32_t>(extensionNames == DE_NULL ? 0 : extensionNames->size()), // enabledExtensionCount
-            extensionNames == DE_NULL ? DE_NULL : extensionNames->data(),                  // ppEnabledExtensionNames
-            DE_NULL                                                                        // pEnabledFeatures
+            nullptr,                                                                       // ppEnabledLayerNames
+            static_cast<uint32_t>(extensionNames == nullptr ? 0 : extensionNames->size()), // enabledExtensionCount
+            extensionNames == nullptr ? nullptr : extensionNames->data(),                  // ppEnabledExtensionNames
+            nullptr                                                                        // pEnabledFeatures
         };
 
-        VkDevice device = (VkDevice)DE_NULL;
+        VkDevice device = VK_NULL_HANDLE;
         const VkResult res =
-            createUncheckedDevice(false, instanceDriver, physicalDevice, &deviceCreateInfo, DE_NULL, &device);
+            createUncheckedDevice(false, instanceDriver, physicalDevice, &deviceCreateInfo, nullptr, &device);
 
         if (res != VK_ERROR_FEATURE_NOT_PRESENT)
         {
@@ -1609,10 +1608,10 @@ void checkFeatures(const PlatformInterface &vkp, const VkInstance &instance, con
             resultCollector.fail("Not returning VK_ERROR_FEATURE_NOT_PRESENT when creating device with feature " +
                                  de::toString(features[featureNdx].name) + ", which was reported as unsupported.");
         }
-        if (device != (VkDevice)DE_NULL)
+        if (device != VK_NULL_HANDLE)
         {
             DeviceDriver deviceDriver(vkp, instance, device, usedApiVersion, commandLine);
-            deviceDriver.destroyDevice(device, DE_NULL);
+            deviceDriver.destroyDevice(device, nullptr);
         }
     }
 }
@@ -1623,7 +1622,7 @@ tcu::TestStatus createDeviceWithUnsupportedFeaturesTest(Context &context)
     tcu::TestLog &log            = context.getTestContext().getLog();
     tcu::ResultCollector resultCollector(log);
     const CustomInstance instance(
-        createCustomInstanceWithExtensions(context, context.getInstanceExtensions(), DE_NULL, true));
+        createCustomInstanceWithExtensions(context, context.getInstanceExtensions(), nullptr, true));
     const InstanceDriver &instanceDriver(instance.getDriver());
     const VkPhysicalDevice physicalDevice =
         chooseDevice(instanceDriver, instance, context.getTestContext().getCommandLine());
@@ -1706,13 +1705,13 @@ tcu::TestStatus createDeviceWithUnsupportedFeaturesTest(Context &context)
             *((VkBool32 *)((uint8_t *)(&enabledFeatures) + feature.offset)) = VK_TRUE;
 
             const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-                                                                   DE_NULL,
+                                                                   nullptr,
                                                                    (VkDeviceQueueCreateFlags)0u,
                                                                    queueFamilyIndex,
                                                                    queueCount,
                                                                    &queuePriority};
 
-            void *pNext = DE_NULL;
+            void *pNext = nullptr;
 #ifdef CTS_USES_VULKANSC
             VkDeviceObjectReservationCreateInfo memReservationInfo =
                 context.getTestContext().getCommandLine().isSubProcess() ?
@@ -1732,14 +1731,14 @@ tcu::TestStatus createDeviceWithUnsupportedFeaturesTest(Context &context)
                                                          1,
                                                          &deviceQueueCreateInfo,
                                                          0u,
-                                                         DE_NULL,
+                                                         nullptr,
                                                          0,
-                                                         DE_NULL,
+                                                         nullptr,
                                                          &enabledFeatures};
 
-            VkDevice device = DE_NULL;
+            VkDevice device = VK_NULL_HANDLE;
             const VkResult res =
-                createUncheckedDevice(false, instanceDriver, physicalDevice, &deviceCreateInfo, DE_NULL, &device);
+                createUncheckedDevice(false, instanceDriver, physicalDevice, &deviceCreateInfo, nullptr, &device);
 
             if (res != VK_ERROR_FEATURE_NOT_PRESENT)
             {
@@ -1747,11 +1746,11 @@ tcu::TestStatus createDeviceWithUnsupportedFeaturesTest(Context &context)
                                      de::toString(feature.name) + ", which was reported as unsupported.");
             }
 
-            if (device != DE_NULL)
+            if (device != nullptr)
             {
                 DeviceDriver deviceDriver(vkp, instance, device, context.getUsedApiVersion(),
                                           context.getTestContext().getCommandLine());
-                deviceDriver.destroyDevice(device, DE_NULL);
+                deviceDriver.destroyDevice(device, nullptr);
             }
         }
     }
@@ -1778,7 +1777,7 @@ tcu::TestStatus createDeviceQueue2Test(Context &context)
 
     VkPhysicalDeviceProtectedMemoryFeatures protectedMemoryFeature = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES, // VkStructureType sType;
-        DE_NULL,                                                     // void* pNext;
+        nullptr,                                                     // void* pNext;
         VK_FALSE                                                     // VkBool32 protectedMemory;
     };
 
@@ -1793,7 +1792,7 @@ tcu::TestStatus createDeviceQueue2Test(Context &context)
 
     const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                    // const void* pNext;
+        nullptr,                                    // const void* pNext;
         VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT,       // VkDeviceQueueCreateFlags flags;
         queueFamilyIndex,                           // uint32_t queueFamilyIndex;
         queueCount,                                 // uint32_t queueCount;
@@ -1820,15 +1819,15 @@ tcu::TestStatus createDeviceQueue2Test(Context &context)
         1,                                    // uint32_t queueCreateInfoCount;
         &deviceQueueCreateInfo,               // const VkDeviceQueueCreateInfo* pQueueCreateInfos;
         0,                                    // uint32_t enabledLayerCount;
-        DE_NULL,                              // const char* const* ppEnabledLayerNames;
+        nullptr,                              // const char* const* ppEnabledLayerNames;
         0,                                    // uint32_t enabledExtensionCount;
-        DE_NULL,                              // const char* const* ppEnabledExtensionNames;
-        DE_NULL,                              // const VkPhysicalDeviceFeatures* pEnabledFeatures;
+        nullptr,                              // const char* const* ppEnabledExtensionNames;
+        nullptr,                              // const VkPhysicalDeviceFeatures* pEnabledFeatures;
     };
 
     const VkDeviceQueueInfo2 deviceQueueInfo2 = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, // VkStructureType sType;
-        DE_NULL,                               // const void* pNext;
+        nullptr,                               // const void* pNext;
         VK_DEVICE_QUEUE_CREATE_PROTECTED_BIT,  // VkDeviceQueueCreateFlags flags;
         queueFamilyIndex,                      // uint32_t queueFamilyIndex;
         queueIndex,                            // uint32_t queueIndex;
@@ -1880,7 +1879,7 @@ void checkProtectedMemorySupport(Context &context)
 
     VkPhysicalDeviceProtectedMemoryFeatures protectedMemoryFeature = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES, // VkStructureType sType;
-        DE_NULL,                                                     // void* pNext;
+        nullptr,                                                     // void* pNext;
         VK_FALSE                                                     // VkBool32 protectedMemory;
     };
 
@@ -1924,7 +1923,7 @@ Move<VkDevice> createProtectedDeviceWithQueueConfig(Context &context,
     // Protected memory features availability should be already checked at this point.
     VkPhysicalDeviceProtectedMemoryFeatures protectedMemoryFeature = {
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROTECTED_MEMORY_FEATURES, // VkStructureType sType;
-        DE_NULL,                                                     // void* pNext;
+        nullptr,                                                     // void* pNext;
         VK_TRUE                                                      // VkBool32 protectedMemory;
     };
 
@@ -1934,7 +1933,7 @@ Move<VkDevice> createProtectedDeviceWithQueueConfig(Context &context,
     features2.pNext = &protectedMemoryFeature;
 
 #ifdef CTS_USES_VULKANSC
-    void *pNext = DE_NULL;
+    void *pNext = nullptr;
 
     VkDeviceObjectReservationCreateInfo memReservationInfo = context.getTestContext().getCommandLine().isSubProcess() ?
                                                                  context.getResourceInterface()->getStatMax() :
@@ -1958,10 +1957,10 @@ Move<VkDevice> createProtectedDeviceWithQueueConfig(Context &context,
         (uint32_t)queueCreateInfos.size(), // uint32_t queueCreateInfoCount;
         queueCreateInfos.data(),           // const VkDeviceQueueCreateInfo* pQueueCreateInfos;
         0,                                 // uint32_t enabledLayerCount;
-        DE_NULL,                           // const char* const* ppEnabledLayerNames;
+        nullptr,                           // const char* const* ppEnabledLayerNames;
         0,                                 // uint32_t enabledExtensionCount;
-        DE_NULL,                           // const char* const* ppEnabledExtensionNames;
-        DE_NULL,                           // const VkPhysicalDeviceFeatures* pEnabledFeatures;
+        nullptr,                           // const char* const* ppEnabledExtensionNames;
+        nullptr,                           // const VkPhysicalDeviceFeatures* pEnabledFeatures;
     };
 
     return createCustomDevice(context.getTestContext().getCommandLine().isValidationEnabled(), platformInterface,
@@ -1973,7 +1972,7 @@ VkQueue getDeviceQueue2WithOptions(const DeviceDriver &deviceDriver, const VkDev
 {
     VkDeviceQueueInfo2 queueInfo2 = {
         VK_STRUCTURE_TYPE_DEVICE_QUEUE_INFO_2, // VkStructureType sType;
-        DE_NULL,                               // const void* pNext;
+        nullptr,                               // const void* pNext;
         flags,                                 // VkDeviceQueueCreateFlags flags;
         queueFamilyIndex,                      // uint32_t queueFamilyIndex;
         queueIndex,                            // uint32_t queueIndex;
@@ -2006,7 +2005,7 @@ bool runQueueCreationTestCombination(Context &context, tcu::ResultCollector &res
     {
         const VkDeviceQueueCreateInfo queueInfo = {
             VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                    // const void* pNext;
+            nullptr,                                    // const void* pNext;
             info.flags,                                 // VkDeviceQueueCreateFlags flags;
             info.familyIndex,                           // uint32_t queueFamilyIndex;
             info.count,                                 // uint32_t queueCount;
@@ -2033,7 +2032,7 @@ bool runQueueCreationTestCombination(Context &context, tcu::ResultCollector &res
             const VkQueue queue =
                 getDeviceQueue2WithOptions(deviceDriver, *device, info.flags, info.familyIndex, queueIdx);
 
-            if (queue != DE_NULL)
+            if (queue != nullptr)
             {
                 VK_CHECK(deviceDriver.queueWaitIdle(queue));
                 results.addResult(QP_TEST_RESULT_PASS, "Found Queue. " + message);
@@ -2443,8 +2442,8 @@ struct AllocTrack
     AllocTrack()
         : active(false)
         , wasAllocated(false)
-        , alignedStartAddress(DE_NULL)
-        , actualStartAddress(DE_NULL)
+        , alignedStartAddress(nullptr)
+        , actualStartAddress(nullptr)
         , requestedSizeBytes(0)
         , actualSizeBytes(0)
         , allocScope(VK_SYSTEM_ALLOCATION_SCOPE_COMMAND)
@@ -2514,7 +2513,7 @@ VKAPI_ATTR void *VKAPI_CALL allocCallbackFunc(void *pUserData, size_t size, size
 {
     if (g_intentionalFailEnabled)
         if (++g_intenionalFailCount >= g_intenionalFailIndex)
-            return DE_NULL;
+            return nullptr;
 
     for (uint32_t vectorIdx = 0; vectorIdx < g_allocatedVector.size(); vectorIdx++)
     {
@@ -2522,10 +2521,10 @@ VKAPI_ATTR void *VKAPI_CALL allocCallbackFunc(void *pUserData, size_t size, size
         {
             g_allocatedVector[vectorIdx].requestedSizeBytes  = size;
             g_allocatedVector[vectorIdx].actualSizeBytes     = size + (alignment - 1);
-            g_allocatedVector[vectorIdx].alignedStartAddress = DE_NULL;
+            g_allocatedVector[vectorIdx].alignedStartAddress = nullptr;
             g_allocatedVector[vectorIdx].actualStartAddress  = new char[g_allocatedVector[vectorIdx].actualSizeBytes];
 
-            if (g_allocatedVector[vectorIdx].actualStartAddress != DE_NULL)
+            if (g_allocatedVector[vectorIdx].actualStartAddress != nullptr)
             {
                 uint64_t addr = (uint64_t)g_allocatedVector[vectorIdx].actualStartAddress;
                 addr += (alignment - 1);
@@ -2541,7 +2540,7 @@ VKAPI_ATTR void *VKAPI_CALL allocCallbackFunc(void *pUserData, size_t size, size
             return g_allocatedVector[vectorIdx].alignedStartAddress;
         }
     }
-    return DE_NULL;
+    return nullptr;
 }
 
 VKAPI_ATTR void VKAPI_CALL freeCallbackFunc(void *pUserData, void *pMemory)
@@ -2562,7 +2561,7 @@ VKAPI_ATTR void VKAPI_CALL freeCallbackFunc(void *pUserData, void *pMemory)
 VKAPI_ATTR void *VKAPI_CALL reallocCallbackFunc(void *pUserData, void *pOriginal, size_t size, size_t alignment,
                                                 VkSystemAllocationScope allocationScope)
 {
-    if (pOriginal != DE_NULL)
+    if (pOriginal != nullptr)
     {
         for (uint32_t vectorIdx = 0; vectorIdx < g_allocatedVector.size(); vectorIdx++)
         {
@@ -2571,7 +2570,7 @@ VKAPI_ATTR void *VKAPI_CALL reallocCallbackFunc(void *pUserData, void *pOriginal
                 if (size == 0)
                 {
                     freeCallbackFunc(pUserData, pOriginal);
-                    return DE_NULL;
+                    return nullptr;
                 }
                 else if (size < g_allocatedVector[vectorIdx].requestedSizeBytes)
                     return pOriginal;
@@ -2579,7 +2578,7 @@ VKAPI_ATTR void *VKAPI_CALL reallocCallbackFunc(void *pUserData, void *pOriginal
                 {
                     void *pNew = allocCallbackFunc(pUserData, size, alignment, allocationScope);
 
-                    if (pNew != DE_NULL)
+                    if (pNew != nullptr)
                     {
                         size_t copySize = size;
 
@@ -2593,7 +2592,7 @@ VKAPI_ATTR void *VKAPI_CALL reallocCallbackFunc(void *pUserData, void *pOriginal
                 }
             }
         }
-        return DE_NULL;
+        return nullptr;
     }
     else
         return allocCallbackFunc(pUserData, size, alignment, allocationScope);
@@ -2603,27 +2602,27 @@ tcu::TestStatus createInstanceDeviceIntentionalAllocFail(Context &context)
 {
     const PlatformInterface &vkp        = context.getPlatformInterface();
     const uint32_t chosenDevice         = context.getTestContext().getCommandLine().getVKDeviceId() - 1;
-    VkInstance instance                 = DE_NULL;
-    VkDevice device                     = DE_NULL;
+    VkInstance instance                 = VK_NULL_HANDLE;
+    VkDevice device                     = VK_NULL_HANDLE;
     uint32_t physicalDeviceCount        = 0;
     uint32_t queueFamilyCount           = 0;
     uint32_t queueFamilyIndex           = 0;
     const float queuePriority           = 0.0f;
     VkInstanceCreateFlags instanceFlags = 0u;
     uint32_t instanceExtCount           = 0u;
-    const char **instanceExtensions     = DE_NULL;
+    const char **instanceExtensions     = nullptr;
 
     const VkAllocationCallbacks allocationCallbacks = {
-        DE_NULL,             // userData
+        nullptr,             // userData
         allocCallbackFunc,   // pfnAllocation
         reallocCallbackFunc, // pfnReallocation
         freeCallbackFunc,    // pfnFree
-        DE_NULL,             // pfnInternalAllocation
-        DE_NULL              // pfnInternalFree
+        nullptr,             // pfnInternalAllocation
+        nullptr              // pfnInternalFree
     };
     const VkApplicationInfo appInfo = {
         VK_STRUCTURE_TYPE_APPLICATION_INFO, // sType
-        DE_NULL,                            // pNext
+        nullptr,                            // pNext
         "appName",                          // pApplicationName
         0u,                                 // applicationVersion
         "engineName",                       // pEngineName
@@ -2633,7 +2632,7 @@ tcu::TestStatus createInstanceDeviceIntentionalAllocFail(Context &context)
 
 #ifndef CTS_USES_VULKANSC
     std::vector<vk::VkExtensionProperties> availableExtensions =
-        vk::enumerateInstanceExtensionProperties(context.getPlatformInterface(), DE_NULL);
+        vk::enumerateInstanceExtensionProperties(context.getPlatformInterface(), nullptr);
     const char *portabilityExtension[] = {"VK_KHR_portability_enumeration"};
     if (vk::isExtensionStructSupported(availableExtensions, vk::RequiredExtension("VK_KHR_portability_enumeration")))
     {
@@ -2645,11 +2644,11 @@ tcu::TestStatus createInstanceDeviceIntentionalAllocFail(Context &context)
 
     const VkInstanceCreateInfo instanceCreateInfo = {
         VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO, // sType
-        DE_NULL,                                // pNext
+        nullptr,                                // pNext
         instanceFlags,                          // flags
         &appInfo,                               // pApplicationInfo
         0u,                                     // enabledLayerCount
-        DE_NULL,                                // ppEnabledLayerNames
+        nullptr,                                // ppEnabledLayerNames
         instanceExtCount,                       // enabledExtensionCount
         instanceExtensions                      // ppEnabledExtensionNames
     };
@@ -2697,7 +2696,7 @@ tcu::TestStatus createInstanceDeviceIntentionalAllocFail(Context &context)
         const InstanceDriver instanceDriver(vkp, instance);
         const InstanceInterface &vki(instanceDriver);
 
-        result = vki.enumeratePhysicalDevices(instance, &physicalDeviceCount, DE_NULL);
+        result = vki.enumeratePhysicalDevices(instance, &physicalDeviceCount, nullptr);
 
         if (result == VK_ERROR_OUT_OF_HOST_MEMORY)
         {
@@ -2729,7 +2728,7 @@ tcu::TestStatus createInstanceDeviceIntentionalAllocFail(Context &context)
         else if (result != VK_SUCCESS)
             return tcu::TestStatus::fail("enumeratePhysicalDevices returned " + de::toString(result));
 
-        vki.getPhysicalDeviceQueueFamilyProperties(physicalDevices[chosenDevice], &queueFamilyCount, DE_NULL);
+        vki.getPhysicalDeviceQueueFamilyProperties(physicalDevices[chosenDevice], &queueFamilyCount, nullptr);
 
         if (queueFamilyCount == 0u)
             return tcu::TestStatus::fail("getPhysicalDeviceQueueFamilyProperties returned zero queue families");
@@ -2753,14 +2752,14 @@ tcu::TestStatus createInstanceDeviceIntentionalAllocFail(Context &context)
 
         const VkDeviceQueueCreateInfo deviceQueueCreateInfo = {
             VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // sType
-            DE_NULL,                                    // pNext
+            nullptr,                                    // pNext
             (VkDeviceQueueCreateFlags)0u,               // flags
             queueFamilyIndex,                           // queueFamilyIndex
             1u,                                         // queueCount
             &queuePriority                              // pQueuePriorities
         };
 
-        void *pNext = DE_NULL;
+        void *pNext = nullptr;
 #ifdef CTS_USES_VULKANSC
         VkDeviceObjectReservationCreateInfo memReservationInfo =
             context.getTestContext().getCommandLine().isSubProcess() ? context.getResourceInterface()->getStatMax() :
@@ -2780,10 +2779,10 @@ tcu::TestStatus createInstanceDeviceIntentionalAllocFail(Context &context)
             1u,                                   // queueCreateInfoCount
             &deviceQueueCreateInfo,               // pQueueCreateInfos
             0u,                                   // enabledLayerCount
-            DE_NULL,                              // ppEnabledLayerNames
+            nullptr,                              // ppEnabledLayerNames
             0u,                                   // enabledExtensionCount
-            DE_NULL,                              // ppEnabledExtensionNames
-            DE_NULL                               // pEnabledFeatures
+            nullptr,                              // ppEnabledExtensionNames
+            nullptr                               // pEnabledFeatures
         };
 
         result = createUncheckedDevice(context.getTestContext().getCommandLine().isValidationEnabled(), vki,

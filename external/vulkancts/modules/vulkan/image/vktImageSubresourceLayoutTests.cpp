@@ -272,7 +272,7 @@ ImageSubresourceLayoutInstance::ImageSubresourceLayoutInstance(Context &context,
 }
 
 // Fills length bytes starting at location with pseudorandom data.
-void fillWithRandomData(de::Random &rnd, void *location, VkDeviceSize length)
+void fillWithRandomBytes(de::Random &rnd, void *location, VkDeviceSize length)
 {
     auto bytePtr      = reinterpret_cast<unsigned char *>(location);
     const auto endPtr = bytePtr + length;
@@ -459,7 +459,7 @@ tcu::TestStatus ImageSubresourceLayoutInstance::iterateAspect(VkImageAspectFlagB
     else if (use24LSB)
         fillWithRandomData24In32(rnd, bufferPtr, bufferSize);
     else
-        fillWithRandomData(rnd, bufferPtr, bufferSize);
+        fillWithRandomBytes(rnd, bufferPtr, bufferSize);
 
     flushAlloc(vkd, device, bufferAlloc);
 
@@ -767,7 +767,7 @@ tcu::TestStatus ImageSubresourceLayoutInvarianceInstance::iterate(void)
         VkDeviceImageSubresourceInfoKHR imageSubresourceInfo = initVulkanStructure();
         imageSubresourceInfo.pCreateInfo                     = &imageCreateInfo;
         imageSubresourceInfo.pSubresource                    = &imageSubresource2;
-        vk.getDeviceImageSubresourceLayoutKHR(device, &imageSubresourceInfo, &subresourceLayout2);
+        vk.getDeviceImageSubresourceLayout(device, &imageSubresourceInfo, &subresourceLayout2);
 
         const auto size = sizeof(VkSubresourceLayout);
         if (deMemCmp(&subresourceLayout1, &(subresourceLayout2.subresourceLayout), size))
@@ -776,7 +776,7 @@ tcu::TestStatus ImageSubresourceLayoutInvarianceInstance::iterate(void)
         if (m_context.isDeviceFunctionalitySupported("VK_EXT_image_compression_control"))
         {
             VkSubresourceLayout2EXT subresourceLayout3 = initVulkanStructure();
-            vk.getImageSubresourceLayout2KHR(device, *image, &imageSubresource2, &subresourceLayout3);
+            vk.getImageSubresourceLayout2(device, *image, &imageSubresource2, &subresourceLayout3);
 
             if (deMemCmp(&subresourceLayout1, &(subresourceLayout3.subresourceLayout), size))
                 return tcu::TestStatus::fail("Fail (vkGetImageSubresourceLayout2KHR)");

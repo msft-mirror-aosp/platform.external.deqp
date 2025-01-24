@@ -11,6 +11,8 @@ set(DEQP_VK_VKSC_API_SRCS
 	vktApiVersionCheck.hpp
 	vktApiTests.cpp
 	vktApiTests.hpp
+	vktApiDebugUtilsTests.cpp
+	vktApiDebugUtilsTests.hpp
 	vktApiDeviceInitializationTests.cpp
 	vktApiDeviceInitializationTests.hpp
 	vktApiDriverPropertiesTests.cpp
@@ -62,6 +64,8 @@ set(DEQP_VK_VKSC_API_SRCS
 	vktApiMaintenance6Check.cpp
 	vktApiExtensionDuplicatesTests.cpp
 	vktApiExtensionDuplicatesTests.hpp
+	vktApiMaintenance7Tests.cpp
+	vktApiMaintenance7Tests.hpp
 	)
 
 set(DEQP_VK_API_SRCS
@@ -85,6 +89,8 @@ set(DEQP_VK_API_SRCS
 	vktApiPhysicalDeviceFormatPropertiesMaint5Tests.hpp
 	vktApiFrameBoundaryTests.cpp
 	vktApiFrameBoundaryTests.hpp
+	vktApiFragmentShaderOutputTests.cpp
+	vktApiFragmentShaderOutputTests.hpp
 	)
 
 PCH(DEQP_VK_API_SRCS ../pch.cpp)

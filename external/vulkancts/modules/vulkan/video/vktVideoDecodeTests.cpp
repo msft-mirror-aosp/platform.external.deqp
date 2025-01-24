@@ -183,6 +183,8 @@ enum TestType
     TEST_TYPE_H265_DECODE_QUERY_RESULT_WITH_STATUS,
     TEST_TYPE_H265_DECODE_INLINE_QUERY_RESULT_WITH_STATUS,
     TEST_TYPE_H265_DECODE_RESOURCES_WITHOUT_PROFILES,
+    TEST_TYPE_H265_DECODE_SLIST_A,
+    TEST_TYPE_H265_DECODE_SLIST_B,
 
     TEST_TYPE_AV1_DECODE_I,
     TEST_TYPE_AV1_DECODE_I_P,
@@ -213,150 +215,205 @@ enum TestType
     TEST_TYPE_LAST
 };
 
-const char *getTestName(TestType type)
+enum TestCodec
+{
+    TEST_CODEC_H264,
+    TEST_CODEC_H265,
+    TEST_CODEC_AV1,
+
+    TEST_CODEC_LAST
+};
+
+static const char *testTypeToStr(TestType type)
 {
     const char *testName;
     switch (type)
     {
     case TEST_TYPE_H264_DECODE_I:
-        testName = "h264_i";
+    case TEST_TYPE_H265_DECODE_I:
+    case TEST_TYPE_AV1_DECODE_I:
+        testName = "i";
         break;
     case TEST_TYPE_H264_DECODE_I_P:
-        testName = "h264_i_p";
+    case TEST_TYPE_H265_DECODE_I_P:
+    case TEST_TYPE_AV1_DECODE_I_P:
+        testName = "i_p";
         break;
     case TEST_TYPE_H264_DECODE_CLIP_A:
-        testName = "h264_420_8bit_high_176x144_30frames";
+        testName = "420_8bit_high_176x144_30frames";
         break;
     case TEST_TYPE_H264_DECODE_I_P_NOT_MATCHING_ORDER:
-        testName = "h264_i_p_not_matching_order";
+    case TEST_TYPE_H265_DECODE_I_P_NOT_MATCHING_ORDER:
+    case TEST_TYPE_AV1_DECODE_I_P_NOT_MATCHING_ORDER:
+        testName = "i_p_not_matching_order";
         break;
     case TEST_TYPE_H264_DECODE_I_P_B_13:
-        testName = "h264_i_p_b_13";
+    case TEST_TYPE_H265_DECODE_I_P_B_13:
+        testName = "i_p_b_13";
         break;
     case TEST_TYPE_H264_DECODE_I_P_B_13_NOT_MATCHING_ORDER:
-        testName = "h264_i_p_b_13_not_matching_order";
+    case TEST_TYPE_H265_DECODE_I_P_B_13_NOT_MATCHING_ORDER:
+        testName = "i_p_b_13_not_matching_order";
         break;
     case TEST_TYPE_H264_DECODE_QUERY_RESULT_WITH_STATUS:
-        testName = "h264_query_with_status";
+    case TEST_TYPE_H265_DECODE_QUERY_RESULT_WITH_STATUS:
+        testName = "query_with_status";
         break;
     case TEST_TYPE_H264_DECODE_INLINE_QUERY_RESULT_WITH_STATUS:
-        testName = "h264_inline_query_with_status";
+    case TEST_TYPE_H265_DECODE_INLINE_QUERY_RESULT_WITH_STATUS:
+        testName = "inline_query_with_status";
         break;
     case TEST_TYPE_H264_DECODE_RESOURCES_WITHOUT_PROFILES:
-        testName = "h264_resources_without_profiles";
+    case TEST_TYPE_H265_DECODE_RESOURCES_WITHOUT_PROFILES:
+        testName = "resources_without_profiles";
         break;
     case TEST_TYPE_H264_DECODE_RESOLUTION_CHANGE:
-        testName = "h264_resolution_change";
+        testName = "resolution_change";
         break;
     case TEST_TYPE_H264_DECODE_RESOLUTION_CHANGE_DPB:
-        testName = "h264_resolution_change_dpb";
+        testName = "resolution_change_dpb";
         break;
     case TEST_TYPE_H264_DECODE_INTERLEAVED:
-        testName = "h264_interleaved";
+        testName = "interleaved";
         break;
     case TEST_TYPE_H264_H265_DECODE_INTERLEAVED:
-        testName = "h264_h265_interleaved";
-        break;
-    case TEST_TYPE_H265_DECODE_I:
-        testName = "h265_i";
-        break;
-    case TEST_TYPE_H265_DECODE_I_P:
-        testName = "h265_i_p";
+        testName = "h265_interleaved";
         break;
     case TEST_TYPE_H265_DECODE_CLIP_D:
-        testName = "h265_420_8bit_main_176x144_30frames";
+        testName = "420_8bit_main_176x144_30frames";
         break;
-    case TEST_TYPE_H265_DECODE_I_P_NOT_MATCHING_ORDER:
-        testName = "h265_i_p_not_matching_order";
+    case TEST_TYPE_H265_DECODE_SLIST_A:
+        testName = "slist_a";
         break;
-    case TEST_TYPE_H265_DECODE_I_P_B_13:
-        testName = "h265_i_p_b_13";
-        break;
-    case TEST_TYPE_H265_DECODE_I_P_B_13_NOT_MATCHING_ORDER:
-        testName = "h265_i_p_b_13_not_matching_order";
-        break;
-    case TEST_TYPE_H265_DECODE_QUERY_RESULT_WITH_STATUS:
-        testName = "h265_query_with_status";
-        break;
-    case TEST_TYPE_H265_DECODE_INLINE_QUERY_RESULT_WITH_STATUS:
-        testName = "h265_inline_query_with_status";
-        break;
-    case TEST_TYPE_H265_DECODE_RESOURCES_WITHOUT_PROFILES:
-        testName = "h265_resources_without_profiles";
-        break;
-    case TEST_TYPE_AV1_DECODE_I:
-        testName = "av1_i";
-        break;
-    case TEST_TYPE_AV1_DECODE_I_P:
-        testName = "av1_i_p";
-        break;
-    case TEST_TYPE_AV1_DECODE_I_P_NOT_MATCHING_ORDER:
-        testName = "av1_i_p_not_matching_order";
+    case TEST_TYPE_H265_DECODE_SLIST_B:
+        testName = "slist_b";
         break;
     case TEST_TYPE_AV1_DECODE_BASIC_8:
-        testName = "av1_basic_8";
+        testName = "basic_8";
         break;
     case TEST_TYPE_AV1_DECODE_BASIC_8_NOT_MATCHING_ORDER:
-        testName = "av1_basic_8_not_matching_order";
+        testName = "basic_8_not_matching_order";
         break;
     case TEST_TYPE_AV1_DECODE_BASIC_10:
-        testName = "av1_basic_10";
+        testName = "basic_10";
         break;
     case TEST_TYPE_AV1_DECODE_ALLINTRA_8:
-        testName = "av1_allintra_8";
+        testName = "allintra_8";
         break;
     case TEST_TYPE_AV1_DECODE_ALLINTRA_NOSETUP_8:
-        testName = "av1_allintra_nosetup_8";
+        testName = "allintra_nosetup_8";
         break;
     case TEST_TYPE_AV1_DECODE_ALLINTRA_BC_8:
-        testName = "av1_allintrabc_8";
+        testName = "allintrabc_8";
         break;
     case TEST_TYPE_AV1_DECODE_CDFUPDATE_8:
-        testName = "av1_cdfupdate_8";
+        testName = "cdfupdate_8";
         break;
     case TEST_TYPE_AV1_DECODE_GLOBALMOTION_8:
-        testName = "av1_globalmotion_8";
+        testName = "globalmotion_8";
         break;
     case TEST_TYPE_AV1_DECODE_FILMGRAIN_8:
-        testName = "av1_filmgrain_8";
+        testName = "filmgrain_8";
         break;
     case TEST_TYPE_AV1_DECODE_SVCL1T2_8:
-        testName = "av1_svcl1t2_8";
+        testName = "svcl1t2_8";
         break;
     case TEST_TYPE_AV1_DECODE_SUPERRES_8:
-        testName = "av1_superres_8";
+        testName = "superres_8";
         break;
     case TEST_TYPE_AV1_DECODE_SIZEUP_8:
-        testName = "av1_sizeup_8";
+        testName = "sizeup_8";
         break;
     case TEST_TYPE_AV1_DECODE_ARGON_SEQCHANGE_AFFINE_8:
-        testName = "av1_argon_seqchange_affine_8";
+        testName = "argon_seqchange_affine_8";
         break;
     case TEST_TYPE_AV1_DECODE_ORDERHINT_10:
-        testName = "av1_orderhint_10";
+        testName = "orderhint_10";
         break;
     case TEST_TYPE_AV1_DECODE_FORWARDKEYFRAME_10:
-        testName = "av1_forwardkeyframe_10";
+        testName = "forwardkeyframe_10";
         break;
     case TEST_TYPE_AV1_DECODE_LOSSLESS_10:
-        testName = "av1_lossless_10";
+        testName = "lossless_10";
         break;
     case TEST_TYPE_AV1_DECODE_LOOPFILTER_10:
-        testName = "av1_loopfilter_10";
+        testName = "loopfilter_10";
         break;
     case TEST_TYPE_AV1_DECODE_CDEF_10:
-        testName = "av1_cdef_10";
+        testName = "cdef_10";
         break;
     case TEST_TYPE_AV1_DECODE_ARGON_FILMGRAIN_10:
-        testName = "av1_argon_filmgrain_10_test1019";
+        testName = "argon_filmgrain_10_test1019";
         break;
     case TEST_TYPE_AV1_DECODE_ARGON_TEST_787:
-        testName = "av1_argon_test787";
+        testName = "argon_test787";
         break;
     default:
         TCU_THROW(InternalError, "Unknown TestType");
     }
     return testName;
+}
+
+enum TestCodec getTestCodec(const TestType testType)
+{
+    switch (testType)
+    {
+    case TEST_TYPE_H264_DECODE_I:
+    case TEST_TYPE_H264_DECODE_I_P:
+    case TEST_TYPE_H264_DECODE_CLIP_A:
+    case TEST_TYPE_H264_DECODE_I_P_NOT_MATCHING_ORDER:
+    case TEST_TYPE_H264_DECODE_I_P_B_13:
+    case TEST_TYPE_H264_DECODE_I_P_B_13_NOT_MATCHING_ORDER:
+    case TEST_TYPE_H264_DECODE_QUERY_RESULT_WITH_STATUS:
+    case TEST_TYPE_H264_DECODE_INLINE_QUERY_RESULT_WITH_STATUS:
+    case TEST_TYPE_H264_DECODE_RESOURCES_WITHOUT_PROFILES:
+    case TEST_TYPE_H264_DECODE_RESOLUTION_CHANGE:
+    case TEST_TYPE_H264_DECODE_RESOLUTION_CHANGE_DPB:
+    case TEST_TYPE_H264_DECODE_INTERLEAVED:
+    case TEST_TYPE_H264_H265_DECODE_INTERLEAVED:
+        return TEST_CODEC_H264;
+
+    case TEST_TYPE_H265_DECODE_I:
+    case TEST_TYPE_H265_DECODE_I_P:
+    case TEST_TYPE_H265_DECODE_CLIP_D:
+    case TEST_TYPE_H265_DECODE_I_P_NOT_MATCHING_ORDER:
+    case TEST_TYPE_H265_DECODE_I_P_B_13:
+    case TEST_TYPE_H265_DECODE_I_P_B_13_NOT_MATCHING_ORDER:
+    case TEST_TYPE_H265_DECODE_QUERY_RESULT_WITH_STATUS:
+    case TEST_TYPE_H265_DECODE_INLINE_QUERY_RESULT_WITH_STATUS:
+    case TEST_TYPE_H265_DECODE_RESOURCES_WITHOUT_PROFILES:
+    case TEST_TYPE_H265_DECODE_SLIST_A:
+    case TEST_TYPE_H265_DECODE_SLIST_B:
+        return TEST_CODEC_H265;
+
+    case TEST_TYPE_AV1_DECODE_I:
+    case TEST_TYPE_AV1_DECODE_I_P:
+    case TEST_TYPE_AV1_DECODE_I_P_NOT_MATCHING_ORDER:
+    case TEST_TYPE_AV1_DECODE_BASIC_8:
+    case TEST_TYPE_AV1_DECODE_BASIC_8_NOT_MATCHING_ORDER:
+    case TEST_TYPE_AV1_DECODE_BASIC_10:
+    case TEST_TYPE_AV1_DECODE_ALLINTRA_8:
+    case TEST_TYPE_AV1_DECODE_ALLINTRA_NOSETUP_8:
+    case TEST_TYPE_AV1_DECODE_ALLINTRA_BC_8:
+    case TEST_TYPE_AV1_DECODE_CDFUPDATE_8:
+    case TEST_TYPE_AV1_DECODE_GLOBALMOTION_8:
+    case TEST_TYPE_AV1_DECODE_FILMGRAIN_8:
+    case TEST_TYPE_AV1_DECODE_SVCL1T2_8:
+    case TEST_TYPE_AV1_DECODE_SUPERRES_8:
+    case TEST_TYPE_AV1_DECODE_SIZEUP_8:
+    case TEST_TYPE_AV1_DECODE_ARGON_SEQCHANGE_AFFINE_8:
+    case TEST_TYPE_AV1_DECODE_ORDERHINT_10:
+    case TEST_TYPE_AV1_DECODE_FORWARDKEYFRAME_10:
+    case TEST_TYPE_AV1_DECODE_LOSSLESS_10:
+    case TEST_TYPE_AV1_DECODE_LOOPFILTER_10:
+    case TEST_TYPE_AV1_DECODE_CDEF_10:
+    case TEST_TYPE_AV1_DECODE_ARGON_FILMGRAIN_10:
+    case TEST_TYPE_AV1_DECODE_ARGON_TEST_787:
+        return TEST_CODEC_AV1;
+
+    default:
+        TCU_THROW(InternalError, "Unknown TestType");
+    }
 }
 
 enum DecoderOption : uint32_t
@@ -421,6 +478,8 @@ struct DecodeTestParam
     {TEST_TYPE_H265_DECODE_INLINE_QUERY_RESULT_WITH_STATUS,
      {CLIP_D, ALL_FRAMES, (DecoderOption)(DecoderOption::UseStatusQueries | DecoderOption::UseInlineStatusQueries)}},
     {TEST_TYPE_H265_DECODE_RESOURCES_WITHOUT_PROFILES, {CLIP_D, ALL_FRAMES, DecoderOption::ResourcesWithoutProfiles}},
+    {TEST_TYPE_H265_DECODE_SLIST_A, {CLIP_ITU_SLIST_A_HEVC, 28, DecoderOption::Default}},
+    {TEST_TYPE_H265_DECODE_SLIST_B, {CLIP_ITU_SLIST_B_HEVC, 28, DecoderOption::Default}},
 
     {TEST_TYPE_AV1_DECODE_I, {CLIP_BASIC_8, 1, DecoderOption::Default}},
     {TEST_TYPE_AV1_DECODE_I_P, {CLIP_BASIC_8, 2, DecoderOption::Default}},
@@ -471,15 +530,16 @@ struct InterleavingDecodeTestParams
 class TestDefinition
 {
 public:
-    static MovePtr<TestDefinition> create(DecodeTestParam params, uint32_t baseSeed)
+    static MovePtr<TestDefinition> create(DecodeTestParam params, uint32_t baseSeed, bool layeredDpb)
     {
-        return MovePtr<TestDefinition>(new TestDefinition(params, baseSeed));
+        return MovePtr<TestDefinition>(new TestDefinition(params, baseSeed, layeredDpb));
     }
 
-    TestDefinition(DecodeTestParam params, uint32_t baseSeed)
+    TestDefinition(DecodeTestParam params, uint32_t baseSeed, bool layeredDpb)
         : m_params(params)
         , m_info(clipInfo(params.stream.clip))
         , m_hash(baseSeed)
+        , m_isLayeredDpb(layeredDpb)
     {
         for (const auto &profile : m_info->sessionProfiles)
         {
@@ -509,6 +569,13 @@ public:
         return m_info->filename;
     }
 
+    std::string getClipFilePath() const
+    {
+        std::vector<std::string> resourcePathComponents = {"vulkan", "video", m_info->filename};
+        de::FilePath resourcePath                       = de::FilePath::join(resourcePathComponents);
+        return resourcePath.getPath();
+    }
+
     const ClipInfo *getClipInfo() const
     {
         return m_info;
@@ -524,6 +591,18 @@ public:
         return &m_profiles[session];
     }
 
+    const std::string getTestName() const
+    {
+        std::stringstream oss;
+        oss << testTypeToStr(getTestType());
+        if (isLayered())
+            oss << "_layered_dpb";
+        else
+            oss << "_separated_dpb";
+
+        return oss.str();
+    }
+
     int framesToCheck() const
     {
         return m_params.stream.framesToCheck;
@@ -532,6 +611,11 @@ public:
     bool hasOption(DecoderOption o) const
     {
         return (m_params.stream.decoderOptions & o) != 0;
+    }
+
+    bool isLayered() const
+    {
+        return m_isLayeredDpb;
     }
 
     int getParamaterUpdateHackRequirement() const
@@ -586,6 +670,7 @@ private:
     DecodeTestParam m_params;
     const ClipInfo *m_info{};
     uint32_t m_hash{};
+    bool m_isLayeredDpb{};
     std::vector<VkVideoCoreProfile> m_profiles;
     // The 1-based count of parameter set updates after which to force
     // a parameter object release.  This is required due to the design
@@ -613,6 +698,7 @@ static std::shared_ptr<VideoBaseDecoder> decoderFromTestDefinition(DeviceContext
     params.context                           = devctx;
     params.framebuffer                       = vkVideoFrameBuffer;
     params.framesToCheck                     = test.framesToCheck();
+    params.layeredDpb                        = test.isLayered();
     params.queryDecodeStatus                 = test.hasOption(DecoderOption::UseStatusQueries);
     params.useInlineQueries                  = test.hasOption(DecoderOption::UseInlineStatusQueries);
     params.resourcesWithoutProfiles          = test.hasOption(DecoderOption::ResourcesWithoutProfiles);
@@ -644,7 +730,7 @@ struct DownloadedFrame
     }
 };
 
-DE_INLINE uint16_t roru16(uint16_t x, uint16_t n)
+inline uint16_t roru16(uint16_t x, uint16_t n)
 {
     return n == 0 ? x : (x >> n) | (x << (-n & 15));
 }
@@ -667,7 +753,7 @@ static void copyAllPlanesToBuffers(const DeviceDriver &vkd, const DecodedFrame &
 
             const VkImageMemoryBarrier preCopyBarrier = {
                 VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-                DE_NULL,
+                nullptr,
                 0u,
                 VK_ACCESS_TRANSFER_READ_BIT,
                 VK_IMAGE_LAYOUT_GENERAL,
@@ -679,8 +765,7 @@ static void copyAllPlanesToBuffers(const DeviceDriver &vkd, const DecodedFrame &
 
             vkd.cmdPipelineBarrier(cmdbuf, (VkPipelineStageFlags)VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                                    (VkPipelineStageFlags)VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0u, 0u,
-                                   (const VkMemoryBarrier *)DE_NULL, 0u, (const VkBufferMemoryBarrier *)DE_NULL, 1u,
-                                   &preCopyBarrier);
+                                   nullptr, 0u, nullptr, 1u, &preCopyBarrier);
         }
         {
             const VkBufferImageCopy copy = {0u, // bufferOffset
@@ -694,7 +779,7 @@ static void copyAllPlanesToBuffers(const DeviceDriver &vkd, const DecodedFrame &
         }
         {
             const VkBufferMemoryBarrier postCopyBarrier = {VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER,
-                                                           DE_NULL,
+                                                           nullptr,
                                                            VK_ACCESS_TRANSFER_WRITE_BIT,
                                                            VK_ACCESS_HOST_READ_BIT,
                                                            VK_QUEUE_FAMILY_IGNORED,
@@ -704,9 +789,8 @@ static void copyAllPlanesToBuffers(const DeviceDriver &vkd, const DecodedFrame &
                                                            VK_WHOLE_SIZE};
 
             vkd.cmdPipelineBarrier(cmdbuf, (VkPipelineStageFlags)VK_PIPELINE_STAGE_TRANSFER_BIT,
-                                   (VkPipelineStageFlags)VK_PIPELINE_STAGE_HOST_BIT, (VkDependencyFlags)0u, 0u,
-                                   (const VkMemoryBarrier *)DE_NULL, 1u, &postCopyBarrier, 0u,
-                                   (const VkImageMemoryBarrier *)DE_NULL);
+                                   (VkPipelineStageFlags)VK_PIPELINE_STAGE_HOST_BIT, (VkDependencyFlags)0u, 0u, nullptr,
+                                   1u, &postCopyBarrier, 0u, nullptr);
         }
     }
 }
@@ -727,6 +811,12 @@ DownloadedFrame getDecodedImage(DeviceContext &devctx, VkImageLayout originalLay
     DE_ASSERT(planarDescription.numPlanes == 2 || planarDescription.numPlanes == 3);
     const VkImageSubresourceRange imageSubresourceRange =
         makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, frame.imageLayerIndex, 1);
+
+    if (videoLoggingEnabled())
+    {
+        tcu::print(";;; getDecodedImage layer=%d arrayLayers=%d\n", frame.imageLayerIndex,
+                   frame.outputImageView->GetImageResource()->GetImageCreateInfo().arrayLayers);
+    }
 
     const Move<VkCommandPool> cmdDecodePool(makeCommandPool(vkd, device, queueFamilyIndexDecode));
     const Move<VkCommandBuffer> cmdDecodeBuffer(
@@ -762,13 +852,13 @@ DownloadedFrame getDecodedImage(DeviceContext &devctx, VkImageLayout originalLay
     {
         const VkBufferCreateInfo bufferInfo = {
             VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-            DE_NULL,
+            nullptr,
             (VkBufferCreateFlags)0u,
             computePlaneSize(imageExtent, planarDescription, plane),
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             VK_SHARING_MODE_EXCLUSIVE,
             0u,
-            (const uint32_t *)DE_NULL,
+            nullptr,
         };
         planeBuffers.emplace_back(new BufferWithMemory(vkd, device, devctx.allocator(), bufferInfo,
                                                        MemoryRequirement::HostVisible | MemoryRequirement::Any));
@@ -823,7 +913,7 @@ DownloadedFrame getDecodedImage(DeviceContext &devctx, VkImageLayout originalLay
 
     const VkSubmitInfo transferSubmitInfo{
         VK_STRUCTURE_TYPE_SUBMIT_INFO, // VkStructureType                              sType;
-        DE_NULL,                       // const void*                                  pNext;
+        nullptr,                       // const void*                                  pNext;
         1u,                            // uint32_t                                             waitSemaphoreCount;
         &*semaphore,                   // const VkSemaphore*                   pWaitSemaphores;
         &waitDstStageMask,             // const VkPipelineStageFlags*  pWaitDstStageMask;
@@ -966,7 +1056,7 @@ DownloadedFrame getDecodedImage(DeviceContext &devctx, VkImageLayout originalLay
 
     const VkSubmitInfo transferSubmitInfo2{
         VK_STRUCTURE_TYPE_SUBMIT_INFO, // VkStructureType                              sType;
-        DE_NULL,                       // const void*                                  pNext;
+        nullptr,                       // const void*                                  pNext;
         1u,                            // uint32_t                                             waitSemaphoreCount;
         &*semaphore,                   // const VkSemaphore*                   pWaitSemaphores;
         &waitDstStageMask,             // const VkPipelineStageFlags*  pWaitDstStageMask;
@@ -984,14 +1074,14 @@ DownloadedFrame getDecodedImage(DeviceContext &devctx, VkImageLayout originalLay
 
     const VkSubmitInfo decodeSubmitInfo2{
         VK_STRUCTURE_TYPE_SUBMIT_INFO, // VkStructureType                              sType;
-        DE_NULL,                       // const void*                                  pNext;
+        nullptr,                       // const void*                                  pNext;
         1u,                            // uint32_t                                             waitSemaphoreCount;
         &*semaphore,                   // const VkSemaphore*                   pWaitSemaphores;
         &waitDstStageMask,             // const VkPipelineStageFlags*  pWaitDstStageMask;
         1u,                            // uint32_t                                             commandBufferCount;
         &*cmdDecodeBuffer,             // const VkCommandBuffer*               pCommandBuffers;
         0u,                            // uint32_t                                             signalSemaphoreCount;
-        DE_NULL,                       // const VkSemaphore*                   pSignalSemaphores;
+        nullptr,                       // const VkSemaphore*                   pSignalSemaphores;
     };
     VK_CHECK(vkd.queueSubmit(queueDecode, 1u, &decodeSubmitInfo2, *decodeFence));
     VK_CHECK(vkd.waitForFences(device, 1, &*decodeFence, true, ~0ull));
@@ -1065,7 +1155,7 @@ static std::unique_ptr<FrameProcessor> createProcessor(const TestDefinition *td,
                                                        bool forceDisableFilmGrain = false)
 {
     Demuxer::Params demuxParams = {};
-    demuxParams.data            = std::make_unique<BufferedReader>(td->getClipFilename());
+    demuxParams.data            = std::make_unique<BufferedReader>(td->getClipFilePath());
     demuxParams.codecOperation  = td->getCodecOperation(0);
     demuxParams.framing         = td->getClipInfo()->framing;
 
@@ -1433,6 +1523,7 @@ TestInstance *VideoDecodeTestCase::createInstance(Context &context) const
 void VideoDecodeTestCase::checkSupport(Context &context) const
 {
     context.requireDeviceFunctionality("VK_KHR_video_queue");
+    context.requireDeviceFunctionality("VK_KHR_video_decode_queue");
     context.requireDeviceFunctionality("VK_KHR_synchronization2");
 
     switch (m_testDefinition->getTestType())
@@ -1464,6 +1555,8 @@ void VideoDecodeTestCase::checkSupport(Context &context) const
     case TEST_TYPE_H265_DECODE_I_P_B_13:
     case TEST_TYPE_H265_DECODE_I_P_B_13_NOT_MATCHING_ORDER:
     case TEST_TYPE_H265_DECODE_QUERY_RESULT_WITH_STATUS:
+    case TEST_TYPE_H265_DECODE_SLIST_A:
+    case TEST_TYPE_H265_DECODE_SLIST_B:
     {
         context.requireDeviceFunctionality("VK_KHR_video_decode_h265");
         break;
@@ -1472,6 +1565,7 @@ void VideoDecodeTestCase::checkSupport(Context &context) const
     case TEST_TYPE_H265_DECODE_RESOURCES_WITHOUT_PROFILES:
     {
         context.requireDeviceFunctionality("VK_KHR_video_decode_h265");
+        context.requireDeviceFunctionality("VK_KHR_video_maintenance1");
         break;
     }
     case TEST_TYPE_AV1_DECODE_I:
@@ -1546,6 +1640,7 @@ void VideoDecodeTestCase::checkSupport(Context &context) const
 void InterleavingDecodeTestCase::checkSupport(Context &context) const
 {
     context.requireDeviceFunctionality("VK_KHR_video_queue");
+    context.requireDeviceFunctionality("VK_KHR_video_decode_queue");
     context.requireDeviceFunctionality("VK_KHR_synchronization2");
 
 #ifdef DE_DEBUG
@@ -1578,27 +1673,51 @@ tcu::TestCaseGroup *createVideoDecodeTests(tcu::TestContext &testCtx)
 {
     const uint32_t baseSeed = static_cast<uint32_t>(testCtx.getCommandLine().getBaseSeed());
     MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, "decode"));
+    MovePtr<tcu::TestCaseGroup> h264Group(new tcu::TestCaseGroup(testCtx, "h264", "H.264 video codec"));
+    MovePtr<tcu::TestCaseGroup> h265Group(new tcu::TestCaseGroup(testCtx, "h265", "H.265 video codec"));
+    MovePtr<tcu::TestCaseGroup> av1Group(new tcu::TestCaseGroup(testCtx, "av1", "AV1 video codec"));
 
-    for (const auto &decodeTest : g_DecodeTests)
+    for (bool layeredDpb : {true, false})
     {
-        auto defn = TestDefinition::create(decodeTest, baseSeed);
+        for (const auto &decodeTest : g_DecodeTests)
+        {
+            auto defn                  = TestDefinition::create(decodeTest, baseSeed, layeredDpb);
+            const std::string testName = defn->getTestName();
+            uint32_t rngSeed           = baseSeed ^ deStringHash(testName.c_str());
+            defn->updateHash(rngSeed);
 
-        const char *testName = getTestName(defn->getTestType());
-        uint32_t rngSeed     = baseSeed ^ deStringHash(testName);
-        defn->updateHash(rngSeed);
-        group->addChild(new VideoDecodeTestCase(testCtx, testName, defn));
-    }
+            auto testCodec = getTestCodec(decodeTest.type);
+            if (testCodec == TEST_CODEC_H264)
+                h264Group->addChild(new VideoDecodeTestCase(testCtx, testName.c_str(), defn));
+            else if (testCodec == TEST_CODEC_H265)
+                h265Group->addChild(new VideoDecodeTestCase(testCtx, testName.c_str(), defn));
+            else
+                av1Group->addChild(new VideoDecodeTestCase(testCtx, testName.c_str(), defn));
+        }
+        for (const auto &interleavingTest : g_InterleavingTests)
+        {
+            std::vector<MovePtr<TestDefinition>> defns;
+            DecodeTestParam streamA{interleavingTest.type, interleavingTest.streamA};
+            DecodeTestParam streamB{interleavingTest.type, interleavingTest.streamB};
+            auto defnA                 = TestDefinition::create(streamA, baseSeed, layeredDpb);
+            auto defnB                 = TestDefinition::create(streamB, baseSeed, layeredDpb);
+            const std::string testName = defnA->getTestName();
+            defns.push_back(std::move(defnA));
+            defns.push_back(std::move(defnB));
 
-    for (const auto &interleavingTest : g_InterleavingTests)
-    {
-        const char *testName = getTestName(interleavingTest.type);
-        std::vector<MovePtr<TestDefinition>> defns;
-        DecodeTestParam streamA{interleavingTest.type, interleavingTest.streamA};
-        defns.push_back(TestDefinition::create(streamA, baseSeed));
-        DecodeTestParam streamB{interleavingTest.type, interleavingTest.streamB};
-        defns.push_back(TestDefinition::create(streamB, baseSeed));
-        group->addChild(new InterleavingDecodeTestCase(testCtx, testName, std::move(defns)));
-    }
+            auto testCodec = getTestCodec(interleavingTest.type);
+            if (testCodec == TEST_CODEC_H264)
+                h264Group->addChild(new InterleavingDecodeTestCase(testCtx, testName.c_str(), std::move(defns)));
+            else if (testCodec == TEST_CODEC_H265)
+                h265Group->addChild(new InterleavingDecodeTestCase(testCtx, testName.c_str(), std::move(defns)));
+            else
+                av1Group->addChild(new InterleavingDecodeTestCase(testCtx, testName.c_str(), std::move(defns)));
+        }
+    } // layered true / false
+
+    group->addChild(h264Group.release());
+    group->addChild(h265Group.release());
+    group->addChild(av1Group.release());
 
     return group.release();
 }

@@ -1475,6 +1475,7 @@ enum class SequenceOrdering
         5, // Bind bad static pipeline and draw, followed by binding correct dynamic pipeline and drawing again.
     TWO_DRAWS_STATIC =
         6, // Bind bad dynamic pipeline and draw, followed by binding correct static pipeline and drawing again.
+    THREE_DRAWS_DYNAMIC = 7, // Initial draw with good dynamic pipeline, offscreen, followed by TWO_DRAWS_DYNAMIC.
 };
 
 // This is used when generating some test cases.
@@ -2069,6 +2070,9 @@ struct TestConfig
     // Force alpha to one feature disabled.
     bool disableAlphaToOneFeature;
 
+    // Create pipeline with VkPipelineSampleLocationsStateCreateInfoEXT
+    bool provideSampleLocationsState;
+
     // Static and dynamic pipeline configuration.
     VertexGeneratorConfig vertexGenerator;
     CullModeConfig cullModeConfig;
@@ -2185,6 +2189,7 @@ struct TestConfig
         , sampleShadingEnable(false)
         , minSampleShading(0.0f)
         , disableAlphaToOneFeature(false)
+        , provideSampleLocationsState(true)
         , vertexGenerator(makeVertexGeneratorConfig(staticVertexGenerator, dynamicVertexGenerator))
         , cullModeConfig(static_cast<vk::VkCullModeFlags>(vk::VK_CULL_MODE_NONE))
         , frontFaceConfig(vk::VK_FRONT_FACE_COUNTER_CLOCKWISE)
@@ -2302,6 +2307,7 @@ struct TestConfig
         , sampleShadingEnable(other.sampleShadingEnable)
         , minSampleShading(other.minSampleShading)
         , disableAlphaToOneFeature(other.disableAlphaToOneFeature)
+        , provideSampleLocationsState(other.provideSampleLocationsState)
         , vertexGenerator(other.vertexGenerator)
         , cullModeConfig(other.cullModeConfig)
         , frontFaceConfig(other.frontFaceConfig)
@@ -2587,7 +2593,7 @@ struct TestConfig
     // Returns true if the test uses a static pipeline.
     bool useStaticPipeline() const
     {
-        return (bindStaticFirst() || isReversed());
+        return (bindStaticFirst() || isReversed() || sequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC);
     }
 
     // Swaps static and dynamic configuration values.
@@ -2660,6 +2666,9 @@ struct TestConfig
 
         switch (sequenceOrdering)
         {
+        case SequenceOrdering::THREE_DRAWS_DYNAMIC:
+            iterations = 3u;
+            break;
         case SequenceOrdering::TWO_DRAWS_DYNAMIC:
         case SequenceOrdering::TWO_DRAWS_STATIC:
             iterations = 2u;
@@ -3146,6 +3155,8 @@ vk::VkImageCreateInfo makeImageCreateInfo(vk::VkFormat format, vk::VkExtent3D ex
     return imageCreateInfo;
 }
 
+using TestConfigSharedPtr = de::SharedPtr<TestConfig>;
+
 class ExtendedDynamicStateTest : public vkt::TestCase
 {
 public:
@@ -3159,13 +3170,14 @@ public:
     virtual TestInstance *createInstance(Context &context) const;
 
 private:
-    TestConfig m_testConfig;
+    const TestConfigSharedPtr m_testConfigPtr;
+    TestConfig &m_testConfig;
 };
 
 class ExtendedDynamicStateInstance : public vkt::TestInstance
 {
 public:
-    ExtendedDynamicStateInstance(Context &context, const TestConfig &testConfig);
+    ExtendedDynamicStateInstance(Context &context, const TestConfigSharedPtr &testConfig);
     virtual ~ExtendedDynamicStateInstance(void)
     {
     }
@@ -3173,13 +3185,15 @@ public:
     virtual tcu::TestStatus iterate(void);
 
 private:
-    TestConfig m_testConfig;
+    const TestConfigSharedPtr m_testConfigPtr;
+    TestConfig &m_testConfig;
 };
 
 ExtendedDynamicStateTest::ExtendedDynamicStateTest(tcu::TestContext &testCtx, const std::string &name,
                                                    const TestConfig &testConfig)
     : vkt::TestCase(testCtx, name)
-    , m_testConfig(testConfig)
+    , m_testConfigPtr(new TestConfig(testConfig))
+    , m_testConfig(*m_testConfigPtr.get())
 {
     const auto staticTopologyClass = getTopologyClass(testConfig.topologyConfig.staticValue);
     DE_UNREF(staticTopologyClass); // For release builds.
@@ -3267,7 +3281,8 @@ void ExtendedDynamicStateTest::checkSupport(Context &context) const
     // where colorCount != rasterizationSamples.
     if (m_testConfig.rasterizationSamplesConfig.dynamicValue &&
         (m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
-         m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC) &&
+         m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC ||
+         m_testConfig.sequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC) &&
         !context.isDeviceFunctionalitySupported("VK_AMD_mixed_attachment_samples") &&
         !context.isDeviceFunctionalitySupported("VK_NV_framebuffer_mixed_samples"))
 
@@ -3277,7 +3292,8 @@ void ExtendedDynamicStateTest::checkSupport(Context &context) const
     if (m_testConfig.rasterizationSamplesConfig.dynamicValue &&
         (m_testConfig.sequenceOrdering == SequenceOrdering::BETWEEN_PIPELINES ||
          m_testConfig.sequenceOrdering == SequenceOrdering::AFTER_PIPELINES ||
-         m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC || m_testConfig.isReversed()) &&
+         m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
+         m_testConfig.sequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC || m_testConfig.isReversed()) &&
         (context.isDeviceFunctionalitySupported("VK_AMD_mixed_attachment_samples") ||
          context.isDeviceFunctionalitySupported("VK_NV_framebuffer_mixed_samples")))
 
@@ -3564,6 +3580,7 @@ void ExtendedDynamicStateTest::checkSupport(Context &context) const
     {
         // Check the implementation supports some type of stippled line.
         const auto &lineRastFeatures = context.getLineRasterizationFeatures();
+
         const auto rasterMode = selectLineRasterizationMode(lineRastFeatures, m_testConfig.lineStippleSupportRequired(),
                                                             m_testConfig.lineRasterModeConfig.staticValue);
 
@@ -3640,8 +3657,6 @@ void ExtendedDynamicStateTest::checkSupport(Context &context) const
             !dbcFeatures.floatRepresentation)
             TCU_THROW(NotSupportedError, "floatRepresentation not supported");
     }
-#else
-    TCU_THROW(NotSupportedError, "VulkanSC does not support VK_EXT_depth_bias_control");
 #endif // CTS_USES_VULKANSC
 
     if (m_testConfig.getActiveLineWidth() != 1.0f)
@@ -4072,12 +4087,13 @@ void ExtendedDynamicStateTest::initPrograms(vk::SourceCollections &programCollec
 
 TestInstance *ExtendedDynamicStateTest::createInstance(Context &context) const
 {
-    return new ExtendedDynamicStateInstance(context, m_testConfig);
+    return new ExtendedDynamicStateInstance(context, m_testConfigPtr);
 }
 
-ExtendedDynamicStateInstance::ExtendedDynamicStateInstance(Context &context, const TestConfig &testConfig)
+ExtendedDynamicStateInstance::ExtendedDynamicStateInstance(Context &context, const TestConfigSharedPtr &testConfig)
     : vkt::TestInstance(context)
-    , m_testConfig(testConfig)
+    , m_testConfigPtr(testConfig)
+    , m_testConfig(*m_testConfigPtr.get())
 {
 }
 
@@ -4120,8 +4136,10 @@ void copyAndFlush(const vk::DeviceInterface &vkd, vk::VkDevice device, vk::Buffe
 }
 
 // Sets values for dynamic states if needed according to the test configuration.
-void setDynamicStates(const TestConfig &testConfig, const vk::DeviceInterface &vkd, vk::VkCommandBuffer cmdBuffer)
+void setDynamicStates(const TestConfig &testConfig, const vk::DeviceInterface &vkd, const bool depthClampControlEnabled,
+                      vk::VkCommandBuffer cmdBuffer)
 {
+    (void)depthClampControlEnabled;
     if (testConfig.lineWidthConfig.dynamicValue)
         vkd.cmdSetLineWidth(cmdBuffer, testConfig.lineWidthConfig.dynamicValue.get());
 
@@ -4297,7 +4315,11 @@ void setDynamicStates(const TestConfig &testConfig, const vk::DeviceInterface &v
         static_cast<bool>(testConfig.lineStippleParamsConfig.dynamicValue.get()))
     {
         const auto &stippleParams = testConfig.lineStippleParamsConfig.dynamicValue->get();
-        vkd.cmdSetLineStippleKHR(cmdBuffer, stippleParams.factor, stippleParams.pattern);
+#ifndef CTS_USES_VULKANSC
+        vkd.cmdSetLineStipple(cmdBuffer, stippleParams.factor, stippleParams.pattern);
+#else
+        vkd.cmdSetLineStippleEXT(cmdBuffer, stippleParams.factor, stippleParams.pattern);
+#endif // CTS_USES_VULKANSC
     }
 
 #ifndef CTS_USES_VULKANSC
@@ -4306,6 +4328,10 @@ void setDynamicStates(const TestConfig &testConfig, const vk::DeviceInterface &v
 
     if (testConfig.depthClampEnableConfig.dynamicValue)
         vkd.cmdSetDepthClampEnableEXT(cmdBuffer, testConfig.depthClampEnableConfig.dynamicValue.get());
+
+    if (testConfig.depthClampEnableConfig.dynamicValue &&
+        vk::isConstructionTypeShaderObject(testConfig.pipelineConstructionType) && depthClampControlEnabled)
+        vkd.cmdSetDepthClampRangeEXT(cmdBuffer, vk::VK_DEPTH_CLAMP_MODE_VIEWPORT_RANGE_EXT, nullptr);
 
     if (testConfig.polygonModeConfig.dynamicValue)
         vkd.cmdSetPolygonModeEXT(cmdBuffer, testConfig.polygonModeConfig.dynamicValue.get());
@@ -4686,7 +4712,7 @@ public:
         // Create a universal queue that supports graphics and compute.
         const vk::VkDeviceQueueCreateInfo queueParams = {
             vk::VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                        // const void* pNext;
+            nullptr,                                        // const void* pNext;
             0u,                                             // VkDeviceQueueCreateFlags flags;
             m_queueFamilyIndex,                             // uint32_t queueFamilyIndex;
             1u,                                             // uint32_t queueCount;
@@ -4939,15 +4965,16 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
     using ImageViewVec       = std::vector<vk::Move<vk::VkImageView>>;
     using RenderPassVec      = std::vector<vk::RenderPassWrapper>;
 
-    const auto &vki           = m_context.getInstanceInterface();
-    const auto physicalDevice = m_context.getPhysicalDevice();
-    const auto &deviceHelper  = getDeviceHelper(m_context, m_testConfig);
-    const auto &vkd           = deviceHelper.getDeviceInterface();
-    const auto device         = deviceHelper.getDevice();
-    auto &allocator           = deviceHelper.getAllocator();
-    const auto queue          = deviceHelper.getQueue();
-    const auto queueIndex     = deviceHelper.getQueueFamilyIndex();
-    auto &log                 = m_context.getTestContext().getLog();
+    const auto &vki              = m_context.getInstanceInterface();
+    const auto physicalDevice    = m_context.getPhysicalDevice();
+    const auto &deviceHelper     = getDeviceHelper(m_context, m_testConfig);
+    const auto &deviceExtensions = deviceHelper.getDeviceExtensions();
+    const auto &vkd              = deviceHelper.getDeviceInterface();
+    const auto device            = deviceHelper.getDevice();
+    auto &allocator              = deviceHelper.getAllocator();
+    const auto queue             = deviceHelper.getQueue();
+    const auto queueIndex        = deviceHelper.getQueueFamilyIndex();
+    auto &log                    = m_context.getTestContext().getLog();
 
     const auto kReversed          = m_testConfig.isReversed();
     const auto kBindStaticFirst   = m_testConfig.bindStaticFirst();
@@ -4960,14 +4987,16 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
         (m_testConfig.sampleLocationsStruct() ?
              static_cast<vk::VkImageCreateFlags>(vk::VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT) :
              0u);
-    const auto colorFormat       = m_testConfig.colorFormat();
-    const auto colorSampleCount  = m_testConfig.getColorSampleCount();
-    const auto activeSampleCount = m_testConfig.getActiveSampleCount();
-    const bool vertDataAsSSBO    = m_testConfig.useMeshShaders;
-    const auto pipelineBindPoint = vk::VK_PIPELINE_BIND_POINT_GRAPHICS;
-    const bool kUseResolveAtt    = (colorSampleCount != kSingleSampleCount);
-    const bool kMultisampleDS    = (activeSampleCount != kSingleSampleCount);
-    const bool kFragAtomics      = m_testConfig.useFragShaderAtomics();
+    const auto colorFormat              = m_testConfig.colorFormat();
+    const auto colorSampleCount         = m_testConfig.getColorSampleCount();
+    const auto activeSampleCount        = m_testConfig.getActiveSampleCount();
+    const bool vertDataAsSSBO           = m_testConfig.useMeshShaders;
+    const auto pipelineBindPoint        = vk::VK_PIPELINE_BIND_POINT_GRAPHICS;
+    const bool kUseResolveAtt           = (colorSampleCount != kSingleSampleCount);
+    const bool kMultisampleDS           = (activeSampleCount != kSingleSampleCount);
+    const bool kFragAtomics             = m_testConfig.useFragShaderAtomics();
+    const bool depthClampControlEnabled = std::find(deviceExtensions.begin(), deviceExtensions.end(),
+                                                    "VK_EXT_depth_clamp_control") != deviceExtensions.end();
 
     // Choose depth/stencil format.
     const DepthStencilFormat *dsFormatInfo = nullptr;
@@ -5783,7 +5812,7 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
     ReprFragmentPtr pReprFragment;
 #endif // CTS_USES_VULKANSC
 
-    if (m_testConfig.sampleLocationsStruct())
+    if (m_testConfig.sampleLocationsStruct() && m_testConfig.provideSampleLocationsState)
     {
         pSampleLocations = SampleLocationsPtr(
             new vk::VkPipelineSampleLocationsStateCreateInfoEXT(vk::initVulkanStructure(multisamplePnext)));
@@ -6216,12 +6245,12 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
 
         const vk::VkPipelineVertexInputStateCreateInfo emptyVertexInputStateCreateInfo = {
             vk::VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                                       // const void* pNext;
+            nullptr,                                                       // const void* pNext;
             0u,      // VkPipelineVertexInputStateCreateFlags flags;
             0u,      // uint32_t vertexBindingDescriptionCount;
-            DE_NULL, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
+            nullptr, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
             0u,      // uint32_t vertexAttributeDescriptionCount;
-            DE_NULL, // const VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
+            nullptr, // const VkVertexInputAttributeDescription* pVertexAttributeDescriptions;
         };
 
 #ifndef CTS_USES_VULKANSC
@@ -6248,7 +6277,7 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
             graphicsPipeline
                 .setupVertexInputState(staticVertexInputStateCreateInfo, staticInputAssemblyStateCreateInfo,
                                        VK_NULL_HANDLE, vk::PipelineCreationFeedbackCreateInfoWrapper(),
-                                       m_testConfig.favorStaticNullPointers)
+                                       vk::PipelineBinaryInfoWrapper(), m_testConfig.favorStaticNullPointers)
                 .setupPreRasterizationShaderState(viewports, scissors, pipelineLayout, *renderPassFramebuffers[0], 0u,
                                                   dynamicVertModule, staticRasterizationStateCreateInfo, tescModule,
                                                   teseModule, geomModule);
@@ -6257,7 +6286,7 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
                 extraDynPipeline
                     .setupVertexInputState(&emptyVertexInputStateCreateInfo, staticInputAssemblyStateCreateInfo,
                                            VK_NULL_HANDLE, vk::PipelineCreationFeedbackCreateInfoWrapper(),
-                                           m_testConfig.favorStaticNullPointers)
+                                           vk::PipelineBinaryInfoWrapper(), m_testConfig.favorStaticNullPointers)
                     .setupPreRasterizationShaderState(viewports, scissors, pipelineLayout, *renderPassFramebuffers[0],
                                                       0u, vertDPCPModule, staticRasterizationStateCreateInfo);
         }
@@ -6371,7 +6400,7 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
         // Maybe set extended dynamic state here.
         if (kSequenceOrdering == SequenceOrdering::CMD_BUFFER_START)
         {
-            setDynamicStates(m_testConfig, vkd, cmdBuffer);
+            setDynamicStates(m_testConfig, vkd, depthClampControlEnabled, cmdBuffer);
             boundInAdvance =
                 maybeBindVertexBufferDynStride(m_testConfig, vkd, cmdBuffer, 0u, vertBuffers, rvertBuffers);
         }
@@ -6381,22 +6410,25 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
                                                 static_cast<uint32_t>(clearValues.size()), clearValues.data());
 
         // Bind a static pipeline first if needed.
-        if (kBindStaticFirst && iteration == 0u)
+        if ((kBindStaticFirst && iteration == 0u) ||
+            (iteration == 1u && kSequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC))
             staticPipeline.bind(cmdBuffer);
 
         // Maybe set extended dynamic state here.
         if (kSequenceOrdering == SequenceOrdering::BETWEEN_PIPELINES)
         {
-            setDynamicStates(m_testConfig, vkd, cmdBuffer);
+            setDynamicStates(m_testConfig, vkd, depthClampControlEnabled, cmdBuffer);
             boundInAdvance =
                 maybeBindVertexBufferDynStride(m_testConfig, vkd, cmdBuffer, 0u, vertBuffers, rvertBuffers);
         }
 
         // Bind dynamic pipeline.
         if ((kSequenceOrdering != SequenceOrdering::TWO_DRAWS_DYNAMIC &&
-             kSequenceOrdering != SequenceOrdering::TWO_DRAWS_STATIC) ||
+             kSequenceOrdering != SequenceOrdering::TWO_DRAWS_STATIC &&
+             kSequenceOrdering != SequenceOrdering::THREE_DRAWS_DYNAMIC) ||
             (kSequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC && iteration > 0u) ||
-            (kSequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC && iteration == 0u))
+            (kSequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC && iteration == 0u) ||
+            (kSequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC && (iteration == 0u || iteration > 1u)))
         {
             if (m_testConfig.bindUnusedMeshShadingPipeline)
             {
@@ -6424,7 +6456,7 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
                 if (kSequenceOrdering == SequenceOrdering::BEFORE_DRAW ||
                     kSequenceOrdering == SequenceOrdering::AFTER_PIPELINES ||
                     kSequenceOrdering == SequenceOrdering::BEFORE_GOOD_STATIC)
-                    setDynamicStates(m_testConfig, vkd, cmdBuffer);
+                    setDynamicStates(m_testConfig, vkd, depthClampControlEnabled, cmdBuffer);
 
                 vkd.cmdDraw(cmdBuffer, 3u, 1u, 0u, 0u);
             }
@@ -6438,9 +6470,10 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
 
         if (kSequenceOrdering == SequenceOrdering::BEFORE_GOOD_STATIC ||
             (kSequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC && iteration > 0u) ||
-            (kSequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC && iteration == 0u))
+            (kSequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC && iteration == 0u) ||
+            (kSequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC && (iteration == 0u || iteration > 1u)))
         {
-            setDynamicStates(m_testConfig, vkd, cmdBuffer);
+            setDynamicStates(m_testConfig, vkd, depthClampControlEnabled, cmdBuffer);
             boundInAdvance =
                 maybeBindVertexBufferDynStride(m_testConfig, vkd, cmdBuffer, 0u, vertBuffers, rvertBuffers);
         }
@@ -6458,15 +6491,20 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
             for (size_t meshIdx = 0u; meshIdx < m_testConfig.meshParams.size(); ++meshIdx)
             {
                 // Push constants.
+
+                // Note for THREE_DRAWS_DYNAMIC we will force an off-screen draw in the first dynamic draw to avoid altering the framebuffer.
+                const float forcedOffset =
+                    (kSequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC && iteration == 0u) ? 1048576.0f : 0.0f;
+
                 PushConstants pushConstants = {
-                    m_testConfig.meshParams[meshIdx].color,      // tcu::Vec4 triangleColor;
-                    m_testConfig.meshParams[meshIdx].depth,      // float meshDepth;
-                    static_cast<int32_t>(viewportIdx),           // int32_t viewPortIndex;
-                    m_testConfig.meshParams[meshIdx].scaleX,     // float scaleX;
-                    m_testConfig.meshParams[meshIdx].scaleY,     // float scaleY;
-                    m_testConfig.meshParams[meshIdx].offsetX,    // float offsetX;
-                    m_testConfig.meshParams[meshIdx].offsetY,    // float offsetY;
-                    m_testConfig.meshParams[meshIdx].stripScale, // float stripScale;
+                    m_testConfig.meshParams[meshIdx].color,                  // tcu::Vec4 triangleColor;
+                    m_testConfig.meshParams[meshIdx].depth,                  // float meshDepth;
+                    static_cast<int32_t>(viewportIdx),                       // int32_t viewPortIndex;
+                    m_testConfig.meshParams[meshIdx].scaleX,                 // float scaleX;
+                    m_testConfig.meshParams[meshIdx].scaleY,                 // float scaleY;
+                    m_testConfig.meshParams[meshIdx].offsetX + forcedOffset, // float offsetX;
+                    m_testConfig.meshParams[meshIdx].offsetY + forcedOffset, // float offsetY;
+                    m_testConfig.meshParams[meshIdx].stripScale,             // float stripScale;
                 };
                 vkd.cmdPushConstants(cmdBuffer, pipelineLayout.get(), pushConstantStageFlags, 0u,
                                      static_cast<uint32_t>(sizeof(pushConstants)), &pushConstants);
@@ -6478,7 +6516,7 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
                 if (kSequenceOrdering == SequenceOrdering::BEFORE_DRAW ||
                     kSequenceOrdering == SequenceOrdering::AFTER_PIPELINES)
                 {
-                    setDynamicStates(m_testConfig, vkd, cmdBuffer);
+                    setDynamicStates(m_testConfig, vkd, depthClampControlEnabled, cmdBuffer);
                     boundBeforeDraw = maybeBindVertexBufferDynStride(m_testConfig, vkd, cmdBuffer, meshIdx, vertBuffers,
                                                                      rvertBuffers);
                 }
@@ -6524,9 +6562,10 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
                     // For SequenceOrdering::TWO_DRAWS_DYNAMIC and TWO_DRAWS_STATIC cases, the first draw does not have primitive restart enabled
                     // So, draw without using the invalid index, the second draw with primitive restart enabled will replace the results
                     // using all indices.
-                    if (iteration == 0u && m_testConfig.testPrimRestartEnable() &&
-                        (m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
-                         m_testConfig.sequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC))
+                    if (m_testConfig.testPrimRestartEnable() &&
+                        ((iteration == 0u && (kSequenceOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
+                                              kSequenceOrdering == SequenceOrdering::TWO_DRAWS_STATIC)) ||
+                         (iteration == 1u && kSequenceOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC)))
                     {
                         numIndices = 2u;
                     }
@@ -6743,15 +6782,17 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
             const auto testEnabled = m_testConfig.getActiveReprFragTestEnable();
             minValue += minInvocations[testEnabled];
         }
-        else if (kNumIterations == 2u)
+        else if (kNumIterations == 2u || kNumIterations == 3u)
         {
-            for (uint32_t i = 0u; i < kNumIterations; ++i)
+            // If kNumIterations is 3, the first draw happen offscreen and does not contribute to the result, so we're only going to
+            // take into account the last two draws, same as two_draws_static/dynamic.
+            for (uint32_t i = kNumIterations - 2u; i < kNumIterations; ++i)
             {
                 bool testEnabled = false;
 
 #ifndef CTS_USES_VULKANSC
                 // Actually varies depending on TWO_DRAWS_STATIC/_DYNAMIC, but does not affect results.
-                const bool staticDraw = (i == 0u);
+                const bool staticDraw = (i == kNumIterations - 2u);
 
                 if (staticDraw)
                     testEnabled = m_testConfig.reprFragTestEnableConfig.staticValue;
@@ -6793,12 +6834,14 @@ tcu::TestStatus ExtendedDynamicStateInstance::iterate(void)
         {
             sampleCount += static_cast<uint32_t>(m_testConfig.getActiveSampleCount());
         }
-        else if (kNumIterations == 2u)
+        else if (kNumIterations == 2u || kNumIterations == 3u)
         {
-            for (uint32_t i = 0u; i < kNumIterations; ++i)
+            // If kNumIterations is 3, the first draw happen offscreen and does not contribute to the result, so we're only going to
+            // take into account the last two draws, same as two_draws_static/dynamic.
+            for (uint32_t i = kNumIterations - 2u; i < kNumIterations; ++i)
             {
                 // Actually varies depending on TWO_DRAWS_STATIC/_DYNAMIC, but does not affect results.
-                const bool staticDraw = (i == 0u);
+                const bool staticDraw = (i == kNumIterations - 2u);
 
                 if (staticDraw)
                     sampleCount += static_cast<uint32_t>(m_testConfig.rasterizationSamplesConfig.staticValue);
@@ -6928,20 +6971,14 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
         SequenceOrdering ordering;
         std::string name;
     } kOrderingCases[] = {
-        // Dynamic state set after command buffer start
         {SequenceOrdering::CMD_BUFFER_START, "cmd_buffer_start"},
-        // Dynamic state set just before drawing
         {SequenceOrdering::BEFORE_DRAW, "before_draw"},
-        // Dynamic after a pipeline with static states has been bound and before a pipeline with dynamic states has been bound
         {SequenceOrdering::BETWEEN_PIPELINES, "between_pipelines"},
-        // Dynamic state set after both a static-state pipeline and a second dynamic-state pipeline have been bound
         {SequenceOrdering::AFTER_PIPELINES, "after_pipelines"},
-        // Dynamic state set after a dynamic pipeline has been bound and before a second static-state pipeline with the right values has been bound
         {SequenceOrdering::BEFORE_GOOD_STATIC, "before_good_static"},
-        // Bind bad static pipeline and draw, followed by binding correct dynamic pipeline and drawing again
         {SequenceOrdering::TWO_DRAWS_DYNAMIC, "two_draws_dynamic"},
-        // Bind bad dynamic pipeline and draw, followed by binding correct static pipeline and drawing again
         {SequenceOrdering::TWO_DRAWS_STATIC, "two_draws_static"},
+        {SequenceOrdering::THREE_DRAWS_DYNAMIC, "three_draws_dynamic"},
     };
 
     static const struct
@@ -7165,9 +7202,11 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
                     const bool onlyEq       = (cbSubCase == ColorBlendSubCase::EQ_ONLY);
                     const bool allCBDynamic = (cbSubCase == ColorBlendSubCase::ALL_CB);
 
-                    // Skip two-draws variants as this will use dynamic logic op and force UNORM color attachments, which would result in illegal operations.
+                    // Skip variants with more than 1 draw as this will use dynamic logic op and force UNORM color attachments, which
+                    // would result in illegal operations.
                     if (allCBDynamic && (kOrdering == SequenceOrdering::TWO_DRAWS_STATIC ||
-                                         kOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC))
+                                         kOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
+                                         kOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC))
                         continue;
 
                     for (int j = 0; j < 2; ++j)
@@ -7248,7 +7287,8 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
 
                     // Skip two-draws variants as this will use dynamic logic op and force UNORM color attachments, which would result in illegal operations.
                     if (allCBDynamic && (kOrdering == SequenceOrdering::TWO_DRAWS_STATIC ||
-                                         kOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC))
+                                         kOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
+                                         kOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC))
                         continue;
 
                     for (int j = 0; j < 2; ++j)
@@ -7733,7 +7773,7 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
                 TestConfig config(pipelineConstructionType, kOrdering, kUseMeshShaders);
                 // Bad static reduced viewport.
                 config.viewportConfig.staticValue = ViewportVec(1u, vk::makeViewport(kHalfWidthU, kFramebufferHeight));
-                config.viewportConfig.staticValue =
+                config.viewportConfig.dynamicValue =
                     ViewportVec(1u, vk::makeViewport(kFramebufferWidth, kFramebufferHeight));
                 // Dynamically set viewport to cover full framebuffer
                 orderingGroup->addChild(new ExtendedDynamicStateTest(testCtx, "1_full_viewport", config));
@@ -7910,9 +7950,11 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
 
                 // Dynamic stride of 0
                 //
-                // The "two_draws" variants are invalid because the non-zero vertex stride will cause out-of-bounds access
+                // The variants with more than 1 draw are invalid because the non-zero vertex stride will cause out-of-bounds access
                 // when drawing more than one vertex.
-                if (kOrdering != SequenceOrdering::TWO_DRAWS_STATIC && kOrdering != SequenceOrdering::TWO_DRAWS_DYNAMIC)
+                if (kOrdering != SequenceOrdering::TWO_DRAWS_STATIC &&
+                    kOrdering != SequenceOrdering::TWO_DRAWS_DYNAMIC &&
+                    kOrdering != SequenceOrdering::THREE_DRAWS_DYNAMIC)
                 {
                     TestConfig config(pipelineConstructionType, kOrdering, kUseMeshShaders,
                                       getVertexWithExtraAttributesGenerator());
@@ -8040,8 +8082,8 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
         //
         // Try to verify the implementation ignores the static depth clipping state. We cannot test the following sequence orderings for this:
         // - BEFORE_GOOD_STATIC and TWO_DRAWS_STATIC because they use static-state pipelines, but for this specific case we need dynamic state as per the spec.
-        // - TWO_DRAWS_DYNAMIC because the first draw may modify the framebuffer with undesired side-effects.
-        if (kOrdering != SequenceOrdering::BEFORE_GOOD_STATIC && kOrdering != SequenceOrdering::TWO_DRAWS_DYNAMIC && kOrdering != SequenceOrdering::TWO_DRAWS_STATIC)
+        // - TWO_DRAWS_DYNAMIC and THREE_DRAWS_DYNAMIC because the draw with static state may modify the framebuffer with undesired side-effects.
+        if (kOrdering != SequenceOrdering::BEFORE_GOOD_STATIC && kOrdering != SequenceOrdering::TWO_DRAWS_DYNAMIC && kOrdering != SequenceOrdering::TWO_DRAWS_STATIC && kOrdering != SequenceOrdering::THREE_DRAWS_DYNAMIC)
         {
             {
                 TestConfig config(pipelineConstructionType, kOrdering, kUseMeshShaders);
@@ -8494,9 +8536,18 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
                 // Dynamically enable sample locations
                 orderingGroup->addChild(new ExtendedDynamicStateTest(testCtx, "sample_locations_enable", config));
 
-                config.sampleLocationsEnableConfig.swapValues();
+                config.provideSampleLocationsState = false;
                 config.referenceColor.reset(new TopLeftBorderGenerator(kDefaultTriangleColor, kDefaultClearColor,
                                                                        kDefaultClearColor, kDefaultClearColor));
+
+                if (!vk::isConstructionTypeShaderObject(pipelineConstructionType))
+                {
+                    orderingGroup->addChild(
+                        new ExtendedDynamicStateTest(testCtx, "sample_locations_enable_no_create_info", config));
+                }
+
+                config.provideSampleLocationsState = true;
+                config.sampleLocationsEnableConfig.swapValues();
 
                 // Dynamically disable sample locations
                 orderingGroup->addChild(new ExtendedDynamicStateTest(testCtx, "sample_locations_disable", config));
@@ -9335,8 +9386,10 @@ tcu::TestCaseGroup *createExtendedDynamicStateTests(tcu::TestContext &testCtx,
                                                 (extraPipelineIter >
                                                  0); // Bind and draw with another pipeline using the same dynamic states.
 
-                                            if (useExtraPipeline && (kOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
-                                                                     kOrdering == SequenceOrdering::TWO_DRAWS_STATIC))
+                                            if (useExtraPipeline &&
+                                                (kOrdering == SequenceOrdering::TWO_DRAWS_DYNAMIC ||
+                                                 kOrdering == SequenceOrdering::TWO_DRAWS_STATIC ||
+                                                 kOrdering == SequenceOrdering::THREE_DRAWS_DYNAMIC))
                                                 continue;
 
                                             if (useExtraPipeline && kUseMeshShaders)

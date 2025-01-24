@@ -76,6 +76,10 @@ void checkSupport(const glu::ContextInfo &info, uint32_t internalFormat)
 
     if (internalFormat == GL_SRG8_EXT && !info.isExtensionSupported("GL_EXT_texture_sRGB_RG8"))
         TCU_THROW(NotSupportedError, "GL_EXT_texture_sRGB_RG8 is not supported.");
+
+    if ((internalFormat == GL_BGRA || internalFormat == GL_BGRA8_EXT) &&
+        !info.isExtensionSupported("GL_EXT_texture_format_BGRA8888"))
+        TCU_THROW(NotSupportedError, "GL_EXT_texture_format_BGRA8888 is not supported.");
 }
 
 } // namespace
@@ -119,7 +123,7 @@ private:
         tcu::Vec2 minCoord;
         tcu::Vec2 maxCoord;
 
-        FilterCase(void) : texture(DE_NULL)
+        FilterCase(void) : texture(nullptr)
         {
         }
 
@@ -423,7 +427,7 @@ private:
         tcu::Vec2 bottomLeft;
         tcu::Vec2 topRight;
 
-        FilterCase(void) : texture(DE_NULL)
+        FilterCase(void) : texture(nullptr)
         {
         }
 
@@ -626,7 +630,7 @@ static const char *getFaceDesc(const tcu::CubeFace face)
         return "+Z";
     default:
         DE_ASSERT(false);
-        return DE_NULL;
+        return nullptr;
     }
 }
 
@@ -644,7 +648,7 @@ TextureCubeFilteringCase::IterateResult TextureCubeFilteringCase::iterate(void)
     ReferenceParams sampleParams(TEXTURETYPE_CUBE);
 
     if (viewport.width < viewportSize || viewport.height < viewportSize)
-        throw tcu::NotSupportedError("Too small render target", DE_NULL, __FILE__, __LINE__);
+        throw tcu::NotSupportedError("Too small render target", nullptr, __FILE__, __LINE__);
 
     // Setup texture
     gl.bindTexture(GL_TEXTURE_CUBE_MAP, curCase.texture->getGLTexture());
@@ -772,7 +776,7 @@ private:
         tcu::Vec2 offset;
         tcu::Vec2 layerRange;
 
-        FilterCase(void) : texture(DE_NULL)
+        FilterCase(void) : texture(nullptr)
         {
         }
 
@@ -808,8 +812,8 @@ Texture2DArrayFilteringCase::Texture2DArrayFilteringCase(Context &context, const
     , m_width(width)
     , m_height(height)
     , m_numLayers(numLayers)
-    , m_gradientTex(DE_NULL)
-    , m_gridTex(DE_NULL)
+    , m_gradientTex(nullptr)
+    , m_gridTex(nullptr)
     , m_renderer(context.getRenderContext(), context.getTestContext().getLog(), glu::GLSL_VERSION_300_ES,
                  glu::PRECISION_HIGHP)
     , m_caseNdx(0)
@@ -920,8 +924,8 @@ void Texture2DArrayFilteringCase::deinit(void)
     delete m_gradientTex;
     delete m_gridTex;
 
-    m_gradientTex = DE_NULL;
-    m_gridTex     = DE_NULL;
+    m_gradientTex = nullptr;
+    m_gridTex     = nullptr;
 
     m_renderer.clear();
     m_cases.clear();
@@ -1067,7 +1071,7 @@ private:
         tcu::Vec3 lod;
         tcu::Vec3 offset;
 
-        FilterCase(void) : texture(DE_NULL)
+        FilterCase(void) : texture(nullptr)
         {
         }
 
@@ -1101,8 +1105,8 @@ Texture3DFilteringCase::Texture3DFilteringCase(Context &context, const char *nam
     , m_width(width)
     , m_height(height)
     , m_depth(depth)
-    , m_gradientTex(DE_NULL)
-    , m_gridTex(DE_NULL)
+    , m_gradientTex(nullptr)
+    , m_gridTex(nullptr)
     , m_renderer(context.getRenderContext(), context.getTestContext().getLog(), glu::GLSL_VERSION_300_ES,
                  glu::PRECISION_HIGHP)
     , m_caseNdx(0)
@@ -1179,8 +1183,8 @@ void Texture3DFilteringCase::deinit(void)
     delete m_gradientTex;
     delete m_gridTex;
 
-    m_gradientTex = DE_NULL;
-    m_gridTex     = DE_NULL;
+    m_gradientTex = nullptr;
+    m_gridTex     = nullptr;
 
     m_renderer.clear();
     m_cases.clear();
@@ -1369,7 +1373,9 @@ void TextureFilteringTests::init(void)
                                    {"srgb8_alpha8", GL_SRGB8_ALPHA8},
                                    {"srgb_r8", GL_SR8_EXT},
                                    {"srgb_rg8", GL_SRG8_EXT},
-                                   {"rgb10_a2", GL_RGB10_A2}};
+                                   {"rgb10_a2", GL_RGB10_A2},
+                                   {"bgra", GL_BGRA},
+                                   {"bgra8", GL_BGRA8_EXT}};
 
     // 2D texture filtering.
     {

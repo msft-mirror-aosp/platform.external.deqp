@@ -22,6 +22,7 @@
  *//*--------------------------------------------------------------------*/
 
 #include "vktPostmortemDeviceFaultTests.hpp"
+#include "vkQueryUtil.hpp"
 #include "vktCustomInstancesDevices.hpp"
 
 #include "deStringUtil.hpp"
@@ -31,6 +32,7 @@
 #include "tcuTestLog.hpp"
 #include "tcuCommandLine.hpp"
 
+#include <cstdint>
 #include <functional>
 #include <limits>
 #include <sstream>
@@ -58,8 +60,7 @@ using namespace tcu;
 enum class TestType
 {
     Fake,
-    Real,
-    CustomDevice
+    Real
 };
 
 struct TestParams
@@ -100,25 +101,23 @@ private:
     const TestParams m_params;
 };
 
-class DeviceFaultCustomInstance : public TestInstance
-{
-public:
-    DeviceFaultCustomInstance(Context &context) : TestInstance(context)
-    {
-    }
-    virtual ~DeviceFaultCustomInstance() = default;
-
-    virtual TestStatus iterate(void) override;
-};
-
 TestInstance *DeviceFaultCase::createInstance(Context &context) const
 {
-    TestInstance *instance = nullptr;
-    if (m_params.type == TestType::CustomDevice)
-        instance = new DeviceFaultCustomInstance(context);
-    else
-        instance = new DeviceFaultInstance(context, m_params);
+    TestInstance *instance = new DeviceFaultInstance(context, m_params);
     return instance;
+}
+
+static std::vector<std::string> getRequiredExtensions(const bool useValidation, const uint32_t instanceVersion)
+{
+    std::vector<std::string> instanceExtensions;
+
+    if (!isCoreInstanceExtension(instanceVersion, "VK_KHR_get_physical_device_properties2"))
+        instanceExtensions.push_back("VK_KHR_get_physical_device_properties2");
+
+    if (useValidation && !isCoreInstanceExtension(instanceVersion, "VK_EXT_debug_utils"))
+        instanceExtensions.push_back("VK_EXT_debug_utils");
+
+    return instanceExtensions;
 }
 
 class CustomDevice
@@ -130,7 +129,8 @@ public:
     {
         const bool useValidation                   = context.getTestContext().getCommandLine().isValidationEnabled();
         const PlatformInterface &platformInterface = context.getPlatformInterface();
-        const VkInstance instance                  = context.getInstance();
+        const CustomInstance instance              = createCustomInstanceWithExtensions(
+            context, getRequiredExtensions(useValidation, context.getUsedApiVersion()));
         const InstanceInterface &instanceInterface = context.getInstanceInterface();
         const VkPhysicalDevice physicalDevice      = context.getPhysicalDevice();
         const uint32_t queueFamilyIndex            = context.getUniversalQueueFamilyIndex();
@@ -145,12 +145,7 @@ public:
             &queuePriority                              // const float* pQueuePriorities;
         };
 
-        VkPhysicalDeviceFaultFeaturesEXT deviceFaultFeatures{
-            VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT, // VkStructureType sType;
-            nullptr,                                              // void* pNext;
-            VK_TRUE,                                              // VkBool32 deviceFault;
-            VK_TRUE                                               // VkBool32 deviceFaultVendorBinary;
-        };
+        VkPhysicalDeviceFaultFeaturesEXT deviceFaultFeatures = initVulkanStructure();
 
         VkPhysicalDeviceFeatures2 deviceFeatures2{
             VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, // VkStructureType sType;
@@ -267,9 +262,9 @@ public:
         static uint64_t vendorFaultCodes[]{0x11223344, 0x22334455, 0xAABBCCDD, 0xCCDDEEFF};
         static Header vendorBinaryData;
 
-        if (DE_NULL == pFaultInfo)
+        if (nullptr == pFaultInfo)
         {
-            if (DE_NULL == pFaultCounts)
+            if (nullptr == pFaultCounts)
                 return VK_ERROR_UNKNOWN;
 
             DE_ASSERT(pFaultCounts->sType == VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT);
@@ -382,13 +377,6 @@ void DeviceFaultCase::checkSupport(Context &context) const
         TCU_THROW(NotSupportedError, "VK_EXT_device_fault extension is not supported by device");
 }
 
-TestStatus DeviceFaultCustomInstance::iterate(void)
-{
-    CustomDevice customDevice(m_context);
-    const VkDevice device = customDevice.getDevice();
-    return (device != DE_NULL) ? TestStatus::pass("") : TestStatus::fail("");
-}
-
 void DeviceFaultInstance::log(const std::vector<VkDeviceFaultAddressInfoEXT> &addressInfos,
                               const std::vector<VkDeviceFaultVendorInfoEXT> &vendorInfos,
                               const std::vector<uint8_t> &vendorBinaryData) const
@@ -440,22 +428,21 @@ void DeviceFaultInstance::log(const std::vector<VkDeviceFaultAddressInfoEXT> &ad
 TestStatus DeviceFaultInstance::iterate(void)
 {
     FakeContext fakeContext(m_context);
-    const VkDevice device                 = m_context.getDevice();
+    CustomDevice customDevice(m_context);
+    const VkDevice device = (m_params.type == TestType::Fake) ? m_context.getDevice() : customDevice.getDevice();
     const VkPhysicalDevice physicalDevice = m_context.getPhysicalDevice();
     const DeviceInterface &deviceInterface =
         (m_params.type == TestType::Fake) ? fakeContext.getDeviceInterface() : m_context.getDeviceInterface();
     const InstanceInterface &instanceInterface =
         (m_params.type == TestType::Fake) ? fakeContext.getInstanceInterface() : m_context.getInstanceInterface();
 
-    VkDeviceFaultCountsEXT fc{};
-    fc.sType = VK_STRUCTURE_TYPE_DEVICE_FAULT_COUNTS_EXT;
-    fc.pNext = nullptr;
+    VkDeviceFaultCountsEXT fc = initVulkanStructure();
+
     deviceInterface.getDeviceFaultInfoEXT(device, &fc, nullptr);
 
     const uint32_t vendorBinarySize = std::min(uint32_t(fc.vendorBinarySize), std::numeric_limits<uint32_t>::max());
 
-    VkPhysicalDeviceFaultFeaturesEXT deviceFaultFeatures{};
-    deviceFaultFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT;
+    VkPhysicalDeviceFaultFeaturesEXT deviceFaultFeatures = initVulkanStructure();
 
     VkPhysicalDeviceFeatures2 deviceFeatures2{};
     deviceFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
@@ -492,7 +479,7 @@ tcu::TestCaseGroup *createDeviceFaultTests(tcu::TestContext &testCtx)
     {
         TestType type;
         const char *name;
-    } const types[] = {{TestType::Real, "real"}, {TestType::Fake, "fake"}, {TestType::CustomDevice, "custom_device"}};
+    } const types[] = {{TestType::Real, "real"}, {TestType::Fake, "fake"}};
 
     auto rootGroup = new TestCaseGroup(testCtx, "device_fault");
     for (const auto &type : types)
