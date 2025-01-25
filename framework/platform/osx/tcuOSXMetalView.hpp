@@ -20,8 +20,10 @@
  *
  *//*!
  * \file
- * \brief VK_MVK_macos_surface compatible view
+ * \brief VK_EXT_metal_surface compatible view
  *//*--------------------------------------------------------------------*/
+
+#include "vkDefs.hpp"
 
 namespace tcu
 {
@@ -36,10 +38,7 @@ public:
 
     void setSize(int width, int height);
 
-    void *getView(void) const
-    {
-        return m_view;
-    }
+    vk::pt::CAMetalLayer getLayer(void) const;
 
 private:
     MetalView(const MetalView &);

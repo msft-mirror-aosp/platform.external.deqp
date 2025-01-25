@@ -738,7 +738,7 @@ TestShaderProgram::TestShaderProgram(Context &context, const int samplerTotal, T
 
 TestShaderProgram::~TestShaderProgram(void)
 {
-    m_referenceSource = de::MovePtr<glu::ShaderProgram>(DE_NULL);
+    m_referenceSource = de::MovePtr<glu::ShaderProgram>(nullptr);
     m_referenceSource.clear();
 }
 
@@ -887,15 +887,15 @@ void Renderer::init(const TestRenderPassConfig &renderPassConfig, const int rend
         m_hasFunction   = m_renderPassConfig.testFunction.hasFunction;
     }
     else
-        m_shaderProgram = DE_NULL;
+        m_shaderProgram = nullptr;
 }
 
 void Renderer::deinit(void)
 {
-    if (m_shaderProgram != DE_NULL)
+    if (m_shaderProgram != nullptr)
     {
         delete m_shaderProgram;
-        m_shaderProgram = DE_NULL;
+        m_shaderProgram = nullptr;
     }
 
     m_fboTextureList.clear();
@@ -1493,7 +1493,8 @@ FboSRGBQueryCase::~FboSRGBQueryCase(void)
 void FboSRGBQueryCase::init(void)
 {
     // extension requirements for test
-    if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_sRGB_write_control"))
+    if (!m_context.getContextInfo().isExtensionSupported("GL_EXT_sRGB_write_control") &&
+        !glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 5)))
         TCU_THROW(NotSupportedError, "Test requires extension GL_EXT_sRGB_write_control");
 }
 

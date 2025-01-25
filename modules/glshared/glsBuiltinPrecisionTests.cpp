@@ -203,7 +203,7 @@ template <>
 const char *dataTypeNameOf<Void>(void)
 {
     DE_FATAL("Impossible");
-    return DE_NULL;
+    return nullptr;
 }
 
 //! A hack to get Void support for VarType.
@@ -1962,7 +1962,7 @@ protected:
 
         // Allow either representable number on both sides of the exact value,
         // but require exactly representable values to be preserved.
-        return ctx.format.roundOut(exact, !deIsInf(x) && !deIsInf(y));
+        return ctx.format.roundOut(exact, !std::isinf(x) && !std::isinf(y));
     }
 
     double precision(const EvalContext &, double, double, double) const
@@ -2196,7 +2196,7 @@ protected:
     {
         Interval ret = FloatFunc2::applyPoint(ctx, x, y);
 
-        if (!deIsInf(x) && !deIsInf(y) && y != 0.0)
+        if (!std::isinf(x) && !std::isinf(y) && y != 0.0)
         {
             const Interval dst = ctx.format.convert(ret);
             if (dst.contains(-TCU_INFINITY))
@@ -5139,9 +5139,9 @@ struct InputLess<float>
 {
     bool operator()(const float &val1, const float &val2) const
     {
-        if (deIsNaN(val1))
+        if (std::isnan(val1))
             return false;
-        if (deIsNaN(val2))
+        if (std::isnan(val2))
             return true;
         return val1 < val2;
     }
@@ -5413,7 +5413,7 @@ PrecisionCase *createFuncCase(const Context &context, const string &name, const 
     default:
         DE_FATAL("Impossible");
     }
-    return DE_NULL;
+    return nullptr;
 }
 
 class CaseFactory

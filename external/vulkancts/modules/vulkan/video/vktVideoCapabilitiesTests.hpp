@@ -32,6 +32,7 @@ namespace video
 {
 
 tcu::TestCaseGroup *createVideoCapabilitiesTests(tcu::TestContext &testCtx);
+tcu::TestCaseGroup *createVideoFormatsTests(tcu::TestContext &testCtx);
 
 } // namespace video
 } // namespace vkt

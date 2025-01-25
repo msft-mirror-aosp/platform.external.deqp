@@ -102,7 +102,7 @@ class VkImageResourceView : public VkVideoRefCountBase
 {
 public:
     static VkResult Create(DeviceContext &vkDevCtx, VkSharedBaseObj<VkImageResource> &imageResource,
-                           VkImageSubresourceRange &imageSubresourceRange,
+                           const VkImageCreateInfo *pImageCreateInfo, VkImageSubresourceRange &imageSubresourceRange,
                            VkSharedBaseObj<VkImageResourceView> &imageResourceView);
 
     virtual int32_t AddRef()
@@ -271,8 +271,8 @@ public:
     virtual int32_t InitImagePool(const VkVideoProfileInfoKHR *pDecodeProfile, uint32_t numImages,
                                   VkFormat dpbImageFormat, VkFormat outImageFormat, const VkExtent2D &maxImageExtent,
                                   VkImageUsageFlags dpbImageUsage, VkImageUsageFlags outImageUsage,
-                                  uint32_t queueFamilyIndex, bool useImageArray = false, bool useImageViewArray = false,
-                                  bool useSeparateOutputImage = false, bool useLinearOutput = false) = 0;
+                                  uint32_t queueFamilyIndex, bool useImageArray, bool useImageViewArray,
+                                  bool useSeparateOutputImage, bool useLinearOutput) = 0;
 
     virtual int32_t QueuePictureForDecode(int8_t picId, VkParserDecodePictureInfo *pDecodePictureInfo,
                                           ReferencedObjectsInfo *pReferencedObjectsInfo,

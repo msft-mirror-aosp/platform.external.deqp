@@ -29,13 +29,13 @@
 #include "vkCmdUtil.hpp"
 #include "vkTypeUtil.hpp"
 #include "vktTestGroupUtil.hpp"
+#include "vktAmberTestCase.hpp"
 
 #include "deDefs.h"
 #include "deRandom.hpp"
 #include "deString.h"
 
 #include "tcuTestCase.hpp"
-#include "tcuRGBA.hpp"
 #include "tcuTextureUtil.hpp"
 #include "tcuImageCompare.hpp"
 #include "tcuVectorUtil.hpp"
@@ -138,6 +138,10 @@ struct DrawParamsBase
                       gParams->secondaryCmdBufferCompletelyContainsDynamicRenderpass, gParams->nestedSecondaryCmdBuffer}
     {
     }
+
+    virtual void checkSupport(Context &) const
+    {
+    }
 };
 
 struct IndexedParamsBase
@@ -189,9 +193,12 @@ struct DrawIndexedParams : DrawParamsBase, IndexedParamsBase
 struct DrawIndirectParams : DrawParamsBase
 {
     std::vector<vk::VkDrawIndirectCommand> commands;
+    bool multiDraw;
 
-    DrawIndirectParams(const vk::VkPrimitiveTopology top, const SharedGroupParams gParams)
+    DrawIndirectParams(const vk::VkPrimitiveTopology top, const SharedGroupParams gParams, bool multiDraw_)
         : DrawParamsBase(top, gParams)
+        , commands()
+        , multiDraw(multiDraw_)
     {
     }
 
@@ -205,16 +212,25 @@ struct DrawIndirectParams : DrawParamsBase
 
         commands.push_back(cmd);
     }
+
+    void checkSupport(Context &context) const override
+    {
+        if (multiDraw && commands.size() > 1)
+            context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_MULTI_DRAW_INDIRECT);
+    }
 };
 
 struct DrawIndexedIndirectParams : DrawParamsBase, IndexedParamsBase
 {
     std::vector<vk::VkDrawIndexedIndirectCommand> commands;
+    bool multiDraw;
 
     DrawIndexedIndirectParams(const vk::VkPrimitiveTopology top, const SharedGroupParams gParams,
-                              const vk::VkIndexType indexT)
+                              const vk::VkIndexType indexT, bool multiDraw_)
         : DrawParamsBase(top, gParams)
         , IndexedParamsBase(indexT)
+        , commands()
+        , multiDraw(multiDraw_)
     {
     }
 
@@ -229,6 +245,12 @@ struct DrawIndexedIndirectParams : DrawParamsBase, IndexedParamsBase
         cmd.firstInstance = firstIns;
 
         commands.push_back(cmd);
+    }
+
+    void checkSupport(Context &context) const override
+    {
+        if (multiDraw && commands.size() > 1)
+            context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_MULTI_DRAW_INDIRECT);
     }
 };
 
@@ -404,9 +426,9 @@ void DrawTestInstanceBase::initialize(const DrawParamsBase &data)
 
         const vk::VkAttachmentReference colorAttachmentReference{0, vk::VK_IMAGE_LAYOUT_GENERAL};
 
-        renderPassCreateInfo.addSubpass(SubpassDescription(vk::VK_PIPELINE_BIND_POINT_GRAPHICS, 0, 0, DE_NULL, 1,
-                                                           &colorAttachmentReference, DE_NULL, AttachmentReference(), 0,
-                                                           DE_NULL));
+        renderPassCreateInfo.addSubpass(SubpassDescription(vk::VK_PIPELINE_BIND_POINT_GRAPHICS, 0, 0, nullptr, 1,
+                                                           &colorAttachmentReference, nullptr, AttachmentReference(), 0,
+                                                           nullptr));
 
         m_renderPass = vk::createRenderPass(m_vk, device, &renderPassCreateInfo);
 
@@ -496,7 +518,7 @@ void DrawTestInstanceBase::initPipeline(const vk::VkDevice device)
 
 #ifndef CTS_USES_VULKANSC
     vk::VkPipelineRenderingCreateInfoKHR renderingCreateInfo{vk::VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR,
-                                                             DE_NULL,
+                                                             nullptr,
                                                              0u,
                                                              1u,
                                                              &m_colorAttachmentFormat,
@@ -511,12 +533,16 @@ void DrawTestInstanceBase::initPipeline(const vk::VkDevice device)
         vk::VK_PIPELINE_CREATE_2_ALLOW_DERIVATIVES_BIT_KHR};
     if (m_data.useMaintenance5)
     {
-        pipelineCreateInfo.flags = 0xBAD00000;
+        // Previously these flags were set to a bad value like 0xBAD00000, but
+        // using VK_PIPELINE_CREATE_LIBRARY_BIT_KHR is much more interesting due
+        // to the implications of using this flag by mistake. In particular,
+        // several Mesa drivers crashed at some point due to this.
+        pipelineCreateInfo.flags = vk::VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
         pipelineCreateInfo.pNext = &pipelineFlags2CreateInfo;
     }
 #endif // CTS_USES_VULKANSC
 
-    m_pipeline = vk::createGraphicsPipeline(m_vk, device, DE_NULL, &pipelineCreateInfo);
+    m_pipeline = vk::createGraphicsPipeline(m_vk, device, VK_NULL_HANDLE, &pipelineCreateInfo);
 }
 
 void DrawTestInstanceBase::preRenderBarriers(void)
@@ -531,12 +557,12 @@ void DrawTestInstanceBase::preRenderBarriers(void)
                             1, &subresourceRange);
 
     const vk::VkMemoryBarrier memBarrier{
-        vk::VK_STRUCTURE_TYPE_MEMORY_BARRIER, DE_NULL, vk::VK_ACCESS_TRANSFER_WRITE_BIT,
+        vk::VK_STRUCTURE_TYPE_MEMORY_BARRIER, nullptr, vk::VK_ACCESS_TRANSFER_WRITE_BIT,
         vk::VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT};
 
     m_vk.cmdPipelineBarrier(*m_cmdBuffer, vk::VK_PIPELINE_STAGE_TRANSFER_BIT,
-                            vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 1, &memBarrier, 0, DE_NULL, 0,
-                            DE_NULL);
+                            vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 1, &memBarrier, 0, nullptr, 0,
+                            nullptr);
 }
 
 void DrawTestInstanceBase::beginRenderPass(vk::VkCommandBuffer cmdBuffer)
@@ -558,7 +584,7 @@ void DrawTestInstanceBase::beginSecondaryCmdBuffer(const vk::DeviceInterface &vk
 {
     const vk::VkCommandBufferInheritanceRenderingInfoKHR inheritanceRenderingInfo{
         vk::VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO_KHR, // VkStructureType sType;
-        DE_NULL,                                                             // const void* pNext;
+        nullptr,                                                             // const void* pNext;
         renderingFlags,                                                      // VkRenderingFlagsKHR flags;
         0u,                                                                  // uint32_t viewMask;
         1u,                                                                  // uint32_t colorAttachmentCount;
@@ -571,9 +597,9 @@ void DrawTestInstanceBase::beginSecondaryCmdBuffer(const vk::DeviceInterface &vk
     const vk::VkCommandBufferInheritanceInfo bufferInheritanceInfo{
         vk::VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO, // VkStructureType sType;
         &inheritanceRenderingInfo,                             // const void* pNext;
-        DE_NULL,                                               // VkRenderPass renderPass;
+        VK_NULL_HANDLE,                                        // VkRenderPass renderPass;
         0u,                                                    // uint32_t subpass;
-        DE_NULL,                                               // VkFramebuffer framebuffer;
+        VK_NULL_HANDLE,                                        // VkFramebuffer framebuffer;
         VK_FALSE,                                              // VkBool32 occlusionQueryEnable;
         (vk::VkQueryControlFlags)0u,                           // VkQueryControlFlags queryFlags;
         (vk::VkQueryPipelineStatisticFlags)0u                  // VkQueryPipelineStatisticFlags pipelineStatistics;
@@ -585,7 +611,7 @@ void DrawTestInstanceBase::beginSecondaryCmdBuffer(const vk::DeviceInterface &vk
 
     const vk::VkCommandBufferBeginInfo commandBufBeginParams{
         vk::VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType sType;
-        DE_NULL,                                         // const void* pNext;
+        nullptr,                                         // const void* pNext;
         usageFlags,                                      // VkCommandBufferUsageFlags flags;
         &bufferInheritanceInfo};
 
@@ -596,7 +622,7 @@ void DrawTestInstanceBase::beginNestedCmdBuffer(const vk::DeviceInterface &vk, v
 {
     const vk::VkCommandBufferInheritanceRenderingInfoKHR inheritanceRenderingInfo{
         vk::VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_RENDERING_INFO_KHR, // VkStructureType sType;
-        DE_NULL,                                                             // const void* pNext;
+        nullptr,                                                             // const void* pNext;
         renderingFlags,                                                      // VkRenderingFlagsKHR flags;
         0u,                                                                  // uint32_t viewMask;
         1u,                                                                  // uint32_t colorAttachmentCount;
@@ -609,9 +635,9 @@ void DrawTestInstanceBase::beginNestedCmdBuffer(const vk::DeviceInterface &vk, v
     const vk::VkCommandBufferInheritanceInfo bufferInheritanceInfo{
         vk::VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO, // VkStructureType sType;
         &inheritanceRenderingInfo,                             // const void* pNext;
-        DE_NULL,                                               // VkRenderPass renderPass;
+        VK_NULL_HANDLE,                                        // VkRenderPass renderPass;
         0u,                                                    // uint32_t subpass;
-        DE_NULL,                                               // VkFramebuffer framebuffer;
+        VK_NULL_HANDLE,                                        // VkFramebuffer framebuffer;
         VK_FALSE,                                              // VkBool32 occlusionQueryEnable;
         (vk::VkQueryControlFlags)0u,                           // VkQueryControlFlags queryFlags;
         (vk::VkQueryPipelineStatisticFlags)0u                  // VkQueryPipelineStatisticFlags pipelineStatistics;
@@ -623,7 +649,7 @@ void DrawTestInstanceBase::beginNestedCmdBuffer(const vk::DeviceInterface &vk, v
 
     const vk::VkCommandBufferBeginInfo commandBufBeginParams{
         vk::VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType sType;
-        DE_NULL,                                         // const void* pNext;
+        nullptr,                                         // const void* pNext;
         usageFlags,                                      // VkCommandBufferUsageFlags flags;
         &bufferInheritanceInfo};
 
@@ -675,7 +701,7 @@ public:
     DrawTestInstance(Context &context, const T &data);
     virtual ~DrawTestInstance(void);
     virtual void generateDrawData(void);
-    virtual void draw(vk::VkCommandBuffer cmdBuffer, vk::VkBuffer indirectBuffer = DE_NULL,
+    virtual void draw(vk::VkCommandBuffer cmdBuffer, vk::VkBuffer indirectBuffer = VK_NULL_HANDLE,
                       vk::VkDeviceSize indirectOffset = 0ul);
     virtual tcu::TestStatus iterate(void);
 
@@ -773,8 +799,7 @@ void DrawTestCase<T>::checkSupport(Context &context) const
     if (m_data.groupParams.nestedSecondaryCmdBuffer)
     {
         context.requireDeviceFunctionality("VK_EXT_nested_command_buffer");
-        const auto &features =
-            *vk::findStructure<vk::VkPhysicalDeviceNestedCommandBufferFeaturesEXT>(&context.getDeviceFeatures2());
+        const auto &features = context.getNestedCommandBufferFeaturesEXT();
         if (!features.nestedCommandBuffer)
             TCU_THROW(NotSupportedError, "nestedCommandBuffer is not supported");
         if (!features.nestedCommandBufferRendering)
@@ -790,6 +815,9 @@ void DrawTestCase<T>::checkSupport(Context &context) const
                   "VK_KHR_portability_subset: Triangle fans are not supported by this implementation");
     }
 #endif // CTS_USES_VULKANSC
+
+    // Parameter-specific support checks.
+    m_data.checkSupport(context);
 }
 
 template <typename T>
@@ -1046,7 +1074,7 @@ tcu::TestStatus DrawTestInstance<DrawIndexedParams>::iterate(void)
 
     const vk::VkBufferCreateInfo bufferCreateInfo = {
         vk::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                  // const void* pNext;
+        nullptr,                                  // const void* pNext;
         0u,                                       // VkBufferCreateFlags flags;
         bufferSize,                               // VkDeviceSize size;
         vk::VK_BUFFER_USAGE_INDEX_BUFFER_BIT,     // VkBufferUsageFlags usage;
@@ -1210,21 +1238,18 @@ template <>
 void DrawTestInstance<DrawIndirectParams>::draw(vk::VkCommandBuffer cmdBuffer, vk::VkBuffer indirectBuffer,
                                                 vk::VkDeviceSize indirectOffset)
 {
-    const vk::VkPhysicalDeviceFeatures features = m_context.getDeviceFeatures();
-
-    // If multiDrawIndirect not supported execute single calls
-    if (m_data.commands.size() > 1 && !(features.multiDrawIndirect))
+    if (m_data.multiDraw)
+    {
+        m_vk.cmdDrawIndirect(cmdBuffer, indirectBuffer, indirectOffset, (uint32_t)m_data.commands.size(),
+                             sizeof(vk::VkDrawIndirectCommand));
+    }
+    else // Use multiple single draws.
     {
         for (uint32_t cmdIdx = 0; cmdIdx < m_data.commands.size(); ++cmdIdx)
         {
             const uint32_t offset = (uint32_t)(indirectOffset + cmdIdx * sizeof(vk::VkDrawIndirectCommand));
             m_vk.cmdDrawIndirect(cmdBuffer, indirectBuffer, offset, 1, sizeof(vk::VkDrawIndirectCommand));
         }
-    }
-    else
-    {
-        m_vk.cmdDrawIndirect(cmdBuffer, indirectBuffer, indirectOffset, (uint32_t)m_data.commands.size(),
-                             sizeof(vk::VkDrawIndirectCommand));
     }
 }
 
@@ -1247,7 +1272,7 @@ tcu::TestStatus DrawTestInstance<DrawIndirectParams>::iterate(void)
 
         const vk::VkBufferCreateInfo indirectCreateInfo = {
             vk::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                  // const void* pNext;
+            nullptr,                                  // const void* pNext;
             0u,                                       // VkBufferCreateFlags flags;
             indirectInfoSize,                         // VkDeviceSize size;
             vk::VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,  // VkBufferUsageFlags usage;
@@ -1434,21 +1459,18 @@ template <>
 void DrawTestInstance<DrawIndexedIndirectParams>::draw(vk::VkCommandBuffer cmdBuffer, vk::VkBuffer indirectBuffer,
                                                        vk::VkDeviceSize indirectOffset)
 {
-    const vk::VkPhysicalDeviceFeatures features = m_context.getDeviceFeatures();
-
-    // If multiDrawIndirect not supported execute single calls
-    if (m_data.commands.size() > 1 && !(features.multiDrawIndirect))
+    if (m_data.multiDraw)
+    {
+        m_vk.cmdDrawIndexedIndirect(cmdBuffer, indirectBuffer, indirectOffset, (uint32_t)m_data.commands.size(),
+                                    sizeof(vk::VkDrawIndexedIndirectCommand));
+    }
+    else // Use multiple single draws.
     {
         for (uint32_t cmdIdx = 0; cmdIdx < m_data.commands.size(); ++cmdIdx)
         {
             const uint32_t offset = (uint32_t)(indirectOffset + cmdIdx * sizeof(vk::VkDrawIndexedIndirectCommand));
             m_vk.cmdDrawIndexedIndirect(cmdBuffer, indirectBuffer, offset, 1, sizeof(vk::VkDrawIndexedIndirectCommand));
         }
-    }
-    else
-    {
-        m_vk.cmdDrawIndexedIndirect(cmdBuffer, indirectBuffer, indirectOffset, (uint32_t)m_data.commands.size(),
-                                    sizeof(vk::VkDrawIndexedIndirectCommand));
     }
 }
 
@@ -1471,7 +1493,7 @@ tcu::TestStatus DrawTestInstance<DrawIndexedIndirectParams>::iterate(void)
 
         vk::VkBufferCreateInfo indirectCreateInfo{
             vk::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                  // const void* pNext;
+            nullptr,                                  // const void* pNext;
             0u,                                       // VkBufferCreateFlags flags;
             indirectInfoSize,                         // VkDeviceSize size;
             vk::VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT,  // VkBufferUsageFlags usage;
@@ -1507,7 +1529,7 @@ tcu::TestStatus DrawTestInstance<DrawIndexedIndirectParams>::iterate(void)
 
     vk::VkBufferCreateInfo bufferCreateInfo{
         vk::VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                  // const void* pNext;
+        nullptr,                                  // const void* pNext;
         0u,                                       // VkBufferCreateFlags flags;
         bufferSize,                               // VkDeviceSize size;
         vk::VK_BUFFER_USAGE_INDEX_BUFFER_BIT,     // VkBufferUsageFlags usage;
@@ -1743,13 +1765,17 @@ void populateSubGroup(tcu::TestCaseGroup *testGroup, const TestCaseParams casePa
         {
             uint32_t firstVertex = rnd.getInt(0, OFFSET_LIMIT);
 
-            DrawIndirectParams params = DrawIndirectParams(topology, groupParams);
+            DrawIndirectParams params = DrawIndirectParams(topology, groupParams, false);
 
             params.addCommand(vertexCount, 1, 0, 0);
             testGroup->addChild(new IndirectCase(testCtx, (name + "_single_command").c_str(), params));
 
             params.addCommand(vertexCount, 1, firstVertex, 0);
             testGroup->addChild(new IndirectCase(testCtx, (name + "_multi_command").c_str(), params));
+
+            params.multiDraw = true;
+            testGroup->addChild(new IndirectCase(testCtx, (name + "_multi_command_multi_draw").c_str(), params));
+
             break;
         }
         case DRAW_COMMAND_TYPE_DRAW_INDEXED_INDIRECT:
@@ -1758,12 +1784,17 @@ void populateSubGroup(tcu::TestCaseGroup *testGroup, const TestCaseParams casePa
             uint32_t vertexOffset = rnd.getInt(vertexCount, OFFSET_LIMIT);
 
             DrawIndexedIndirectParams params =
-                DrawIndexedIndirectParams(topology, groupParams, vk::VK_INDEX_TYPE_UINT32);
+                DrawIndexedIndirectParams(topology, groupParams, vk::VK_INDEX_TYPE_UINT32, false);
+
             params.addCommand(vertexCount, 1, 0, 0, 0);
             testGroup->addChild(new IndexedIndirectCase(testCtx, (name + "_single_command").c_str(), params));
 
             params.addCommand(vertexCount, 1, firstIndex, vertexOffset, 0);
             testGroup->addChild(new IndexedIndirectCase(testCtx, (name + "_multi_command").c_str(), params));
+
+            params.multiDraw = true;
+            testGroup->addChild(new IndexedIndirectCase(testCtx, (name + "_multi_command_multi_draw").c_str(), params));
+
             break;
         }
         default:
@@ -1774,11 +1805,12 @@ void populateSubGroup(tcu::TestCaseGroup *testGroup, const TestCaseParams casePa
 
 void createDrawTests(tcu::TestCaseGroup *testGroup, const SharedGroupParams groupParams)
 {
+    auto &testCtx = testGroup->getTestContext();
+
     for (uint32_t drawTypeIndex = 0; drawTypeIndex < DRAW_COMMAND_TYPE_DRAW_LAST; ++drawTypeIndex)
     {
         const DrawCommandType command(static_cast<DrawCommandType>(drawTypeIndex));
-        de::MovePtr<tcu::TestCaseGroup> topologyGroup(
-            new tcu::TestCaseGroup(testGroup->getTestContext(), getDrawCommandTypeName(command)));
+        de::MovePtr<tcu::TestCaseGroup> topologyGroup(new tcu::TestCaseGroup(testCtx, getDrawCommandTypeName(command)));
 
         for (uint32_t topologyIdx = 0; topologyIdx != vk::VK_PRIMITIVE_TOPOLOGY_PATCH_LIST; ++topologyIdx)
         {
@@ -1801,14 +1833,20 @@ void createDrawTests(tcu::TestCaseGroup *testGroup, const SharedGroupParams grou
     }
 
 #ifndef CTS_USES_VULKANSC
-    de::MovePtr<tcu::TestCaseGroup> miscGroup(new tcu::TestCaseGroup(testGroup->getTestContext(), "misc"));
+    de::MovePtr<tcu::TestCaseGroup> miscGroup(new tcu::TestCaseGroup(testCtx, "misc"));
     if (groupParams->useDynamicRendering == false)
     {
-        DrawIndexedIndirectParams params(vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, groupParams,
-                                         vk::VK_INDEX_TYPE_UINT32);
-        params.addCommand(4, 1, 0, 0, 0);
-        params.useMaintenance5 = true;
-        miscGroup->addChild(new IndexedIndirectCase(testGroup->getTestContext(), "maintenance5", params));
+        {
+            DrawIndexedIndirectParams params(vk::VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, groupParams,
+                                             vk::VK_INDEX_TYPE_UINT32, false);
+            params.addCommand(4, 1, 0, 0, 0);
+            params.useMaintenance5 = true;
+            miscGroup->addChild(new IndexedIndirectCase(testCtx, "maintenance5", params));
+        }
+        {
+            miscGroup->addChild(
+                cts_amber::createAmberTestCase(testCtx, "flat_b_sat_error", "", "draw/misc", "flat_b_sat_error.amber"));
+        }
     }
     testGroup->addChild(miscGroup.release());
 #endif // CTS_USES_VULKANSC

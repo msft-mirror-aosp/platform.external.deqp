@@ -305,7 +305,7 @@ void NegativeShaderApiTests::init(void)
         glLinkProgram(program.getProgram());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, tfID);
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buf);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, DE_NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf);
         glBeginTransformFeedback(GL_TRIANGLES);
         expectError(GL_NO_ERROR);
@@ -351,7 +351,7 @@ void NegativeShaderApiTests::init(void)
         glLinkProgram(program1.getProgram());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, tfID);
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buf);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, DE_NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf);
         glBeginTransformFeedback(GL_TRIANGLES);
         expectError(GL_NO_ERROR);
@@ -1760,7 +1760,7 @@ void NegativeShaderApiTests::init(void)
         glLinkProgram(program.getProgram());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, tfID[0]);
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buf);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, DE_NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf);
         glBeginTransformFeedback(GL_TRIANGLES);
         expectError(GL_NO_ERROR);
@@ -1803,7 +1803,7 @@ void NegativeShaderApiTests::init(void)
         glLinkProgram(program.getProgram());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, tfID[0]);
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buf);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, DE_NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf);
         expectError(GL_NO_ERROR);
 
@@ -1819,6 +1819,7 @@ void NegativeShaderApiTests::init(void)
         expectError(GL_NO_ERROR);
         glBeginTransformFeedback(GL_POINTS);
         expectError(GL_INVALID_OPERATION);
+        glEndTransformFeedback();
         m_log << tcu::TestLog::EndSection;
 
         m_log << tcu::TestLog::Section("", "GL_INVALID_OPERATION is generated if any binding point used in transform "
@@ -1841,11 +1842,12 @@ void NegativeShaderApiTests::init(void)
                                        "GL_INVALID_OPERATION is generated if no binding points would be used because "
                                        "the active program object has specified no varying variables to record.");
         glTransformFeedbackVaryings(program.getProgram(), 0, 0, GL_INTERLEAVED_ATTRIBS);
+        glLinkProgram(program.getProgram());
+        expectError(GL_NO_ERROR);
         glBeginTransformFeedback(GL_TRIANGLES);
         expectError(GL_INVALID_OPERATION);
         m_log << tcu::TestLog::EndSection;
 
-        glEndTransformFeedback();
         glDeleteBuffers(1, &buf);
         glDeleteTransformFeedbacks(2, tfID);
         expectError(GL_NO_ERROR);
@@ -1865,7 +1867,7 @@ void NegativeShaderApiTests::init(void)
         glLinkProgram(program.getProgram());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, tfID[0]);
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buf);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, DE_NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf);
         expectError(GL_NO_ERROR);
 
@@ -1900,7 +1902,7 @@ void NegativeShaderApiTests::init(void)
         glLinkProgram(program.getProgram());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, tfID[0]);
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buf);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, DE_NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf);
         expectError(GL_NO_ERROR);
 
@@ -1936,7 +1938,7 @@ void NegativeShaderApiTests::init(void)
         glLinkProgram(program.getProgram());
         glBindTransformFeedback(GL_TRANSFORM_FEEDBACK, tfID);
         glBindBuffer(GL_TRANSFORM_FEEDBACK_BUFFER, buf);
-        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, DE_NULL, GL_DYNAMIC_DRAW);
+        glBufferData(GL_TRANSFORM_FEEDBACK_BUFFER, 32, nullptr, GL_DYNAMIC_DRAW);
         glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, 0, buf);
         expectError(GL_NO_ERROR);
 

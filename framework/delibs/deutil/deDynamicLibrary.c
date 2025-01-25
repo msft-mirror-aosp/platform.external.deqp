@@ -41,7 +41,7 @@ deDynamicLibrary *deDynamicLibrary_open(const char *fileName)
 {
     deDynamicLibrary *library = (deDynamicLibrary *)deCalloc(sizeof(deDynamicLibrary));
     if (!library)
-        return DE_NULL;
+        return NULL;
 
     if (getenv("LD_LIBRARY_PATH"))
     {
@@ -59,7 +59,7 @@ deDynamicLibrary *deDynamicLibrary_open(const char *fileName)
     if (!library->libHandle)
     {
         deFree(library);
-        return DE_NULL;
+        return NULL;
     }
 
     return library;
@@ -102,13 +102,13 @@ deDynamicLibrary *deDynamicLibrary_open(const char *fileName)
 {
     deDynamicLibrary *library = (deDynamicLibrary *)deCalloc(sizeof(deDynamicLibrary));
     if (!library)
-        return DE_NULL;
+        return NULL;
 
     library->handle = LoadLibrary(fileName);
     if (!library->handle)
     {
         deFree(library);
-        return DE_NULL;
+        return NULL;
     }
 
     return library;

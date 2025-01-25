@@ -6,6 +6,7 @@ vk-default/conditional-rendering.txt
 vk-default/depth.txt
 vk-default/descriptor-indexing.txt
 vk-default/device-group.txt
+vk-default/dgc.txt
 vk-default/draw.txt
 vk-default/drm-format-modifiers.txt
 vk-default/dynamic-rendering.txt
@@ -19,7 +20,10 @@ vk-default/glsl.txt
 vk-default/graphicsfuzz.txt
 vk-default/image/astc-decode-mode.txt
 vk-default/image/atomic-operations.txt
+vk-default/image/concurrent-copy.txt
 vk-default/image/depth-stencil-descriptor.txt
+vk-default/image/depth-stencil-separate-access.txt
+vk-default/image/device-scope-access.txt
 vk-default/image/extend-operands-spirv1p4.txt
 vk-default/image/extended-usage-bit.txt
 vk-default/image/extended-usage-bit-compatibility.txt

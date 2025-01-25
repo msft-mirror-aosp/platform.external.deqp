@@ -401,6 +401,23 @@ inline T channelToIntType(const uint8_t *value, TextureFormat::ChannelType type)
         return (T) * ((const int8_t *)value);
     case TextureFormat::SSCALED_INT16:
         return (T) * ((const int16_t *)value);
+    // required by modifiers tests
+    case TextureFormat::UNSIGNED_INT_11F_11F_10F_REV:
+        return (T) * ((const uint32_t *)value);
+    case TextureFormat::UNORM_INT_1010102_REV:
+        return (T) * ((const uint32_t *)value);
+    case TextureFormat::SNORM_INT_1010102_REV:
+        return (T) * ((const uint32_t *)value);
+    case TextureFormat::USCALED_INT_1010102_REV:
+        return (T) * ((const uint32_t *)value);
+    case TextureFormat::SSCALED_INT_1010102_REV:
+        return (T) * ((const uint32_t *)value);
+    case TextureFormat::UNSIGNED_INT_1010102_REV:
+        return (T) * ((const uint32_t *)value);
+    case TextureFormat::SIGNED_INT_1010102_REV:
+        return (T) * ((const uint32_t *)value);
+    case TextureFormat::UNSIGNED_INT_999_E5_REV:
+        return (T) * ((const uint32_t *)value);
     default:
         DE_ASSERT(false);
         return 0;
@@ -1040,6 +1057,23 @@ int getChannelSize(TextureFormat::ChannelType type)
         return 1;
     case TextureFormat::SSCALED_INT16:
         return 2;
+    // required by modifiers tests
+    case TextureFormat::UNSIGNED_INT_11F_11F_10F_REV:
+        return 4;
+    case TextureFormat::UNORM_INT_1010102_REV:
+        return 4;
+    case TextureFormat::SNORM_INT_1010102_REV:
+        return 4;
+    case TextureFormat::USCALED_INT_1010102_REV:
+        return 4;
+    case TextureFormat::SSCALED_INT_1010102_REV:
+        return 4;
+    case TextureFormat::UNSIGNED_INT_1010102_REV:
+        return 4;
+    case TextureFormat::SIGNED_INT_1010102_REV:
+        return 4;
+    case TextureFormat::UNSIGNED_INT_999_E5_REV:
+        return 4;
     default:
         DE_ASSERT(false);
         return 0;
@@ -1295,7 +1329,7 @@ IVec3 calculatePackedPitch(const TextureFormat &format, const IVec3 &size)
     return IVec3(pixelSize, rowPitch, slicePitch);
 }
 
-ConstPixelBufferAccess::ConstPixelBufferAccess(void) : m_size(0), m_pitch(0), m_divider(1, 1, 1), m_data(DE_NULL)
+ConstPixelBufferAccess::ConstPixelBufferAccess(void) : m_size(0), m_pitch(0), m_divider(1, 1, 1), m_data(nullptr)
 {
 }
 
@@ -1340,7 +1374,7 @@ ConstPixelBufferAccess::ConstPixelBufferAccess(const TextureFormat &format, cons
     , m_data((void *)data)
 {
     DE_ASSERT(isValid(format));
-    DE_ASSERT(m_format.getPixelSize() <= m_pitch.x());
+    //DE_ASSERT(m_format.getPixelSize() <= m_pitch.x());
 }
 
 ConstPixelBufferAccess::ConstPixelBufferAccess(const TextureFormat &format, const IVec3 &size, const IVec3 &pitch,
@@ -1352,7 +1386,7 @@ ConstPixelBufferAccess::ConstPixelBufferAccess(const TextureFormat &format, cons
     , m_data((void *)data)
 {
     DE_ASSERT(isValid(format));
-    DE_ASSERT(m_format.getPixelSize() <= m_pitch.x());
+    //DE_ASSERT(m_format.getPixelSize() <= m_pitch.x());
 }
 
 ConstPixelBufferAccess::ConstPixelBufferAccess(const TextureLevel &level)
@@ -3108,7 +3142,7 @@ Vec4 sampleLevelArray2DOffset(const ConstPixelBufferAccess *levels, int numLevel
     // minLodRelative is used to calculate the image level to sample from, when VK_EXT_image_view_min_lod extension is enabled.
     // The value is relative to baseLevel as the Texture*View was created as the baseLevel being level[0].
     const float minLodRelative =
-        (minLodParams != DE_NULL) ? getImageViewMinLod(minLodParams->minLod) - (float)minLodParams->baseLevel : 0.0f;
+        (minLodParams != nullptr) ? getImageViewMinLod(minLodParams->minLod) - (float)minLodParams->baseLevel : 0.0f;
 
     if (es2 && sampler.magFilter == Sampler::LINEAR &&
         (sampler.minFilter == Sampler::NEAREST_MIPMAP_NEAREST || sampler.minFilter == Sampler::NEAREST_MIPMAP_LINEAR))
@@ -3117,7 +3151,7 @@ Vec4 sampleLevelArray2DOffset(const ConstPixelBufferAccess *levels, int numLevel
         magnified = lod <= sampler.lodThreshold;
 
     // VK_EXT_image_view_min_lod: Integer Texel Coordinates case (with robustness2 supported)
-    if (minLodParams != DE_NULL && minLodParams->intTexCoord)
+    if (minLodParams != nullptr && minLodParams->intTexCoord)
     {
         if (lod < deFloatFloor(minLodRelative) || lod >= (float)numLevels)
             return Vec4(0.0f);
@@ -3152,7 +3186,7 @@ Vec4 sampleLevelArray2DOffset(const ConstPixelBufferAccess *levels, int numLevel
     case Sampler::LINEAR_MIPMAP_NEAREST:
     case Sampler::CUBIC_MIPMAP_NEAREST:
     {
-        if (minLodParams != DE_NULL && !minLodParams->intTexCoord)
+        if (minLodParams != nullptr && !minLodParams->intTexCoord)
             lod = de::max(lod, minLodRelative);
 
         int maxLevel = (int)numLevels - 1;
@@ -3181,7 +3215,7 @@ Vec4 sampleLevelArray2DOffset(const ConstPixelBufferAccess *levels, int numLevel
     case Sampler::LINEAR_MIPMAP_LINEAR:
     case Sampler::CUBIC_MIPMAP_LINEAR:
     {
-        if (minLodParams != DE_NULL && !minLodParams->intTexCoord)
+        if (minLodParams != nullptr && !minLodParams->intTexCoord)
             lod = de::max(lod, minLodRelative);
 
         int maxLevel = (int)numLevels - 1;
@@ -3222,12 +3256,12 @@ Vec4 sampleLevelArray3DOffset(const ConstPixelBufferAccess *levels, int numLevel
     // minLodRelative is used to calculate the image level to sample from, when VK_EXT_image_view_min_lod extension is enabled.
     // The value is relative to baseLevel as the Texture*View was created as the baseLevel being level[0].
     const float minLodRelative =
-        (minLodParams != DE_NULL) ? getImageViewMinLod(minLodParams->minLod) - (float)minLodParams->baseLevel : 0.0f;
+        (minLodParams != nullptr) ? getImageViewMinLod(minLodParams->minLod) - (float)minLodParams->baseLevel : 0.0f;
     bool magnified                 = lod <= sampler.lodThreshold;
     Sampler::FilterMode filterMode = magnified ? sampler.magFilter : sampler.minFilter;
 
     // VK_EXT_image_view_min_lod: Integer Texel Coordinates case (with robustness2 supported)
-    if (minLodParams != DE_NULL && minLodParams->intTexCoord)
+    if (minLodParams != nullptr && minLodParams->intTexCoord)
     {
         if (lod < deFloatFloor(minLodRelative) || lod >= (float)numLevels)
             return Vec4(0.0f);
@@ -3259,7 +3293,7 @@ Vec4 sampleLevelArray3DOffset(const ConstPixelBufferAccess *levels, int numLevel
     case Sampler::NEAREST_MIPMAP_NEAREST:
     case Sampler::LINEAR_MIPMAP_NEAREST:
     {
-        if (minLodParams != DE_NULL && !minLodParams->intTexCoord)
+        if (minLodParams != nullptr && !minLodParams->intTexCoord)
             lod = de::max(lod, minLodRelative);
 
         int maxLevel = (int)numLevels - 1;
@@ -3273,7 +3307,7 @@ Vec4 sampleLevelArray3DOffset(const ConstPixelBufferAccess *levels, int numLevel
     case Sampler::NEAREST_MIPMAP_LINEAR:
     case Sampler::LINEAR_MIPMAP_LINEAR:
     {
-        if (minLodParams != DE_NULL && !minLodParams->intTexCoord)
+        if (minLodParams != nullptr && !minLodParams->intTexCoord)
             lod = de::max(lod, minLodRelative);
 
         int maxLevel = (int)numLevels - 1;
@@ -3720,12 +3754,12 @@ static Vec4 sampleLevelArrayCubeSeamless(const ConstPixelBufferAccess *const (&f
     // minLodRelative is used to calculate the image level to sample from, when VK_EXT_image_view_min_lod extension is enabled.
     // The value is relative to baseLevel as the Texture*View was created as the baseLevel being level[0].
     const float minLodRelative =
-        (minLodParams != DE_NULL) ? getImageViewMinLod(minLodParams->minLod) - (float)minLodParams->baseLevel : 0.0f;
+        (minLodParams != nullptr) ? getImageViewMinLod(minLodParams->minLod) - (float)minLodParams->baseLevel : 0.0f;
     bool magnified                 = lod <= sampler.lodThreshold;
     Sampler::FilterMode filterMode = magnified ? sampler.magFilter : sampler.minFilter;
 
     // VK_EXT_image_view_min_lod: Integer Texel Coordinates case (with robustness2 supported)
-    if (minLodParams != DE_NULL && minLodParams->intTexCoord)
+    if (minLodParams != nullptr && minLodParams->intTexCoord)
     {
         if (lod < deFloatFloor(minLodRelative) || lod >= (float)(numLevels - 1))
             return Vec4(0.0f);
@@ -3781,7 +3815,7 @@ static Vec4 sampleLevelArrayCubeSeamless(const ConstPixelBufferAccess *const (&f
     case Sampler::NEAREST_MIPMAP_NEAREST:
     case Sampler::LINEAR_MIPMAP_NEAREST:
     {
-        if (minLodParams != DE_NULL && !minLodParams->intTexCoord)
+        if (minLodParams != nullptr && !minLodParams->intTexCoord)
             lod = de::max(lod, minLodRelative);
 
         int maxLevel = (int)numLevels - 1;
@@ -3806,7 +3840,7 @@ static Vec4 sampleLevelArrayCubeSeamless(const ConstPixelBufferAccess *const (&f
     case Sampler::NEAREST_MIPMAP_LINEAR:
     case Sampler::LINEAR_MIPMAP_LINEAR:
     {
-        if (minLodParams != DE_NULL && !minLodParams->intTexCoord)
+        if (minLodParams != nullptr && !minLodParams->intTexCoord)
             lod = de::max(lod, minLodRelative);
 
         int maxLevel = (int)numLevels - 1;
@@ -4396,10 +4430,10 @@ void Texture2D::allocLevel(int levelNdx)
 
 // TextureCubeView
 
-TextureCubeView::TextureCubeView(void) : m_numLevels(0), m_es2(false), m_minLodParams(DE_NULL)
+TextureCubeView::TextureCubeView(void) : m_numLevels(0), m_es2(false), m_minLodParams(nullptr)
 {
     for (int ndx = 0; ndx < CUBEFACE_LAST; ndx++)
-        m_levels[ndx] = DE_NULL;
+        m_levels[ndx] = nullptr;
 }
 
 TextureCubeView::TextureCubeView(int numLevels, const ConstPixelBufferAccess *const (&levels)[CUBEFACE_LAST], bool es2,

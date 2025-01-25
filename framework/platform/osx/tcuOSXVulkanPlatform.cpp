@@ -40,10 +40,10 @@ namespace tcu
 namespace osx
 {
 
-class VulkanWindow : public vk::wsi::MacOSWindowInterface
+class VulkanWindow : public vk::wsi::MetalWindowInterface
 {
 public:
-    VulkanWindow(MovePtr<osx::MetalView> view) : vk::wsi::MacOSWindowInterface(view->getView()), m_view(view)
+    VulkanWindow(MovePtr<osx::MetalView> view) : vk::wsi::MetalWindowInterface(view->getLayer()), m_view(view)
     {
     }
 
@@ -85,7 +85,7 @@ class VulkanLibrary : public vk::Library
 {
 public:
     VulkanLibrary(const char *libraryPath)
-        : m_library(libraryPath != DE_NULL ? libraryPath : "libvulkan.dylib")
+        : m_library(libraryPath != nullptr ? libraryPath : "libvulkan.dylib")
         , m_driver(m_library)
     {
     }
@@ -138,7 +138,7 @@ vk::wsi::Display *VulkanPlatform::createWsiDisplay(vk::wsi::Type wsiType) const
 {
     switch (wsiType)
     {
-    case vk::wsi::TYPE_MACOS:
+    case vk::wsi::TYPE_METAL:
         return new VulkanDisplay();
     case vk::wsi::TYPE_HEADLESS:
         return new VulkanDisplayHeadless();
@@ -151,7 +151,7 @@ bool VulkanPlatform::hasDisplay(vk::wsi::Type wsiType) const
 {
     switch (wsiType)
     {
-    case vk::wsi::TYPE_MACOS:
+    case vk::wsi::TYPE_METAL:
     case vk::wsi::TYPE_HEADLESS:
         return true;
     default:

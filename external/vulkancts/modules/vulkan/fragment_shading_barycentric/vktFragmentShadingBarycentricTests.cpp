@@ -120,6 +120,10 @@ struct TestParams
     uint32_t rotation;
     bool dynamicTopologyInPipeline;
     VkSampleCountFlagBits sampleCount;
+    bool testWithInterpolation;
+    bool testWithFlatInterpolation;
+    bool clipVertices;
+    bool useMeshShader;
 };
 
 size_t getComponentCount(const TestParams &testParams)
@@ -140,7 +144,7 @@ static VkImageCreateInfo makeImageCreateInfo(const VkFormat format, const uint32
         VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
     const VkImageCreateInfo imageCreateInfo = {
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                             // const void* pNext;
+        nullptr,                             // const void* pNext;
         0u,                                  // VkImageCreateFlags flags;
         VK_IMAGE_TYPE_2D,                    // VkImageType imageType;
         format,                              // VkFormat format;
@@ -152,7 +156,7 @@ static VkImageCreateInfo makeImageCreateInfo(const VkFormat format, const uint32
         usage,                               // VkImageUsageFlags usage;
         VK_SHARING_MODE_EXCLUSIVE,           // VkSharingMode sharingMode;
         0u,                                  // uint32_t queueFamilyIndexCount;
-        DE_NULL,                             // const uint32_t* pQueueFamilyIndices;
+        nullptr,                             // const uint32_t* pQueueFamilyIndices;
         VK_IMAGE_LAYOUT_UNDEFINED,           // VkImageLayout initialLayout;
     };
 
@@ -201,39 +205,39 @@ static Move<VkRenderPass> makeRenderPass(const DeviceInterface &vk, const VkDevi
     const bool useMultisampling = (samples > VK_SAMPLE_COUNT_1_BIT);
     const VkAttachmentReference *colorAttachment =
         useMultisampling ? &attachmentMultiSampleRef : &attachmentSingleSampleRef;
-    const VkAttachmentReference *resolveAttachment = useMultisampling ? &attachmentSingleSampleRef : DE_NULL;
+    const VkAttachmentReference *resolveAttachment = useMultisampling ? &attachmentSingleSampleRef : nullptr;
 
     const VkSubpassDescription subpassDescription{
         (VkSubpassDescriptionFlags)0u,   // VkSubpassDescriptionFlags flags;
         VK_PIPELINE_BIND_POINT_GRAPHICS, // VkPipelineBindPoint pipelineBindPoint;
         0u,                              // uint32_t inputAttachmentCount;
-        DE_NULL,                         // const VkAttachmentReference* pInputAttachments;
+        nullptr,                         // const VkAttachmentReference* pInputAttachments;
         1u,                              // uint32_t colorAttachmentCount;
         colorAttachment,                 // const VkAttachmentReference* pColorAttachments;
         resolveAttachment,               // const VkAttachmentReference* pResolveAttachments;
-        DE_NULL,                         // const VkAttachmentReference* pDepthStencilAttachment;
+        nullptr,                         // const VkAttachmentReference* pDepthStencilAttachment;
         0u,                              // uint32_t preserveAttachmentCount;
-        DE_NULL                          // const uint32_t* pPreserveAttachments;
+        nullptr                          // const uint32_t* pPreserveAttachments;
     };
 
     const VkRenderPassCreateInfo renderPassInfo{
         VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                   // const void* pNext;
+        nullptr,                                   // const void* pNext;
         (VkRenderPassCreateFlags)0u,               // VkRenderPassCreateFlags flags;
         1u + useMultisampling,                     // uint32_t attachmentCount;
         attachments,                               // const VkAttachmentDescription* pAttachments;
         1u,                                        // uint32_t subpassCount;
         &subpassDescription,                       // const VkSubpassDescription* pSubpasses;
         0u,                                        // uint32_t dependencyCount;
-        DE_NULL                                    // const VkSubpassDependency* pDependencies;
+        nullptr                                    // const VkSubpassDependency* pDependencies;
     };
 
-    return createRenderPass(vk, device, &renderPassInfo, DE_NULL);
+    return createRenderPass(vk, device, &renderPassInfo, nullptr);
 }
 
 using GraphicsPipelinePtr = std::unique_ptr<GraphicsPipelineWrapper>;
 
-static GraphicsPipelinePtr makeGraphicsPipeline(
+static GraphicsPipelinePtr makeGraphicsVertexShaderPipeline(
     PipelineConstructionType pipelineConstructionType, const InstanceInterface &vki, const DeviceInterface &vkd,
     const VkPhysicalDevice physicalDevice, const VkDevice device, const std::vector<std::string> &deviceExtensions,
     const PipelineLayoutWrapper &pipelineLayout, const VkRenderPass renderPass, const ShaderWrapper vertShaderModule,
@@ -267,7 +271,7 @@ static GraphicsPipelinePtr makeGraphicsPipeline(
     };
     const VkPipelineVertexInputStateCreateInfo vertexInputStateInfo = {
         VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                                                   // const void* pNext;
+        nullptr,                                                   // const void* pNext;
         (VkPipelineVertexInputStateCreateFlags)0,                  // VkPipelineVertexInputStateCreateFlags flags;
         1u,                                                        // uint32_t vertexBindingDescriptionCount;
         &vertexInputBindingDescription, // const VkVertexInputBindingDescription* pVertexBindingDescriptions;
@@ -276,12 +280,12 @@ static GraphicsPipelinePtr makeGraphicsPipeline(
     };
     const VkPipelineRasterizationProvokingVertexStateCreateInfoEXT provokingVertexStateCreateInfoEXT = {
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_PROVOKING_VERTEX_STATE_CREATE_INFO_EXT, //  VkStructureType sType;
-        DE_NULL,                                                                         //  const void* pNext;
+        nullptr,                                                                         //  const void* pNext;
         VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, //  VkProvokingVertexModeEXT provokingVertexMode;
     };
     const VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {
         VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,         //  VkStructureType sType;
-        provokingVertexLast ? &provokingVertexStateCreateInfoEXT : DE_NULL, //  const void* pNext;
+        provokingVertexLast ? &provokingVertexStateCreateInfoEXT : nullptr, //  const void* pNext;
         0u,                              //  VkPipelineRasterizationStateCreateFlags flags;
         VK_FALSE,                        //  VkBool32 depthClampEnable;
         false,                           //  VkBool32 rasterizerDiscardEnable;
@@ -302,7 +306,7 @@ static GraphicsPipelinePtr makeGraphicsPipeline(
         rasterizationSamples,                                     // VkSampleCountFlagBits rasterizationSamples;
         (isMultiSample ? VK_TRUE : VK_FALSE),                     // VkBool32 sampleShadingEnable;
         1.0f,                                                     // float minSampleShading;
-        DE_NULL,                                                  // const VkSampleMask* pSampleMask;
+        nullptr,                                                  // const VkSampleMask* pSampleMask;
         VK_FALSE,                                                 // VkBool32 alphaToCoverageEnable;
         VK_FALSE,                                                 // VkBool32 alphaToOneEnable;
     };
@@ -311,13 +315,13 @@ static GraphicsPipelinePtr makeGraphicsPipeline(
     };
     const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {
         VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, //  VkStructureType sType;
-        DE_NULL,                                              //  const void* pNext;
+        nullptr,                                              //  const void* pNext;
         0u,                                                   //  VkPipelineDynamicStateCreateFlags flags;
         DE_LENGTH_OF_ARRAY(dynamicStates),                    //  uint32_t dynamicStateCount;
         dynamicStates,                                        //  const VkDynamicState* pDynamicStates;
     };
     const VkPipelineDynamicStateCreateInfo *pDynamicStateCreateInfo =
-        dynamicTopology ? &dynamicStateCreateInfo : DE_NULL;
+        dynamicTopology ? &dynamicStateCreateInfo : nullptr;
     const auto pVertexInputStateCreateInfo = (withColor ? &vertexInputStateInfo : nullptr);
 
     GraphicsPipelinePtr pipelineWrapperPtr(
@@ -339,6 +343,112 @@ static GraphicsPipelinePtr makeGraphicsPipeline(
         .buildPipeline();
 
     return pipelineWrapperPtr;
+}
+
+static GraphicsPipelinePtr makeGraphicsMeshShaderPipeline(
+    PipelineConstructionType pipelineConstructionType, const InstanceInterface &vki, const DeviceInterface &vkd,
+    const VkPhysicalDevice physicalDevice, const VkDevice device, const std::vector<std::string> &deviceExtensions,
+    const PipelineLayoutWrapper &pipelineLayout, const VkRenderPass renderPass, const ShaderWrapper meshShaderModule,
+    const ShaderWrapper fragShaderModule, const uint32_t width, const uint32_t height,
+    const VkPrimitiveTopology topology, const VkSampleCountFlagBits rasterizationSamples,
+    const bool provokingVertexLast = false, const bool dynamicTopology = false)
+{
+    const std::vector<VkViewport> viewports(1, makeViewport(width, height));
+    const std::vector<VkRect2D> scissors(1, makeRect2D(width, height));
+
+    const VkPipelineRasterizationProvokingVertexStateCreateInfoEXT provokingVertexStateCreateInfoEXT = {
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_PROVOKING_VERTEX_STATE_CREATE_INFO_EXT, //  VkStructureType sType;
+        nullptr,                                                                         //  const void* pNext;
+        VK_PROVOKING_VERTEX_MODE_LAST_VERTEX_EXT, //  VkProvokingVertexModeEXT provokingVertexMode;
+    };
+    const VkPipelineRasterizationStateCreateInfo rasterizationStateCreateInfo = {
+        VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,         //  VkStructureType sType;
+        provokingVertexLast ? &provokingVertexStateCreateInfoEXT : nullptr, //  const void* pNext;
+        0u,                              //  VkPipelineRasterizationStateCreateFlags flags;
+        VK_FALSE,                        //  VkBool32 depthClampEnable;
+        false,                           //  VkBool32 rasterizerDiscardEnable;
+        VK_POLYGON_MODE_FILL,            //  VkPolygonMode polygonMode;
+        VK_CULL_MODE_NONE,               //  VkCullModeFlags cullMode;
+        VK_FRONT_FACE_COUNTER_CLOCKWISE, //  VkFrontFace frontFace;
+        VK_FALSE,                        //  VkBool32 depthBiasEnable;
+        0.0f,                            //  float depthBiasConstantFactor;
+        0.0f,                            //  float depthBiasClamp;
+        0.0f,                            //  float depthBiasSlopeFactor;
+        1.0f                             //  float lineWidth;
+    };
+    const bool isMultiSample = (rasterizationSamples > VK_SAMPLE_COUNT_1_BIT);
+    const VkPipelineMultisampleStateCreateInfo multisampleStateInfo{
+        VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, // VkStructureType sType;
+        nullptr,                                                  // const void* pNext;
+        0u,                                                       // VkPipelineMultisampleStateCreateFlags flags;
+        rasterizationSamples,                                     // VkSampleCountFlagBits rasterizationSamples;
+        (isMultiSample ? VK_TRUE : VK_FALSE),                     // VkBool32 sampleShadingEnable;
+        1.0f,                                                     // float minSampleShading;
+        nullptr,                                                  // const VkSampleMask* pSampleMask;
+        VK_FALSE,                                                 // VkBool32 alphaToCoverageEnable;
+        VK_FALSE,                                                 // VkBool32 alphaToOneEnable;
+    };
+    const VkDynamicState dynamicStates[] = {
+        VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
+    };
+    const VkPipelineDynamicStateCreateInfo dynamicStateCreateInfo = {
+        VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO, //  VkStructureType sType;
+        nullptr,                                              //  const void* pNext;
+        0u,                                                   //  VkPipelineDynamicStateCreateFlags flags;
+        DE_LENGTH_OF_ARRAY(dynamicStates),                    //  uint32_t dynamicStateCount;
+        dynamicStates,                                        //  const VkDynamicState* pDynamicStates;
+    };
+    const VkPipelineDynamicStateCreateInfo *pDynamicStateCreateInfo =
+        dynamicTopology ? &dynamicStateCreateInfo : nullptr;
+
+    GraphicsPipelinePtr pipelineWrapperPtr(
+        new GraphicsPipelineWrapper(vki, vkd, physicalDevice, device, deviceExtensions, pipelineConstructionType));
+    auto &pipelineWrapper = *pipelineWrapperPtr.get();
+
+    pipelineWrapper.setMonolithicPipelineLayout(pipelineLayout)
+        .setDefaultDepthStencilState()
+        .setDefaultColorBlendState()
+        .setDefaultTopology(topology)
+        .setDynamicState(pDynamicStateCreateInfo)
+        .setupPreRasterizationMeshShaderState(viewports, scissors, pipelineLayout, renderPass, 0u, vk::ShaderWrapper(),
+                                              meshShaderModule, &rasterizationStateCreateInfo)
+        .setupFragmentShaderState(pipelineLayout, renderPass, 0u, fragShaderModule)
+        .setupFragmentOutputState(renderPass, 0u, nullptr, &multisampleStateInfo)
+        .buildPipeline();
+
+    return pipelineWrapperPtr;
+}
+
+static GraphicsPipelinePtr makeGraphicsPipeline(
+    bool useMeshShader, PipelineConstructionType pipelineConstructionType, const InstanceInterface &vki,
+    const DeviceInterface &vkd, const VkPhysicalDevice physicalDevice, const VkDevice device,
+    const std::vector<std::string> &deviceExtensions, const PipelineLayoutWrapper &pipelineLayout,
+    const VkRenderPass renderPass, const ShaderWrapper vertOrMeshShaderModule, const ShaderWrapper fragShaderModule,
+    const uint32_t width, const uint32_t height, const VkPrimitiveTopology topology,
+    const VkSampleCountFlagBits rasterizationSamples, const bool withColor = false,
+    const bool provokingVertexLast = false, const bool dynamicTopology = false,
+    const ShaderWrapper tessCtrlShaderModule = ShaderWrapper(),
+    const ShaderWrapper tessEvalShaderModule = ShaderWrapper(),
+    const ShaderWrapper geometryShaderModule = ShaderWrapper())
+{
+    if (useMeshShader)
+    {
+        DE_ASSERT(!tessCtrlShaderModule.isSet());
+        DE_ASSERT(!tessEvalShaderModule.isSet());
+        DE_ASSERT(!geometryShaderModule.isSet());
+
+        return makeGraphicsMeshShaderPipeline(pipelineConstructionType, vki, vkd, physicalDevice, device,
+                                              deviceExtensions, pipelineLayout, renderPass, vertOrMeshShaderModule,
+                                              fragShaderModule, width, height, topology, rasterizationSamples,
+                                              provokingVertexLast, dynamicTopology);
+    }
+    else
+    {
+        return makeGraphicsVertexShaderPipeline(
+            pipelineConstructionType, vki, vkd, physicalDevice, device, deviceExtensions, pipelineLayout, renderPass,
+            vertOrMeshShaderModule, fragShaderModule, width, height, topology, rasterizationSamples, withColor,
+            provokingVertexLast, dynamicTopology, tessCtrlShaderModule, tessEvalShaderModule, geometryShaderModule);
+    }
 }
 
 // Function replacing all occurrences of substring with string passed in last parameter.
@@ -387,6 +497,8 @@ vector<tcu::Vec4> FragmentShadingBarycentricDataTestInstance::generateVertexBuff
 {
     size_t verticesCount = static_cast<size_t>(~0ull);
     vector<tcu::Vec4> result;
+
+    DE_ASSERT(!m_testParams.clipVertices || m_testParams.topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
     switch (m_testParams.topology)
     {
@@ -596,17 +708,30 @@ vector<tcu::Vec4> FragmentShadingBarycentricDataTestInstance::generateVertexBuff
 
     DE_ASSERT(result.size() == verticesCount);
 
+    if (m_testParams.clipVertices)
+    {
+        for (size_t i = 0; i < result.size(); ++i)
+        {
+            result[i][1] *= 2.0f;
+        }
+    }
+
     return result;
 }
 
 bool FragmentShadingBarycentricDataTestInstance::verify(BufferWithMemory *resultBuffer)
 {
-    const size_t components   = getComponentCount(m_testParams);
-    const uint32_t expected   = m_testParams.testSubtype == TEST_SUBTYPE_PERVERTEX_CORRECTNESS ?
-                                    10u :
-                                    static_cast<uint32_t>(1 << components) - 1;
-    const uint32_t *retrieved = (uint32_t *)resultBuffer->getAllocation().getHostPtr();
-    size_t failures           = 0;
+    const size_t components             = getComponentCount(m_testParams);
+    const uint32_t expectedPerVertex    = static_cast<uint32_t>(1 << components) - 1;
+    const uint32_t expectedInterpolated = (static_cast<uint32_t>(1 << components / 3) - 1);
+    const uint32_t expectedFlat         = (static_cast<uint32_t>(1 << components / 3) - 1);
+    const tcu::UVec4 expected =
+        m_testParams.testSubtype == TEST_SUBTYPE_PERVERTEX_CORRECTNESS ?
+            tcu::UVec4(10u) :
+            tcu::UVec4(expectedPerVertex, m_testParams.testWithInterpolation ? expectedInterpolated : 0u,
+                       m_testParams.testWithFlatInterpolation ? expectedFlat : 0u, 0u);
+    const tcu::UVec4 *retrieved = (tcu::UVec4 *)resultBuffer->getAllocation().getHostPtr();
+    size_t failures             = 0;
 
     {
         size_t n = 0;
@@ -656,7 +781,8 @@ MovePtr<BufferWithMemory> FragmentShadingBarycentricDataTestInstance::createVert
     Allocator &allocator                = m_context.getDefaultAllocator();
     const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(vertices[0]);
     const VkBufferCreateInfo vertexBufferCreateInfo =
-        makeBufferCreateInfo(vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        makeBufferCreateInfo(vertexBufferSize, m_testParams.useMeshShader ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT :
+                                                                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     MovePtr<BufferWithMemory> vertexBuffer = MovePtr<BufferWithMemory>(
         new BufferWithMemory(vkd, device, allocator, vertexBufferCreateInfo, MemoryRequirement::HostVisible));
     Allocation &vertexBufferAlloc = vertexBuffer->getAllocation();
@@ -694,7 +820,7 @@ tcu::TestStatus FragmentShadingBarycentricDataTestInstance::iterate(void)
     const uint32_t queueFamilyIndex       = m_context.getUniversalQueueFamilyIndex();
 
     const VkDeviceSize offsetZero      = 0ull;
-    const VkFormat format              = VK_FORMAT_R32_UINT;
+    const VkFormat format              = VK_FORMAT_R32G32B32A32_UINT;
     const uint32_t pixelSize           = mapVkFormat(format).getPixelSize();
     const tcu::Vec4 clearColor         = tcu::Vec4(0.0f, 0.0f, 0.0f, 1.0f);
     const uint32_t width               = static_cast<uint32_t>(m_testParams.width);
@@ -715,14 +841,19 @@ tcu::TestStatus FragmentShadingBarycentricDataTestInstance::iterate(void)
     const Move<VkImageView> imageView =
         makeImageView(vkd, device, **image, VK_IMAGE_VIEW_TYPE_2D, format, imageSubresourceRange);
 
+    bool useMeshShader = m_testParams.useMeshShader;
+
     const VkBufferCreateInfo resultBufferCreateInfo =
-        makeBufferCreateInfo(width * height * pixelSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        makeBufferCreateInfo(width * height * pixelSize,
+                             (useMeshShader ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT :
+                                              VK_BUFFER_USAGE_TRANSFER_DST_BIT));
     MovePtr<BufferWithMemory> resultBuffer = MovePtr<BufferWithMemory>(
         new BufferWithMemory(vkd, device, allocator, resultBufferCreateInfo, MemoryRequirement::HostVisible));
 
-    const string shaderSuffix = (provokingVertexLast == m_testParams.provokingVertexLast) ? "" : "-forced";
-    const ShaderWrapper vertModule =
-        ShaderWrapper(vkd, device, m_context.getBinaryCollection().get("vert" + shaderSuffix), 0u);
+    const string shaderSuffix  = (provokingVertexLast == m_testParams.provokingVertexLast) ? "" : "-forced";
+    const ShaderWrapper module = ShaderWrapper(
+        vkd, device, m_context.getBinaryCollection().get(useMeshShader ? "mesh" + shaderSuffix : "vert" + shaderSuffix),
+        0u);
 
     const ShaderWrapper tessCtrlShaderModule =
         ((m_testParams.testSubtype == TEST_SUBTYPE_TESS_SHADER) ||
@@ -746,17 +877,52 @@ tcu::TestStatus FragmentShadingBarycentricDataTestInstance::iterate(void)
     const uint32_t pushConstants[] = {0, 1, 2};
     const VkPushConstantRange pushConstantRange =
         makePushConstantRange(VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(pushConstants));
-    const VkPushConstantRange *pushConstantRangePtr = m_testParams.dynamicIndexing ? &pushConstantRange : DE_NULL;
+    const VkPushConstantRange *pushConstantRangePtr = m_testParams.dynamicIndexing ? &pushConstantRange : nullptr;
     const uint32_t pushConstantRangeCount           = m_testParams.dynamicIndexing ? 1 : 0;
-    const PipelineLayoutWrapper pipelineLayout(m_testParams.pipelineConstructionType, vkd, device, 0, DE_NULL,
-                                               pushConstantRangeCount, pushConstantRangePtr);
-    const auto pipelineWrapper = makeGraphicsPipeline(
-        m_testParams.pipelineConstructionType, vki, vkd, physicalDevice, device, deviceExtensions, pipelineLayout,
-        *renderPass, vertModule, fragModule, width, height, topology, VK_SAMPLE_COUNT_1_BIT, withColor,
-        provokingVertexLast, false, tessCtrlShaderModule, tessEvalShaderModule, geometryShaderModule);
-    const Move<VkCommandPool> commandPool = createCommandPool(vkd, device, 0, queueFamilyIndex);
+    const Move<VkCommandPool> commandPool           = createCommandPool(vkd, device, 0, queueFamilyIndex);
     const Move<VkCommandBuffer> commandBuffer =
         allocateCommandBuffer(vkd, device, *commandPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+    Move<VkDescriptorSetLayout> descriptorSetLayout;
+    Move<VkDescriptorPool> descriptorPool;
+    Move<VkDescriptorSet> descriptorSet;
+
+    if (useMeshShader)
+    {
+        DescriptorSetLayoutBuilder layoutBuilder;
+        layoutBuilder.addSingleBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
+        descriptorSetLayout = layoutBuilder.build(vkd, device);
+
+        DescriptorPoolBuilder poolBuilder;
+        poolBuilder.addType(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        descriptorPool = poolBuilder.build(vkd, device, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1u);
+
+        descriptorSet = makeDescriptorSet(vkd, device, descriptorPool.get(), *descriptorSetLayout);
+    }
+
+    // Pipeline layout
+    const PipelineLayoutWrapper pipelineLayout(m_testParams.pipelineConstructionType, vkd, device,
+                                               useMeshShader ? 1 : 0, useMeshShader ? &*descriptorSetLayout : nullptr,
+                                               pushConstantRangeCount, pushConstantRangePtr);
+    const auto pipelineWrapper =
+        makeGraphicsPipeline(m_testParams.useMeshShader, m_testParams.pipelineConstructionType, vki, vkd,
+                             physicalDevice, device, deviceExtensions, pipelineLayout, *renderPass, module, fragModule,
+                             width, height, topology, VK_SAMPLE_COUNT_1_BIT, withColor, provokingVertexLast, false,
+                             tessCtrlShaderModule, tessEvalShaderModule, geometryShaderModule);
+
+    // Update descriptor set.
+    if (useMeshShader)
+    {
+        DescriptorSetUpdateBuilder updateBuilder;
+
+        const auto vertexBufferSize     = static_cast<VkDeviceSize>(de::dataSize(vertices));
+        const auto vertexBufferDescInfo = makeDescriptorBufferInfo(vertexBuffer->get(), 0ull, vertexBufferSize);
+        updateBuilder.writeSingle(descriptorSet.get(), DescriptorSetUpdateBuilder::Location::binding(0u),
+                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &vertexBufferDescInfo);
+        updateBuilder.update(vkd, device);
+    }
+
+    const tcu::IVec3 groupCount =
+        (topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ? tcu::IVec3(4u, 4u, 4u) : tcu::IVec3(1u, 1u, 1u);
 
     beginCommandBuffer(vkd, *commandBuffer);
     {
@@ -764,13 +930,20 @@ tcu::TestStatus FragmentShadingBarycentricDataTestInstance::iterate(void)
 
         pipelineWrapper->bind(*commandBuffer);
 
-        vkd.cmdBindVertexBuffers(*commandBuffer, 0u, 1u, &vertexBuffer->get(), &offsetZero);
+        if (useMeshShader)
+            vkd.cmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout.get(), 0u, 1u,
+                                      &descriptorSet.get(), 0u, nullptr);
+        else
+            vkd.cmdBindVertexBuffers(*commandBuffer, 0u, 1u, &vertexBuffer->get(), &offsetZero);
 
         if (m_testParams.dynamicIndexing)
             vkd.cmdPushConstants(*commandBuffer, *pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0u,
                                  sizeof(pushConstants), &pushConstants);
 
-        vkd.cmdDraw(*commandBuffer, vertexCount, 1u, 0u, 0u);
+        if (useMeshShader)
+            vkd.cmdDrawMeshTasksEXT(*commandBuffer, groupCount.x(), groupCount.y(), groupCount.z());
+        else
+            vkd.cmdDraw(*commandBuffer, vertexCount, 1u, 0u, 0u);
 
         renderPass.end(vkd, *commandBuffer);
 
@@ -783,7 +956,7 @@ tcu::TestStatus FragmentShadingBarycentricDataTestInstance::iterate(void)
     invalidateMappedMemoryRange(vkd, device, resultBuffer->getAllocation().getMemory(),
                                 resultBuffer->getAllocation().getOffset(), VK_WHOLE_SIZE);
 
-    DE_ASSERT(8 * pixelSize >= getComponentCount(m_testParams));
+    DE_ASSERT(8 * pixelSize >= 3 * getComponentCount(m_testParams));
 
     if (verify(resultBuffer.get()))
         return tcu::TestStatus::pass("Pass");
@@ -1100,7 +1273,8 @@ MovePtr<BufferWithMemory> FragmentShadingBarycentricWeightTestInstance::createVe
     Allocator &allocator                = m_context.getDefaultAllocator();
     const VkDeviceSize vertexBufferSize = vertices.size() * sizeof(vertices[0]);
     const VkBufferCreateInfo vertexBufferCreateInfo =
-        makeBufferCreateInfo(vertexBufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+        makeBufferCreateInfo(vertexBufferSize, m_testParams.useMeshShader ? VK_BUFFER_USAGE_STORAGE_BUFFER_BIT :
+                                                                            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     MovePtr<BufferWithMemory> vertexBuffer = MovePtr<BufferWithMemory>(
         new BufferWithMemory(vkd, device, allocator, vertexBufferCreateInfo, MemoryRequirement::HostVisible));
     Allocation &vertexBufferAlloc = vertexBuffer->getAllocation();
@@ -1131,35 +1305,66 @@ tcu::TestStatus FragmentShadingBarycentricWeightTestInstance::iterate(void)
     const bool dynamicStateTopology = m_testParams.dynamicTopologyInPipeline;
     const VkPrimitiveTopology pipelineTopology =
         dynamicStateTopology ? primitiveTopologyCastToList(m_testParams.topology) : m_testParams.topology;
-    const bool withColor                   = true;
-    const bool provokingVertexLast         = m_testParams.provokingVertexLast;
-    const bool useMultisampling            = m_testParams.sampleCount > VK_SAMPLE_COUNT_1_BIT;
-    const float teta                       = deFloatRadians(-float(m_testParams.rotation));
-    const float mvp[4 * 4]                 = {cos(teta), -sin(teta), 0.0f, 0.0f, sin(teta), cos(teta), 0.0f, 0.0f,
-                                              0.0f,      0.0f,       1.0f, 0.0f, 0.0f,      0.0f,      0.0f, 1.0f};
+    const bool withColor           = true;
+    const bool provokingVertexLast = m_testParams.provokingVertexLast;
+    const bool useMultisampling    = m_testParams.sampleCount > VK_SAMPLE_COUNT_1_BIT;
+    const float teta               = deFloatRadians(-float(m_testParams.rotation));
+    const float mvp[4 * 4]         = {cos(teta), -sin(teta), 0.0f, 0.0f, sin(teta), cos(teta), 0.0f, 0.0f,
+                                      0.0f,      0.0f,       1.0f, 0.0f, 0.0f,      0.0f,      0.0f, 1.0f};
+    bool useMeshShader             = m_testParams.useMeshShader;
+
     const vector<tcu::Vec4> vertices       = generateVertexBuffer();
     const uint32_t vertexCount             = static_cast<uint32_t>(vertices.size() / 2);
     MovePtr<BufferWithMemory> vertexBuffer = createVertexBuffer(vertices);
 
     const VkBufferCreateInfo bufferCreateInfo =
-        makeBufferCreateInfo(width * height * pixelSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+        makeBufferCreateInfo(width * height * pixelSize,
+                             useMeshShader ? VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT :
+                                             VK_BUFFER_USAGE_TRANSFER_DST_BIT);
     MovePtr<BufferWithMemory> resultBuffer = MovePtr<BufferWithMemory>(
         new BufferWithMemory(vkd, device, allocator, bufferCreateInfo, MemoryRequirement::HostVisible));
     MovePtr<BufferWithMemory> referenceBuffer = MovePtr<BufferWithMemory>(
         new BufferWithMemory(vkd, device, allocator, bufferCreateInfo, MemoryRequirement::HostVisible));
     const Move<VkRenderPass> renderPass   = makeRenderPass(vkd, device, format, m_testParams.sampleCount);
     const Move<VkCommandPool> commandPool = createCommandPool(vkd, device, 0, queueFamilyIndex);
-    const ShaderWrapper vertModule        = ShaderWrapper(vkd, device, m_context.getBinaryCollection().get("vert"), 0u);
-    const VkImageCreateInfo imageCreateInfo   = makeImageCreateInfo(format, width, height, VK_SAMPLE_COUNT_1_BIT);
-    const VkImageCreateInfo msImageCreateInfo = makeImageCreateInfo(format, width, height, m_testParams.sampleCount);
+    const ShaderWrapper shaderModule =
+        ShaderWrapper(vkd, device, m_context.getBinaryCollection().get(useMeshShader ? "mesh" : "vert"), 0u);
+
+    const VkImageCreateInfo imageCreateInfo = makeImageCreateInfo(format, width, height, VK_SAMPLE_COUNT_1_BIT);
     const VkImageSubresourceRange imageSubresourceRange =
         makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u);
+    const VkImageCreateInfo msImageCreateInfo = makeImageCreateInfo(format, width, height, m_testParams.sampleCount);
     const std::vector<VkClearValue> clearValues(2u, makeClearValueColorU32(0u, 0u, 0u, 0u));
 
+    Move<VkDescriptorSetLayout> descriptorSetLayout;
+    Move<VkDescriptorPool> descriptorPool;
+    Move<VkDescriptorSet> descriptorSet;
+
+    if (useMeshShader)
+    {
+        DescriptorSetLayoutBuilder layoutBuilder;
+        layoutBuilder.addSingleBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT);
+        descriptorSetLayout = layoutBuilder.build(vkd, device);
+
+        DescriptorPoolBuilder poolBuilder;
+        poolBuilder.addType(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+        descriptorPool = poolBuilder.build(vkd, device, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, 1u);
+
+        descriptorSet = makeDescriptorSet(vkd, device, descriptorPool.get(), *descriptorSetLayout);
+
+        DescriptorSetUpdateBuilder updateBuilder;
+
+        const auto vertexBufferSize     = static_cast<VkDeviceSize>(de::dataSize(vertices));
+        const auto vertexBufferDescInfo = makeDescriptorBufferInfo(vertexBuffer->get(), 0ull, vertexBufferSize);
+        updateBuilder.writeSingle(descriptorSet.get(), DescriptorSetUpdateBuilder::Location::binding(0u),
+                                  VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, &vertexBufferDescInfo);
+        updateBuilder.update(vkd, device);
+    }
+
     std::vector<VkImageMemoryBarrier> initialImageBarriers(
-        2, makeImageMemoryBarrier(VK_ACCESS_TRANSFER_WRITE_BIT,
-                                  VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
-                                  VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, DE_NULL, imageSubresourceRange));
+        2, makeImageMemoryBarrier(
+               VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_COLOR_ATTACHMENT_READ_BIT | VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+               VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, VK_NULL_HANDLE, imageSubresourceRange));
 
     for (size_t ndx = 0; ndx < 2; ndx++)
     {
@@ -1189,13 +1394,15 @@ tcu::TestStatus FragmentShadingBarycentricWeightTestInstance::iterate(void)
         const string fragModuleName    = (ndx == 0) ? "frag_test" : "frag_reference";
         const ShaderWrapper fragModule =
             ShaderWrapper(vkd, device, m_context.getBinaryCollection().get(fragModuleName), 0u);
-        const VkPushConstantRange pushConstantRange = makePushConstantRange(VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mvp));
-        const PipelineLayoutWrapper pipelineLayout(m_testParams.pipelineConstructionType, vkd, device, 0, DE_NULL, 1,
-                                                   &pushConstantRange);
+        const VkPushConstantRange pushConstantRange = makePushConstantRange(
+            useMeshShader ? VK_SHADER_STAGE_MESH_BIT_EXT : VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(mvp));
+        const PipelineLayoutWrapper pipelineLayout(
+            m_testParams.pipelineConstructionType, vkd, device, useMeshShader ? 1 : 0,
+            useMeshShader ? &*descriptorSetLayout : nullptr, 1, &pushConstantRange);
         const auto pipelineWrapper = makeGraphicsPipeline(
-            m_testParams.pipelineConstructionType, vki, vkd, physicalDevice, device, deviceExtensions, pipelineLayout,
-            *renderPass, vertModule, fragModule, width, height, pipelineTopology, m_testParams.sampleCount, withColor,
-            provokingVertexLast, dynamicStateTopology);
+            useMeshShader, m_testParams.pipelineConstructionType, vki, vkd, physicalDevice, device, deviceExtensions,
+            pipelineLayout, *renderPass, shaderModule, fragModule, width, height, pipelineTopology,
+            m_testParams.sampleCount, withColor, provokingVertexLast, dynamicStateTopology);
         const VkPipeline pipeline = pipelineWrapper->getPipeline();
 
         beginCommandBuffer(vkd, *commandBuffer);
@@ -1212,12 +1419,25 @@ tcu::TestStatus FragmentShadingBarycentricWeightTestInstance::iterate(void)
             {
                 vkd.cmdBindPipeline(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline);
 
-                vkd.cmdBindVertexBuffers(*commandBuffer, 0u, 1u, &vertexBuffer->get(), &offsetZero);
+                if (useMeshShader)
+                    vkd.cmdBindDescriptorSets(*commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout.get(), 0u,
+                                              1u, &descriptorSet.get(), 0u, nullptr);
+                else
+                    vkd.cmdBindVertexBuffers(*commandBuffer, 0u, 1u, &vertexBuffer->get(), &offsetZero);
 
-                vkd.cmdPushConstants(*commandBuffer, *pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0u, sizeof(mvp),
-                                     &mvp);
+                vkd.cmdPushConstants(*commandBuffer, *pipelineLayout,
+                                     useMeshShader ? VK_SHADER_STAGE_MESH_BIT_EXT : VK_SHADER_STAGE_VERTEX_BIT, 0u,
+                                     sizeof(mvp), &mvp);
 
-                vkd.cmdDraw(*commandBuffer, vertexCount, 1u, 0u, 0u);
+                if (useMeshShader)
+                {
+                    const tcu::IVec3 groupCount = (m_testParams.topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST) ?
+                                                      tcu::IVec3(256u, 8u, 8u) :
+                                                      tcu::IVec3(1u, 1u, 1u);
+                    vkd.cmdDrawMeshTasksEXT(*commandBuffer, groupCount.x(), groupCount.y(), groupCount.z());
+                }
+                else
+                    vkd.cmdDraw(*commandBuffer, vertexCount, 1u, 0u, 0u);
             }
             endRenderPass(vkd, *commandBuffer);
 
@@ -1252,9 +1472,11 @@ private:
     void initMiscDataTessPrograms(SourceCollections &programCollection, map<string, string> &attributes) const;
     void initMiscDataGeomPrograms(SourceCollections &programCollection, map<string, string> &attributes) const;
     void initWeightPrograms(SourceCollections &programCollection) const;
+    string generateDataMeshShader(void) const;
+    string generateWeightMeshShader(void) const;
     string getDataPrimitiveFormula(void) const;
-    string getDataVertexFormula(const uint32_t vertex, const bool *provokingVertexLastPtr = DE_NULL) const;
-
+    string getDataVertexFormula(const uint32_t vertex, const bool *provokingVertexLastPtr = nullptr) const;
+    string getDataProvokingVertexFormula(const bool *provokingVertexLastPtr = nullptr) const;
     TestParams m_testParams;
 };
 
@@ -1306,6 +1528,16 @@ void FragmentShadingBarycentricTestCase::checkSupport(Context &context) const
         if (!extendedDynamicStateFeaturesEXT.extendedDynamicState)
             TCU_THROW(NotSupportedError,
                       "Requires VkPhysicalDeviceExtendedDynamicStateFeaturesEXT.extendedDynamicState");
+    }
+
+    if (m_testParams.useMeshShader)
+    {
+        context.requireDeviceFunctionality("VK_EXT_mesh_shader");
+
+        const VkPhysicalDeviceMeshShaderFeaturesEXT &meshShaderFeaturesEXT = context.getMeshShaderFeaturesEXT();
+
+        if (!meshShaderFeaturesEXT.meshShader)
+            TCU_THROW(NotSupportedError, "Requires VkPhysicalDeviceMeshShaderFeaturesEXT.meshShader");
     }
 
     if ((m_testParams.dataType == glu::TYPE_DOUBLE) || (m_testParams.dataType == glu::TYPE_DOUBLE_VEC2) ||
@@ -1368,6 +1600,11 @@ void FragmentShadingBarycentricTestCase::initPrograms(SourceCollections &program
 
 string FragmentShadingBarycentricTestCase::getDataPrimitiveFormula(void) const
 {
+    if (m_testParams.clipVertices)
+    {
+        DE_ASSERT(m_testParams.topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
+        return "((x - 2) * 2 < y) ? 0 : 1";
+    }
     const char *primitiveFormulas[] = {
         "w * y + x",       //  VK_PRIMITIVE_TOPOLOGY_POINT_LIST
         "y",               //  VK_PRIMITIVE_TOPOLOGY_LINE_LIST
@@ -1432,6 +1669,198 @@ string FragmentShadingBarycentricTestCase::getDataVertexFormula(const uint32_t v
     return "(" + string(triVertexFormula[0][vertex]) + ")";
 }
 
+string FragmentShadingBarycentricTestCase::getDataProvokingVertexFormula(const bool *provokingVertexLastPtr) const
+{
+    typedef const char *ProvokingVertexFormula[2];
+
+    const ProvokingVertexFormula provokingVertexFormulas[] = {
+        {"p", "p"},       //  VK_PRIMITIVE_TOPOLOGY_POINT_LIST
+        {"2*p", "2*p+1"}, //  VK_PRIMITIVE_TOPOLOGY_LINE_LIST
+        {"p", "p+1"},     //  VK_PRIMITIVE_TOPOLOGY_LINE_STRIP
+        {"3*p", "3*p+2"}, //  VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST
+        {"p", "p+2"},     //  VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP
+        {
+            "p+1",
+            "p+2",
+        },                  //  VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN
+        {"4*p+1", "4*p+2"}, //  VK_PRIMITIVE_TOPOLOGY_LINE_LIST_WITH_ADJACENCY
+        {"p+1", "p+2"},     //  VK_PRIMITIVE_TOPOLOGY_LINE_STRIP_WITH_ADJACENCY
+        {"6*p", "6*p+4"},   //  VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY
+        {"2*p", "2*p+4"},   //  VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY
+        {
+            "",
+            "",
+        }, //  VK_PRIMITIVE_TOPOLOGY_PATCH_LIST
+    };
+
+    const bool provokingVertexLast =
+        provokingVertexLastPtr ? (*provokingVertexLastPtr) : m_testParams.provokingVertexLast;
+    const ProvokingVertexFormula &provokingVertexFormula =
+        provokingVertexFormulas[static_cast<size_t>(m_testParams.topology)];
+
+    return "(" + string(provokingVertexFormula[provokingVertexLast ? 1 : 0]) + ")";
+}
+
+string FragmentShadingBarycentricTestCase::generateDataMeshShader() const
+{
+
+    string meshShader;
+
+    switch (m_testParams.topology)
+    {
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+    {
+        meshShader = "#version 450\n"
+                     "#extension GL_EXT_mesh_shader : enable\n"
+                     "\n"
+                     "${dataStruct}\n"
+                     "layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;\n"
+                     "layout(triangles) out;\n"
+                     "layout(max_vertices=6, max_primitives=6) out;\n"
+                     "\n"
+                     "layout(set = 0, binding = 0) buffer PerVertexData{ \n"
+                     "    vec4 vertexBuffer[6];\n"
+                     "} pvd;\n"
+                     "layout (location=0) out ${typePrefix} data[]${typeSuffix};\n" +
+                     string(m_testParams.testWithInterpolation ?
+                                "layout(location = ${locInterp}) out ${typePrefix} dataInterp[]${typeSuffix};\n" :
+                                "") +
+                     string(m_testParams.testWithFlatInterpolation ?
+                                "layout(location = ${locFlat}) out ${typePrefix} dataFlat[]${typeSuffix};\n" :
+                                "") +
+                     "\n"
+                     "out gl_MeshPerVertexEXT \n"
+                     "{\n"
+                     "    vec4  gl_Position;\n"
+                     "    float gl_PointSize;\n"
+                     "} gl_MeshVerticesEXT[];\n"
+                     "\n"
+                     "void main()\n"
+                     "{\n"
+                     "    uint maxVertex = 6;\n"
+                     "    uint maxPrimitive = 2;\n"
+                     "    SetMeshOutputsEXT(maxVertex, maxPrimitive);\n"
+                     "    const uint vertex = gl_LocalInvocationIndex;\n"
+                     "    const uint primitive = gl_LocalInvocationIndex;\n"
+                     "    const uvec3 indices[2] = uvec3[](\n"
+                     "        uvec3(0, 1, 2),\n"
+                     "        uvec3(3, 4, 5)\n"
+                     "    );\n"
+                     "    if (vertex < maxVertex)\n"
+                     "    {\n"
+                     "        gl_MeshVerticesEXT[vertex].gl_Position = pvd.vertexBuffer[vertex];\n"
+                     "        gl_MeshVerticesEXT[vertex].gl_PointSize = 1.0;\n"
+                     "        uint n  = vertex + 1;\n"
+                     "        data[vertex] = ${value};\n" +
+                     string(m_testParams.testWithInterpolation ? "    dataInterp[vertex]    = ${value};\n" : "") +
+                     string(m_testParams.testWithFlatInterpolation ? "    dataFlat[vertex]      = ${value};\n" : "") +
+                     "    }\n"
+                     "    if(primitive < maxPrimitive){\n"
+                     "        gl_PrimitiveTriangleIndicesEXT[primitive] = indices[primitive];\n"
+                     "    }\n"
+                     "}\n";
+
+        return meshShader;
+    }
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+    {
+        meshShader = "#version 450\n"
+                     "#extension GL_EXT_mesh_shader : enable\n"
+                     "\n"
+                     "${dataStruct}\n"
+                     "layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;\n"
+                     "layout(lines) out;\n"
+                     "layout(max_vertices=16, max_primitives=16) out;\n"
+                     "\n"
+                     "layout(set = 0, binding = 0) buffer PerVertexData{ \n"
+                     "    vec4 vertexBuffer[16];\n"
+                     "} pvd;\n"
+                     "layout (location=0) out ${typePrefix} data[]${typeSuffix};\n" +
+                     string(m_testParams.testWithInterpolation ?
+                                "layout(location = ${locInterp}) out ${typePrefix} dataInterp[]${typeSuffix};\n" :
+                                "") +
+                     string(m_testParams.testWithFlatInterpolation ?
+                                "layout(location = ${locFlat}) out ${typePrefix} dataFlat[]${typeSuffix};\n" :
+                                "") +
+                     "\n"
+                     "out gl_MeshPerVertexEXT \n"
+                     "{\n"
+                     "    vec4  gl_Position;\n"
+                     "    float gl_PointSize;\n"
+                     "} gl_MeshVerticesEXT[];\n"
+                     "\n"
+                     "void main()\n"
+                     "{\n"
+                     "    uint maxVertex = 16;\n"
+                     "    uint maxPrimitive = 8;\n"
+                     "    SetMeshOutputsEXT(maxVertex, maxPrimitive);\n"
+                     "    const uint vertex = gl_LocalInvocationIndex;\n"
+                     "    const uint primitive = gl_LocalInvocationIndex;\n"
+                     "    if (vertex < maxVertex)\n"
+                     "    {\n"
+                     "        gl_MeshVerticesEXT[vertex].gl_Position = pvd.vertexBuffer[vertex];\n"
+                     "        gl_MeshVerticesEXT[vertex].gl_PointSize = 1.0;\n"
+                     "        uint n  = vertex + 1;\n"
+                     "        data[vertex] = ${value};\n" +
+                     string(m_testParams.testWithInterpolation ? "    dataInterp[vertex]    = ${value};\n" : "") +
+                     string(m_testParams.testWithFlatInterpolation ? "    dataFlat[vertex]      = ${value};\n" : "") +
+                     "    }\n"
+                     "    if(primitive < maxPrimitive){\n"
+                     "        gl_PrimitiveLineIndicesEXT[vertex] = uvec2(vertex * 2, vertex * 2 + 1u);\n"
+                     "    }\n"
+                     "}\n";
+
+        return meshShader;
+    }
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+    {
+        meshShader = "#version 450\n"
+                     "#extension GL_EXT_mesh_shader : enable\n"
+                     "\n"
+                     "${dataStruct}\n"
+                     "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
+                     "layout(points) out;\n"
+                     "layout(max_vertices=1, max_primitives = 1) out;\n"
+                     "layout(set = 0, binding = 0) buffer PerVertexData{ \n"
+                     "    vec4 vertexBuffer[64];\n"
+                     "} pvd;\n"
+                     "layout (location=0) out ${typePrefix} data[]${typeSuffix};\n" +
+                     string(m_testParams.testWithInterpolation ?
+                                "layout(location = ${locInterp}) out ${typePrefix} dataInterp[]${typeSuffix};\n" :
+                                "") +
+                     string(m_testParams.testWithFlatInterpolation ?
+                                "layout(location = ${locFlat}) out ${typePrefix} dataFlat[]${typeSuffix};\n" :
+                                "") +
+                     "\n"
+                     "out gl_MeshPerVertexEXT \n"
+                     "{\n"
+                     "    vec4  gl_Position;\n"
+                     "    float gl_PointSize;\n"
+                     "} gl_MeshVerticesEXT[];\n"
+                     "\n"
+                     "void main()\n"
+                     "{\n"
+                     "    SetMeshOutputsEXT(1u, 1u);\n"
+                     "    const uint vertex = gl_LocalInvocationIndex;\n"
+                     "    const uint workGroupIndex = gl_NumWorkGroups.x * gl_NumWorkGroups.y * gl_WorkGroupID.z + "
+                     "gl_NumWorkGroups.x * gl_WorkGroupID.y + gl_WorkGroupID.x;\n"
+                     "    uint jobId = workGroupIndex + gl_LocalInvocationIndex;\n"
+                     "    gl_MeshVerticesEXT[vertex].gl_Position = pvd.vertexBuffer[jobId];\n"
+                     "    gl_MeshVerticesEXT[vertex].gl_PointSize = 1.0;\n"
+                     "    gl_PrimitivePointIndicesEXT[vertex] = vertex;\n"
+                     "    uint n  = jobId + 1;\n"
+                     "    data[vertex] = ${value};\n" +
+                     string(m_testParams.testWithInterpolation ? "    dataInterp[vertex]    = ${value};\n" : "") +
+                     string(m_testParams.testWithFlatInterpolation ? "    dataFlat[vertex]      = ${value};\n" : "") +
+                     "}\n";
+
+        return meshShader;
+    }
+    default:
+        TCU_THROW(InternalError, "Unknown topology");
+    }
+}
+
 void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &programCollection) const
 {
     map<string, string> attributes;
@@ -1472,6 +1901,15 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
         replace(deaggregated, "${S}", "A") + replace(deaggregated, "${S}", "B") + replace(deaggregated, "${S}", "C");
     const string expected = unwrap.substr(0, unwrap.size() - 1);
     const string arrived  = replace(expected, "e", "v");
+
+    const string unwrapFlat   = replace(deaggregated, "${S}", "FlatV");
+    const string expectedFlat = unwrapFlat.substr(0, unwrapFlat.size() - 1);
+    const string arrivedFlat  = replace(expectedFlat, "e", "v");
+
+    const string unwraIntrp    = replace(deaggregated, "${S}", "IntrpV");
+    const string expectedIntrp = unwraIntrp.substr(0, unwraIntrp.size() - 1);
+    const string arrivedIntrp  = replace(expectedIntrp, "e", "v");
+
     const string dynamicIndexing =
         m_testParams.dynamicIndexing ? "layout(push_constant) uniform PushConstant { uint n[3]; } pc;\n" : "";
     const string i0              = m_testParams.dynamicIndexing ? "pc.n[0]" : "0";
@@ -1479,34 +1917,67 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
     const string i2              = m_testParams.dynamicIndexing ? "pc.n[2]" : "2";
     const string primitiveId     = getDataPrimitiveFormula();
     const string vertexFormula[] = {getDataVertexFormula(0), getDataVertexFormula(1), getDataVertexFormula(2)};
-    const tcu::StringTemplate vertShader(string("#version 450\n"
-                                                "#extension GL_EXT_fragment_shader_barycentric : require\n"
-                                                "\n"
-                                                "${dataStruct}\n"
-                                                "\n"
-                                                "layout(location = 0) in  vec4 in_position;\n"
-                                                "layout(location = 0) out ${typePrefix} data${typeSuffix};\n"
-                                                "\n"
-                                                "out gl_PerVertex\n"
-                                                "{\n"
-                                                "    vec4  gl_Position;\n"
-                                                "    float gl_PointSize;\n"
-                                                "};\n"
-                                                "\n"
-                                                "void main()\n"
-                                                "{\n"
-                                                "    const int n  = gl_VertexIndex + 1;\n"
-                                                "    data         = ${value};\n"
-                                                "    gl_PointSize = 1.0;\n"
-                                                "    gl_Position  = in_position;\n"
-                                                "}\n"));
+    string intrpFormula;
+    for (size_t i = 0; i < std::max(static_cast<size_t>(1), m_testParams.aggregate); ++i)
+    {
+        string acc = m_testParams.aggregate > 1 ? "[" + de::toString(i) + "]" : "";
+        if (m_testParams.aggregate == 1)
+            acc += ".q";
+        intrpFormula +=
+            "eA" + acc + " * gl_BaryCoordEXT.x + eB" + acc + " * gl_BaryCoordEXT.y + eC" + acc + " * gl_BaryCoordEXT.z";
+        if (i + 1 < m_testParams.aggregate)
+        {
+            intrpFormula += ", ";
+        }
+    }
+
+    const ShaderBuildOptions buildOptions(programCollection.usedVulkanVersion, SPIRV_VERSION_1_4, 0u);
+
+    const tcu::StringTemplate meshShader(m_testParams.useMeshShader ? generateDataMeshShader() : "");
+
+    const tcu::StringTemplate vertShader(
+        string("#version 450\n"
+               "#extension GL_EXT_fragment_shader_barycentric : require\n"
+               "\n"
+               "${dataStruct}\n"
+               "\n"
+               "layout(location = 0) in  vec4 in_position;\n"
+               "layout(location = 0) out ${typePrefix} data${typeSuffix};\n" +
+               string(m_testParams.testWithInterpolation ?
+                          "layout(location = ${locInterp}) out ${typePrefix} dataInterp${typeSuffix};\n" :
+                          "") +
+               string(m_testParams.testWithFlatInterpolation ?
+                          "layout(location = ${locFlat}) out ${typePrefix} dataFlat${typeSuffix};\n" :
+                          "") +
+               "\n"
+               "out gl_PerVertex\n"
+               "{\n"
+               "    vec4  gl_Position;\n"
+               "    float gl_PointSize;\n"
+               "};\n"
+               "\n"
+               "void main()\n"
+               "{\n"
+               "    const int n  = gl_VertexIndex + 1;\n"
+               "    data         = ${value};\n" +
+               string(m_testParams.testWithInterpolation ? "    dataInterp    = ${value};\n" : "") +
+               string(m_testParams.testWithFlatInterpolation ? "    dataFlat      = ${value};\n" : "") +
+               "    gl_PointSize = 1.0;\n"
+               "    gl_Position  = in_position;\n"
+               "}\n"));
     const tcu::StringTemplate fragShader(
         string("#version 450\n") +
         "#extension GL_EXT_fragment_shader_barycentric : require\n"
         "\n"
         "${dataStruct}\n"
         "\n"
-        "${dynamicIndexing}\n"
+        "${dynamicIndexing}\n" +
+        string(m_testParams.testWithInterpolation ?
+                   "layout(location = ${locInterp}) in ${typePrefix} dataIntrp${typeSuffix};\n" :
+                   "") +
+        string(m_testParams.testWithFlatInterpolation ?
+                   "layout(location = ${locFlat}) flat in ${typePrefix} dataFlat${typeSuffix};\n" :
+                   "") +
         "layout(location = 0) out uvec4 out_color;\n"
         "\n" +
         string(((m_testParams.testSubtype == TEST_SUBTYPE_TESS_SHADER) ||
@@ -1541,9 +2012,22 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
         "\n"
         "    ${typePrefix} eA${typeSuffix}; { const int n = 1 + ${vertexFormula0}; eA = ${value}; }\n"
         "    ${typePrefix} eB${typeSuffix}; { const int n = 1 + ${vertexFormula1}; eB = ${value}; }\n"
-        "    ${typePrefix} eC${typeSuffix}; { const int n = 1 + ${vertexFormula2}; eC = ${value}; }\n"
+        "    ${typePrefix} eC${typeSuffix}; { const int n = 1 + ${vertexFormula2}; eC = ${value}; }\n" +
         "\n"
-        "    ${scalarName} e[${componentCount}] = { ${expected} };\n"
+        "    ${scalarName} e[${componentCount}] = { ${expected} };\n" +
+        string(
+            m_testParams.testWithInterpolation ?
+                "    ${typePrefix} eIntrpV${typeSuffix}; {eIntrpV = ${typePrefix}${typeSuffix}(${intrpFormula}); }\n" :
+                "") +
+        string(m_testParams.testWithInterpolation ?
+                   "    ${scalarName} eIntrp[${componentCount} / 3] = { ${expectedIntrp} };\n" :
+                   "") +
+        string(m_testParams.testWithFlatInterpolation ? "    ${typePrefix} eFlatV${typeSuffix}; { const int n = 1 + "
+                                                        "${vertexFormulaFlat}; eFlatV = ${value}; }\n" :
+                                                        "") +
+        string(m_testParams.testWithFlatInterpolation ?
+                   "    ${scalarName} eFlat[${componentCount} / 3] = { ${expectedFlat} };\n" :
+                   "") +
         "\n" +
         string(
             ((m_testParams.testSubtype == TEST_SUBTYPE_TESS_SHADER) ||
@@ -1562,19 +2046,41 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
                     "    ${typePrefix} vC${typeSuffix}; { vC = " +
                     string(m_testParams.aggregate == 2 ? "${typePrefix}${typeSuffix}(data[${i2}][0],data[${i2}][1])" :
                                                          "data[${i2}]") +
-                    "; }\n"
-
-            ) +
-
-        "    ${scalarName} v[${componentCount}] = { ${arrived} };\n"
+                    "; }\n" +
+                    string(m_testParams.testWithInterpolation ?
+                               "    ${typePrefix} vIntrpV${typeSuffix}; { vIntrpV = " +
+                                   string(m_testParams.aggregate == 2 ?
+                                              "${typePrefix}${typeSuffix}(dataIntrp[0],dataIntrp[1])" :
+                                              "dataIntrp") +
+                                   "; }\n" :
+                               "") +
+                    string(m_testParams.testWithInterpolation ?
+                               "    ${scalarName} vIntrp[${componentCount} / 3] = { ${arrivedIntrp} };\n" :
+                               "") +
+                    string(m_testParams.testWithFlatInterpolation ?
+                               "    ${typePrefix} vFlatV${typeSuffix}; { vFlatV = " +
+                                   string(m_testParams.aggregate == 2 ?
+                                              "${typePrefix}${typeSuffix}(dataFlat[0],dataFlat[1])" :
+                                              "dataFlat") +
+                                   "; }\n" :
+                               "") +
+                    string(m_testParams.testWithFlatInterpolation ?
+                               "    ${scalarName} vFlat[${componentCount} / 3] = { ${arrivedFlat}};\n" :
+                               "")) +
         "\n"
-        "    int mask = 0;\n"
+        "    ${scalarName} v[${componentCount}] = { ${arrived} };\n" +
+        "    uvec4 mask = uvec4(0);\n"
         "\n"
         "    for (int i = 0; i<${componentCount}; i++)\n"
         "        if (e[i] == v[i])\n"
-        "            mask = mask | (1<<i);\n"
-        "\n"
-        "    out_color = uvec4(mask);\n"
+        "            mask.x = mask.x | (1<<i);\n" +
+        string(m_testParams.testWithInterpolation ? "    for (int i = 0; i<${componentCount} / 3; i++)\n" : "") +
+        string(m_testParams.testWithInterpolation ? "        if (abs(eIntrp[i] - vIntrp[i]) < 0.001)\n" : "") +
+        string(m_testParams.testWithInterpolation ? "            mask.y = mask.y | (1<<i);\n" : "") +
+        string(m_testParams.testWithFlatInterpolation ? "    for (int i = 0; i<${componentCount} / 3; i++)\n" : "") +
+        string(m_testParams.testWithFlatInterpolation ? "        if (eFlat[i] == vFlat[i])\n" : "") +
+        string(m_testParams.testWithFlatInterpolation ? "            mask.z = mask.z | (1<<i);\n" : "") +
+        "    out_color = mask;\n"
         "}\n");
 
     attributes["typePrefix"]      = typePrefix;
@@ -1583,6 +2089,10 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
     attributes["componentCount"]  = de::toString(componentCount);
     attributes["expected"]        = expected;
     attributes["arrived"]         = arrived;
+    attributes["expectedIntrp"]   = expectedIntrp;
+    attributes["arrivedIntrp"]    = arrivedIntrp;
+    attributes["expectedFlat"]    = expectedFlat;
+    attributes["arrivedFlat"]     = arrivedFlat;
     attributes["scalarName"]      = scalarName;
     attributes["dataStruct"]      = dataStructType;
     attributes["dynamicIndexing"] = dynamicIndexing;
@@ -1593,6 +2103,33 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
     attributes["vertexFormula0"]  = vertexFormula[0];
     attributes["vertexFormula1"]  = vertexFormula[1];
     attributes["vertexFormula2"]  = vertexFormula[2];
+    attributes["intrpFormula"]    = intrpFormula;
+
+    {
+        size_t locationsPerInput = (m_testParams.aggregate > 0u ? m_testParams.aggregate : 1u);
+
+        if (glu::isDataTypeDoubleOrDVec(m_testParams.dataType))
+        {
+            locationsPerInput *= 2;
+        }
+
+        size_t usedLocations = 0u;
+        if (m_testParams.testWithInterpolation)
+        {
+            usedLocations += locationsPerInput;
+            attributes["locInterp"] = de::toString(usedLocations);
+        }
+        if (m_testParams.testWithFlatInterpolation)
+        {
+            usedLocations += locationsPerInput;
+            attributes["locFlat"] = de::toString(usedLocations);
+        }
+    }
+
+    if (m_testParams.testWithFlatInterpolation)
+    {
+        attributes["vertexFormulaFlat"] = getDataProvokingVertexFormula();
+    }
 
     if (isPrimitiveTopologyLine(m_testParams.topology))
     {
@@ -1603,7 +2140,11 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
         DE_ASSERT(vertexFormula[2] == vertexFormula[1] && vertexFormula[1] == vertexFormula[0]);
     }
 
-    programCollection.glslSources.add("vert") << glu::VertexSource(vertShader.specialize(attributes));
+    if (m_testParams.useMeshShader)
+        programCollection.glslSources.add("mesh") << glu::MeshSource(meshShader.specialize(attributes)) << buildOptions;
+    else
+        programCollection.glslSources.add("vert") << glu::VertexSource(vertShader.specialize(attributes));
+
     programCollection.glslSources.add("frag") << glu::FragmentSource(fragShader.specialize(attributes));
 
     if (m_testParams.provokingVertexLast && m_testParams.topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP)
@@ -1614,7 +2155,12 @@ void FragmentShadingBarycentricTestCase::initDataPrograms(SourceCollections &pro
         attributes["vertexFormula1"] = getDataVertexFormula(1, &provokingVertexLast);
         attributes["vertexFormula2"] = getDataVertexFormula(2, &provokingVertexLast);
 
-        programCollection.glslSources.add("vert-forced") << glu::VertexSource(vertShader.specialize(attributes));
+        if (m_testParams.useMeshShader)
+            programCollection.glslSources.add("mesh-forced")
+                << glu::VertexSource(meshShader.specialize(attributes)) << buildOptions;
+        else
+            programCollection.glslSources.add("vert-forced") << glu::VertexSource(vertShader.specialize(attributes));
+
         programCollection.glslSources.add("frag-forced") << glu::FragmentSource(fragShader.specialize(attributes));
     }
 
@@ -1802,23 +2348,152 @@ void FragmentShadingBarycentricTestCase::initMiscDataGeomPrograms(SourceCollecti
     programCollection.glslSources.add("geom") << glu::GeometrySource(geom.specialize(attributes));
 }
 
+string FragmentShadingBarycentricTestCase::generateWeightMeshShader(void) const
+{
+
+    string meshShader;
+
+    switch (m_testParams.topology)
+    {
+    case VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST:
+    {
+        meshShader =
+            "#version 450\n"
+            "#extension GL_EXT_mesh_shader : enable\n"
+            "\n"
+            "layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;\n"
+            "layout(triangles) out;\n"
+            "layout(max_vertices=256, max_primitives=256) out;\n"
+            "layout(push_constant) uniform PushConstant { mat4 mvp; } pc;\n"
+            "\n"
+            "layout(set = 0, binding = 0) buffer PerVertexData{ \n"
+            "    vec4 vertexBuffer[12];\n"
+            "} pvd;\n"
+            "layout (location=0) out vec3 outColor[];\n"
+            "\n"
+            "void main ()\n"
+            "{\n"
+            "    uint maxVertex = 6;\n"
+            "    uint maxPrimitive = 2;\n"
+            "    SetMeshOutputsEXT(maxVertex, maxPrimitive);\n"
+            "    const uint vertex = gl_LocalInvocationIndex;\n"
+            "    const uint primitive = gl_LocalInvocationIndex;\n"
+            "    const uvec3 indices[2] = uvec3[](\n"
+            "        uvec3(0, 1, 2),\n"
+            "        uvec3(3, 4, 5)\n"
+            "    );\n"
+            "    if (vertex < maxVertex)\n"
+            "    {\n"
+            "        gl_MeshVerticesEXT[vertex].gl_Position = transpose(pc.mvp) * pvd.vertexBuffer[vertex*2];\n"
+            "        outColor[vertex] = pvd.vertexBuffer[vertex*2+1].xyz;\n"
+            "    }\n"
+            "    if(primitive < maxPrimitive){\n"
+            "        gl_PrimitiveTriangleIndicesEXT[primitive] = indices[primitive];\n"
+            "    }\n"
+            "}\n";
+
+        return meshShader;
+    }
+    case VK_PRIMITIVE_TOPOLOGY_LINE_LIST:
+    {
+        meshShader =
+            "#version 450\n"
+            "#extension GL_EXT_mesh_shader : enable\n"
+            "\n"
+            "layout(local_size_x = 8, local_size_y = 4, local_size_z = 1) in;\n"
+            "layout(lines) out;\n"
+            "layout(max_vertices=256, max_primitives=256) out;\n"
+            "layout(push_constant) uniform PushConstant { mat4 mvp; } pc;\n"
+            "\n"
+            "layout(set = 0, binding = 0) buffer PerVertexData{ \n"
+            "    vec4 vertexBuffer[512];\n"
+            "} pvd;\n"
+            "layout (location=0) out vec3 outColor[];\n"
+            "\n"
+            "void main ()\n"
+            "{\n"
+            "    uint maxVertex = 256;\n"
+            "    uint maxPrimitive = 128;\n"
+            "    SetMeshOutputsEXT(maxVertex, maxPrimitive);\n"
+            "    uint iterations = max(maxVertex, maxPrimitive) / (8 * 4 * 1);\n"
+            "    for (int  iteration = 0; iteration < iterations; ++iteration)\n"
+            "    {\n"
+            "        const uint vertex = gl_LocalInvocationIndex * iterations + iteration;\n"
+            "        const uint primitive = gl_LocalInvocationIndex * iterations + iteration;\n"
+            "        if (vertex < maxVertex)\n"
+            "        {\n"
+            "             gl_MeshVerticesEXT[vertex].gl_Position = transpose(pc.mvp) * pvd.vertexBuffer[vertex*2];\n"
+            "             outColor[vertex] = pvd.vertexBuffer[vertex*2+1].xyz;\n"
+            "        }\n"
+            "        if(primitive < maxPrimitive){\n"
+            "             gl_PrimitiveLineIndicesEXT[primitive] = uvec2(primitive*2, primitive*2+1);\n"
+            "        }\n"
+            "    }\n"
+            "}\n";
+
+        return meshShader;
+    }
+    case VK_PRIMITIVE_TOPOLOGY_POINT_LIST:
+    {
+        meshShader = "#version 450\n"
+                     "#extension GL_EXT_mesh_shader : enable\n"
+                     "\n"
+                     "layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
+                     "layout(points) out;\n"
+                     "layout(max_vertices=1, max_primitives = 1) out;\n"
+                     "layout(push_constant) uniform PushConstant { mat4 mvp; } pc;\n"
+                     "\n"
+                     "layout(set = 0, binding = 0) buffer PerVertexData{ \n"
+                     "    vec4 vertexBuffer[32768];\n"
+                     "} pvd;\n"
+                     "layout (location=0) out vec3 outColor[];\n"
+                     "\n"
+                     "void main ()\n"
+                     "{\n"
+                     "    uint maxVertex = 1;\n"
+                     "    uint maxPrimitive = 1;\n"
+                     "    SetMeshOutputsEXT(maxVertex, maxPrimitive);\n"
+                     "    const uint vertex = gl_LocalInvocationIndex;\n"
+                     "    const uint primitive = gl_LocalInvocationIndex;\n"
+                     "    const uint workGroupIndex = gl_NumWorkGroups.x * gl_NumWorkGroups.y * gl_WorkGroupID.z + "
+                     "gl_NumWorkGroups.x * gl_WorkGroupID.y + gl_WorkGroupID.x;\n"
+                     "    uint jobId = workGroupIndex + gl_LocalInvocationIndex;\n"
+                     "    gl_MeshVerticesEXT[vertex].gl_Position = transpose(pc.mvp) * pvd.vertexBuffer[jobId*2];\n"
+                     "    outColor[vertex] = pvd.vertexBuffer[jobId*2+1].xyz;\n"
+                     "    gl_PrimitivePointIndicesEXT[primitive] = primitive;\n"
+                     "}\n";
+
+        return meshShader;
+    }
+    default:
+        TCU_THROW(InternalError, "Unknown topology");
+    }
+}
+
 void FragmentShadingBarycentricTestCase::initWeightPrograms(SourceCollections &programCollection) const
 {
     const string baryCoordVariable = m_testParams.perspective ? "BaryCoord" : "BaryCoordNoPersp";
-    const string declspecRef       = m_testParams.perspective ? "" : "noperspective";
-    const string vertShader        = "#version 450\n"
-                                     "\n"
-                                     "layout(location = 0) in  vec4 in_position;\n"
-                                     "layout(location = 1) in  vec4 in_color;\n"
-                                     "layout(location = 0) out vec3 color;\n"
-                                     "layout(push_constant) uniform PushConstant { mat4 mvp; } pc;\n"
-                                     "\n"
-                                     "void main()\n"
-                                     "{\n"
-                                     "    color        = in_color.xyz;\n"
-                                     "    gl_Position  = transpose(pc.mvp) * in_position;\n"
-                                     "    gl_PointSize = 1.0;\n"
-                                     "}\n";
+    const string declspecRef       = m_testParams.perspective ? "smooth" : "noperspective";
+    const ShaderBuildOptions buildOptions(programCollection.usedVulkanVersion, SPIRV_VERSION_1_4, 0u);
+
+    string meshShader;
+
+    if (m_testParams.useMeshShader)
+        meshShader = generateWeightMeshShader();
+
+    const string vertShader = "#version 450\n"
+                              "\n"
+                              "layout(location = 0) in  vec4 in_position;\n"
+                              "layout(location = 1) in  vec4 in_color;\n"
+                              "layout(location = 0) out vec3 color;\n"
+                              "layout(push_constant) uniform PushConstant { mat4 mvp; } pc;\n"
+                              "\n"
+                              "void main()\n"
+                              "{\n"
+                              "    color        = in_color.xyz;\n"
+                              "    gl_Position  = transpose(pc.mvp) * in_position;\n"
+                              "    gl_PointSize = 1.0;\n"
+                              "}\n";
     const tcu::StringTemplate fragShaderReference("#version 450\n"
                                                   "\n"
                                                   "layout(location = 0) ${glslDeclspecRef} in vec3 in_color;\n"
@@ -1947,7 +2622,11 @@ void FragmentShadingBarycentricTestCase::initWeightPrograms(SourceCollections &p
         break;
     }
 
-    programCollection.glslSources.add("vert") << glu::VertexSource(vertShader);
+    if (m_testParams.useMeshShader)
+        programCollection.glslSources.add("mesh") << glu::MeshSource(meshShader) << buildOptions;
+    else
+        programCollection.glslSources.add("vert") << glu::VertexSource(vertShader);
+
     programCollection.glslSources.add("frag_reference")
         << glu::FragmentSource(fragShaderReference.specialize(attributes));
 
@@ -1995,6 +2674,22 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
         {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST_WITH_ADJACENCY, "triangle_list_with_adjacency"},
         {VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP_WITH_ADJACENCY, "triangle_strip_with_adjacency"},
     };
+    const struct ClipVerticesTestSpec
+    {
+        bool clip;
+        const char *name;
+    } clipVerticesSpecs[] = {
+        {false, "no_clip"},
+        {true, "clip"},
+    };
+    const struct useMeshShaderTestSpec
+    {
+        bool meshShader;
+        const char *name;
+    } useMeshShaderSpecs[] = {
+        {true, "mesh_shader"},
+        {false, "vertex_shader"},
+    };
     const glu::DataType dataTypes[] = {
         glu::TYPE_FLOAT,  glu::TYPE_FLOAT_VEC2,  glu::TYPE_FLOAT_VEC3,  glu::TYPE_FLOAT_VEC4,
         glu::TYPE_DOUBLE, glu::TYPE_DOUBLE_VEC2, glu::TYPE_DOUBLE_VEC3, glu::TYPE_DOUBLE_VEC4,
@@ -2034,6 +2729,13 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
         {"pipeline_topology_static", false},
         {"pipeline_topology_dynamic", true},
     };
+    const struct InterpolationTypes
+    {
+        const char *name;
+        bool testWithInterpolation;
+        bool testWithFlatInterpolation;
+    } interpolationTypes[] = {
+        {"per_vertex", false, false}, {"per_vertex_interp", true, false}, {"per_vertex_flat", false, true}};
 
     for (const auto &constructionTypeCase : constructionTypeCases)
     {
@@ -2059,41 +2761,94 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
                         new tcu::TestCaseGroup(testCtx, topologies[topologyNdx].name));
                     const VkPrimitiveTopology topology = topologies[topologyNdx].topology;
 
-                    for (size_t aggregateNdx = 0; aggregateNdx < 3; ++aggregateNdx)
+                    for (size_t clipVerticesSpecNdx = 0; clipVerticesSpecNdx < DE_LENGTH_OF_ARRAY(clipVerticesSpecs);
+                         ++clipVerticesSpecNdx)
                     {
-                        const string aggregateName = aggregateNdx == 0 ? "type" :
-                                                     aggregateNdx == 1 ? "struct" :
-                                                                         "array" + de::toString(aggregateNdx);
-                        MovePtr<tcu::TestCaseGroup> aggregateGroup(
-                            new tcu::TestCaseGroup(testCtx, aggregateName.c_str()));
+                        MovePtr<tcu::TestCaseGroup> clipVerticesGroup(
+                            new tcu::TestCaseGroup(testCtx, clipVerticesSpecs[clipVerticesSpecNdx].name, ""));
+                        const bool clipVertices = clipVerticesSpecs[clipVerticesSpecNdx].clip;
 
-                        for (size_t dataTypeNdx = 0; dataTypeNdx < DE_LENGTH_OF_ARRAY(dataTypes); ++dataTypeNdx)
+                        if (clipVertices && topology != VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST)
+                            // no implemented
+                            continue;
+
+                        for (size_t aggregateNdx = 0; aggregateNdx < 3; ++aggregateNdx)
                         {
-                            const glu::DataType dataType = dataTypes[dataTypeNdx];
-                            const char *dataTypeName     = getDataTypeName(dataType);
+                            const string aggregateName = aggregateNdx == 0 ? "type" :
+                                                         aggregateNdx == 1 ? "struct" :
+                                                                             "array" + de::toString(aggregateNdx);
+                            MovePtr<tcu::TestCaseGroup> aggregateGroup(
+                                new tcu::TestCaseGroup(testCtx, aggregateName.c_str()));
 
-                            const TestParams testParams{
-                                constructionTypeCase.constructionType,
-                                testType,              //  TestType testType;
-                                TEST_SUBTYPE_DEFAULT,  //  TestSubtype testSubtype;
-                                topology,              //  VkPrimitiveTopology topology;
-                                dynamicIndexing,       //  bool dynamicIndexing;
-                                aggregateNdx,          //  size_t aggregate;
-                                dataType,              //  glu::DataType dataType;
-                                DATA_TEST_WIDTH,       //  uint32_t width;
-                                DATA_TEST_HEIGHT,      //  uint32_t height;
-                                notused,               //  bool perspective;
-                                provokingVertexLast,   //  bool provokingVertexLast;
-                                (uint32_t)notused,     //  uint32_t rotation;
-                                notused,               //  bool                    dynamicTopologyInPipeline
-                                VK_SAMPLE_COUNT_1_BIT, //  VkSampleCountFlagBits sampleCount;
-                            };
+                            for (size_t dataTypeNdx = 0; dataTypeNdx < DE_LENGTH_OF_ARRAY(dataTypes); ++dataTypeNdx)
+                            {
+                                const glu::DataType dataType = dataTypes[dataTypeNdx];
 
-                            aggregateGroup->addChild(
-                                new FragmentShadingBarycentricTestCase(testCtx, dataTypeName, testParams));
+                                MovePtr<tcu::TestCaseGroup> dataTypeGroup(
+                                    new tcu::TestCaseGroup(testCtx, getDataTypeName(dataType), ""));
+
+                                for (size_t interpolationTypeNdx = 0;
+                                     interpolationTypeNdx < DE_LENGTH_OF_ARRAY(interpolationTypes);
+                                     ++interpolationTypeNdx)
+                                {
+                                    MovePtr<tcu::TestCaseGroup> interpolationTypeGroup(new tcu::TestCaseGroup(
+                                        testCtx, interpolationTypes[interpolationTypeNdx].name, ""));
+
+                                    if (interpolationTypes[interpolationTypeNdx].testWithInterpolation &&
+                                        (glu::isDataTypeIntOrIVec(dataType) || glu::isDataTypeUintOrUVec(dataType) ||
+                                         glu::isDataTypeDoubleOrDVec(dataType)))
+                                    {
+                                        // integer and double inputs must be qualified as flat, cannot be interpolated
+                                        continue;
+                                    }
+
+                                    for (size_t useMeshShaderSpecNdx = 0;
+                                         useMeshShaderSpecNdx < DE_LENGTH_OF_ARRAY(useMeshShaderSpecs);
+                                         ++useMeshShaderSpecNdx)
+                                    {
+                                        const bool useMeshShader = useMeshShaderSpecs[useMeshShaderSpecNdx].meshShader;
+                                        const char *useMeshShaderName = useMeshShaderSpecs[useMeshShaderSpecNdx].name;
+
+                                        if (useMeshShader && !(topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST ||
+                                                               topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST ||
+                                                               topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
+                                            // mesh shader support only for point, line or triangle list topology
+                                            continue;
+
+                                        const TestParams testParams = {
+                                            constructionTypeCase.constructionType,
+                                            testType,              //  TestType testType;
+                                            TEST_SUBTYPE_DEFAULT,  //  TestSubtype testSubtype;
+                                            topology,              //  VkPrimitiveTopology topology;
+                                            dynamicIndexing,       //  bool dynamicIndexing;
+                                            aggregateNdx,          //  size_t aggregate;
+                                            dataType,              //  glu::DataType dataType;
+                                            DATA_TEST_WIDTH,       //  uint32_t width;
+                                            DATA_TEST_HEIGHT,      //  uint32_t height;
+                                            notused,               //  bool perspective;
+                                            provokingVertexLast,   //  bool provokingVertexLast;
+                                            (uint32_t)notused,     //  uint32_t rotation;
+                                            notused,               //  bool                dynamicTopologyInPipeline
+                                            VK_SAMPLE_COUNT_1_BIT, //  VkSampleCountFlagBits sampleCount;
+                                            interpolationTypes[interpolationTypeNdx]
+                                                .testWithInterpolation, //  bool                testWithInterpolation
+                                            interpolationTypes[interpolationTypeNdx]
+                                                .testWithFlatInterpolation, //  bool                testWithFlatInterpolation
+                                            clipVertices,                   //  bool                clipVertices
+                                            useMeshShader,                  //  bool                useMeshShader
+                                        };
+                                        interpolationTypeGroup->addChild(new FragmentShadingBarycentricTestCase(
+                                            testCtx, useMeshShaderName, testParams));
+                                    }
+
+                                    dataTypeGroup->addChild(interpolationTypeGroup.release());
+                                }
+                                aggregateGroup->addChild(dataTypeGroup.release());
+                            }
+
+                            clipVerticesGroup->addChild(aggregateGroup.release());
                         }
-
-                        topologyGroup->addChild(aggregateGroup.release());
+                        topologyGroup->addChild(clipVerticesGroup.release());
                     }
 
                     dynamicIndexingGroup->addChild(topologyGroup.release());
@@ -2122,6 +2877,10 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
                 (uint32_t)notused,                   //  uint32_t rotation;
                 notused,                             //  bool                    dynamicTopologyInPipeline
                 VK_SAMPLE_COUNT_1_BIT,               //  VkSampleCountFlagBits sampleCount;
+                false,                               //  bool                    testWithInterpolation
+                false,                               //    bool                    testWithFlatInterpolation
+                false,                               //    bool                    clipVertices
+                false,                               //  bool                    useMeshShader
             };
             miscGroup->addChild(new FragmentShadingBarycentricTestCase(testCtx, "pervertex_correctness", testParams));
             testTypeGroup->addChild(miscGroup.release());
@@ -2166,6 +2925,10 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
                             (uint32_t)notused,        //  uint32_t rotation;
                             notused,                  //  bool                    dynamicTopologyInPipeline
                             VK_SAMPLE_COUNT_1_BIT,    //  VkSampleCountFlagBits sampleCount;
+                            false,                    //  bool                    testWithInterpolation
+                            false,                    //    bool                    testWithFlatInterpolation
+                            false,                    //    bool                    clipVertices
+                            false,                    //  bool                    useMeshShader
                         };
                         aggregateGroup->addChild(
                             new FragmentShadingBarycentricTestCase(testCtx, dataTypeName, testParamsShaders));
@@ -2199,109 +2962,182 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
         MovePtr<tcu::TestCaseGroup> testTypeGroup(new tcu::TestCaseGroup(testCtx, "weights"));
         const TestType testType = TEST_TYPE_WEIGHTS;
 
-        for (size_t topologyInPipelineNdx = 0; topologyInPipelineNdx < DE_LENGTH_OF_ARRAY(topologiesInPipeline);
-             ++topologyInPipelineNdx)
+        for (size_t provokingVertexNdx = 0; provokingVertexNdx < DE_LENGTH_OF_ARRAY(provokingVertices);
+             ++provokingVertexNdx)
         {
-            MovePtr<tcu::TestCaseGroup> topologyInPipelineGroup(
-                new tcu::TestCaseGroup(testCtx, topologiesInPipeline[topologyInPipelineNdx].name));
-            const bool topologyInPipeline = topologiesInPipeline[topologyInPipelineNdx].value;
+            MovePtr<tcu::TestCaseGroup> provokingVertexGroup(
+                new tcu::TestCaseGroup(testCtx, provokingVertices[provokingVertexNdx].name, ""));
+            const bool provokingVertexLast = provokingVertices[provokingVertexNdx].value;
 
-            if (topologyInPipeline)
+            for (size_t topologyInPipelineNdx = 0; topologyInPipelineNdx < DE_LENGTH_OF_ARRAY(topologiesInPipeline);
+                 ++topologyInPipelineNdx)
             {
-                for (size_t msaaCaseNdx = 0; msaaCaseNdx < DE_LENGTH_OF_ARRAY(msaaCases); ++msaaCaseNdx)
+                MovePtr<tcu::TestCaseGroup> topologyInPipelineGroup(
+                    new tcu::TestCaseGroup(testCtx, topologiesInPipeline[topologyInPipelineNdx].name));
+                const bool topologyInPipeline = topologiesInPipeline[topologyInPipelineNdx].value;
+
+                if (topologyInPipeline)
                 {
-                    MovePtr<tcu::TestCaseGroup> msaaGroup(new tcu::TestCaseGroup(testCtx, msaaCases[msaaCaseNdx].name));
-                    for (size_t topologyNdx = 0; topologyNdx < DE_LENGTH_OF_ARRAY(topologies); ++topologyNdx)
+                    for (size_t msaaCaseNdx = 0; msaaCaseNdx < DE_LENGTH_OF_ARRAY(msaaCases); ++msaaCaseNdx)
                     {
-                        MovePtr<tcu::TestCaseGroup> topologyGroup(
-                            new tcu::TestCaseGroup(testCtx, topologies[topologyNdx].name));
-                        const VkPrimitiveTopology topology = topologies[topologyNdx].topology;
-                        const bool testableTopology =
-                            isPrimitiveTopologyLine(topology) || isPrimitiveTopologyTriangle(topology);
-
-                        if (!testableTopology)
-                            continue;
-
-                        for (size_t perspectiveNdx = 0; perspectiveNdx < DE_LENGTH_OF_ARRAY(perspectives);
-                             ++perspectiveNdx)
+                        MovePtr<tcu::TestCaseGroup> msaaGroup(
+                            new tcu::TestCaseGroup(testCtx, msaaCases[msaaCaseNdx].name));
+                        for (size_t topologyNdx = 0; topologyNdx < DE_LENGTH_OF_ARRAY(topologies); ++topologyNdx)
                         {
-                            const bool perspective      = perspectives[perspectiveNdx].value;
-                            const char *perspectiveName = perspectives[perspectiveNdx].name;
+                            MovePtr<tcu::TestCaseGroup> topologyGroup(
+                                new tcu::TestCaseGroup(testCtx, topologies[topologyNdx].name));
+                            const VkPrimitiveTopology topology = topologies[topologyNdx].topology;
+                            const bool testableTopology =
+                                isPrimitiveTopologyLine(topology) || isPrimitiveTopologyTriangle(topology);
 
-                            const TestParams testParams{
-                                constructionTypeCase.constructionType,
-                                testType,                       //  TestType testType;
-                                msaaCases[msaaCaseNdx].subtype, //  TestSubtype testSubtype;
-                                topology,                       //  VkPrimitiveTopology topology;
-                                notused,                        //  bool dynamicIndexing;
-                                (size_t)notused,                //  size_t aggregate;
-                                (glu::DataType)notused,         //  glu::DataType dataType;
-                                WEIGHT_TEST_WIDTH,              //  uint32_t width;
-                                WEIGHT_TEST_HEIGHT,             //  uint32_t height;
-                                perspective,                    //  bool perspective;
-                                false,                          //  bool provokingVertexLast;
-                                0,                              //  uint32_t rotation;
-                                topologyInPipeline,             //  bool                    dynamicTopologyInPipeline
-                                msaaCases[msaaCaseNdx].samples, //  VkSampleCountFlagBits sampleCount;
-                            };
+                            if (!testableTopology)
+                                continue;
 
-                            topologyGroup->addChild(
-                                new FragmentShadingBarycentricTestCase(testCtx, perspectiveName, testParams));
+                            for (size_t perspectiveNdx = 0; perspectiveNdx < DE_LENGTH_OF_ARRAY(perspectives);
+                                 ++perspectiveNdx)
+                            {
+                                MovePtr<tcu::TestCaseGroup> usePerspectiveGroup(
+                                    new tcu::TestCaseGroup(testCtx, perspectives[perspectiveNdx].name, ""));
+                                const bool perspective = perspectives[perspectiveNdx].value;
+
+                                for (size_t useMeshShaderSpecNdx = 0;
+                                     useMeshShaderSpecNdx < DE_LENGTH_OF_ARRAY(useMeshShaderSpecs);
+                                     ++useMeshShaderSpecNdx)
+                                {
+                                    const bool useMeshShader      = useMeshShaderSpecs[useMeshShaderSpecNdx].meshShader;
+                                    const char *useMeshShaderName = useMeshShaderSpecs[useMeshShaderSpecNdx].name;
+
+                                    if (useMeshShader && !(topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST ||
+                                                           topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST ||
+                                                           topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
+                                        // mesh shader support only for point, line or triangle list topology
+                                        continue;
+
+                                    if (useMeshShader && topologyInPipeline)
+                                    {
+                                        // topology is a dynamic state, so cannot use mesh shaders
+                                        // """
+                                        //  If the pipeline requires pre - rasterization shader state, and includes a mesh shader,
+                                        //  there must be no element of the pDynamicStates member of pDynamicState set to VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
+                                        //  or VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE
+                                        // """
+                                        continue;
+                                    }
+
+                                    const TestParams testParams{
+                                        constructionTypeCase.constructionType,
+                                        testType,                       //  TestType testType;
+                                        msaaCases[msaaCaseNdx].subtype, //  TestSubtype testSubtype;
+                                        topology,                       //  VkPrimitiveTopology topology;
+                                        notused,                        //  bool dynamicIndexing;
+                                        (size_t)notused,                //  size_t aggregate;
+                                        (glu::DataType)notused,         //  glu::DataType dataType;
+                                        WEIGHT_TEST_WIDTH,              //  uint32_t width;
+                                        WEIGHT_TEST_HEIGHT,             //  uint32_t height;
+                                        perspective,                    //  bool perspective;
+                                        false,                          //  bool provokingVertexLast;
+                                        0,                              //  uint32_t rotation;
+                                        topologyInPipeline, //  bool                    dynamicTopologyInPipeline
+                                        msaaCases[msaaCaseNdx].samples, //  VkSampleCountFlagBits sampleCount;
+                                        false,         //  bool                    testWithInterpolation
+                                        false,         //  bool                    testWithFlatInterpolation
+                                        false,         //  bool                    clipVertices
+                                        useMeshShader, //    bool                    useMeshShader
+                                    };
+
+                                    usePerspectiveGroup->addChild(
+                                        new FragmentShadingBarycentricTestCase(testCtx, useMeshShaderName, testParams));
+                                }
+
+                                topologyGroup->addChild(usePerspectiveGroup.release());
+                            }
+                            msaaGroup->addChild(topologyGroup.release());
                         }
-                        msaaGroup->addChild(topologyGroup.release());
+                        topologyInPipelineGroup->addChild(msaaGroup.release());
                     }
-                    topologyInPipelineGroup->addChild(msaaGroup.release());
                 }
-            }
-            else
-            {
-                for (size_t rotationNdx = 0; rotationNdx < DE_LENGTH_OF_ARRAY(rotations); ++rotationNdx)
+                else
                 {
-                    const uint32_t rotation = rotations[rotationNdx];
-                    MovePtr<tcu::TestCaseGroup> rotationGroup(
-                        new tcu::TestCaseGroup(testCtx, de::toString(rotation).c_str()));
-
-                    for (size_t topologyNdx = 0; topologyNdx < DE_LENGTH_OF_ARRAY(topologies); ++topologyNdx)
+                    for (size_t rotationNdx = 0; rotationNdx < DE_LENGTH_OF_ARRAY(rotations); ++rotationNdx)
                     {
-                        const VkPrimitiveTopology topology = topologies[topologyNdx].topology;
-                        MovePtr<tcu::TestCaseGroup> topologyGroup(
-                            new tcu::TestCaseGroup(testCtx, topologies[topologyNdx].name));
+                        const uint32_t rotation = rotations[rotationNdx];
+                        MovePtr<tcu::TestCaseGroup> rotationGroup(
+                            new tcu::TestCaseGroup(testCtx, de::toString(rotation).c_str()));
 
-                        for (size_t perspectiveNdx = 0; perspectiveNdx < DE_LENGTH_OF_ARRAY(perspectives);
-                             ++perspectiveNdx)
+                        for (size_t topologyNdx = 0; topologyNdx < DE_LENGTH_OF_ARRAY(topologies); ++topologyNdx)
                         {
-                            const bool perspective      = perspectives[perspectiveNdx].value;
-                            const char *perspectiveName = perspectives[perspectiveNdx].name;
+                            const VkPrimitiveTopology topology = topologies[topologyNdx].topology;
+                            MovePtr<tcu::TestCaseGroup> topologyGroup(
+                                new tcu::TestCaseGroup(testCtx, topologies[topologyNdx].name));
 
-                            const TestParams testParams{
-                                constructionTypeCase.constructionType,
-                                testType,              //  TestType testType;
-                                TEST_SUBTYPE_DEFAULT,  //  TestSubtype testSubtype;
-                                topology,              //  VkPrimitiveTopology topology;
-                                notused,               //  bool dynamicIndexing;
-                                (size_t)-1,            //  size_t aggregate;
-                                glu::TYPE_INVALID,     //  glu::DataType dataType;
-                                WEIGHT_TEST_WIDTH,     //  uint32_t width;
-                                WEIGHT_TEST_HEIGHT,    //  uint32_t height;
-                                perspective,           //  bool perspective;
-                                false,                 //  bool provokingVertexLast;
-                                rotation,              //  uint32_t rotation;
-                                topologyInPipeline,    //  bool                    dynamicTopologyInPipeline
-                                VK_SAMPLE_COUNT_1_BIT, //  VkSampleCountFlagBits sampleCount;
-                            };
+                            for (size_t perspectiveNdx = 0; perspectiveNdx < DE_LENGTH_OF_ARRAY(perspectives);
+                                 ++perspectiveNdx)
+                            {
+                                MovePtr<tcu::TestCaseGroup> usePerspectiveGroup(
+                                    new tcu::TestCaseGroup(testCtx, perspectives[perspectiveNdx].name, ""));
+                                const bool perspective = perspectives[perspectiveNdx].value;
 
-                            topologyGroup->addChild(
-                                new FragmentShadingBarycentricTestCase(testCtx, perspectiveName, testParams));
+                                for (size_t useMeshShaderSpecNdx = 0;
+                                     useMeshShaderSpecNdx < DE_LENGTH_OF_ARRAY(useMeshShaderSpecs);
+                                     ++useMeshShaderSpecNdx)
+                                {
+                                    const bool useMeshShader      = useMeshShaderSpecs[useMeshShaderSpecNdx].meshShader;
+                                    const char *useMeshShaderName = useMeshShaderSpecs[useMeshShaderSpecNdx].name;
+
+                                    if (useMeshShader && !(topology == VK_PRIMITIVE_TOPOLOGY_POINT_LIST ||
+                                                           topology == VK_PRIMITIVE_TOPOLOGY_LINE_LIST ||
+                                                           topology == VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST))
+                                    {
+                                        // mesh shader support only for point, line or triangle list topology
+                                        continue;
+                                    }
+
+                                    if (useMeshShader && topologyInPipeline)
+                                    {
+                                        // topology is a dynamic state, so cannot use mesh shaders
+                                        // """
+                                        //  If the pipeline requires pre - rasterization shader state, and includes a mesh shader,
+                                        //  there must be no element of the pDynamicStates member of pDynamicState set to VK_DYNAMIC_STATE_PRIMITIVE_TOPOLOGY,
+                                        //  or VK_DYNAMIC_STATE_VERTEX_INPUT_BINDING_STRIDE
+                                        // """
+                                        continue;
+                                    }
+
+                                    const TestParams testParams{
+                                        constructionTypeCase.constructionType,
+                                        testType,              //  TestType testType;
+                                        TEST_SUBTYPE_DEFAULT,  //  TestSubtype testSubtype;
+                                        topology,              //  VkPrimitiveTopology topology;
+                                        notused,               //  bool dynamicIndexing;
+                                        (size_t)-1,            //  size_t aggregate;
+                                        glu::TYPE_INVALID,     //  glu::DataType dataType;
+                                        WEIGHT_TEST_WIDTH,     //  uint32_t width;
+                                        WEIGHT_TEST_HEIGHT,    //  uint32_t height;
+                                        perspective,           //  bool perspective;
+                                        provokingVertexLast,   //  bool provokingVertexLast;
+                                        rotation,              //  uint32_t rotation;
+                                        topologyInPipeline,    //  bool                    dynamicTopologyInPipeline
+                                        VK_SAMPLE_COUNT_1_BIT, //  VkSampleCountFlagBits sampleCount;
+                                        false,                 //  bool                    testWithInterpolation
+                                        false,                 //  bool                    testWithFlatInterpolation
+                                        false,                 //  bool                    clipVertices
+                                        useMeshShader,         //    bool                    useMeshShader
+                                    };
+
+                                    usePerspectiveGroup->addChild(
+                                        new FragmentShadingBarycentricTestCase(testCtx, useMeshShaderName, testParams));
+                                }
+                                topologyGroup->addChild(usePerspectiveGroup.release());
+                            }
+                            rotationGroup->addChild(topologyGroup.release());
                         }
 
-                        rotationGroup->addChild(topologyGroup.release());
+                        topologyInPipelineGroup->addChild(rotationGroup.release());
                     }
-
-                    topologyInPipelineGroup->addChild(rotationGroup.release());
                 }
+                provokingVertexGroup->addChild(topologyInPipelineGroup.release());
             }
-
-            testTypeGroup->addChild(topologyInPipelineGroup.release());
+            testTypeGroup->addChild(provokingVertexGroup.release());
         }
 
         constructionTypeCase.testGroup->addChild(testTypeGroup.release());
