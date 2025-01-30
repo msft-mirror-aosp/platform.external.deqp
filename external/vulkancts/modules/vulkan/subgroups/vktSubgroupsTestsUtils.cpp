@@ -3987,6 +3987,11 @@ tcu::TestStatus vkt::subgroups::makeComputeTestRequiredSubgroupSize (Context&			
 
 			vk.cmdDispatch(*cmdBuffer,numWorkgroups[0], numWorkgroups[1], numWorkgroups[2]);
 		}
+
+		// Make shader writes available.
+		const auto postShaderBarrier = makeMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT);
+		vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 1u, &postShaderBarrier, 0u, nullptr, 0u, nullptr);
+
 		endCommandBuffer(vk, *cmdBuffer);
 
 		submitCommandsAndWait(vk, device, queue, *cmdBuffer);
