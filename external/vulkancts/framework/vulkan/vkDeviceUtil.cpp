@@ -54,17 +54,17 @@ Move<VkInstance> createDefaultInstance(const PlatformInterface &vkPlatform, uint
     vector<string> actualExtensions = enabledExtensions;
 
     // Enumerate once, pass it in to the various functions that require the list of available extensions
-    vector<vk::VkExtensionProperties> availableExtensions = enumerateInstanceExtensionProperties(vkPlatform, DE_NULL);
+    vector<vk::VkExtensionProperties> availableExtensions = enumerateInstanceExtensionProperties(vkPlatform, nullptr);
 
 #ifndef CTS_USES_VULKANSC
     if (validationEnabled)
     {
         // Make sure the debug report extension is enabled when validation is enabled.
-        if (!isExtensionStructSupported(availableExtensions, RequiredExtension("VK_EXT_debug_report")))
-            TCU_THROW(NotSupportedError, "VK_EXT_debug_report is not supported");
+        if (!isExtensionStructSupported(availableExtensions, RequiredExtension("VK_EXT_debug_utils")))
+            TCU_THROW(NotSupportedError, "VK_EXT_debug_utils is not supported");
 
-        if (!de::contains(begin(actualExtensions), end(actualExtensions), "VK_EXT_debug_report"))
-            actualExtensions.push_back("VK_EXT_debug_report");
+        if (!de::contains(begin(actualExtensions), end(actualExtensions), "VK_EXT_debug_utils"))
+            actualExtensions.push_back("VK_EXT_debug_utils");
 
         DE_ASSERT(recorder);
     }
@@ -98,9 +98,9 @@ Move<VkInstance> createDefaultInstance(const PlatformInterface &vkPlatform, uint
     const struct VkApplicationInfo appInfo = {
         VK_STRUCTURE_TYPE_APPLICATION_INFO,
 #ifdef CTS_USES_VULKANSC
-        hasAppParams ? &appParams[0] : DE_NULL,
+        hasAppParams ? &appParams[0] : nullptr,
 #else
-        DE_NULL,
+        nullptr,
 #endif                    // CTS_USES_VULKANSC
         "deqp",           // pAppName
         qpGetReleaseId(), // appVersion
@@ -110,7 +110,7 @@ Move<VkInstance> createDefaultInstance(const PlatformInterface &vkPlatform, uint
     };
 
 #ifndef CTS_USES_VULKANSC
-    const VkDebugReportCallbackCreateInfoEXT callbackInfo =
+    const VkDebugUtilsMessengerCreateInfoEXT callbackInfo =
         (validationEnabled ? recorder->makeCreateInfo() : initVulkanStructure());
 #endif // CTS_USES_VULKANSC
 

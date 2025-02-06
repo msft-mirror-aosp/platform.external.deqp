@@ -44,6 +44,8 @@
 #include "deSTLUtil.hpp"
 #include "deStringUtil.hpp"
 
+#include <cstdint>
+#include <string>
 #include <vector>
 #include <algorithm>
 #include <iterator>
@@ -72,7 +74,7 @@ VkDevice getDevice(Context &context)
         // Create a universal queue that supports graphics and compute
         const VkDeviceQueueCreateInfo queueParams{
             VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO, // VkStructureType sType;
-            DE_NULL,                                    // const void* pNext;
+            nullptr,                                    // const void* pNext;
             0u,                                         // VkDeviceQueueCreateFlags flags;
             context.getUniversalQueueFamilyIndex(),     // uint32_t queueFamilyIndex;
             1u,                                         // uint32_t queueCount;
@@ -125,7 +127,7 @@ VkDevice getDevice(Context &context)
             nullptr,                              //ppEnabledLayerNames;
             de::sizeU32(extensionPtrs),           // uint32_t enabledExtensionCount;
             de::dataOrNull(extensionPtrs),        // const char* const* ppEnabledExtensionNames;
-            DE_NULL,                              //pEnabledFeatures;
+            nullptr,                              //pEnabledFeatures;
         };
 
         Move<VkDevice> device = createCustomDevice(
@@ -337,6 +339,7 @@ enum class PoolMutableStrategy
     KEEP_TYPES = 0,
     EXPAND_TYPES,
     NO_TYPES,
+    KEEP_NO_MUTABLE_TYPES // mutable descriptor type out-of-range case: Do not keep type list of a mutable descriptor in the array of type lists for allocation in the descriptor pool
 };
 
 // Type of information that's present in VkWriteDescriptorSet.
@@ -791,14 +794,14 @@ struct Resource
         {
         case ResourceType::SAMPLER:
         {
-            const VkDescriptorImageInfo imageInfo = {sampler.get(), DE_NULL, VK_IMAGE_LAYOUT_UNDEFINED};
+            const VkDescriptorImageInfo imageInfo = {sampler.get(), VK_NULL_HANDLE, VK_IMAGE_LAYOUT_UNDEFINED};
             writeInfo                             = WriteInfoPtr(new WriteInfo(imageInfo));
         }
         break;
 
         case ResourceType::IMAGE:
         {
-            const VkDescriptorImageInfo imageInfo = {DE_NULL, imageView.get(), VK_IMAGE_LAYOUT_GENERAL};
+            const VkDescriptorImageInfo imageInfo = {VK_NULL_HANDLE, imageView.get(), VK_IMAGE_LAYOUT_GENERAL};
             writeInfo                             = WriteInfoPtr(new WriteInfo(imageInfo));
         }
         break;
@@ -1588,6 +1591,8 @@ public:
         std::vector<VkDescriptorPoolSize> poolSizes;
         std::vector<std::vector<VkDescriptorType>> mutableTypesVec;
         std::vector<VkMutableDescriptorTypeListEXT> mutableTypeLists;
+        bool mutableDescriptorBefore         = false;
+        uint32_t countNonMutDescAfterMutDesc = 0;
 
         // Make vector element addresses stable.
         const auto bindingCount = numBindings();
@@ -1604,11 +1609,18 @@ public:
             };
             poolSizes.push_back(poolSize);
 
-            if (strategy == PoolMutableStrategy::KEEP_TYPES || strategy == PoolMutableStrategy::EXPAND_TYPES)
+            if (strategy == PoolMutableStrategy::KEEP_TYPES || strategy == PoolMutableStrategy::EXPAND_TYPES ||
+                strategy == PoolMutableStrategy::KEEP_NO_MUTABLE_TYPES)
             {
                 if (mainType == VK_DESCRIPTOR_TYPE_MUTABLE_EXT)
                 {
-                    if (strategy == PoolMutableStrategy::KEEP_TYPES)
+                    if (strategy == PoolMutableStrategy::KEEP_NO_MUTABLE_TYPES)
+                    {
+                        mutableDescriptorBefore     = true;
+                        countNonMutDescAfterMutDesc = 0;
+                        continue;
+                    }
+                    else if (strategy == PoolMutableStrategy::KEEP_TYPES)
                     {
                         mutableTypesVec.emplace_back(b->mutableTypes());
                     }
@@ -1626,17 +1638,28 @@ public:
                     const VkMutableDescriptorTypeListEXT typeList = {static_cast<uint32_t>(lastVec.size()),
                                                                      de::dataOrNull(lastVec)};
                     mutableTypeLists.push_back(typeList);
+                    // mutable descriptor type out-of-range case: mutableTypeLists must not include type lists for mutable descriptors
+                    DE_ASSERT(!mutableDescriptorBefore || strategy != PoolMutableStrategy::KEEP_NO_MUTABLE_TYPES);
                 }
                 else
                 {
                     const VkMutableDescriptorTypeListEXT typeList = {0u, nullptr};
                     mutableTypeLists.push_back(typeList);
+                    countNonMutDescAfterMutDesc++;
                 }
             }
             else if (strategy == PoolMutableStrategy::NO_TYPES)
                 ; // Do nothing, we will not use any type list.
             else
                 DE_ASSERT(false);
+        }
+
+        // mutable descriptor type out-of-range case:
+        // there should be no non-mutable descriptor after the last mutable descriptor
+        // and there should be at least 1 mutable descriptor in the binding list
+        if (strategy == PoolMutableStrategy::KEEP_NO_MUTABLE_TYPES)
+        {
+            DE_ASSERT((mutableDescriptorBefore == true) && (countNonMutDescAfterMutDesc == 0));
         }
 
         VkDescriptorPoolCreateInfo poolCreateInfo = initVulkanStructure();
@@ -1648,7 +1671,9 @@ public:
 
         VkMutableDescriptorTypeCreateInfoEXT mutableInfo = initVulkanStructure();
 
-        if (strategy == PoolMutableStrategy::KEEP_TYPES || strategy == PoolMutableStrategy::EXPAND_TYPES)
+        if (strategy == PoolMutableStrategy::KEEP_TYPES || strategy == PoolMutableStrategy::EXPAND_TYPES ||
+            ((strategy == PoolMutableStrategy::KEEP_NO_MUTABLE_TYPES) &&
+             ((mutableDescriptorBefore == true) && (countNonMutDescAfterMutDesc == 0))))
         {
             mutableInfo.mutableDescriptorTypeListCount = static_cast<uint32_t>(mutableTypeLists.size());
             mutableInfo.pMutableDescriptorTypeLists    = de::dataOrNull(mutableTypeLists);
@@ -3099,7 +3124,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vkd, VkDevice devi
     const auto extent = getDefaultExtent();
     const std::vector<VkViewport> viewports(1u, makeViewport(extent));
     const std::vector<VkRect2D> scissors(1u, makeRect2D(extent));
-    const auto hasTess  = (tescModule != DE_NULL || teseModule != DE_NULL);
+    const auto hasTess  = (tescModule != VK_NULL_HANDLE || teseModule != VK_NULL_HANDLE);
     const auto topology = (hasTess ? VK_PRIMITIVE_TOPOLOGY_PATCH_LIST : VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST);
 
     const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = initVulkanStructure();
@@ -3134,7 +3159,7 @@ Move<VkPipeline> buildGraphicsPipeline(const DeviceInterface &vkd, VkDevice devi
         nullptr,                                                    //  const void* pNext;
         0u,                                                         //  VkPipelineRasterizationStateCreateFlags flags;
         VK_FALSE,                                                   //  VkBool32 depthClampEnable;
-        (fragModule == DE_NULL ? VK_TRUE : VK_FALSE),               //  VkBool32 rasterizerDiscardEnable;
+        (fragModule == VK_NULL_HANDLE ? VK_TRUE : VK_FALSE),        //  VkBool32 rasterizerDiscardEnable;
         VK_POLYGON_MODE_FILL,                                       //  VkPolygonMode polygonMode;
         VK_CULL_MODE_NONE,                                          //  VkCullModeFlags cullMode;
         VK_FRONT_FACE_CLOCKWISE,                                    //  VkFrontFace frontFace;
@@ -3315,11 +3340,11 @@ tcu::TestStatus MutableTypesInstance::iterate()
     bufferInfoPtr               = DescriptorBufferInfoPtr(new VkDescriptorBufferInfo(
         makeDescriptorBufferInfo(extraResources[bindingCount++].bufferWithMemory->get(), 0ull, outputBufferSize)));
     if (useExternalImage)
-        imageInfoPtr = DescriptorImageInfoPtr(new VkDescriptorImageInfo(
-            makeDescriptorImageInfo(DE_NULL, extraResources[bindingCount++].imageView.get(), VK_IMAGE_LAYOUT_GENERAL)));
+        imageInfoPtr = DescriptorImageInfoPtr(new VkDescriptorImageInfo(makeDescriptorImageInfo(
+            VK_NULL_HANDLE, extraResources[bindingCount++].imageView.get(), VK_IMAGE_LAYOUT_GENERAL)));
     if (useExternalSampler)
-        samplerInfoPtr = DescriptorImageInfoPtr(new VkDescriptorImageInfo(
-            makeDescriptorImageInfo(extraResources[bindingCount++].sampler.get(), DE_NULL, VK_IMAGE_LAYOUT_GENERAL)));
+        samplerInfoPtr = DescriptorImageInfoPtr(new VkDescriptorImageInfo(makeDescriptorImageInfo(
+            extraResources[bindingCount++].sampler.get(), VK_NULL_HANDLE, VK_IMAGE_LAYOUT_GENERAL)));
     if (rayTracing)
     {
         asWriteInfoPtr  = DescriptorASInfoPtr(new VkWriteDescriptorSetAccelerationStructureKHR);
@@ -3436,20 +3461,20 @@ tcu::TestStatus MutableTypesInstance::iterate()
         de::MovePtr<BufferWithMemory> hitSBT;
         de::MovePtr<BufferWithMemory> callableSBT;
 
-        VkStridedDeviceAddressRegionKHR raygenSBTRegion   = makeStridedDeviceAddressRegionKHR(DE_NULL, 0, 0);
-        VkStridedDeviceAddressRegionKHR missSBTRegion     = makeStridedDeviceAddressRegionKHR(DE_NULL, 0, 0);
-        VkStridedDeviceAddressRegionKHR hitSBTRegion      = makeStridedDeviceAddressRegionKHR(DE_NULL, 0, 0);
-        VkStridedDeviceAddressRegionKHR callableSBTRegion = makeStridedDeviceAddressRegionKHR(DE_NULL, 0, 0);
+        VkStridedDeviceAddressRegionKHR raygenSBTRegion   = makeStridedDeviceAddressRegionKHR(0, 0, 0);
+        VkStridedDeviceAddressRegionKHR missSBTRegion     = makeStridedDeviceAddressRegionKHR(0, 0, 0);
+        VkStridedDeviceAddressRegionKHR hitSBTRegion      = makeStridedDeviceAddressRegionKHR(0, 0, 0);
+        VkStridedDeviceAddressRegionKHR callableSBTRegion = makeStridedDeviceAddressRegionKHR(0, 0, 0);
 
         if (bindPoint == VK_PIPELINE_BIND_POINT_COMPUTE)
             pipeline = makeComputePipeline(vkd, device, pipelineLayout.get(), shaderModule.get());
         else if (bindPoint == VK_PIPELINE_BIND_POINT_GRAPHICS)
         {
-            VkShaderModule vertModule = DE_NULL;
-            VkShaderModule teseModule = DE_NULL;
-            VkShaderModule tescModule = DE_NULL;
-            VkShaderModule geomModule = DE_NULL;
-            VkShaderModule fragModule = DE_NULL;
+            VkShaderModule vertModule = VK_NULL_HANDLE;
+            VkShaderModule teseModule = VK_NULL_HANDLE;
+            VkShaderModule tescModule = VK_NULL_HANDLE;
+            VkShaderModule geomModule = VK_NULL_HANDLE;
+            VkShaderModule fragModule = VK_NULL_HANDLE;
 
             if (m_params.testingStage == TestingStage::VERTEX)
                 vertModule = shaderModule.get();
@@ -3490,12 +3515,12 @@ tcu::TestStatus MutableTypesInstance::iterate()
             shaderGroupHandleSize              = rayTracingPropertiesKHR->getShaderGroupHandleSize();
             shaderGroupBaseAlignment           = rayTracingPropertiesKHR->getShaderGroupBaseAlignment();
 
-            VkShaderModule rgenModule = DE_NULL;
-            VkShaderModule isecModule = DE_NULL;
-            VkShaderModule ahitModule = DE_NULL;
-            VkShaderModule chitModule = DE_NULL;
-            VkShaderModule missModule = DE_NULL;
-            VkShaderModule callModule = DE_NULL;
+            VkShaderModule rgenModule = VK_NULL_HANDLE;
+            VkShaderModule isecModule = VK_NULL_HANDLE;
+            VkShaderModule ahitModule = VK_NULL_HANDLE;
+            VkShaderModule chitModule = VK_NULL_HANDLE;
+            VkShaderModule missModule = VK_NULL_HANDLE;
+            VkShaderModule callModule = VK_NULL_HANDLE;
 
             const uint32_t rgenGroup = 0u;
             uint32_t hitGroup        = 0u;
@@ -4253,6 +4278,55 @@ void createChildren(tcu::TestCaseGroup *mainGroup)
         multipleGroup->addChild(mutableOnlyGroup.release());
         multipleGroup->addChild(mixedGroup.release());
         mainGroup->addChild(multipleGroup.release());
+    }
+
+    // Corner cases
+    {
+        GroupPtr miscGroup(new tcu::TestCaseGroup(testCtx, "misc"));
+        {
+            TestParams params = {(DescriptorSetPtr) nullptr,
+                                 UpdateType::WRITE,
+                                 SourceSetStrategy::MUTABLE,
+                                 SourceSetType::NORMAL,
+                                 PoolMutableStrategy::KEEP_NO_MUTABLE_TYPES,
+                                 UpdateMoment::NORMAL,
+                                 ArrayAccessType::CONSTANT,
+                                 TestingStage::COMPUTE};
+
+            const std::vector<VkDescriptorType> mutableTypes(1u, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+            const uint32_t maxNonMutableDescs = 2;
+            const uint32_t maxMutableDescs    = 2;
+
+            for (uint32_t numNonMutDescs = 0; numNonMutDescs <= maxNonMutableDescs; numNonMutDescs++)
+            {
+                for (uint32_t numMutDescs = 1; numMutDescs <= maxMutableDescs; numMutDescs++)
+                {
+                    DescriptorSetPtr setPtr;
+                    {
+                        DescriptorSet::BindingPtrVector setBindings;
+
+                        for (uint32_t cntNonMutDescs = 0; cntNonMutDescs < numNonMutDescs; cntNonMutDescs++)
+                            setBindings.emplace_back(
+                                new SingleBinding(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, std::vector<VkDescriptorType>()));
+
+                        // mutable descriptors are kept at end to make them out-of-range
+                        for (uint32_t cntMutDescs = 0; cntMutDescs < numMutDescs; cntMutDescs++)
+                            setBindings.emplace_back(new SingleBinding(VK_DESCRIPTOR_TYPE_MUTABLE_EXT, mutableTypes));
+
+                        setPtr = DescriptorSetPtr(new DescriptorSet(setBindings));
+                    }
+                    params.descriptorSet = setPtr;
+
+                    // test mutable descriptor type out-of-range
+                    {
+                        const std::string &testName =
+                            "mutable_type_out_of_range_" + de::toString(numNonMutDescs) + de::toString(numMutDescs);
+                        miscGroup->addChild(new MutableTypesTest(testCtx, testName, params));
+                    }
+                }
+            }
+        }
+        mainGroup->addChild(miscGroup.release());
     }
 }
 

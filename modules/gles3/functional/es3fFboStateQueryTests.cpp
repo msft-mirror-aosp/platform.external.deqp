@@ -171,10 +171,22 @@ public:
                                     m_context.getRenderTarget().getPixelFormat().greenBits > 0 ||
                                     m_context.getRenderTarget().getPixelFormat().blueBits > 0 ||
                                     m_context.getRenderTarget().getPixelFormat().alphaBits > 0;
-        const GLenum attachments[] = {
-            (GLenum)(glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 5)) ? GL_FRONT :
-                                                                                                              GL_BACK),
-            GL_DEPTH, GL_STENCIL};
+
+        bool isGlCore45        = glu::contextSupports(m_context.getRenderContext().getType(), glu::ApiType::core(4, 5));
+        GLenum colorAttachment = isGlCore45 ? GL_FRONT : GL_BACK;
+        if (isGlCore45)
+        {
+            // Make sure GL_FRONT is available. If not, use GL_BACK instead.
+            GLint objectType = GL_NONE;
+            glGetFramebufferAttachmentParameteriv(m_framebufferTarget, colorAttachment,
+                                                  GL_FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE, &objectType);
+            if (objectType == GL_NONE)
+            {
+                colorAttachment = GL_BACK;
+            }
+        }
+
+        const GLenum attachments[]    = {colorAttachment, GL_DEPTH, GL_STENCIL};
         const bool attachmentExists[] = {hasColorBuffer, m_context.getRenderTarget().getDepthBits() > 0,
                                          m_context.getRenderTarget().getStencilBits() > 0};
 
@@ -235,7 +247,7 @@ public:
             GLuint textureID = 0;
             glGenTextures(1, &textureID);
             glBindTexture(GL_TEXTURE_2D, textureID);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 128, 128, 0, GL_RGBA, GL_UNSIGNED_BYTE, DE_NULL);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, 128, 128, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
             expectError(GL_NO_ERROR);
 
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, textureID, 0);
@@ -619,9 +631,9 @@ public:
     }
 
     virtual void testColorAttachment(GLenum internalFormat, GLenum attachment, GLint bitsR, GLint bitsG, GLint bitsB,
-                                     GLint bitsA) = DE_NULL;
+                                     GLint bitsA) = 0;
 
-    virtual void testDepthAttachment(GLenum internalFormat, GLenum attachment, GLint bitsD, GLint bitsS) = DE_NULL;
+    virtual void testDepthAttachment(GLenum internalFormat, GLenum attachment, GLint bitsD, GLint bitsS) = 0;
 
     void test(void)
     {
@@ -864,9 +876,9 @@ public:
     {
     }
 
-    virtual void testColorAttachment(void) = DE_NULL;
+    virtual void testColorAttachment(void) = 0;
 
-    virtual void testDepthAttachment(void) = DE_NULL;
+    virtual void testDepthAttachment(void) = 0;
 
     void test(void)
     {

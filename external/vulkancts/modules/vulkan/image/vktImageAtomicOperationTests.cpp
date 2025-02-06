@@ -2,7 +2,7 @@
  * Vulkan Conformance Tests
  * ------------------------
  *
- * Copyright (c) 2016 The Khronos Group Inc.
+ * Copyright (c) 2016-2024 The Khronos Group Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,7 @@
 #include "vktImageAtomicOperationTests.hpp"
 #include "vktImageAtomicSpirvShaders.hpp"
 
+#include "deFloat16.h"
 #include "deUniquePtr.hpp"
 #include "deStringUtil.hpp"
 #include "deSTLUtil.hpp"
@@ -46,6 +47,227 @@
 #include "tcuTexture.hpp"
 #include "tcuVectorType.hpp"
 #include "tcuStringTemplate.hpp"
+
+class Half
+{
+public:
+    static Half create(float value)
+    {
+        Half h;
+        h.m_value = floatToHalf(value);
+        return h;
+    }
+    inline deFloat16 getValue(void) const
+    {
+        return m_value;
+    }
+
+    inline Half operator+(const Half &other) const
+    {
+        return create(halfToFloat(m_value) + halfToFloat(other.getValue()));
+    }
+    inline Half operator*(const Half &other) const
+    {
+        return create(halfToFloat(m_value) * halfToFloat(other.getValue()));
+    }
+    inline Half operator/(const Half &other) const
+    {
+        return create(halfToFloat(m_value) / halfToFloat(other.getValue()));
+    }
+    inline Half operator-(const Half &other) const
+    {
+        return create(halfToFloat(m_value) - halfToFloat(other.getValue()));
+    }
+
+    inline Half &operator+=(const Half &other)
+    {
+        m_value = floatToHalf(halfToFloat(other.getValue()) + halfToFloat(m_value));
+        return *this;
+    }
+    inline Half &operator*=(const Half &other)
+    {
+        m_value = floatToHalf(halfToFloat(other.getValue()) * halfToFloat(m_value));
+        return *this;
+    }
+    inline Half &operator/=(const Half &other)
+    {
+        m_value = floatToHalf(halfToFloat(other.getValue()) / halfToFloat(m_value));
+        return *this;
+    }
+    inline Half &operator-=(const Half &other)
+    {
+        m_value = floatToHalf(halfToFloat(other.getValue()) - halfToFloat(m_value));
+        return *this;
+    }
+
+    inline bool operator==(const Half &other) const
+    {
+        return m_value == other.m_value;
+    }
+    inline bool operator!=(const Half &other) const
+    {
+        return m_value != other.m_value;
+    }
+    inline bool operator<(const Half &other) const
+    {
+        return halfToFloat(m_value) < halfToFloat(other.m_value);
+    }
+    inline bool operator>(const Half &other) const
+    {
+        return halfToFloat(m_value) > halfToFloat(other.m_value);
+    }
+    inline bool operator<=(const Half &other) const
+    {
+        return halfToFloat(m_value) <= halfToFloat(other.m_value);
+    }
+    inline bool operator>=(const Half &other) const
+    {
+        return halfToFloat(m_value) >= halfToFloat(other.m_value);
+    }
+
+    inline Half &operator=(const float f)
+    {
+        m_value = floatToHalf(f);
+        return *this;
+    }
+    Half(float value)
+    {
+        m_value = floatToHalf(value);
+    }
+    Half(int value) : Half((float)value)
+    {
+    }
+    Half(uint32_t value) : Half((float)value)
+    {
+    }
+    Half(uint64_t value) : Half((float)value)
+    {
+    }
+    Half() : Half(0)
+    {
+    }
+
+    template <class T>
+    inline T to(void) const
+    {
+        return (T)halfToFloat(m_value);
+    }
+
+    inline static deFloat16 floatToHalf(float f);
+    inline static float halfToFloat(deFloat16 h);
+
+private:
+    deFloat16 m_value;
+};
+
+inline deFloat16 Half::floatToHalf(float f)
+{
+    tcu::Float<uint16_t, 5, 10, 15, tcu::FLOAT_HAS_SIGN> v(f);
+    return v.bits();
+}
+
+inline float Half::halfToFloat(deFloat16 h)
+{
+    return tcu::Float16((uint16_t)h).asFloat();
+}
+
+class F16Vec2 : public tcu::Vector<Half, 2>
+{
+    using BaseT = tcu::Vector<Half, 2>;
+
+public:
+    F16Vec2(const BaseT &v) : BaseT(v)
+    {
+    }
+    F16Vec2(int i) : F16Vec2((float)i)
+    {
+    }
+    F16Vec2(uint32_t i) : F16Vec2((float)i)
+    {
+    }
+    F16Vec2(uint64_t i) : F16Vec2((float)i)
+    {
+    }
+    F16Vec2(float f) : F16Vec2(f, f)
+    {
+    }
+    F16Vec2(float f0, float f1)
+    {
+        m_data[0] = f0;
+        m_data[1] = f1;
+    }
+    F16Vec2(Half h0, Half h1)
+    {
+        m_data[0] = h0;
+        m_data[1] = h1;
+    }
+    F16Vec2() : F16Vec2(0)
+    {
+    }
+};
+
+class F16Vec4 : public tcu::Vector<Half, 4>
+{
+    using BaseT = tcu::Vector<Half, 4>;
+
+public:
+    F16Vec4(const BaseT &v) : BaseT(v)
+    {
+    }
+    F16Vec4(int i) : F16Vec4((float)i)
+    {
+    }
+    F16Vec4(uint32_t i) : F16Vec4((float)i)
+    {
+    }
+    F16Vec4(uint64_t i) : F16Vec4((float)i)
+    {
+    }
+    F16Vec4(float f) : F16Vec4(f, f, f, f)
+    {
+    }
+    F16Vec4(float f0, float f1, float f2, float f3)
+    {
+        m_data[0] = f0;
+        m_data[1] = f1;
+        m_data[2] = f2;
+        m_data[3] = f3;
+    }
+    F16Vec4(Half h0, Half h1, Half h2, Half h3)
+    {
+        m_data[0] = h0;
+        m_data[1] = h1;
+        m_data[2] = h2;
+        m_data[3] = h3;
+    }
+    F16Vec4() : F16Vec4(0)
+    {
+    }
+};
+
+namespace de
+{
+template <>
+inline F16Vec2 min<F16Vec2>(F16Vec2 a, F16Vec2 b)
+{
+    return F16Vec2(de::min(a[0], b[0]), de::min(a[1], b[1]));
+}
+template <>
+inline F16Vec2 max<F16Vec2>(F16Vec2 a, F16Vec2 b)
+{
+    return F16Vec2(de::max(a[0], b[0]), de::max(a[1], b[1]));
+}
+template <>
+inline F16Vec4 min<F16Vec4>(F16Vec4 a, F16Vec4 b)
+{
+    return F16Vec4(de::min(a[0], b[0]), de::min(a[1], b[1]), de::min(a[2], b[2]), de::min(a[3], b[3]));
+}
+template <>
+inline F16Vec4 max<F16Vec4>(F16Vec4 a, F16Vec4 b)
+{
+    return F16Vec4(de::max(a[0], b[0]), de::max(a[1], b[1]), de::max(a[2], b[2]), de::max(a[3], b[3]));
+}
+} // namespace de
 
 namespace vkt
 {
@@ -131,11 +353,17 @@ static string getCoordStr(const ImageType imageType, const std::string &x, const
     }
 }
 
-static string getComponentTypeStr(uint32_t componentWidth, bool intFormat, bool uintFormat, bool floatFormat)
+static string getComponentTypeStr(tcu::TextureFormat format, uint32_t componentWidth, bool intFormat, bool uintFormat,
+                                  bool floatFormat)
 {
     DE_ASSERT(intFormat || uintFormat || floatFormat);
 
     const bool is64 = (componentWidth == 64);
+    if (format.type == tcu::TextureFormat::HALF_FLOAT)
+    {
+        DE_ASSERT(floatFormat);
+        return string("f16vec") + to_string(tcu::getNumUsedChannels(format.order));
+    }
 
     if (intFormat)
         return (is64 ? "int64_t" : "int");
@@ -163,8 +391,8 @@ static string getVec4TypeStr(uint32_t componentWidth, bool intFormat, bool uintF
     return "";
 }
 
-static string getAtomicFuncArgumentShaderStr(const AtomicOperation op, const string &x, const string &y,
-                                             const string &z, const IVec3 &gridSize)
+static string getAtomicFuncArgumentShaderStr(const tcu::TextureFormat format, const AtomicOperation op, const string &x,
+                                             const string &y, const string &z, const IVec3 &gridSize)
 {
     switch (op)
     {
@@ -172,16 +400,40 @@ static string getAtomicFuncArgumentShaderStr(const AtomicOperation op, const str
     case ATOMIC_OPERATION_AND:
     case ATOMIC_OPERATION_OR:
     case ATOMIC_OPERATION_XOR:
-        return string("(" + x + "*" + x + " + " + y + "*" + y + " + " + z + "*" + z + ")");
+        if (format.type == tcu::TextureFormat::HALF_FLOAT)
+        {
+            return string("(" + x + " + 2*" + y + " + 3*" + z + ")");
+        }
+        else
+        {
+            return string("(" + x + "*" + x + " + " + y + "*" + y + " + " + z + "*" + z + ")");
+        }
     case ATOMIC_OPERATION_MIN:
     case ATOMIC_OPERATION_MAX:
         // multiply by (1-2*(value % 2) to make half of the data negative
         // this will result in generating large numbers for uint formats
-        return string("((1 - 2*(" + x + " % 2)) * (" + x + "*" + x + " + " + y + "*" + y + " + " + z + "*" + z + "))");
+        if (format.type == tcu::TextureFormat::HALF_FLOAT)
+        {
+            return string("((1 - 2*(" + x + " % 2)) * (" + x + " + 2*" + y + " + 3*" + z + "))");
+        }
+        else
+        {
+            return string("((1 - 2*(" + x + " % 2)) * (" + x + "*" + x + " + " + y + "*" + y + " + " + z + "*" + z +
+                          "))");
+        }
     case ATOMIC_OPERATION_EXCHANGE:
     case ATOMIC_OPERATION_COMPARE_EXCHANGE:
-        return string("((" + z + "*" + toString(gridSize.x()) + " + " + x + ")*" + toString(gridSize.y()) + " + " + y +
-                      ")");
+        if (format.type == tcu::TextureFormat::HALF_FLOAT)
+        {
+            // Only use values exactly representable with 10-bit mantissa.
+            return string("(((" + z + "*" + toString(gridSize.x()) + " + " + x + ")*" + toString(gridSize.y()) + " + " +
+                          y + ") % 1024)");
+        }
+        else
+        {
+            return string("((" + z + "*" + toString(gridSize.x()) + " + " + x + ")*" + toString(gridSize.y()) + " + " +
+                          y + ")");
+        }
     default:
         DE_ASSERT(false);
         return "";
@@ -249,35 +501,49 @@ static string getAtomicOperationShaderFuncName(const AtomicOperation op)
 template <typename T>
 T getOperationInitialValue(const AtomicOperation op)
 {
+    int ret = 0;
     switch (op)
     {
     // \note 18 is just an arbitrary small nonzero value.
     case ATOMIC_OPERATION_ADD:
-        return 18;
+        ret = 18;
+        break;
     case ATOMIC_OPERATION_INC:
-        return 18;
+        ret = 18;
+        break;
     case ATOMIC_OPERATION_SUB:
-        return (1 << 24) - 1;
+        ret = (1 << 24) - 1;
+        break;
     case ATOMIC_OPERATION_DEC:
-        return (1 << 24) - 1;
+        ret = (1 << 24) - 1;
+        break;
     case ATOMIC_OPERATION_MIN:
-        return (1 << 15) - 1;
+        ret = (1 << 15) - 1;
+        break;
     case ATOMIC_OPERATION_MAX:
-        return 18;
+        ret = 18;
+        break;
     case ATOMIC_OPERATION_AND:
-        return (1 << 15) - 1;
+        ret = (1 << 15) - 1;
+        break;
     case ATOMIC_OPERATION_OR:
-        return 18;
+        ret = 18;
+        break;
     case ATOMIC_OPERATION_XOR:
-        return 18;
+        ret = 18;
+        break;
     case ATOMIC_OPERATION_EXCHANGE:
-        return 18;
+        ret = 18;
+        break;
     case ATOMIC_OPERATION_COMPARE_EXCHANGE:
-        return 18;
+        ret = 18;
+        break;
     default:
         DE_ASSERT(false);
-        return 0xFFFFFFFF;
+        ret = 0xFFFFFFFF;
+        break;
     }
+    return T(ret);
 }
 
 template <>
@@ -321,11 +587,14 @@ uint64_t getOperationInitialValue<uint64_t>(const AtomicOperation op)
 }
 
 template <typename T>
-static T getAtomicFuncArgument(const AtomicOperation op, const IVec3 &invocationID, const IVec3 &gridSize)
+static T getAtomicFuncArgument(const tcu::TextureFormat format, const AtomicOperation op, const IVec3 &invocationID,
+                               const IVec3 &gridSize)
 {
-    const T x = static_cast<T>(invocationID.x());
-    const T y = static_cast<T>(invocationID.y());
-    const T z = static_cast<T>(invocationID.z());
+    const int x = static_cast<int>(invocationID.x());
+    const int y = static_cast<int>(invocationID.y());
+    const int z = static_cast<int>(invocationID.z());
+
+    int ret = 0;
 
     switch (op)
     {
@@ -335,21 +604,49 @@ static T getAtomicFuncArgument(const AtomicOperation op, const IVec3 &invocation
     case ATOMIC_OPERATION_AND:
     case ATOMIC_OPERATION_OR:
     case ATOMIC_OPERATION_XOR:
-        return x * x + y * y + z * z;
+        if (format.type == tcu::TextureFormat::HALF_FLOAT)
+        {
+            ret = x + 2 * y + 3 * z;
+        }
+        else
+        {
+            ret = x * x + y * y + z * z;
+        }
+        break;
     case ATOMIC_OPERATION_INC:
     case ATOMIC_OPERATION_DEC:
-        return 1;
+        ret = 1;
+        break;
     case ATOMIC_OPERATION_MIN:
     case ATOMIC_OPERATION_MAX:
         // multiply half of the data by -1
-        return (1 - 2 * (x % 2)) * (x * x + y * y + z * z);
+        if (format.type == tcu::TextureFormat::HALF_FLOAT)
+        {
+            ret = (1 - 2 * (x % 2)) * (x + 2 * y + 3 * z);
+        }
+        else
+        {
+            ret = (1 - 2 * (x % 2)) * (x * x + y * y + z * z);
+        }
+        break;
     case ATOMIC_OPERATION_EXCHANGE:
     case ATOMIC_OPERATION_COMPARE_EXCHANGE:
-        return (z * static_cast<T>(gridSize.x()) + x) * static_cast<T>(gridSize.y()) + y;
+        if (format.type == tcu::TextureFormat::HALF_FLOAT)
+        {
+            // Only use values exactly representable with 10-bit mantissa.
+            ret = ((z * gridSize.x() + x) * gridSize.y() + y) % 1024;
+        }
+        else
+        {
+            ret = (z * gridSize.x() + x) * gridSize.y() + y;
+        }
+        break;
     default:
         DE_ASSERT(false);
-        return -1;
+        ret = -1;
+        break;
     }
+    return T(ret);
 }
 
 //! An order-independent operation is one for which the end result doesn't depend on the order in which the operations are carried (i.e. is both commutative and associative).
@@ -403,6 +700,78 @@ static bool isSpirvAtomicNoLastArgOp(const AtomicOperation op)
     return false;
 }
 
+Half operator&(const Half &a, const Half &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return Half(0);
+}
+
+Half operator|(const Half &a, const Half &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return Half(0);
+}
+
+Half operator^(const Half &a, const Half &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return Half(0);
+}
+
+F16Vec2 operator&(const F16Vec2 &a, const F16Vec2 &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return F16Vec2(0);
+}
+
+F16Vec2 operator|(const F16Vec2 &a, const F16Vec2 &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return F16Vec2(0);
+}
+
+F16Vec2 operator^(const F16Vec2 &a, const F16Vec2 &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return F16Vec2(0);
+}
+
+F16Vec4 operator&(const F16Vec4 &a, const F16Vec4 &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return F16Vec4(0);
+}
+
+F16Vec4 operator|(const F16Vec4 &a, const F16Vec4 &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return F16Vec4(0);
+}
+
+F16Vec4 operator^(const F16Vec4 &a, const F16Vec4 &b)
+{
+    DE_UNREF(a);
+    DE_UNREF(b);
+    DE_ASSERT(0);
+    return F16Vec4(0);
+}
+
 //! Computes the result of an atomic operation where "a" is the data operated on and "b" is the parameter to the atomic function.
 template <typename T>
 static T computeBinaryAtomicOperationResult(const AtomicOperation op, const T a, const T b)
@@ -428,10 +797,13 @@ static T computeBinaryAtomicOperationResult(const AtomicOperation op, const T a,
     case ATOMIC_OPERATION_EXCHANGE:
         return b;
     case ATOMIC_OPERATION_COMPARE_EXCHANGE:
-        return (a == (sizeof(T) == 8 ? 0xBEFFFFFF18 : 18)) ? b : a;
+    {
+        constexpr uint64_t val = (uint64_t)(sizeof(T) == 8 ? 0xBEFFFFFF18 : 18);
+        return (a == T(val)) ? b : a;
+    }
     default:
         DE_ASSERT(false);
-        return -1;
+        return T(-1);
     }
 }
 
@@ -455,7 +827,12 @@ void AddFillReadShader(SourceCollections &sourceCollections, const ImageType &im
     const string extensions =
         ((componentWidth == 64u) ? "#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require\n"
                                    "#extension GL_EXT_shader_image_int64 : require\n" :
-                                   "");
+                                   "#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable\n");
+
+    const string constructVec4 =
+        (format.type == tcu::TextureFormat::HALF_FLOAT && tcu::getNumUsedChannels(format.order) == 2) ?
+            "#define TOVEC4(x) " + vec4Type + "(x, 0, 0)\n" :
+            "#define TOVEC4(x) " + vec4Type + "(x)\n";
 
     const string fillShader =
         "#version 450\n" + extensions + "precision highp " + shaderImageTypeStr +
@@ -472,6 +849,8 @@ void AddFillReadShader(SourceCollections &sourceCollections, const ImageType &im
         componentType +
         " data[];\n"
         "} inBuffer;\n"
+        "\n" +
+        constructVec4 +
         "\n"
         "void main(void)\n"
         "{\n"
@@ -480,9 +859,13 @@ void AddFillReadShader(SourceCollections &sourceCollections, const ImageType &im
         "    int gz = int(gl_GlobalInvocationID.z);\n"
         "    uint index = gx + (gy * gl_NumWorkGroups.x) + (gz *gl_NumWorkGroups.x * gl_NumWorkGroups.y);\n"
         "    imageStore(u_resultImage, " +
-        imageInCoord + ", " + vec4Type +
-        "(inBuffer.data[index]));\n"
+        imageInCoord +
+        ", TOVEC4(inBuffer.data[index]));\n"
         "}\n";
+
+    const string swizzle = (format.type == tcu::TextureFormat::HALF_FLOAT) ?
+                               (tcu::getNumUsedChannels(format.order) == 4 ? "" : ".xy") :
+                               ".x";
 
     const string readShader =
         "#version 450\n" + extensions + "precision highp " + shaderImageTypeStr +
@@ -506,9 +889,9 @@ void AddFillReadShader(SourceCollections &sourceCollections, const ImageType &im
         "    int gy = int(gl_GlobalInvocationID.y);\n"
         "    int gz = int(gl_GlobalInvocationID.z);\n"
         "    uint index = gx + (gy * gl_NumWorkGroups.x) + (gz *gl_NumWorkGroups.x * gl_NumWorkGroups.y);\n"
-        "    outBuffer.data[index] = imageLoad(u_resultImage, " +
-        imageInCoord +
-        ").x;\n"
+        "    outBuffer.data[index] = " +
+        componentType + "(imageLoad(u_resultImage, " + imageInCoord + ")" + swizzle +
+        ");\n"
         "}\n";
 
     if ((imageType != IMAGE_TYPE_1D) && (imageType != IMAGE_TYPE_1D_ARRAY) && (imageType != IMAGE_TYPE_BUFFER))
@@ -537,19 +920,21 @@ void AddFillReadShader(SourceCollections &sourceCollections, const ImageType &im
             "    int gy = int(gl_GlobalInvocationID.y);\n"
             "    int gz = int(gl_GlobalInvocationID.z);\n"
             "    uint index = gx + (gy * gl_NumWorkGroups.x) + (gz *gl_NumWorkGroups.x * gl_NumWorkGroups.y);\n"
-            "    outBuffer.data[index] = imageLoad(u_resultImage, " +
-            imageInCoord +
-            ").x;\n"
+            "    outBuffer.data[index] = " +
+            componentType + "(imageLoad(u_resultImage, " + imageInCoord + ")" + swizzle +
+            ");\n"
             "    " +
             vec4Type +
             " sparseValue;\n"
             "    sparseImageLoadARB(u_resultImage, " +
             imageInCoord +
             ", sparseValue);\n"
-            "    if (outBuffer.data[index] != sparseValue.x)\n"
+            "    if (outBuffer.data[index] != " +
+            componentType +
+            "(sparseValue))\n"
             "        outBuffer.data[index] = " +
-            vec4Type +
-            "(1234).x;\n"
+            componentType +
+            "(1234);\n"
             "}\n";
 
         sourceCollections.glslSources.add("readShaderResidency")
@@ -669,60 +1054,76 @@ void commonCheckSupport(Context &context, const tcu::TextureFormat &tcuFormat, V
     }
 #endif // CTS_USES_VULKANSC
 
-    if (isFloatFormat(format))
-    {
-        context.requireDeviceFunctionality("VK_EXT_shader_atomic_float");
-
-        const VkFormatFeatureFlags requiredFeatures =
-            (VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT);
-        const auto &atomicFloatFeatures = context.getShaderAtomicFloatFeaturesEXT();
-
-        if (!atomicFloatFeatures.shaderImageFloat32Atomics)
-            TCU_THROW(NotSupportedError, "shaderImageFloat32Atomics not supported");
-
-        if ((operation == ATOMIC_OPERATION_ADD) && !atomicFloatFeatures.shaderImageFloat32AtomicAdd)
-            TCU_THROW(NotSupportedError, "shaderImageFloat32AtomicAdd not supported");
-
-        if (operation == ATOMIC_OPERATION_MIN || operation == ATOMIC_OPERATION_MAX)
-        {
-            context.requireDeviceFunctionality("VK_EXT_shader_atomic_float2");
 #ifndef CTS_USES_VULKANSC
-            if (!context.getShaderAtomicFloat2FeaturesEXT().shaderImageFloat32AtomicMinMax)
-            {
-                TCU_THROW(NotSupportedError, "shaderImageFloat32AtomicMinMax not supported");
-            }
-#endif // CTS_USES_VULKANSC
-        }
-
-        if ((formatProperties.optimalTilingFeatures & requiredFeatures) != requiredFeatures)
-            TCU_FAIL("Required format feature bits not supported");
-
-        if (backingType == ImageBackingType::SPARSE)
-        {
-            if (!atomicFloatFeatures.sparseImageFloat32Atomics)
-                TCU_THROW(NotSupportedError, "sparseImageFloat32Atomics not supported");
-
-            if (operation == ATOMIC_OPERATION_ADD && !atomicFloatFeatures.sparseImageFloat32AtomicAdd)
-                TCU_THROW(NotSupportedError, "sparseImageFloat32AtomicAdd not supported");
-        }
-    }
-    else if (format == VK_FORMAT_R64_UINT || format == VK_FORMAT_R64_SINT)
+    if (format == VK_FORMAT_R16G16_SFLOAT || format == VK_FORMAT_R16G16B16A16_SFLOAT)
     {
-        context.requireDeviceFunctionality("VK_EXT_shader_image_atomic_int64");
+        context.requireDeviceFunctionality("VK_NV_shader_atomic_float16_vector");
 
         const VkFormatFeatureFlags requiredFeatures =
             (VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT);
-        const auto &atomicInt64Features = context.getShaderImageAtomicInt64FeaturesEXT();
 
-        if (!atomicInt64Features.shaderImageInt64Atomics)
-            TCU_THROW(NotSupportedError, "shaderImageInt64Atomics not supported");
-
-        if (backingType == ImageBackingType::SPARSE && !atomicInt64Features.sparseImageInt64Atomics)
-            TCU_THROW(NotSupportedError, "sparseImageInt64Atomics not supported");
+        if (!context.getShaderAtomicFloat16VectorFeaturesNV().shaderFloat16VectorAtomics)
+            TCU_THROW(NotSupportedError, "shaderFloat16VectorAtomics not supported");
 
         if ((formatProperties.optimalTilingFeatures & requiredFeatures) != requiredFeatures)
             TCU_FAIL("Mandatory format features not supported");
     }
+    else
+#endif // CTS_USES_VULKANSC
+        if (isFloatFormat(format))
+        {
+            context.requireDeviceFunctionality("VK_EXT_shader_atomic_float");
+
+            const VkFormatFeatureFlags requiredFeatures =
+                (VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT);
+            const auto &atomicFloatFeatures = context.getShaderAtomicFloatFeaturesEXT();
+
+            if (!atomicFloatFeatures.shaderImageFloat32Atomics)
+                TCU_THROW(NotSupportedError, "shaderImageFloat32Atomics not supported");
+
+            if ((operation == ATOMIC_OPERATION_ADD) && !atomicFloatFeatures.shaderImageFloat32AtomicAdd)
+                TCU_THROW(NotSupportedError, "shaderImageFloat32AtomicAdd not supported");
+
+            if (operation == ATOMIC_OPERATION_MIN || operation == ATOMIC_OPERATION_MAX)
+            {
+                context.requireDeviceFunctionality("VK_EXT_shader_atomic_float2");
+#ifndef CTS_USES_VULKANSC
+                if (!context.getShaderAtomicFloat2FeaturesEXT().shaderImageFloat32AtomicMinMax)
+                {
+                    TCU_THROW(NotSupportedError, "shaderImageFloat32AtomicMinMax not supported");
+                }
+#endif // CTS_USES_VULKANSC
+            }
+
+            if ((formatProperties.optimalTilingFeatures & requiredFeatures) != requiredFeatures)
+                TCU_FAIL("Required format feature bits not supported");
+
+            if (backingType == ImageBackingType::SPARSE)
+            {
+                if (!atomicFloatFeatures.sparseImageFloat32Atomics)
+                    TCU_THROW(NotSupportedError, "sparseImageFloat32Atomics not supported");
+
+                if (operation == ATOMIC_OPERATION_ADD && !atomicFloatFeatures.sparseImageFloat32AtomicAdd)
+                    TCU_THROW(NotSupportedError, "sparseImageFloat32AtomicAdd not supported");
+            }
+        }
+        else if (format == VK_FORMAT_R64_UINT || format == VK_FORMAT_R64_SINT)
+        {
+            context.requireDeviceFunctionality("VK_EXT_shader_image_atomic_int64");
+
+            const VkFormatFeatureFlags requiredFeatures =
+                (VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT | VK_FORMAT_FEATURE_STORAGE_IMAGE_ATOMIC_BIT);
+            const auto &atomicInt64Features = context.getShaderImageAtomicInt64FeaturesEXT();
+
+            if (!atomicInt64Features.shaderImageInt64Atomics)
+                TCU_THROW(NotSupportedError, "shaderImageInt64Atomics not supported");
+
+            if (backingType == ImageBackingType::SPARSE && !atomicInt64Features.sparseImageInt64Atomics)
+                TCU_THROW(NotSupportedError, "sparseImageInt64Atomics not supported");
+
+            if ((formatProperties.optimalTilingFeatures & requiredFeatures) != requiredFeatures)
+                TCU_FAIL("Mandatory format features not supported");
+        }
 
     if (useTransfer)
     {
@@ -797,7 +1198,7 @@ void BinaryAtomicEndResultCase::initPrograms(SourceCollections &sourceCollection
     const bool intFormat          = isIntFormat(imageFormat);
     const bool uintFormat         = isUintFormat(imageFormat);
     const bool floatFormat        = isFloatFormat(imageFormat);
-    const string type             = getComponentTypeStr(componentWidth, intFormat, uintFormat, floatFormat);
+    const string type             = getComponentTypeStr(m_format, componentWidth, intFormat, uintFormat, floatFormat);
     const string vec4Type         = getVec4TypeStr(componentWidth, intFormat, uintFormat, floatFormat);
 
     if (!m_useTransfer)
@@ -826,7 +1227,7 @@ void BinaryAtomicEndResultCase::initPrograms(SourceCollections &sourceCollection
 
         const string atomicArgExpr =
             type +
-            getAtomicFuncArgumentShaderStr(m_operation, "gx", "gy", "gz",
+            getAtomicFuncArgumentShaderStr(m_format, m_operation, "gx", "gy", "gz",
                                            IVec3(NUM_INVOCATIONS_PER_PIXEL * gridSize.x(), gridSize.y(), gridSize.z()));
 
         const string compareExchangeStr = (m_operation == ATOMIC_OPERATION_COMPARE_EXCHANGE) ?
@@ -840,7 +1241,9 @@ void BinaryAtomicEndResultCase::initPrograms(SourceCollections &sourceCollection
         const string shaderImageTypeStr   = getShaderImageType(m_format, m_imageType);
         const string extensions           = "#extension GL_EXT_shader_atomic_float : enable\n"
                                             "#extension GL_EXT_shader_atomic_float2 : enable\n"
-                                            "#extension GL_KHR_memory_scope_semantics : enable";
+                                            "#extension GL_KHR_memory_scope_semantics : enable\n"
+                                            "#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable\n"
+                                            "#extension GL_NV_shader_atomic_fp16_vector : enable\n";
 
         string source = versionDecl + "\n" + extensions + "\n";
 
@@ -927,7 +1330,7 @@ void BinaryAtomicIntermValuesCase::initPrograms(SourceCollections &sourceCollect
     const bool intFormat          = isIntFormat(imageFormat);
     const bool uintFormat         = isUintFormat(imageFormat);
     const bool floatFormat        = isFloatFormat(imageFormat);
-    const string type             = getComponentTypeStr(componentWidth, intFormat, uintFormat, floatFormat);
+    const string type             = getComponentTypeStr(m_format, componentWidth, intFormat, uintFormat, floatFormat);
     const string vec4Type         = getVec4TypeStr(componentWidth, intFormat, uintFormat, floatFormat);
 
     if (!m_useTransfer)
@@ -956,7 +1359,7 @@ void BinaryAtomicIntermValuesCase::initPrograms(SourceCollections &sourceCollect
         const string invocationCoord = getCoordStr(m_imageType, "gx", "gy", "gz");
         const string atomicArgExpr =
             type +
-            getAtomicFuncArgumentShaderStr(m_operation, "gx", "gy", "gz",
+            getAtomicFuncArgumentShaderStr(m_format, m_operation, "gx", "gy", "gz",
                                            IVec3(NUM_INVOCATIONS_PER_PIXEL * gridSize.x(), gridSize.y(), gridSize.z()));
 
         const string compareExchangeStr = (m_operation == ATOMIC_OPERATION_COMPARE_EXCHANGE) ?
@@ -970,7 +1373,9 @@ void BinaryAtomicIntermValuesCase::initPrograms(SourceCollections &sourceCollect
         const string shaderImageTypeStr   = getShaderImageType(m_format, m_imageType);
         const string extensions           = "#extension GL_EXT_shader_atomic_float : enable\n"
                                             "#extension GL_EXT_shader_atomic_float2 : enable\n"
-                                            "#extension GL_KHR_memory_scope_semantics : enable";
+                                            "#extension GL_KHR_memory_scope_semantics : enable\n"
+                                            "#extension GL_EXT_shader_explicit_arithmetic_types_float16 : enable\n"
+                                            "#extension GL_NV_shader_atomic_fp16_vector : enable\n";
 
         string source = versionDecl + "\n" + extensions +
                         "\n"
@@ -982,6 +1387,11 @@ void BinaryAtomicIntermValuesCase::initPrograms(SourceCollections &sourceCollect
                       "#extension GL_EXT_shader_image_int64 : require\n";
         }
 
+        const string constructVec4 =
+            (m_format.type == tcu::TextureFormat::HALF_FLOAT && tcu::getNumUsedChannels(m_format.order) == 2) ?
+                "#define TOVEC4(x) " + vec4Type + "(x, 0, 0)\n" :
+                "#define TOVEC4(x) " + vec4Type + "(x)\n";
+
         source += "precision highp " + shaderImageTypeStr +
                   "; \n"
                   "layout (local_size_x = 1, local_size_y = 1, local_size_z = 1) in;\n"
@@ -991,6 +1401,8 @@ void BinaryAtomicIntermValuesCase::initPrograms(SourceCollections &sourceCollect
                   "layout (" +
                   shaderImageFormatStr + ", binding=1) writeonly uniform " + shaderImageTypeStr +
                   " u_intermValuesImage;\n"
+                  "\n" +
+                  constructVec4 +
                   "\n"
                   "void main (void)\n"
                   "{\n"
@@ -998,7 +1410,7 @@ void BinaryAtomicIntermValuesCase::initPrograms(SourceCollections &sourceCollect
                   "    int gy = int(gl_GlobalInvocationID.y);\n"
                   "    int gz = int(gl_GlobalInvocationID.z);\n"
                   "    imageStore(u_intermValuesImage, " +
-                  invocationCoord + ", " + vec4Type + "(" + atomicInvocation +
+                  invocationCoord + ", TOVEC4(" + atomicInvocation +
                   "));\n"
                   "}\n";
 
@@ -1217,7 +1629,7 @@ tcu::TestStatus BinaryAtomicInstanceBase::iterate(void)
 
     deviceInterface.cmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *pipeline);
     deviceInterface.cmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, *pipelineLayout, 0u, 1u,
-                                          &m_descriptorSet.get(), 0u, DE_NULL);
+                                          &m_descriptorSet.get(), 0u, nullptr);
 
     deviceInterface.cmdDispatch(*cmdBuffer, NUM_INVOCATIONS_PER_PIXEL * gridSize.x(), gridSize.y(), gridSize.z());
 
@@ -1231,7 +1643,7 @@ tcu::TestStatus BinaryAtomicInstanceBase::iterate(void)
     deviceInterface.cmdPipelineBarrier(
         *cmdBuffer,
         ((m_useTransfer || isTexelBuffer) ? VK_PIPELINE_STAGE_TRANSFER_BIT : VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT),
-        VK_PIPELINE_STAGE_HOST_BIT, false, 0u, DE_NULL, 1u, &outputBufferPreHostReadBarrier, 0u, DE_NULL);
+        VK_PIPELINE_STAGE_HOST_BIT, false, 0u, nullptr, 1u, &outputBufferPreHostReadBarrier, 0u, nullptr);
 
     endCommandBuffer(deviceInterface, *cmdBuffer);
 
@@ -1258,7 +1670,7 @@ void BinaryAtomicInstanceBase::shaderFillImage(const VkCommandBuffer cmdBuffer, 
     const VkDevice device                  = m_context.getDevice();
     const DeviceInterface &deviceInterface = m_context.getDeviceInterface();
     const VkDescriptorImageInfo descResultImageInfo =
-        makeDescriptorImageInfo(DE_NULL, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
+        makeDescriptorImageInfo(VK_NULL_HANDLE, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
     const VkDescriptorBufferInfo descResultBufferInfo = makeDescriptorBufferInfo(buffer, 0, range);
     const VkImageSubresourceRange subresourceRange =
         makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, getNumLayers(m_imageType, m_imageSize));
@@ -1274,13 +1686,13 @@ void BinaryAtomicInstanceBase::shaderFillImage(const VkCommandBuffer cmdBuffer, 
         makeImageMemoryBarrier(0, VK_ACCESS_SHADER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
                                m_resultImage->get(), subresourceRange);
 
-    deviceInterface.cmdPipelineBarrier(
-        cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, (VkDependencyFlags)0, 0,
-        (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1, &imageBarrierPre);
+    deviceInterface.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                                       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, (VkDependencyFlags)0, 0, nullptr, 0,
+                                       nullptr, 1, &imageBarrierPre);
 
     deviceInterface.cmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
     deviceInterface.cmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0u, 1u,
-                                          &descriptorSet, 0u, DE_NULL);
+                                          &descriptorSet, 0u, nullptr);
 
     deviceInterface.cmdDispatch(cmdBuffer, gridSize.x(), gridSize.y(), gridSize.z());
 
@@ -1288,9 +1700,9 @@ void BinaryAtomicInstanceBase::shaderFillImage(const VkCommandBuffer cmdBuffer, 
         makeImageMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL,
                                VK_IMAGE_LAYOUT_GENERAL, m_resultImage->get(), subresourceRange);
 
-    deviceInterface.cmdPipelineBarrier(
-        cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, (VkDependencyFlags)0, 0,
-        (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1, &imageBarrierPost);
+    deviceInterface.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                                       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, (VkDependencyFlags)0, 0, nullptr, 0,
+                                       nullptr, 1, &imageBarrierPost);
 }
 
 void BinaryAtomicInstanceBase::createImageAndView(VkFormat imageFormat, const tcu::UVec3 &imageExent, bool useTransfer,
@@ -1309,7 +1721,7 @@ void BinaryAtomicInstanceBase::createImageAndView(VkFormat imageFormat, const tc
 
     VkImageCreateInfo createInfo = {
         VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO, // VkStructureType sType;
-        DE_NULL,                             // const void* pNext;
+        nullptr,                             // const void* pNext;
         createFlags,                         // VkImageCreateFlags flags;
         mapImageType(m_imageType),           // VkImageType imageType;
         imageFormat,                         // VkFormat format;
@@ -1321,7 +1733,7 @@ void BinaryAtomicInstanceBase::createImageAndView(VkFormat imageFormat, const tc
         usageFlags,                          // VkImageUsageFlags usage;
         VK_SHARING_MODE_EXCLUSIVE,           // VkSharingMode sharingMode;
         0u,                                  // uint32_t queueFamilyIndexCount;
-        DE_NULL,                             // const uint32_t* pQueueFamilyIndices;
+        nullptr,                             // const uint32_t* pQueueFamilyIndices;
         VK_IMAGE_LAYOUT_UNDEFINED,           // VkImageLayout initialLayout;
     };
 
@@ -1438,7 +1850,7 @@ void BinaryAtomicEndResultInstance::prepareDescriptors(const bool isTexelBuffer)
     else
     {
         const VkDescriptorImageInfo descResultImageInfo =
-            makeDescriptorImageInfo(DE_NULL, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
+            makeDescriptorImageInfo(VK_NULL_HANDLE, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
 
         DescriptorSetUpdateBuilder()
             .writeSingle(*m_descriptorSet, DescriptorSetUpdateBuilder::Location::binding(0u), descriptorType,
@@ -1468,7 +1880,7 @@ void BinaryAtomicEndResultInstance::commandsAfterCompute(const VkCommandBuffer c
                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_resultImage->get(), subresourceRange);
 
         deviceInterface.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                           VK_PIPELINE_STAGE_TRANSFER_BIT, false, 0u, DE_NULL, 0u, DE_NULL, 1u,
+                                           VK_PIPELINE_STAGE_TRANSFER_BIT, false, 0u, nullptr, 0u, nullptr, 1u,
                                            &resultImagePostDispatchBarrier);
 
         const VkBufferImageCopy bufferImageCopyParams =
@@ -1481,7 +1893,7 @@ void BinaryAtomicEndResultInstance::commandsAfterCompute(const VkCommandBuffer c
     {
         const VkDevice device = m_context.getDevice();
         const VkDescriptorImageInfo descResultImageInfo =
-            makeDescriptorImageInfo(DE_NULL, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
+            makeDescriptorImageInfo(VK_NULL_HANDLE, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
         const VkDescriptorBufferInfo descResultBufferInfo = makeDescriptorBufferInfo(m_outputBuffer->get(), 0, range);
 
         DescriptorSetUpdateBuilder()
@@ -1496,12 +1908,12 @@ void BinaryAtomicEndResultInstance::commandsAfterCompute(const VkCommandBuffer c
                                    VK_IMAGE_LAYOUT_GENERAL, m_resultImage->get(), subresourceRange);
 
         deviceInterface.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, false, 0u, DE_NULL, 0u, DE_NULL, 1u,
+                                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, false, 0u, nullptr, 0u, nullptr, 1u,
                                            &resultImagePostDispatchBarrier);
 
         deviceInterface.cmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
         deviceInterface.cmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0u, 1u,
-                                              &descriptorSet, 0u, DE_NULL);
+                                              &descriptorSet, 0u, nullptr);
 
         switch (m_imageType)
         {
@@ -1575,30 +1987,76 @@ bool BinaryAtomicEndResultInstance::verifyResult(Allocation &outputBufferAllocat
                     }
                     else
                     {
-                        // 32-bit floating point
-                        if (!isValueCorrect<int32_t>(floatToIntValue, x, y, z, gridSize, extendedGridSize))
-                            return false;
+                        if (m_format.type == tcu::TextureFormat::HALF_FLOAT)
+                        {
+                            if (tcu::getNumUsedChannels(m_format.order) == 2)
+                            {
+                                if (!isValueCorrect<F16Vec2>(*((F16Vec2 *)resultValue), x, y, z, gridSize,
+                                                             extendedGridSize))
+                                    return false;
+                            }
+                            else
+                            {
+                                if (!isValueCorrect<F16Vec4>(*((F16Vec4 *)resultValue), x, y, z, gridSize,
+                                                             extendedGridSize))
+                                    return false;
+                            }
+                        }
+                        else
+                        {
+                            // 32-bit floating point
+                            if (!isValueCorrect<int32_t>(floatToIntValue, x, y, z, gridSize, extendedGridSize))
+                                return false;
+                        }
                     }
                 }
                 else if (m_operation == ATOMIC_OPERATION_EXCHANGE)
                 {
-                    // Check if the end result equals one of the atomic args.
-                    bool matchFound = false;
-
-                    for (int32_t i = 0; i < static_cast<int32_t>(NUM_INVOCATIONS_PER_PIXEL) && !matchFound; i++)
+                    if (m_format.type == tcu::TextureFormat::HALF_FLOAT)
                     {
-                        const IVec3 gid(x + i * gridSize.x(), y, z);
-                        matchFound = is64Bit ? (*((int64_t *)resultValue) ==
-                                                getAtomicFuncArgument<int64_t>(m_operation, gid, extendedGridSize)) :
-                                     isFloatValue ?
-                                               floatToIntValue ==
-                                                   getAtomicFuncArgument<int32_t>(m_operation, gid, extendedGridSize) :
-                                               (*((int32_t *)resultValue) ==
-                                                getAtomicFuncArgument<int32_t>(m_operation, gid, extendedGridSize));
-                    }
+                        for (int32_t c = 0; c < tcu::getNumUsedChannels(m_format.order); ++c)
+                        {
+                            // Check if the end result equals one of the atomic args.
+                            bool matchFound = false;
 
-                    if (!matchFound)
-                        return false;
+                            for (int32_t i = 0; i < static_cast<int32_t>(NUM_INVOCATIONS_PER_PIXEL) && !matchFound; i++)
+                            {
+                                const IVec3 gid(x + i * gridSize.x(), y, z);
+
+                                F16Vec4 ref =
+                                    getAtomicFuncArgument<F16Vec4>(m_format, m_operation, gid, extendedGridSize);
+
+                                matchFound = tcu::getNumUsedChannels(m_format.order) == 2 ?
+                                                 (*((F16Vec2 *)resultValue))[c] == ref[c] :
+                                                 (*((F16Vec4 *)resultValue))[c] == ref[c];
+                            }
+
+                            if (!matchFound)
+                                return false;
+                        }
+                    }
+                    else
+                    {
+                        // Check if the end result equals one of the atomic args.
+                        bool matchFound = false;
+
+                        for (int32_t i = 0; i < static_cast<int32_t>(NUM_INVOCATIONS_PER_PIXEL) && !matchFound; i++)
+                        {
+                            const IVec3 gid(x + i * gridSize.x(), y, z);
+                            matchFound =
+                                is64Bit ?
+                                    (*((int64_t *)resultValue) ==
+                                     getAtomicFuncArgument<int64_t>(m_format, m_operation, gid, extendedGridSize)) :
+                                isFloatValue ?
+                                    floatToIntValue ==
+                                        getAtomicFuncArgument<int32_t>(m_format, m_operation, gid, extendedGridSize) :
+                                    (*((int32_t *)resultValue) ==
+                                     getAtomicFuncArgument<int32_t>(m_format, m_operation, gid, extendedGridSize));
+                        }
+
+                        if (!matchFound)
+                            return false;
+                    }
                 }
                 else if (m_operation == ATOMIC_OPERATION_COMPARE_EXCHANGE)
                 {
@@ -1608,13 +2066,14 @@ bool BinaryAtomicEndResultInstance::verifyResult(Allocation &outputBufferAllocat
                     for (int32_t i = 0; i < static_cast<int32_t>(NUM_INVOCATIONS_PER_PIXEL) && !matchFound; i++)
                     {
                         const IVec3 gid(x + i * gridSize.x(), y, z);
-                        matchFound = is64Bit ? (*((int64_t *)resultValue) ==
-                                                getAtomicFuncArgument<int64_t>(m_operation, gid, extendedGridSize)) :
-                                     isFloatValue ?
-                                               floatToIntValue ==
-                                                   getAtomicFuncArgument<int32_t>(m_operation, gid, extendedGridSize) :
-                                               (*((int32_t *)resultValue) ==
-                                                getAtomicFuncArgument<int32_t>(m_operation, gid, extendedGridSize));
+                        matchFound =
+                            is64Bit ? (*((int64_t *)resultValue) ==
+                                       getAtomicFuncArgument<int64_t>(m_format, m_operation, gid, extendedGridSize)) :
+                            isFloatValue ?
+                                      floatToIntValue ==
+                                          getAtomicFuncArgument<int32_t>(m_format, m_operation, gid, extendedGridSize) :
+                                      (*((int32_t *)resultValue) ==
+                                       getAtomicFuncArgument<int32_t>(m_format, m_operation, gid, extendedGridSize));
                     }
 
                     if (!matchFound)
@@ -1634,7 +2093,7 @@ bool BinaryAtomicEndResultInstance::isValueCorrect(const T resultValue, int32_t 
     for (int32_t i = 0; i < static_cast<int32_t>(NUM_INVOCATIONS_PER_PIXEL); i++)
     {
         const IVec3 gid(x + i * gridSize.x(), y, z);
-        T arg     = getAtomicFuncArgument<T>(m_operation, gid, extendedGridSize);
+        T arg     = getAtomicFuncArgument<T>(m_format, m_operation, gid, extendedGridSize);
         reference = computeBinaryAtomicOperationResult(m_operation, reference, arg);
     }
     return (resultValue == reference);
@@ -1675,6 +2134,10 @@ protected:
     template <typename T>
     bool areValuesCorrect(tcu::ConstPixelBufferAccess &resultBuffer, const bool isFloatingPoint, int32_t x, int32_t y,
                           int32_t z, const UVec3 &gridSize, const IVec3 extendedGridSize) const;
+
+    template <typename T>
+    bool areValuesCorrectVector(tcu::ConstPixelBufferAccess &resultBuffer, int32_t x, int32_t y, int32_t z,
+                                const UVec3 &gridSize, const IVec3 extendedGridSize) const;
 
     template <typename T>
     bool verifyRecursive(const int32_t index, const T valueSoFar, bool argsUsed[NUM_INVOCATIONS_PER_PIXEL],
@@ -1738,9 +2201,9 @@ void BinaryAtomicIntermValuesInstance::prepareDescriptors(const bool isTexelBuff
     else
     {
         const VkDescriptorImageInfo descResultImageInfo =
-            makeDescriptorImageInfo(DE_NULL, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
+            makeDescriptorImageInfo(VK_NULL_HANDLE, *m_resultImageView, VK_IMAGE_LAYOUT_GENERAL);
         const VkDescriptorImageInfo descIntermResultsImageInfo =
-            makeDescriptorImageInfo(DE_NULL, *m_intermResultsImageView, VK_IMAGE_LAYOUT_GENERAL);
+            makeDescriptorImageInfo(VK_NULL_HANDLE, *m_intermResultsImageView, VK_IMAGE_LAYOUT_GENERAL);
 
         DescriptorSetUpdateBuilder()
             .writeSingle(*m_descriptorSet, DescriptorSetUpdateBuilder::Location::binding(0u), descriptorType,
@@ -1762,7 +2225,7 @@ void BinaryAtomicIntermValuesInstance::commandsBeforeCompute(const VkCommandBuff
                                m_intermResultsImage->get(), subresourceRange);
 
     deviceInterface.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-                                       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, false, 0u, DE_NULL, 0u, DE_NULL, 1u,
+                                       VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, false, 0u, nullptr, 0u, nullptr, 1u,
                                        &imagePreDispatchBarrier);
 }
 
@@ -1787,7 +2250,7 @@ void BinaryAtomicIntermValuesInstance::commandsAfterCompute(const VkCommandBuffe
                                    VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, m_intermResultsImage->get(), subresourceRange);
 
         deviceInterface.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                           VK_PIPELINE_STAGE_TRANSFER_BIT, false, 0u, DE_NULL, 0u, DE_NULL, 1u,
+                                           VK_PIPELINE_STAGE_TRANSFER_BIT, false, 0u, nullptr, 0u, nullptr, 1u,
                                            &imagePostDispatchBarrier);
 
         const UVec3 extendedLayerSize = UVec3(NUM_INVOCATIONS_PER_PIXEL * layerSize.x(), layerSize.y(), layerSize.z());
@@ -1802,7 +2265,7 @@ void BinaryAtomicIntermValuesInstance::commandsAfterCompute(const VkCommandBuffe
     {
         const VkDevice device = m_context.getDevice();
         const VkDescriptorImageInfo descResultImageInfo =
-            makeDescriptorImageInfo(DE_NULL, *m_intermResultsImageView, VK_IMAGE_LAYOUT_GENERAL);
+            makeDescriptorImageInfo(VK_NULL_HANDLE, *m_intermResultsImageView, VK_IMAGE_LAYOUT_GENERAL);
         const VkDescriptorBufferInfo descResultBufferInfo = makeDescriptorBufferInfo(m_outputBuffer->get(), 0, range);
 
         DescriptorSetUpdateBuilder()
@@ -1817,12 +2280,12 @@ void BinaryAtomicIntermValuesInstance::commandsAfterCompute(const VkCommandBuffe
                                    VK_IMAGE_LAYOUT_GENERAL, m_intermResultsImage->get(), subresourceRange);
 
         deviceInterface.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, false, 0u, DE_NULL, 0u, DE_NULL, 1u,
+                                           VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, false, 0u, nullptr, 0u, nullptr, 1u,
                                            &resultImagePostDispatchBarrier);
 
         deviceInterface.cmdBindPipeline(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
         deviceInterface.cmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0u, 1u,
-                                              &descriptorSet, 0u, DE_NULL);
+                                              &descriptorSet, 0u, nullptr);
 
         switch (m_imageType)
         {
@@ -1884,9 +2347,25 @@ bool BinaryAtomicIntermValuesInstance::verifyResult(Allocation &outputBufferAllo
                 }
                 else
                 {
-                    // 32-bit floating point
-                    if (!areValuesCorrect<int32_t>(resultBuffer, true, x, y, z, gridSize, extendedGridSize))
-                        return false;
+                    if (m_format.type == tcu::TextureFormat::HALF_FLOAT)
+                    {
+                        if (tcu::getNumUsedChannels(m_format.order) == 2)
+                        {
+                            if (!areValuesCorrectVector<F16Vec2>(resultBuffer, x, y, z, gridSize, extendedGridSize))
+                                return false;
+                        }
+                        else
+                        {
+                            if (!areValuesCorrectVector<F16Vec4>(resultBuffer, x, y, z, gridSize, extendedGridSize))
+                                return false;
+                        }
+                    }
+                    else
+                    {
+                        // 32-bit floating point
+                        if (!areValuesCorrect<int32_t>(resultBuffer, true, x, y, z, gridSize, extendedGridSize))
+                            return false;
+                    }
                 }
             }
 
@@ -1913,12 +2392,50 @@ bool BinaryAtomicIntermValuesInstance::areValuesCorrect(tcu::ConstPixelBufferAcc
             data = static_cast<T>(fData);
         }
         resultValues[i] = data;
-        atomicArgs[i]   = getAtomicFuncArgument<T>(m_operation, gid, extendedGridSize);
+        atomicArgs[i]   = getAtomicFuncArgument<T>(m_format, m_operation, gid, extendedGridSize);
         argsUsed[i]     = false;
     }
 
     // Verify that the return values form a valid sequence.
     return verifyRecursive(0, getOperationInitialValue<T>(m_operation), argsUsed, atomicArgs, resultValues);
+}
+
+template <typename T>
+bool BinaryAtomicIntermValuesInstance::areValuesCorrectVector(tcu::ConstPixelBufferAccess &resultBuffer, int32_t x,
+                                                              int32_t y, int32_t z, const UVec3 &gridSize,
+                                                              const IVec3 extendedGridSize) const
+{
+    T resultValues[NUM_INVOCATIONS_PER_PIXEL];
+    T atomicArgs[NUM_INVOCATIONS_PER_PIXEL];
+    bool argsUsed[NUM_INVOCATIONS_PER_PIXEL];
+
+    for (int32_t i = 0; i < static_cast<int32_t>(NUM_INVOCATIONS_PER_PIXEL); i++)
+    {
+        IVec3 gid(x + i * gridSize.x(), y, z);
+        T data          = *((T *)resultBuffer.getPixelPtr(gid.x(), gid.y(), gid.z()));
+        resultValues[i] = data;
+        atomicArgs[i]   = getAtomicFuncArgument<T>(m_format, m_operation, gid, extendedGridSize);
+        argsUsed[i]     = false;
+    }
+
+    bool allMatch = true;
+    for (int32_t c = 0; c < T::SIZE; ++c)
+    {
+        // Verify that the return values form a valid sequence.
+        Half resultValuesComp[NUM_INVOCATIONS_PER_PIXEL];
+        Half atomicArgsComp[NUM_INVOCATIONS_PER_PIXEL];
+
+        for (int32_t i = 0; i < static_cast<int32_t>(NUM_INVOCATIONS_PER_PIXEL); i++)
+        {
+            resultValuesComp[i] = resultValues[i][c];
+            atomicArgsComp[i]   = atomicArgs[i][c];
+            argsUsed[i]         = false;
+        }
+
+        allMatch = allMatch && verifyRecursive(0, getOperationInitialValue<Half>(m_operation), argsUsed, atomicArgsComp,
+                                               resultValuesComp);
+    }
+    return allMatch;
 }
 
 template <typename T>
@@ -1981,11 +2498,17 @@ tcu::TestCaseGroup *createImageAtomicOperationTests(tcu::TestContext &testCtx)
                                             ImageParams(IMAGE_TYPE_CUBE_ARRAY, tcu::UVec3(64u, 64u, 2u)),
                                             ImageParams(IMAGE_TYPE_BUFFER, tcu::UVec3(64u, 1u, 1u))};
 
-    const tcu::TextureFormat formats[] = {tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::UNSIGNED_INT32),
-                                          tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::SIGNED_INT32),
-                                          tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::FLOAT),
-                                          tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::UNSIGNED_INT64),
-                                          tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::SIGNED_INT64)};
+    const tcu::TextureFormat formats[] = {
+        tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::UNSIGNED_INT32),
+        tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::SIGNED_INT32),
+        tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::FLOAT),
+        tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::UNSIGNED_INT64),
+        tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::SIGNED_INT64),
+#ifndef CTS_USES_VULKANSC
+        tcu::TextureFormat(tcu::TextureFormat::RG, tcu::TextureFormat::HALF_FLOAT),
+        tcu::TextureFormat(tcu::TextureFormat::RGBA, tcu::TextureFormat::HALF_FLOAT),
+#endif // CTS_USES_VULKANSC
+    };
 
     static const VkImageTiling s_tilings[] = {
         VK_IMAGE_TILING_OPTIMAL,
@@ -2057,8 +2580,11 @@ tcu::TestCaseGroup *createImageAtomicOperationTests(tcu::TestContext &testCtx)
                                 const std::string formatName = getShaderImageFormatQualifier(format);
                                 const char *suffix = (s_tilings[tilingNdx] == VK_IMAGE_TILING_OPTIMAL) ? "" : "_linear";
 
-                                // Need SPIRV programs in vktImageAtomicSpirvShaders.cpp
-                                if (imageType == IMAGE_TYPE_BUFFER && (format.type != tcu::TextureFormat::FLOAT))
+                                // Need SPIRV programs in vktImageAtomicSpirvShaders.cpp for linear tiling case
+                                if (imageType == IMAGE_TYPE_BUFFER &&
+                                    ((format.type != tcu::TextureFormat::FLOAT) &&
+                                     (format.type != tcu::TextureFormat::HALF_FLOAT)) &&
+                                    (s_tilings[tilingNdx] == VK_IMAGE_TILING_LINEAR))
                                 {
                                     continue;
                                 }
@@ -2072,7 +2598,8 @@ tcu::TestCaseGroup *createImageAtomicOperationTests(tcu::TestContext &testCtx)
                                     continue;
 
                                 // Only some operations are supported on floating-point
-                                if (format.type == tcu::TextureFormat::FLOAT)
+                                if (format.type == tcu::TextureFormat::FLOAT ||
+                                    format.type == tcu::TextureFormat::HALF_FLOAT)
                                 {
                                     if (operation != ATOMIC_OPERATION_ADD &&
 #ifndef CTS_USES_VULKANSC

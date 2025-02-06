@@ -252,7 +252,7 @@ class GitRepo (Source):
 
     def checkout(self, url, fullDstPath, force):
         if not os.path.exists(os.path.join(fullDstPath, '.git')):
-            execute(["git", "clone", "--no-checkout", url, fullDstPath])
+            run(["git", "clone", "--no-checkout", url, fullDstPath])
 
         pushWorkingDir(fullDstPath)
         print("Directory: " + fullDstPath)
@@ -261,15 +261,18 @@ class GitRepo (Source):
                 proc = subprocess.Popen(['git', 'tag', '-l', tag], stdout=subprocess.PIPE)
                 (stdout, stderr) = proc.communicate()
                 if len(stdout) > 0:
-                    execute(["git", "tag", "-d",tag])
+                    run(["git", "tag", "-d",tag])
             force_arg = ['--force'] if force else []
-            execute(["git", "fetch"] + force_arg + ["--tags", url, "+refs/heads/*:refs/remotes/origin/*"])
-            execute(["git", "checkout"] + force_arg + [self.revision])
+            run(["git", "fetch"] + force_arg + ["--tags", url, "+refs/heads/*:refs/remotes/origin/*"])
+            run(["git", "checkout"] + force_arg + [self.revision])
 
             if(self.patch != ""):
                 patchFile = os.path.join(EXTERNAL_DIR, self.patch)
-                execute(["git", "reset", "--hard", "HEAD"])
-                execute(["git", "apply", patchFile])
+                run(["git", "reset", "--hard", "HEAD"])
+                run(["git", "apply", patchFile])
+        except:
+            # This might be a KeyboardInterrupt or other error, propagate.
+            raise
         finally:
             popWorkingDir()
 
@@ -285,7 +288,12 @@ class GitRepo (Source):
 
         try:
             self.checkout(url, fullDstPath, force)
+        except KeyboardInterrupt:
+            # Propagate the exception to stop the process if possible.
+            raise
         except:
+            # For any other kind of exception, including subprocess errors, we
+            # try the backup URL.
             if backupUrl != None:
                 self.checkout(backupUrl, fullDstPath, force)
 
@@ -311,28 +319,33 @@ PACKAGES = [
     GitRepo(
         "https://github.com/KhronosGroup/SPIRV-Tools.git",
         "git@github.com:KhronosGroup/SPIRV-Tools.git",
-        "f9184c6501f7e349e0664d281ac93b1db9c1e5ad",
+        "3fb52548bc8a68d349d31e21bd4e80e3d953e87c",
         "spirv-tools"),
     GitRepo(
         "https://github.com/KhronosGroup/glslang.git",
         "git@github.com:KhronosGroup/glslang.git",
-        "bada5c87ec6db4441db129d8506742c4a72bd610",
+        "3a2834e7702651043ca9f35d022739e740563516",
         "glslang",
-        removeTags = ["main-tot"]),
+        removeTags = ["main-tot", "master-tot"]),
     GitRepo(
         "https://github.com/KhronosGroup/SPIRV-Headers.git",
         "git@github.com:KhronosGroup/SPIRV-Headers.git",
-        "d3c2a6fa95ad463ca8044d7fc45557db381a6a64",
+        "36d5e2ddaa54c70d2f29081510c66f4fc98e5e53",
         "spirv-headers"),
     GitRepo(
         "https://github.com/KhronosGroup/Vulkan-Docs.git",
         "git@github.com:KhronosGroup/Vulkan-Docs.git",
-        "d99193d3fcc4b2a0dacc0a9d7e4951ea611a3e96",
+        "c7a3955e47d223c6a37fb29e2061c973eec98d0a",
         "vulkan-docs"),
+    GitRepo(
+        "https://github.com/KhronosGroup/Vulkan-ValidationLayers.git",
+        "git@github.com:KhronosGroup/Vulkan-ValidationLayers.git",
+        "902f3cf8d51e76be0c0deb4be39c6223abebbae2",
+        "vulkan-validationlayers"),
     GitRepo(
         "https://github.com/google/amber.git",
         "git@github.com:google/amber.git",
-        "8e90b2d2f532bcd4a80069e3f37a9698209a21bc",
+        "1ec5e96db7e0343d045a52c590e30eba154f74a8",
         "amber"),
     GitRepo(
         "https://github.com/open-source-parsers/jsoncpp.git",
@@ -345,8 +358,21 @@ PACKAGES = [
     GitRepo(
         "https://github.com/Igalia/vk_video_samples.git",
         "git@github.com:Igalia/vk_video_samples.git",
-        "6821adf11eb4f84a2168264b954c170d03237699",
+        "45fe88b456c683120138f052ea81f0a958ff3ec4",
         "nvidia-video-samples"),
+    # NOTE: Temporary vk_video_samples repo and branch where AV1
+    # encoder library is being developed by NVidia.
+    GitRepo(
+        "https://github.com/KhronosGroup/Vulkan-Video-Samples.git",
+        "git@github.com:KhronosGroup/Vulkan-Video-Samples.git",
+        "70dfd5a6007680ddb8970d7e71bf7af9ee173f3c",
+        "vulkan-video-samples"),
+    # NOTE: Temporary video generator repo .
+    GitRepo(
+        "https://github.com/Igalia/video_generator.git",
+        "git@github.com:Igalia/video_generator.git",
+        "426300e12a5cc5d4676807039a1be237a2b68187",
+        "video_generator"),
 ]
 
 def parseArgs ():
@@ -384,24 +410,31 @@ def run(*popenargs, **kwargs):
 
     try:
         stdout, stderr = process.communicate(None)
+    except KeyboardInterrupt:
+        # Terminate the process, wait and propagate.
+        process.terminate()
+        process.wait()
+        raise
     except:
+        # With any other exception, we _kill_ the process and propagate.
         process.kill()
         process.wait()
         raise
-
-    retcode = process.poll()
-
-    if retcode:
-        raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
-
-    return retcode, stdout, stderr
+    else:
+        # Everything good, fetch the retcode and raise exception if needed.
+        retcode = process.poll()
+        if retcode:
+            raise subprocess.CalledProcessError(retcode, process.args, output=stdout, stderr=stderr)
 
 if __name__ == "__main__":
     args = parseArgs()
     initializeLogger(args.verbose)
 
-    for pkg in PACKAGES:
-        if args.clean:
-            pkg.clean()
-        else:
-            pkg.update(args.protocol, args.force)
+    try:
+        for pkg in PACKAGES:
+            if args.clean:
+                pkg.clean()
+            else:
+                pkg.update(args.protocol, args.force)
+    except KeyboardInterrupt:
+        sys.exit("") # Returns 1.

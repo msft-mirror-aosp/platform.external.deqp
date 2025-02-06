@@ -647,7 +647,7 @@ void TextureBorderClampTest::init(void)
     // repeat filterable test with valid context
     const glw::Functions &gl = m_context.getRenderContext().getFunctions();
     const bool is_texture_float_linear_supported =
-        glu::hasExtension(gl, glu::ApiType::es(3, 0), "GL_OES_texture_float_linear");
+        glu::hasExtension(gl, glu::ApiType::es(3, 0), "GL_OES_texture_float_linear") || supportsGL45;
     const bool coreFilterable = isCoreFilterableFormat(m_texFormat, m_sampleMode, is_texture_float_linear_supported);
 
     if (m_useFloatFilterable && !coreFilterable && filterRequiresFilterability(m_filter))
@@ -663,7 +663,8 @@ void TextureBorderClampTest::init(void)
         throw tcu::NotSupportedError("Test requires GL_KHR_texture_compression_astc_ldr extension");
     }
 
-    if (m_texFormat == GL_BGRA && !m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_format_BGRA8888"))
+    if (m_texFormat == GL_BGRA && !m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_format_BGRA8888") &&
+        !supportsGL45)
         throw tcu::NotSupportedError("Test requires GL_EXT_texture_format_BGRA8888 extension");
 
     if (m_context.getRenderTarget().getWidth() < VIEWPORT_WIDTH ||
@@ -2009,15 +2010,15 @@ TextureBorderClampPerAxisCase3D::TextureBorderClampPerAxisCase3D(Context &contex
 
 void TextureBorderClampPerAxisCase3D::init(void)
 {
-    auto ctxType            = m_context.getRenderContext().getType();
-    const bool isES32orGL45 = glu::contextSupports(ctxType, glu::ApiType::es(3, 2)) ||
-                              glu::contextSupports(ctxType, glu::ApiType::core(4, 5));
+    auto ctxType                       = m_context.getRenderContext().getType();
+    const bool isGL45                  = glu::contextSupports(ctxType, glu::ApiType::core(4, 5));
+    const bool isES32orGL45            = glu::contextSupports(ctxType, glu::ApiType::es(3, 2)) || isGL45;
     const glu::GLSLVersion glslVersion = glu::getContextTypeGLSLVersion(ctxType);
 
     // repeat filterable test with valid context
     const glw::Functions &gl = m_context.getRenderContext().getFunctions();
     const bool is_texture_float_linear_supported =
-        glu::hasExtension(gl, glu::ApiType::es(3, 0), "GL_OES_texture_float_linear");
+        glu::hasExtension(gl, glu::ApiType::es(3, 0), "GL_OES_texture_float_linear") || isGL45;
     const bool coreFilterable =
         isCoreFilterableFormat(m_texFormat, tcu::Sampler::MODE_LAST, is_texture_float_linear_supported);
 
@@ -2033,7 +2034,8 @@ void TextureBorderClampPerAxisCase3D::init(void)
     {
         throw tcu::NotSupportedError("Test requires GL_KHR_texture_compression_astc_ldr extension");
     }
-    if (m_texFormat == GL_BGRA && !m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_format_BGRA8888"))
+    if (m_texFormat == GL_BGRA && !m_context.getContextInfo().isExtensionSupported("GL_EXT_texture_format_BGRA8888") &&
+        !isGL45)
         throw tcu::NotSupportedError("Test requires GL_EXT_texture_format_BGRA8888 extension");
     if (m_context.getRenderTarget().getWidth() < VIEWPORT_WIDTH ||
         m_context.getRenderTarget().getHeight() < VIEWPORT_HEIGHT)

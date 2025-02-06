@@ -82,6 +82,7 @@
 #include "vktSpvAsmVectorShuffleTests.hpp"
 #include "vktSpvAsmFloatControlsExtensionlessTests.hpp"
 #include "vktSpvAsmNonSemanticInfoTests.hpp"
+#include "vktSpvAsmRelaxedWithForwardReferenceTests.hpp"
 #include "vktSpvAsm64bitCompareTests.hpp"
 #include "vktSpvAsmTrinaryMinMaxTests.hpp"
 #include "vktSpvAsmTerminateInvocationTests.hpp"
@@ -89,8 +90,10 @@
 #ifndef CTS_USES_VULKANSC
 #include "vktSpvAsmFloatControls2Tests.hpp"
 #include "vktSpvAsmIntegerDotProductTests.hpp"
+#include "vktSpvAsmComputeShaderDerivativesTests.hpp"
 #endif // CTS_USES_VULKANSC
 #include "vktSpvAsmPhysicalStorageBufferPointerTests.hpp"
+#include "vktSpvAsmRawAccessChainTests.hpp"
 
 #include <cmath>
 #include <limits>
@@ -1757,9 +1760,8 @@ bool veryfiBinaryShader(const ProgramBinary &binary)
 
     for (size_t ndx = 0u; ndx < binary.getSize(); ++ndx)
     {
-        if (false == paternsCheck[paternNdx] && patersns[paternNdx][0] == static_cast<char>(binary.getBinary()[ndx]) &&
-            deMemoryEqual((const char *)&binary.getBinary()[ndx], &patersns[paternNdx][0],
-                          patersns[paternNdx].length()))
+        if (!paternsCheck[paternNdx] && patersns[paternNdx][0] == static_cast<char>(binary.getBinary()[ndx]) &&
+            memcmp(&binary.getBinary()[ndx], &patersns[paternNdx][0], patersns[paternNdx].length()) == 0)
         {
             paternsCheck[paternNdx] = true;
             paternNdx++;
@@ -3960,13 +3962,13 @@ tcu::TestCaseGroup *createSpecConstantGroup(tcu::TestContext &testCtx)
                                            -21, addScToInput, outputInts1));
     cases.push_back(SpecConstantTwoValCase("sdiv", " %i32 0", " %i32 0", "%i32", "SDiv                 %sc_0 %sc_1",
                                            -126, -3, addScToInput, outputInts1));
-    cases.push_back(SpecConstantTwoValCase("udiv", " %i32 0", " %i32 0", "%i32", "UDiv                 %sc_0 %sc_1",
+    cases.push_back(SpecConstantTwoValCase("udiv", " %u32 0", " %u32 0", "%u32", "UDiv                 %sc_0 %sc_1",
                                            126, 3, addScToInput, outputInts1));
     cases.push_back(SpecConstantTwoValCase("srem", " %i32 0", " %i32 0", "%i32", "SRem                 %sc_0 %sc_1", 7,
                                            3, addScToInput, outputInts4));
     cases.push_back(SpecConstantTwoValCase("smod", " %i32 0", " %i32 0", "%i32", "SMod                 %sc_0 %sc_1", 7,
                                            3, addScToInput, outputInts4));
-    cases.push_back(SpecConstantTwoValCase("umod", " %i32 0", " %i32 0", "%i32", "UMod                 %sc_0 %sc_1",
+    cases.push_back(SpecConstantTwoValCase("umod", " %u32 0", " %u32 0", "%u32", "UMod                 %sc_0 %sc_1",
                                            342, 50, addScToInput, outputInts1));
     cases.push_back(SpecConstantTwoValCase("bitwiseand", " %i32 0", " %i32 0", "%i32",
                                            "BitwiseAnd           %sc_0 %sc_1", 42, 63, addScToInput, outputInts1));
@@ -5945,10 +5947,8 @@ bool compareNan(const std::vector<Resource> &, const vector<AllocationSp> &outpu
 
     for (size_t idx = 0; idx < byteSize / sizeof(float); ++idx)
     {
-        if (!deFloatIsNaN(output_as_float[idx]))
-        {
+        if (!std::isnan(output_as_float[idx]))
             return false;
-        }
     }
 
     return true;
@@ -5975,39 +5975,76 @@ bool compareZeros(const std::vector<Resource> &, const vector<AllocationSp> &out
 }
 
 // Checks that a compute shader can generate a constant composite value of various types, without exercising a computation on it.
-tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
+tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx, bool testVec4Form)
 {
-    de::MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(testCtx, "opquantize"));
+    de::MovePtr<tcu::TestCaseGroup> group(
+        new tcu::TestCaseGroup(testCtx, testVec4Form ? "opquantize_vec4" : "opquantize"));
 
-    const std::string shader(string(getComputeAsmShaderPreamble()) +
+    std::string shader(getComputeAsmShaderPreamble());
+    if (testVec4Form)
+    {
+        shader += "OpSource GLSL 430\n"
+                  "OpName %main           \"main\"\n"
+                  "OpName %id             \"gl_GlobalInvocationID\"\n"
 
-                             "OpSource GLSL 430\n"
-                             "OpName %main           \"main\"\n"
-                             "OpName %id             \"gl_GlobalInvocationID\"\n"
+                  "OpDecorate %id BuiltIn GlobalInvocationId\n"
+                  "OpDecorate %fvec4_array ArrayStride 16\n"
 
-                             "OpDecorate %id BuiltIn GlobalInvocationId\n"
+                  + string(getComputeAsmInputOutputBufferTraits()) + string(getComputeAsmCommonTypes()) +
+                  "%fvec4       = OpTypeVector %f32 4\n"
+                  "%fvec4_array = OpTypeRuntimeArray %fvec4\n"
+                  "%fvec4ptr    = OpTypePointer Uniform %fvec4\n"
+                  "%buf         = OpTypeStruct %fvec4_array\n"
+                  "%bufptr      = OpTypePointer Uniform %buf\n"
+                  "%indata      = OpVariable %bufptr Uniform\n"
+                  "%outdata     = OpVariable %bufptr Uniform\n"
 
-                             + string(getComputeAsmInputOutputBufferTraits()) + string(getComputeAsmCommonTypes()) +
-                             string(getComputeAsmInputOutputBuffer()) +
+                  "%id          = OpVariable %uvec3ptr Input\n"
+                  "%zero        = OpConstant %i32 0\n"
 
-                             "%id        = OpVariable %uvec3ptr Input\n"
-                             "%zero      = OpConstant %i32 0\n"
+                  "%main        = OpFunction %void None %voidf\n"
+                  "%label       = OpLabel\n"
+                  "%idval       = OpLoad %uvec3 %id\n"
+                  "%x           = OpCompositeExtract %u32 %idval 0\n"
+                  "%inloc       = OpAccessChain %fvec4ptr %indata %zero %x\n"
+                  "%inval       = OpLoad %fvec4 %inloc\n"
+                  "%quant       = OpQuantizeToF16 %fvec4 %inval\n"
+                  "%outloc      = OpAccessChain %fvec4ptr %outdata %zero %x\n"
+                  "               OpStore %outloc %quant\n"
+                  "               OpReturn\n"
+                  "               OpFunctionEnd\n";
+    }
+    else
+    {
+        shader += "OpSource GLSL 430\n"
+                  "OpName %main           \"main\"\n"
+                  "OpName %id             \"gl_GlobalInvocationID\"\n"
 
-                             "%main      = OpFunction %void None %voidf\n"
-                             "%label     = OpLabel\n"
-                             "%idval     = OpLoad %uvec3 %id\n"
-                             "%x         = OpCompositeExtract %u32 %idval 0\n"
-                             "%inloc     = OpAccessChain %f32ptr %indata %zero %x\n"
-                             "%inval     = OpLoad %f32 %inloc\n"
-                             "%quant     = OpQuantizeToF16 %f32 %inval\n"
-                             "%outloc    = OpAccessChain %f32ptr %outdata %zero %x\n"
-                             "             OpStore %outloc %quant\n"
-                             "             OpReturn\n"
-                             "             OpFunctionEnd\n");
+                  "OpDecorate %id BuiltIn GlobalInvocationId\n"
+
+                  + string(getComputeAsmInputOutputBufferTraits()) + string(getComputeAsmCommonTypes()) +
+                  string(getComputeAsmInputOutputBuffer()) +
+
+                  "%id        = OpVariable %uvec3ptr Input\n"
+                  "%zero      = OpConstant %i32 0\n"
+
+                  "%main      = OpFunction %void None %voidf\n"
+                  "%label     = OpLabel\n"
+                  "%idval     = OpLoad %uvec3 %id\n"
+                  "%x         = OpCompositeExtract %u32 %idval 0\n"
+                  "%inloc     = OpAccessChain %f32ptr %indata %zero %x\n"
+                  "%inval     = OpLoad %f32 %inloc\n"
+                  "%quant     = OpQuantizeToF16 %f32 %inval\n"
+                  "%outloc    = OpAccessChain %f32ptr %outdata %zero %x\n"
+                  "             OpStore %outloc %quant\n"
+                  "             OpReturn\n"
+                  "             OpFunctionEnd\n";
+    }
 
     {
         ComputeShaderSpec spec;
-        const uint32_t numElements = 100;
+        const uint32_t numElements   = 100;
+        const uint32_t numWorkGroups = testVec4Form ? numElements / 4 : numElements;
         vector<float> infinities;
         vector<float> results;
 
@@ -6040,7 +6077,7 @@ tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
         spec.assembly = shader;
         spec.inputs.push_back(BufferSp(new Float32Buffer(infinities)));
         spec.outputs.push_back(BufferSp(new Float32Buffer(results)));
-        spec.numWorkGroups = IVec3(numElements, 1, 1);
+        spec.numWorkGroups = IVec3(numWorkGroups, 1, 1);
 
         group->addChild(new SpvAsmComputeShaderCase(testCtx, "infinities", spec));
     }
@@ -6048,7 +6085,8 @@ tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
     {
         ComputeShaderSpec spec;
         vector<float> nans;
-        const uint32_t numElements = 100;
+        const uint32_t numElements   = 100;
+        const uint32_t numWorkGroups = testVec4Form ? numElements / 4 : numElements;
 
         nans.reserve(numElements);
 
@@ -6067,7 +6105,7 @@ tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
         spec.assembly = shader;
         spec.inputs.push_back(BufferSp(new Float32Buffer(nans)));
         spec.outputs.push_back(BufferSp(new Float32Buffer(nans)));
-        spec.numWorkGroups = IVec3(numElements, 1, 1);
+        spec.numWorkGroups = IVec3(numWorkGroups, 1, 1);
         spec.verifyIO      = &compareNan;
 
         group->addChild(new SpvAsmComputeShaderCase(testCtx, "propagated_nans", spec));
@@ -6076,11 +6114,10 @@ tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
     {
         ComputeShaderSpec spec;
         vector<float> small;
-        vector<float> zeros;
-        const uint32_t numElements = 100;
+        const uint32_t numElements   = 100;
+        const uint32_t numWorkGroups = testVec4Form ? numElements / 4 : numElements;
 
         small.reserve(numElements);
-        zeros.reserve(numElements);
 
         for (size_t idx = 0; idx < numElements; ++idx)
         {
@@ -6111,7 +6148,7 @@ tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
         spec.inputs.push_back(BufferSp(new Float32Buffer(small)));
         // Only the size of outputs[0] will be used, actual expected values aren't needed.
         spec.outputs.push_back(BufferSp(new Float32Buffer(small)));
-        spec.numWorkGroups = IVec3(numElements, 1, 1);
+        spec.numWorkGroups = IVec3(numWorkGroups, 1, 1);
         spec.verifyIO      = &compareZeros;
 
         group->addChild(new SpvAsmComputeShaderCase(testCtx, "flush_to_zero", spec));
@@ -6119,8 +6156,9 @@ tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
 
     {
         ComputeShaderSpec spec;
+        const uint32_t numElements   = 200;
+        const uint32_t numWorkGroups = testVec4Form ? numElements / 4 : numElements;
         vector<float> exact;
-        const uint32_t numElements = 200;
 
         exact.reserve(numElements);
 
@@ -6130,26 +6168,22 @@ tcu::TestCaseGroup *createOpQuantizeToF16Group(tcu::TestContext &testCtx)
         spec.assembly = shader;
         spec.inputs.push_back(BufferSp(new Float32Buffer(exact)));
         spec.outputs.push_back(BufferSp(new Float32Buffer(exact)));
-        spec.numWorkGroups = IVec3(numElements, 1, 1);
+        spec.numWorkGroups = IVec3(numWorkGroups, 1, 1);
 
         group->addChild(new SpvAsmComputeShaderCase(testCtx, "exact", spec));
     }
 
     {
         ComputeShaderSpec spec;
-        vector<float> inputs;
-        const uint32_t numElements = 4;
-
-        inputs.push_back(constructNormalizedFloat(8, 0x300300));
-        inputs.push_back(-constructNormalizedFloat(-7, 0x600800));
-        inputs.push_back(constructNormalizedFloat(2, 0x01E000));
-        inputs.push_back(constructNormalizedFloat(1, 0xFFE000));
+        const uint32_t numWorkGroups = testVec4Form ? 1 : 4;
+        vector<float> inputs{constructNormalizedFloat(8, 0x300300), -constructNormalizedFloat(-7, 0x600800),
+                             constructNormalizedFloat(2, 0x01E000), constructNormalizedFloat(1, 0xFFE000)};
 
         spec.assembly = shader;
         spec.verifyIO = &compareOpQuantizeF16ComputeExactCase;
         spec.inputs.push_back(BufferSp(new Float32Buffer(inputs)));
         spec.outputs.push_back(BufferSp(new Float32Buffer(inputs)));
-        spec.numWorkGroups = IVec3(numElements, 1, 1);
+        spec.numWorkGroups = IVec3(numWorkGroups, 1, 1);
 
         group->addChild(new SpvAsmComputeShaderCase(testCtx, "rounded", spec));
     }
@@ -8459,14 +8493,14 @@ tcu::TestCaseGroup *createSpecConstantTests(tcu::TestContext &testCtx)
     cases.push_back(SpecConstantTwoValGraphicsCase("sdiv", " %i32 0", " %i32 0", "%i32",
                                                    "SDiv                 %sc_0 %sc_1", -126, 126, addZeroToSc,
                                                    outputColors0));
-    cases.push_back(SpecConstantTwoValGraphicsCase("udiv", " %i32 0", " %i32 0", "%i32",
+    cases.push_back(SpecConstantTwoValGraphicsCase("udiv", " %u32 0", " %u32 0", "%u32",
                                                    "UDiv                 %sc_0 %sc_1", 126, 126, addZeroToSc,
                                                    outputColors2));
     cases.push_back(SpecConstantTwoValGraphicsCase(
         "srem", " %i32 0", " %i32 0", "%i32", "SRem                 %sc_0 %sc_1", 3, 2, addZeroToSc, outputColors2));
     cases.push_back(SpecConstantTwoValGraphicsCase(
         "smod", " %i32 0", " %i32 0", "%i32", "SMod                 %sc_0 %sc_1", 3, 2, addZeroToSc, outputColors2));
-    cases.push_back(SpecConstantTwoValGraphicsCase("umod", " %i32 0", " %i32 0", "%i32",
+    cases.push_back(SpecConstantTwoValGraphicsCase("umod", " %u32 0", " %u32 0", "%u32",
                                                    "UMod                 %sc_0 %sc_1", 1001, 500, addZeroToSc,
                                                    outputColors2));
     cases.push_back(SpecConstantTwoValGraphicsCase("bitwiseand", " %i32 0", " %i32 0", "%i32",
@@ -9413,10 +9447,12 @@ void createOpQuantizeSingleOptionTests(tcu::TestCaseGroup *testCtx)
 
         if (tests[idx].preserveNanInf)
         {
-            fragments["capability"] = "OpCapability SignedZeroInfNanPreserve\n";
-            fragments["extension"]  = "OpExtension \"SPV_KHR_float_controls\"\n";
+            fragments["capability"]     = "OpCapability SignedZeroInfNanPreserve\n";
+            fragments["extension"]      = "OpExtension \"SPV_KHR_float_controls\"\n";
+            fragments["execution_mode"] = "OpExecutionMode %BP_main SignedZeroInfNanPreserve 32\n";
             extensions.push_back("VK_KHR_shader_float_controls");
             features.floatControlsProperties.shaderSignedZeroInfNanPreserveFloat16 = true;
+            features.floatControlsProperties.shaderSignedZeroInfNanPreserveFloat32 = true;
         }
 
         createTestsForAllStages(tests[idx].name, inputColors, expectedColors, fragments, SpecConstants(),
@@ -9441,10 +9477,12 @@ void createOpQuantizeSingleOptionTests(tcu::TestCaseGroup *testCtx)
 
         if (tests[idx].preserveNanInf)
         {
-            fragments["capability"] = "OpCapability SignedZeroInfNanPreserve\n";
-            fragments["extension"]  = "OpExtension \"SPV_KHR_float_controls\"\n";
+            fragments["capability"]     = "OpCapability SignedZeroInfNanPreserve\n";
+            fragments["extension"]      = "OpExtension \"SPV_KHR_float_controls\"\n";
+            fragments["execution_mode"] = "OpExecutionMode %BP_main SignedZeroInfNanPreserve 32\n";
             extensions.push_back("VK_KHR_shader_float_controls");
             features.floatControlsProperties.shaderSignedZeroInfNanPreserveFloat16 = true;
+            features.floatControlsProperties.shaderSignedZeroInfNanPreserveFloat32 = true;
         }
 
         createTestsForAllStages(string("spec_const_") + tests[idx].name, inputColors, expectedColors, fragments,
@@ -10572,7 +10610,7 @@ const string getTypeName(ConversionDataType type)
 
 const string getTestName(ConversionDataType from, ConversionDataType to, const char *suffix)
 {
-    const string fullSuffix(suffix == DE_NULL ? "" : string("_") + string(suffix));
+    const string fullSuffix(suffix == nullptr ? "" : string("_") + string(suffix));
 
     return getTypeName(from) + "_to_" + getTypeName(to) + fullSuffix;
 }
@@ -10720,7 +10758,7 @@ void getVulkanFeaturesAndExtensions(ConversionDataType from, ConversionDataType 
 struct ConvertCase
 {
     ConvertCase(const string &instruction, ConversionDataType from, ConversionDataType to, int64_t number,
-                bool separateOutput = false, int64_t outputNumber = 0, const char *suffix = DE_NULL,
+                bool separateOutput = false, int64_t outputNumber = 0, const char *suffix = nullptr,
                 bool useStorageExt = true)
         : m_fromType(from)
         , m_toType(to)
@@ -14394,7 +14432,7 @@ tcu::TestCaseGroup *createFloat16CompositeInsertExtractSet(tcu::TestContext &tes
 
     const char *accessPathF16[] = {
         "0", // %f16
-        DE_NULL,
+        nullptr,
     };
     const char *accessPathV2F16[] = {
         "0 0", // %v2f16
@@ -14404,7 +14442,7 @@ tcu::TestCaseGroup *createFloat16CompositeInsertExtractSet(tcu::TestContext &tes
         "0 0", // %v3f16
         "0 1",
         "0 2",
-        DE_NULL,
+        nullptr,
     };
     const char *accessPathV4F16[] = {
         "0 0", // %v4f16"
@@ -14416,13 +14454,13 @@ tcu::TestCaseGroup *createFloat16CompositeInsertExtractSet(tcu::TestContext &tes
         "0 0", // %f16arr3
         "0 1",
         "0 2",
-        DE_NULL,
+        nullptr,
     };
     const char *accessPathStruct16Arr3[] = {
         "0 0 0", // %struct16arr3
-        DE_NULL, "0 0 1 0 0", "0 0 1 0 1", "0 0 1 1 0", "0 0 1 1 1", "0 0 1 2 0", "0 0 1 2 1", "0 1 0",
-        DE_NULL, "0 1 1 0 0", "0 1 1 0 1", "0 1 1 1 0", "0 1 1 1 1", "0 1 1 2 0", "0 1 1 2 1", "0 2 0",
-        DE_NULL, "0 2 1 0 0", "0 2 1 0 1", "0 2 1 1 0", "0 2 1 1 1", "0 2 1 2 0", "0 2 1 2 1",
+        nullptr, "0 0 1 0 0", "0 0 1 0 1", "0 0 1 1 0", "0 0 1 1 1", "0 0 1 2 0", "0 0 1 2 1", "0 1 0",
+        nullptr, "0 1 1 0 0", "0 1 1 0 1", "0 1 1 1 0", "0 1 1 1 1", "0 1 1 2 0", "0 1 1 2 1", "0 2 0",
+        nullptr, "0 2 1 0 0", "0 2 1 0 1", "0 2 1 1 0", "0 2 1 1 1", "0 2 1 2 0", "0 2 1 2 1",
     };
     const char *accessPathV2F16Arr5[] = {
         "0 0 0", // %v2f16arr5
@@ -14430,13 +14468,13 @@ tcu::TestCaseGroup *createFloat16CompositeInsertExtractSet(tcu::TestContext &tes
     };
     const char *accessPathV3F16Arr5[] = {
         "0 0 0", // %v3f16arr5
-        "0 0 1", "0 0 2", DE_NULL, "0 1 0", "0 1 1", "0 1 2", DE_NULL, "0 2 0", "0 2 1", "0 2 2",
-        DE_NULL, "0 3 0", "0 3 1", "0 3 2", DE_NULL, "0 4 0", "0 4 1", "0 4 2", DE_NULL,
+        "0 0 1", "0 0 2", nullptr, "0 1 0", "0 1 1", "0 1 2", nullptr, "0 2 0", "0 2 1", "0 2 2",
+        nullptr, "0 3 0", "0 3 1", "0 3 2", nullptr, "0 4 0", "0 4 1", "0 4 2", nullptr,
     };
     const char *accessPathV4F16Arr3[] = {
         "0 0 0", // %v4f16arr3
         "0 0 1", "0 0 2", "0 0 3", "0 1 0", "0 1 1", "0 1 2", "0 1 3", "0 2 0",
-        "0 2 1", "0 2 2", "0 2 3", DE_NULL, DE_NULL, DE_NULL, DE_NULL,
+        "0 2 1", "0 2 2", "0 2 3", nullptr, nullptr, nullptr, nullptr,
     };
 
     struct TypeTestParameters
@@ -14478,7 +14516,7 @@ tcu::TestCaseGroup *createFloat16CompositeInsertExtractSet(tcu::TestContext &tes
         // Generate values for input
         inputFP16.reserve(structItemsCount);
         for (uint32_t structItemNdx = 0; structItemNdx < structItemsCount; ++structItemNdx)
-            inputFP16.push_back((accessPath[structItemNdx] == DE_NULL) ? exceptionValue :
+            inputFP16.push_back((accessPath[structItemNdx] == nullptr) ? exceptionValue :
                                                                          tcu::Float16(float(structItemNdx)).bits());
 
         unusedFP16Output.resize(structItemsCount);
@@ -14489,7 +14527,7 @@ tcu::TestCaseGroup *createFloat16CompositeInsertExtractSet(tcu::TestContext &tes
             string caseList;
 
             for (uint32_t caseNdx = 0; caseNdx < structItemsCount; ++caseNdx)
-                if (accessPath[caseNdx] != DE_NULL)
+                if (accessPath[caseNdx] != nullptr)
                 {
                     map<string, string> specCase;
 
@@ -17876,9 +17914,9 @@ bool compareFP16ArithmeticFunc(const std::vector<Resource> &inputs, const vector
         inputs[inputNdx].getBytes(inputBytes[inputNdx]);
 
     const deFloat16 *const inputsAsFP16[3] = {
-        inputs.size() >= 1 ? (const deFloat16 *)&inputBytes[0][0] : DE_NULL,
-        inputs.size() >= 2 ? (const deFloat16 *)&inputBytes[1][0] : DE_NULL,
-        inputs.size() >= 3 ? (const deFloat16 *)&inputBytes[2][0] : DE_NULL,
+        inputs.size() >= 1 ? (const deFloat16 *)&inputBytes[0][0] : nullptr,
+        inputs.size() >= 2 ? (const deFloat16 *)&inputBytes[1][0] : nullptr,
+        inputs.size() >= 3 ? (const deFloat16 *)&inputBytes[2][0] : nullptr,
     };
 
     for (size_t idx = 0; idx < iterationsCount; ++idx)
@@ -18568,7 +18606,7 @@ void createFloat16ArithmeticFuncTest(tcu::TestContext &testCtx, tcu::TestCaseGro
                                  "       %fp_v4i32 = OpTypePointer Function %v4i32\n"
 
                                  "      %c_u32_ndp = OpConstant %u32 ${num_data_points}\n"
-                                 " %c_u32_half_ndp = OpSpecConstantOp %u32 UDiv %c_i32_ndp %c_u32_2\n"
+                                 " %c_u32_half_ndp = OpSpecConstantOp %u32 UDiv %c_u32_ndp %c_u32_2\n"
                                  "        %c_u32_5 = OpConstant %u32 5\n"
                                  "        %c_u32_6 = OpConstant %u32 6\n"
                                  "        %c_u32_7 = OpConstant %u32 7\n"
@@ -18897,7 +18935,7 @@ void createFloat16ArithmeticFuncTest(tcu::TestContext &testCtx, tcu::TestCaseGro
     const Math16TestType &testType         = testTypes[testTypeIdx];
     const string funcNameString            = string(testFunc.funcName) + string(testFunc.funcSuffix);
     const string testName                  = de::toLower(funcNameString);
-    const Math16ArgFragments *argFragments = DE_NULL;
+    const Math16ArgFragments *argFragments = nullptr;
     const size_t typeStructStride          = testType.typeStructStride;
     const bool extInst                     = !(testFunc.funcName[0] == 'O' && testFunc.funcName[1] == 'p');
     const size_t numFloatsPerArg0Type      = testTypes[testFunc.typeArg0].typeArrayStride / sizeof(deFloat16);
@@ -21038,6 +21076,32 @@ tcu::TestCaseGroup *createOpExecutionModeTests(tcu::TestContext &testCtx)
     return testGroup.release();
 }
 
+tcu::TestCaseGroup *createMixedRelaxedPrecisionOperandsTests(tcu::TestContext &testCtx)
+{
+    de::MovePtr<tcu::TestCaseGroup> testGroup(new tcu::TestCaseGroup(testCtx, "mixed_relaxed_precision_operands"));
+
+#ifndef CTS_USES_VULKANSC
+    static const char dataDir[] = "spirv_assembly/instruction/graphics/fragment";
+
+    static const struct Case
+    {
+        const string name;
+        const string desc;
+    } cases[] = {
+        {"mixedrelaxedprecisionoperands", "Test OpSelect using a mix of operands with and without RelaxedPrecision."},
+    };
+
+    for (const auto &case_ : cases)
+    {
+        cts_amber::AmberTestCase *testCase = cts_amber::createAmberTestCase(
+            testCtx, case_.name.c_str(), case_.desc.c_str(), dataDir, case_.name + ".amber");
+        testGroup->addChild(testCase);
+    }
+#endif // CTS_USES_VULKANSC
+
+    return testGroup.release();
+}
+
 tcu::TestCaseGroup *createOpMulExtendedGroup(tcu::TestContext &testCtx)
 {
     de::MovePtr<tcu::TestCaseGroup> testGroup(new tcu::TestCaseGroup(testCtx, "mul_extended"));
@@ -21109,6 +21173,7 @@ tcu::TestCaseGroup *createInstructionTests(tcu::TestContext &testCtx)
     computeTests->addChild(createLocalSizeGroup(testCtx, false));
     computeTests->addChild(createLocalSizeGroup(testCtx, true));
     computeTests->addChild(createNonSemanticInfoGroup(testCtx));
+    computeTests->addChild(createRelaxedWithForwardReferenceGraphicsGroup(testCtx));
     computeTests->addChild(createOpNopGroup(testCtx));
     computeTests->addChild(createOpFUnordGroup(testCtx, TEST_WITHOUT_NAN));
     computeTests->addChild(createOpFUnordGroup(testCtx, TEST_WITH_NAN));
@@ -21139,7 +21204,8 @@ tcu::TestCaseGroup *createInstructionTests(tcu::TestContext &testCtx)
     computeTests->addChild(createNoContractionGroup(testCtx));
     computeTests->addChild(createOpUndefGroup(testCtx));
     computeTests->addChild(createOpUnreachableGroup(testCtx));
-    computeTests->addChild(createOpQuantizeToF16Group(testCtx));
+    computeTests->addChild(createOpQuantizeToF16Group(testCtx, false));
+    computeTests->addChild(createOpQuantizeToF16Group(testCtx, true));
     computeTests->addChild(createOpFRemGroup(testCtx));
     computeTests->addChild(createOpSRemComputeGroup(testCtx, QP_TEST_RESULT_PASS));
     computeTests->addChild(createOpSRemComputeGroup64(testCtx, QP_TEST_RESULT_PASS));
@@ -21214,9 +21280,11 @@ tcu::TestCaseGroup *createInstructionTests(tcu::TestContext &testCtx)
     computeTests->addChild(create64bitCompareComputeGroup(testCtx));
 #ifndef CTS_USES_VULKANSC
     computeTests->addChild(createOpArrayLengthComputeGroup(testCtx));
+    computeTests->addChild(createComputeShaderDerivativesTests(testCtx));
 #endif // CTS_USES_VULKANSC
     computeTests->addChild(createPhysicalStorageBufferTestGroup(testCtx));
     computeTests->addChild(createOpMulExtendedGroup(testCtx));
+    computeTests->addChild(createRawAccessChainGroup(testCtx));
 
     graphicsTests->addChild(createCrossStageInterfaceTests(testCtx));
     graphicsTests->addChild(createSpivVersionCheckTests(testCtx, !testComputePipeline));
@@ -21290,6 +21358,7 @@ tcu::TestCaseGroup *createInstructionTests(tcu::TestContext &testCtx)
     graphicsTests->addChild(createEarlyFragmentTests(testCtx));
     graphicsTests->addChild(createEarlyAndLateFragmentTests(testCtx));
     graphicsTests->addChild(createOpExecutionModeTests(testCtx));
+    graphicsTests->addChild(createMixedRelaxedPrecisionOperandsTests(testCtx));
 
     instructionTests->addChild(computeTests.release());
     instructionTests->addChild(graphicsTests.release());

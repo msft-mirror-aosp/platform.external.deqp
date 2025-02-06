@@ -159,12 +159,12 @@ public:
                     vk::VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL, uint32_t mipLevels = 1,
                     vk::VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE);
 
-    VkImage getImage();
-    VkImageView getImageView();
-    VkBuffer getBuffer();
-    VkDeviceSize getBufferSize();
-    Allocation &getImageAllocation();
-    Allocation &getBufferAllocation();
+    VkImage getImage() const;
+    VkImageView getImageView() const;
+    VkBuffer getBuffer() const;
+    VkDeviceSize getBufferSize() const;
+    Allocation &getImageAllocation() const;
+    Allocation &getBufferAllocation() const;
 };
 
 bool isYCbCrFormat(VkFormat format);
@@ -222,7 +222,7 @@ void copyBufferToImage(const DeviceInterface &vk, vk::VkDevice device, vk::VkQue
                        vk::VkImage destImage, VkImageLayout destImageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                        VkPipelineStageFlags destImageDstStageFlags = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
                        VkAccessFlags destImageDstAccessMask        = VK_ACCESS_SHADER_READ_BIT,
-                       const VkCommandPool *externalCommandPool = DE_NULL, uint32_t baseMipLevel = 0);
+                       const VkCommandPool *externalCommandPool = nullptr, uint32_t baseMipLevel = 0);
 
 void copyBufferToImage(const DeviceInterface &vk, const VkCommandBuffer &cmdBuffer, const VkBuffer &buffer,
                        vk::VkDeviceSize bufferSize, const std::vector<VkBufferImageCopy> &copyRegions,

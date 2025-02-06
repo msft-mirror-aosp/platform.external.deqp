@@ -289,6 +289,23 @@ inline VkPushConstantRange makePushConstantRange (VkShaderStageFlags stageFlags,
 	return res;
 }
 
+inline VkPipelineBinaryDataKHR makePipelineBinaryDataKHR (size_t dataSize, void* pData)
+{
+	VkPipelineBinaryDataKHR res;
+	res.dataSize	= dataSize;
+	res.pData		= pData;
+	return res;
+}
+
+inline VkPipelineBinaryKeysAndDataKHR makePipelineBinaryKeysAndDataKHR (uint32_t binaryCount, const VkPipelineBinaryKeyKHR* pPipelineBinaryKeys, const VkPipelineBinaryDataKHR* pPipelineBinaryData)
+{
+	VkPipelineBinaryKeysAndDataKHR res;
+	res.binaryCount			= binaryCount;
+	res.pPipelineBinaryKeys	= pPipelineBinaryKeys;
+	res.pPipelineBinaryData	= pPipelineBinaryData;
+	return res;
+}
+
 inline VkClearDepthStencilValue makeClearDepthStencilValue (float depth, uint32_t stencil)
 {
 	VkClearDepthStencilValue res;
@@ -589,9 +606,9 @@ inline VkShaderResourceUsageAMD makeShaderResourceUsageAMD (uint32_t numUsedVgpr
 	return res;
 }
 
-inline VkVertexInputBindingDivisorDescriptionKHR makeVertexInputBindingDivisorDescriptionKHR (uint32_t binding, uint32_t divisor)
+inline VkVertexInputBindingDivisorDescription makeVertexInputBindingDivisorDescription (uint32_t binding, uint32_t divisor)
 {
-	VkVertexInputBindingDivisorDescriptionKHR res;
+	VkVertexInputBindingDivisorDescription res;
 	res.binding	= binding;
 	res.divisor	= divisor;
 	return res;
@@ -749,6 +766,55 @@ inline VkMutableDescriptorTypeListEXT makeMutableDescriptorTypeListEXT (uint32_t
 	return res;
 }
 
+inline VkDrawIndirectCountIndirectCommandEXT makeDrawIndirectCountIndirectCommandEXT (VkDeviceAddress bufferAddress, uint32_t stride, uint32_t commandCount)
+{
+	VkDrawIndirectCountIndirectCommandEXT res;
+	res.bufferAddress	= bufferAddress;
+	res.stride			= stride;
+	res.commandCount	= commandCount;
+	return res;
+}
+
+inline VkIndirectCommandsVertexBufferTokenEXT makeIndirectCommandsVertexBufferTokenEXT (uint32_t vertexBindingUnit)
+{
+	VkIndirectCommandsVertexBufferTokenEXT res;
+	res.vertexBindingUnit	= vertexBindingUnit;
+	return res;
+}
+
+inline VkBindVertexBufferIndirectCommandEXT makeBindVertexBufferIndirectCommandEXT (VkDeviceAddress bufferAddress, uint32_t size, uint32_t stride)
+{
+	VkBindVertexBufferIndirectCommandEXT res;
+	res.bufferAddress	= bufferAddress;
+	res.size			= size;
+	res.stride			= stride;
+	return res;
+}
+
+inline VkIndirectCommandsIndexBufferTokenEXT makeIndirectCommandsIndexBufferTokenEXT (VkIndirectCommandsInputModeFlagBitsEXT mode)
+{
+	VkIndirectCommandsIndexBufferTokenEXT res;
+	res.mode	= mode;
+	return res;
+}
+
+inline VkBindIndexBufferIndirectCommandEXT makeBindIndexBufferIndirectCommandEXT (VkDeviceAddress bufferAddress, uint32_t size, VkIndexType indexType)
+{
+	VkBindIndexBufferIndirectCommandEXT res;
+	res.bufferAddress	= bufferAddress;
+	res.size			= size;
+	res.indexType		= indexType;
+	return res;
+}
+
+inline VkIndirectCommandsExecutionSetTokenEXT makeIndirectCommandsExecutionSetTokenEXT (VkIndirectExecutionSetInfoTypeEXT type, VkShaderStageFlags shaderStages)
+{
+	VkIndirectCommandsExecutionSetTokenEXT res;
+	res.type			= type;
+	res.shaderStages	= shaderStages;
+	return res;
+}
+
 inline VkVideoEncodeH264QpKHR makeVideoEncodeH264QpKHR (int32_t qpI, int32_t qpP, int32_t qpB)
 {
 	VkVideoEncodeH264QpKHR res;
@@ -782,6 +848,24 @@ inline VkVideoEncodeH265FrameSizeKHR makeVideoEncodeH265FrameSizeKHR (uint32_t f
 	res.frameISize	= frameISize;
 	res.framePSize	= framePSize;
 	res.frameBSize	= frameBSize;
+	return res;
+}
+
+inline VkVideoEncodeAV1QIndexKHR makeVideoEncodeAV1QIndexKHR (uint32_t intraQIndex, uint32_t predictiveQIndex, uint32_t bipredictiveQIndex)
+{
+	VkVideoEncodeAV1QIndexKHR res;
+	res.intraQIndex			= intraQIndex;
+	res.predictiveQIndex	= predictiveQIndex;
+	res.bipredictiveQIndex	= bipredictiveQIndex;
+	return res;
+}
+
+inline VkVideoEncodeAV1FrameSizeKHR makeVideoEncodeAV1FrameSizeKHR (uint32_t intraFrameSize, uint32_t predictiveFrameSize, uint32_t bipredictiveFrameSize)
+{
+	VkVideoEncodeAV1FrameSizeKHR res;
+	res.intraFrameSize			= intraFrameSize;
+	res.predictiveFrameSize		= predictiveFrameSize;
+	res.bipredictiveFrameSize	= bipredictiveFrameSize;
 	return res;
 }
 
@@ -861,6 +945,14 @@ inline VkDecompressMemoryRegionNV makeDecompressMemoryRegionNV (VkDeviceAddress 
 	return res;
 }
 
+inline VkDepthClampRangeEXT makeDepthClampRangeEXT (float minDepthClamp, float maxDepthClamp)
+{
+	VkDepthClampRangeEXT res;
+	res.minDepthClamp	= minDepthClamp;
+	res.maxDepthClamp	= maxDepthClamp;
+	return res;
+}
+
 inline StdVideoEncodeH264WeightTableFlags makeStdVideoEncodeH264WeightTableFlags (uint32_t luma_weight_l0_flag, uint32_t chroma_weight_l0_flag, uint32_t luma_weight_l1_flag, uint32_t chroma_weight_l1_flag)
 {
 	StdVideoEncodeH264WeightTableFlags res;
@@ -898,5 +990,24 @@ inline StdVideoEncodeH265WeightTableFlags makeStdVideoEncodeH265WeightTableFlags
 	res.chroma_weight_l0_flag	= chroma_weight_l0_flag;
 	res.luma_weight_l1_flag		= luma_weight_l1_flag;
 	res.chroma_weight_l1_flag	= chroma_weight_l1_flag;
+	return res;
+}
+
+inline StdVideoEncodeAV1ExtensionHeader makeStdVideoEncodeAV1ExtensionHeader (uint8_t temporal_id, uint8_t spatial_id)
+{
+	StdVideoEncodeAV1ExtensionHeader res;
+	res.temporal_id	= temporal_id;
+	res.spatial_id	= spatial_id;
+	return res;
+}
+
+inline StdVideoEncodeAV1DecoderModelInfo makeStdVideoEncodeAV1DecoderModelInfo (uint8_t buffer_delay_length_minus_1, uint8_t buffer_removal_time_length_minus_1, uint8_t frame_presentation_time_length_minus_1, uint8_t reserved1, uint32_t num_units_in_decoding_tick)
+{
+	StdVideoEncodeAV1DecoderModelInfo res;
+	res.buffer_delay_length_minus_1				= buffer_delay_length_minus_1;
+	res.buffer_removal_time_length_minus_1		= buffer_removal_time_length_minus_1;
+	res.frame_presentation_time_length_minus_1	= frame_presentation_time_length_minus_1;
+	res.reserved1								= reserved1;
+	res.num_units_in_decoding_tick				= num_units_in_decoding_tick;
 	return res;
 }

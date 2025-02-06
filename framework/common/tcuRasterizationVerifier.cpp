@@ -1189,7 +1189,7 @@ bool verifyMultisampleLineGroupRasterization(const tcu::Surface &surface, const 
         }
     }
 
-    if (logStash != DE_NULL)
+    if (logStash != nullptr)
     {
         logStash->messages.push_back(
             "Rasterization clipping mode: " +
@@ -1490,14 +1490,14 @@ void genScreenSpaceLines(std::vector<tcu::Vec4> &screenspaceLines, const std::ve
 bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const LineSceneSpec &scene,
                                               const RasterizationArguments &args, tcu::TestLog &log)
 {
-    DE_ASSERT(deFloatFrac(scene.lineWidth) != 0.5f); // rounding direction is not defined, disallow undefined cases
-    DE_ASSERT(scene.lines.size() < 255);             // indices are stored as unsigned 8-bit ints
+    DE_ASSERT(scene.lines.size() < 255); // indices are stored as unsigned 8-bit ints
 
     bool allOK               = true;
     bool overdrawInReference = false;
     int referenceFragments   = 0;
     int resultFragments      = 0;
     int lineWidth            = deFloorFloatToInt32(scene.lineWidth + 0.5f);
+    bool lineWidthHasFrac    = deFloatFrac(scene.lineWidth) > 0;
     std::vector<bool> lineIsXMajor(scene.lines.size());
     std::vector<tcu::Vec4> screenspaceLines(scene.lines.size());
 
@@ -1505,6 +1505,9 @@ bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const
     tcu::TextureLevel referenceLineMap(tcu::TextureFormat(tcu::TextureFormat::R, tcu::TextureFormat::UNSIGNED_INT8),
                                        surface.getWidth(), surface.getHeight());
     tcu::clear(referenceLineMap.getAccess(), tcu::IVec4(0, 0, 0, 0));
+
+    tcu::Surface errorMask(surface.getWidth(), surface.getHeight());
+    tcu::clear(errorMask.getAccess(), tcu::IVec4(0, 255, 0, 255));
 
     genScreenSpaceLines(screenspaceLines, scene.lines, tcu::IVec2(surface.getWidth(), surface.getHeight()));
 
@@ -1528,7 +1531,7 @@ bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const
             int numRasterized    = 0;
             rr::FragmentPacket packets[maxPackets];
 
-            rasterizer.rasterize(packets, DE_NULL, maxPackets, numRasterized);
+            rasterizer.rasterize(packets, nullptr, maxPackets, numRasterized);
 
             for (int packetNdx = 0; packetNdx < numRasterized; ++packetNdx)
             {
@@ -1556,12 +1559,8 @@ bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const
     }
 
     // Requirement 1: The coordinates of a fragment produced by the algorithm may not deviate by more than one unit
+    bool missingFragments = false;
     {
-        tcu::Surface errorMask(surface.getWidth(), surface.getHeight());
-        bool missingFragments = false;
-
-        tcu::clear(errorMask.getAccess(), tcu::IVec4(0, 255, 0, 255));
-
         log << tcu::TestLog::Message << "Searching for deviating fragments." << tcu::TestLog::EndMessage;
 
         for (int y = 0; y < referenceLineMap.getHeight(); ++y)
@@ -1610,7 +1609,7 @@ bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const
 
         if (missingFragments)
         {
-
+            log << tcu::TestLog::Message << "Invalid deviations found - missing fragments." << tcu::TestLog::EndMessage;
             allOK = false;
         }
         else
@@ -1740,7 +1739,12 @@ bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const
                     if (fullyVisibleLine && !lineIsXMajor[currentLine - 1])
                     {
                         // check width
-                        if (currentWidth != lineWidth)
+                        if (lineWidthHasFrac && currentWidth + 1 == lineWidth)
+                        {
+                            log << tcu::TestLog::Message << "\tAllowing width of " << currentWidth
+                                << " due to fractional line width" << tcu::TestLog::EndMessage;
+                        }
+                        else if (currentWidth != lineWidth)
                         {
                             log << tcu::TestLog::Message << "\tInvalid line width at (" << x - currentWidth << ", " << y
                                 << ") - (" << x - 1 << ", " << y << "). Detected width of " << currentWidth
@@ -1828,7 +1832,12 @@ bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const
                     if (fullyVisibleLine && lineIsXMajor[currentLine - 1])
                     {
                         // check width
-                        if (currentWidth != lineWidth)
+                        if (lineWidthHasFrac && currentWidth + 1 == lineWidth)
+                        {
+                            log << tcu::TestLog::Message << "\tAllowing width of " << currentWidth
+                                << " due to fractional line width" << tcu::TestLog::EndMessage;
+                        }
+                        else if (currentWidth != lineWidth)
                         {
                             log << tcu::TestLog::Message << "\tInvalid line width at (" << x << ", " << y - currentWidth
                                 << ") - (" << x << ", " << y - 1 << "). Detected width of " << currentWidth
@@ -1869,10 +1878,12 @@ bool verifySinglesampleLineGroupRasterization(const tcu::Surface &surface, const
             for (int x = 0; x < surface.getWidth(); ++x)
                 if (referenceLineMap.getAccess().getPixelInt(x, y).x())
                     reference.setPixel(x, y, tcu::RGBA::white());
-        log << tcu::TestLog::Message << "Invalid fragment count in result image." << tcu::TestLog::EndMessage;
         log << tcu::TestLog::ImageSet("Verification result", "Result of rendering")
             << tcu::TestLog::Image("Reference", "Reference", reference)
-            << tcu::TestLog::Image("Result", "Result", surface) << tcu::TestLog::EndImageSet;
+            << tcu::TestLog::Image("Result", "Result", surface);
+        if (missingFragments)
+            log << tcu::TestLog::Image("ErrorMask", "ErrorMask", errorMask);
+        log << tcu::TestLog::EndImageSet;
     }
 
     return allOK;
@@ -1906,7 +1917,7 @@ void setMaskMapCoverageBitForLine(int bitNdx, const tcu::Vec2 &screenSpaceP0, co
 
     while (numRasterized == MAX_PACKETS)
     {
-        rasterizer.rasterize(packets, DE_NULL, MAX_PACKETS, numRasterized);
+        rasterizer.rasterize(packets, nullptr, MAX_PACKETS, numRasterized);
 
         for (int packetNdx = 0; packetNdx < numRasterized; ++packetNdx)
         {
@@ -2208,8 +2219,7 @@ bool isBlack(const tcu::RGBA &c)
 bool verifySinglesampleWideLineGroupInterpolation(const tcu::Surface &surface, const LineSceneSpec &scene,
                                                   const RasterizationArguments &args, tcu::TestLog &log)
 {
-    DE_ASSERT(deFloatFrac(scene.lineWidth) != 0.5f); // rounding direction is not defined, disallow undefined cases
-    DE_ASSERT(scene.lines.size() < 8);               // coverage indices are stored as bitmask in a unsigned 8-bit ints
+    DE_ASSERT(scene.lines.size() < 8); // coverage indices are stored as bitmask in a unsigned 8-bit ints
 
     enum
     {
@@ -3109,14 +3119,14 @@ bool verifyTriangleGroupRasterization(const tcu::Surface &surface, const Triangl
     // Output or stash results
     {
         VerifyTriangleGroupRasterizationLogStash *tempLogStash =
-            (logStash == DE_NULL) ? new VerifyTriangleGroupRasterizationLogStash : logStash;
+            (logStash == nullptr) ? new VerifyTriangleGroupRasterizationLogStash : logStash;
 
         tempLogStash->result           = result;
         tempLogStash->missingPixels    = missingPixels;
         tempLogStash->unexpectedPixels = unexpectedPixels;
         tempLogStash->errorMask        = errorMask;
 
-        if (logStash == DE_NULL)
+        if (logStash == nullptr)
         {
             logTriangleGroupRasterizationStash(surface, log, *tempLogStash);
             delete tempLogStash;
@@ -3132,7 +3142,7 @@ bool verifyLineGroupRasterization(const tcu::Surface &surface, const LineSceneSp
     const bool multisampled = args.numSamples != 0;
 
     if (multisampled)
-        return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_NO_CLIPPING, DE_NULL, false,
+        return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_NO_CLIPPING, nullptr, false,
                                                        true);
     else
         return verifySinglesampleLineGroupRasterization(surface, scene, args, log);
@@ -3141,7 +3151,7 @@ bool verifyLineGroupRasterization(const tcu::Surface &surface, const LineSceneSp
 bool verifyClippedTriangulatedLineGroupRasterization(const tcu::Surface &surface, const LineSceneSpec &scene,
                                                      const RasterizationArguments &args, tcu::TestLog &log)
 {
-    return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_USE_CLIPPING_BOX, DE_NULL, false,
+    return verifyMultisampleLineGroupRasterization(surface, scene, args, log, CLIPMODE_USE_CLIPPING_BOX, nullptr, false,
                                                    true);
 }
 

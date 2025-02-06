@@ -47,7 +47,7 @@ using std::vector;
 
 #if defined(DEQP_SUPPORT_WAYLAND)
 #include "tcuLnxWayland.hpp"
-#define WAYLAND_DISPLAY DE_NULL
+#define WAYLAND_DISPLAY 0
 #endif // DEQP_SUPPORT_WAYLAND
 
 #if (DE_OS == DE_OS_WIN32)
@@ -65,7 +65,7 @@ namespace wsi
 const char *getName(Type wsiType)
 {
     static const char *const s_names[] = {
-        "xlib", "xcb", "wayland", "android", "win32", "macos", "headless", "direct_drm",
+        "xlib", "xcb", "wayland", "android", "win32", "metal", "headless", "direct_drm",
     };
     return de::getSizedArrayElement<TYPE_LAST>(s_names, wsiType);
 }
@@ -74,7 +74,7 @@ const char *getExtensionName(Type wsiType)
 {
     static const char *const s_extNames[] = {
         "VK_KHR_xlib_surface",  "VK_KHR_xcb_surface",   "VK_KHR_wayland_surface",  "VK_KHR_android_surface",
-        "VK_KHR_win32_surface", "VK_MVK_macos_surface", "VK_EXT_headless_surface", "VK_EXT_acquire_drm_display",
+        "VK_KHR_win32_surface", "VK_EXT_metal_surface", "VK_EXT_headless_surface", "VK_EXT_acquire_drm_display",
     };
     return de::getSizedArrayElement<TYPE_LAST>(s_extNames, wsiType);
 }
@@ -124,10 +124,10 @@ const PlatformProperties &getPlatformProperties(Type wsiType)
             noDisplayLimit,
             noWindowLimit,
         },
-        // VK_MVK_macos_surface
+        // VK_EXT_metal_surface
         {
             PlatformProperties::FEATURE_INITIAL_WINDOW_SIZE | PlatformProperties::FEATURE_RESIZE_WINDOW,
-            PlatformProperties::SWAPCHAIN_EXTENT_MUST_MATCH_WINDOW_SIZE,
+            PlatformProperties::SWAPCHAIN_EXTENT_SCALED_TO_WINDOW_SIZE,
             noDisplayLimit,
             noWindowLimit,
         },
@@ -161,7 +161,7 @@ static VkResult createDisplaySurface(const InstanceInterface &vki, VkInstance in
     uint32_t planeCount = 0u;
     uint32_t planeIndex = 0u;
     bool planeFound     = false;
-    VK_CHECK_SUPPORTED(vki.getPhysicalDeviceDisplayPlanePropertiesKHR(physDevice, &planeCount, DE_NULL));
+    VK_CHECK_SUPPORTED(vki.getPhysicalDeviceDisplayPlanePropertiesKHR(physDevice, &planeCount, nullptr));
 
     planeProperties.resize(planeCount);
     VK_CHECK_SUPPORTED(vki.getPhysicalDeviceDisplayPlanePropertiesKHR(physDevice, &planeCount, &planeProperties[0]));
@@ -170,7 +170,7 @@ static VkResult createDisplaySurface(const InstanceInterface &vki, VkInstance in
     {
         vector<VkDisplayKHR> supportedDisplays;
         uint32_t supportedDisplayCount = 0u;
-        VK_CHECK_SUPPORTED(vki.getDisplayPlaneSupportedDisplaysKHR(physDevice, i, &supportedDisplayCount, DE_NULL));
+        VK_CHECK_SUPPORTED(vki.getDisplayPlaneSupportedDisplaysKHR(physDevice, i, &supportedDisplayCount, nullptr));
 
         supportedDisplays.resize(supportedDisplayCount);
         VK_CHECK_SUPPORTED(
@@ -194,7 +194,7 @@ static VkResult createDisplaySurface(const InstanceInterface &vki, VkInstance in
 
     vector<VkDisplayModePropertiesKHR> displayModeProperties;
     uint32_t displayModeCount = 0u;
-    VK_CHECK_SUPPORTED(vki.getDisplayModePropertiesKHR(physDevice, display, &displayModeCount, DE_NULL));
+    VK_CHECK_SUPPORTED(vki.getDisplayModePropertiesKHR(physDevice, display, &displayModeCount, nullptr));
     if (displayModeCount < 1)
         TCU_THROW(NotSupportedError, "No display modes defined.");
 
@@ -204,7 +204,7 @@ static VkResult createDisplaySurface(const InstanceInterface &vki, VkInstance in
 
     const VkDisplaySurfaceCreateInfoKHR createInfo = {
         VK_STRUCTURE_TYPE_DISPLAY_SURFACE_CREATE_INFO_KHR, // VkStructureType                    sType
-        DE_NULL,                                           // const void*                        pNext
+        nullptr,                                           // const void*                        pNext
         0,                                                 // VkDisplaySurfaceCreateFlagsKHR    flags
         displayModeProperties[0].displayMode,              // VkDisplayModeKHR                    displayMode
         planeIndex,                                        // uint32_t                            planeIndex
@@ -244,7 +244,7 @@ VkResult createSurface(const InstanceInterface &vki, VkInstance instance, Type w
     {
         const XlibDisplayInterface &xlibDisplay     = dynamic_cast<const XlibDisplayInterface &>(nativeDisplay);
         const XlibWindowInterface &xlibWindow       = dynamic_cast<const XlibWindowInterface &>(nativeWindow);
-        const VkXlibSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR, DE_NULL,
+        const VkXlibSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR, nullptr,
                                                        (VkXlibSurfaceCreateFlagsKHR)0, xlibDisplay.getNative(),
                                                        xlibWindow.getNative()};
 
@@ -255,7 +255,7 @@ VkResult createSurface(const InstanceInterface &vki, VkInstance instance, Type w
     {
         const XcbDisplayInterface &xcbDisplay      = dynamic_cast<const XcbDisplayInterface &>(nativeDisplay);
         const XcbWindowInterface &xcbWindow        = dynamic_cast<const XcbWindowInterface &>(nativeWindow);
-        const VkXcbSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR, DE_NULL,
+        const VkXcbSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_XCB_SURFACE_CREATE_INFO_KHR, nullptr,
                                                       (VkXcbSurfaceCreateFlagsKHR)0, xcbDisplay.getNative(),
                                                       xcbWindow.getNative()};
 
@@ -266,7 +266,7 @@ VkResult createSurface(const InstanceInterface &vki, VkInstance instance, Type w
     {
         const WaylandDisplayInterface &waylandDisplay  = dynamic_cast<const WaylandDisplayInterface &>(nativeDisplay);
         const WaylandWindowInterface &waylandWindow    = dynamic_cast<const WaylandWindowInterface &>(nativeWindow);
-        const VkWaylandSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR, DE_NULL,
+        const VkWaylandSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_WAYLAND_SURFACE_CREATE_INFO_KHR, nullptr,
                                                           (VkWaylandSurfaceCreateFlagsKHR)0, waylandDisplay.getNative(),
                                                           waylandWindow.getNative()};
 
@@ -276,7 +276,7 @@ VkResult createSurface(const InstanceInterface &vki, VkInstance instance, Type w
     case TYPE_ANDROID:
     {
         const AndroidWindowInterface &androidWindow    = dynamic_cast<const AndroidWindowInterface &>(nativeWindow);
-        const VkAndroidSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR, DE_NULL,
+        const VkAndroidSurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_ANDROID_SURFACE_CREATE_INFO_KHR, nullptr,
                                                           (VkAndroidSurfaceCreateFlagsKHR)0, androidWindow.getNative()};
 
         return vki.createAndroidSurfaceKHR(instance, &createInfo, pAllocator, pSurface);
@@ -286,25 +286,28 @@ VkResult createSurface(const InstanceInterface &vki, VkInstance instance, Type w
     {
         const Win32DisplayInterface &win32Display    = dynamic_cast<const Win32DisplayInterface &>(nativeDisplay);
         const Win32WindowInterface &win32Window      = dynamic_cast<const Win32WindowInterface &>(nativeWindow);
-        const VkWin32SurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR, DE_NULL,
+        const VkWin32SurfaceCreateInfoKHR createInfo = {VK_STRUCTURE_TYPE_WIN32_SURFACE_CREATE_INFO_KHR, nullptr,
                                                         (VkWin32SurfaceCreateFlagsKHR)0, win32Display.getNative(),
                                                         win32Window.getNative()};
 
         return vki.createWin32SurfaceKHR(instance, &createInfo, pAllocator, pSurface);
     }
 
-    case TYPE_MACOS:
+    case TYPE_METAL:
     {
-        const MacOSWindowInterface &macOSWindow      = dynamic_cast<const MacOSWindowInterface &>(nativeWindow);
-        const VkMacOSSurfaceCreateInfoMVK createInfo = {VK_STRUCTURE_TYPE_MACOS_SURFACE_CREATE_INFO_MVK, DE_NULL,
-                                                        (VkMacOSSurfaceCreateFlagsMVK)0, macOSWindow.getNative()};
+        const MetalWindowInterface &metalWindow      = dynamic_cast<const MetalWindowInterface &>(nativeWindow);
+        const VkMetalSurfaceCreateInfoEXT createInfo = {
+            VK_STRUCTURE_TYPE_METAL_SURFACE_CREATE_INFO_EXT, nullptr, (VkMetalSurfaceCreateFlagsEXT)0,
+            // pt::CAMetalLayer is defined as a pointer, but the struct def uses a pointer to this pointer type.
+            // *sigh*...
+            reinterpret_cast<pt::CAMetalLayer *>(metalWindow.getNative().internal)};
 
-        return vki.createMacOSSurfaceMVK(instance, &createInfo, pAllocator, pSurface);
+        return vki.createMetalSurfaceEXT(instance, &createInfo, pAllocator, pSurface);
     }
 
     case TYPE_HEADLESS:
     {
-        const VkHeadlessSurfaceCreateInfoEXT createInfo = {VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT, DE_NULL,
+        const VkHeadlessSurfaceCreateInfoEXT createInfo = {VK_STRUCTURE_TYPE_HEADLESS_SURFACE_CREATE_INFO_EXT, nullptr,
                                                            (VkHeadlessSurfaceCreateFlagsEXT)0};
 
         return vki.createHeadlessSurfaceEXT(instance, &createInfo, pAllocator, pSurface);
@@ -330,7 +333,7 @@ Move<VkSurfaceKHR> createSurface(const InstanceInterface &vki, VkInstance instan
                                  const Display &nativeDisplay, const Window &nativeWindow,
                                  const tcu::CommandLine &cmdLine, const VkAllocationCallbacks *pAllocator)
 {
-    VkSurfaceKHR object = 0;
+    VkSurfaceKHR object = VK_NULL_HANDLE;
     VK_CHECK(createSurface(vki, instance, wsiType, nativeDisplay, nativeWindow, cmdLine, pAllocator, &object));
     return Move<VkSurfaceKHR>(check<VkSurfaceKHR>(object), Deleter<VkSurfaceKHR>(vki, instance, pAllocator));
 }
@@ -393,7 +396,7 @@ VkBool32 getPhysicalDevicePresentationSupport(const InstanceInterface &vki, VkPh
     }
     case TYPE_HEADLESS:
     case TYPE_ANDROID:
-    case TYPE_MACOS:
+    case TYPE_METAL:
     case TYPE_DIRECT_DRM:
     {
         return 1;
@@ -451,7 +454,7 @@ std::vector<VkSurfaceFormatKHR> getPhysicalDeviceSurfaceFormats(const InstanceIn
 {
     uint32_t numFormats = 0;
 
-    VK_CHECK(vki.getPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &numFormats, DE_NULL));
+    VK_CHECK(vki.getPhysicalDeviceSurfaceFormatsKHR(physicalDevice, surface, &numFormats, nullptr));
 
     if (numFormats > 0)
     {
@@ -471,7 +474,7 @@ std::vector<VkPresentModeKHR> getPhysicalDeviceSurfacePresentModes(const Instanc
 {
     uint32_t numModes = 0;
 
-    VK_CHECK(vki.getPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &numModes, DE_NULL));
+    VK_CHECK(vki.getPhysicalDeviceSurfacePresentModesKHR(physicalDevice, surface, &numModes, nullptr));
 
     if (numModes > 0)
     {
@@ -489,7 +492,7 @@ std::vector<VkImage> getSwapchainImages(const DeviceInterface &vkd, VkDevice dev
 {
     uint32_t numImages = 0;
 
-    VK_CHECK(vkd.getSwapchainImagesKHR(device, swapchain, &numImages, DE_NULL));
+    VK_CHECK(vkd.getSwapchainImagesKHR(device, swapchain, &numImages, nullptr));
 
     if (numImages > 0)
     {
@@ -510,7 +513,7 @@ std::vector<uint32_t> getSupportedQueueFamilyIndices(const InstanceInterface &vk
                                                      VkSurfaceKHR surface)
 {
     uint32_t numTotalFamilyIndices;
-    vki.getPhysicalDeviceQueueFamilyProperties(physicalDevice, &numTotalFamilyIndices, DE_NULL);
+    vki.getPhysicalDeviceQueueFamilyProperties(physicalDevice, &numTotalFamilyIndices, nullptr);
 
     std::vector<VkQueueFamilyProperties> queueFamilyProperties(numTotalFamilyIndices);
     vki.getPhysicalDeviceQueueFamilyProperties(physicalDevice, &numTotalFamilyIndices, &queueFamilyProperties[0]);
@@ -631,7 +634,7 @@ tcu::UVec2 getFullScreenSize(const vk::wsi::Type wsiType, const vk::wsi::Display
         break;
     }
 
-    case TYPE_MACOS:
+    case TYPE_METAL:
     {
 #if (DE_OS == DE_OS_OSX)
 #endif
@@ -656,7 +659,7 @@ VkBool32 isDisplaySurface(Type wsiType)
     case TYPE_WAYLAND:
     case TYPE_ANDROID:
     case TYPE_WIN32:
-    case TYPE_MACOS:
+    case TYPE_METAL:
     case TYPE_HEADLESS:
         return 0;
     case TYPE_DIRECT_DRM:
@@ -690,13 +693,13 @@ Move<VkRenderPass> WsiTriangleRenderer::createRenderPass(const DeviceInterface &
         (VkSubpassDescriptionFlags)0u,
         VK_PIPELINE_BIND_POINT_GRAPHICS,
         0u,           // inputAttachmentCount
-        DE_NULL,      // pInputAttachments
+        nullptr,      // pInputAttachments
         1u,           // colorAttachmentCount
         &colorAttRef, // pColorAttachments
-        DE_NULL,      // pResolveAttachments
-        DE_NULL,      // depthStencilAttachment
+        nullptr,      // pResolveAttachments
+        nullptr,      // depthStencilAttachment
         0u,           // preserveAttachmentCount
-        DE_NULL,      // pPreserveAttachments
+        nullptr,      // pPreserveAttachments
     };
     const VkSubpassDependency dependencies[] = {
         {VK_SUBPASS_EXTERNAL, // srcSubpass
@@ -711,7 +714,7 @@ Move<VkRenderPass> WsiTriangleRenderer::createRenderPass(const DeviceInterface &
     };
     const VkRenderPassCreateInfo renderPassParams = {
         VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         (VkRenderPassCreateFlags)0,
         1u,
         &colorAttDesc,
@@ -733,10 +736,10 @@ Move<VkPipelineLayout> WsiTriangleRenderer::createPipelineLayout(const DeviceInt
     };
     const VkPipelineLayoutCreateInfo pipelineLayoutParams = {
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         (vk::VkPipelineLayoutCreateFlags)0,
         0u,      // setLayoutCount
-        DE_NULL, // pSetLayouts
+        nullptr, // pSetLayouts
         1u,
         &pushConstantRange,
     };
@@ -761,9 +764,9 @@ Move<VkPipeline> WsiTriangleRenderer::createPipeline(const DeviceInterface &vkd,
                                     device,            // const VkDevice                    device
                                     pipelineLayout,    // const VkPipelineLayout            pipelineLayout
                                     *vertShaderModule, // const VkShaderModule              vertexShaderModule
-                                    DE_NULL, // const VkShaderModule              tessellationControlShaderModule
-                                    DE_NULL, // const VkShaderModule              tessellationEvalShaderModule
-                                    DE_NULL, // const VkShaderModule              geometryShaderModule
+                                    VK_NULL_HANDLE, // const VkShaderModule              tessellationControlShaderModule
+                                    VK_NULL_HANDLE, // const VkShaderModule              tessellationEvalShaderModule
+                                    VK_NULL_HANDLE, // const VkShaderModule              geometryShaderModule
                                     *fragShaderModule, // const VkShaderModule              fragmentShaderModule
                                     renderPass,        // const VkRenderPass                renderPass
                                     viewports,         // const std::vector<VkViewport>&    viewports
@@ -775,7 +778,7 @@ Move<VkImageView> WsiTriangleRenderer::createAttachmentView(const DeviceInterfac
 {
     const VkImageViewCreateInfo viewParams = {
         VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         (VkImageViewCreateFlags)0,
         image,
         VK_IMAGE_VIEW_TYPE_2D,
@@ -800,7 +803,7 @@ Move<VkFramebuffer> WsiTriangleRenderer::createFramebuffer(const DeviceInterface
 {
     const VkFramebufferCreateInfo framebufferParams = {
         VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         (VkFramebufferCreateFlags)0,
         renderPass,
         1u,
@@ -817,13 +820,13 @@ Move<VkBuffer> WsiTriangleRenderer::createBuffer(const DeviceInterface &vkd, VkD
                                                  VkBufferUsageFlags usage)
 {
     const VkBufferCreateInfo bufferParams = {VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-                                             DE_NULL,
+                                             nullptr,
                                              (VkBufferCreateFlags)0,
                                              size,
                                              usage,
                                              VK_SHARING_MODE_EXCLUSIVE,
                                              0,
-                                             DE_NULL};
+                                             nullptr};
 
     return vk::createBuffer(vkd, device, &bufferParams);
 }
@@ -862,7 +865,7 @@ WsiTriangleRenderer::WsiTriangleRenderer(const DeviceInterface &vkd, const VkDev
                                   m_vertexBufferMemory->getOffset()));
 
     {
-        const VkMappedMemoryRange memRange = {VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, DE_NULL,
+        const VkMappedMemoryRange memRange = {VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE, nullptr,
                                               m_vertexBufferMemory->getMemory(), m_vertexBufferMemory->getOffset(),
                                               VK_WHOLE_SIZE};
         const tcu::Vec4 vertices[]         = {tcu::Vec4(-0.5f, -0.5f, 0.0f, 1.0f), tcu::Vec4(+0.5f, -0.5f, 0.0f, 1.0f),
@@ -941,7 +944,7 @@ void WsiTriangleRenderer::recordFrame(VkCommandBuffer cmdBuffer, uint32_t imageN
             makeImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, m_attachmentLayouts[imageNdx],
                                    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, m_aliasImages[imageNdx], range);
         m_vkd.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, DE_NULL, 0u, DE_NULL, 1u, &barrier);
+                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, nullptr, 0u, nullptr, 1u, &barrier);
         m_attachmentLayouts[imageNdx] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
 
@@ -1006,7 +1009,7 @@ void WsiTriangleRenderer::recordDeviceGroupFrame(VkCommandBuffer cmdBuffer, uint
         }
 
         const VkDeviceGroupRenderPassBeginInfo deviceGroupRPBeginInfo = {
-            VK_STRUCTURE_TYPE_DEVICE_GROUP_RENDER_PASS_BEGIN_INFO, DE_NULL, (uint32_t)((1 << devicesCount) - 1),
+            VK_STRUCTURE_TYPE_DEVICE_GROUP_RENDER_PASS_BEGIN_INFO, nullptr, (uint32_t)((1 << devicesCount) - 1),
             devicesCount, &renderAreas[0]};
 
         const VkRenderPassBeginInfo passBeginParams = {
@@ -1040,7 +1043,7 @@ void WsiTriangleRenderer::recordDeviceGroupFrame(VkCommandBuffer cmdBuffer, uint
             makeImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, 0, m_attachmentLayouts[imageNdx],
                                    VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, m_aliasImages[imageNdx], range);
         m_vkd.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, DE_NULL, 0u, DE_NULL, 1u, &barrier);
+                                 VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0u, 0u, nullptr, 0u, nullptr, 1u, &barrier);
         m_attachmentLayouts[imageNdx] = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     }
 

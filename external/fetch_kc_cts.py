@@ -33,7 +33,7 @@ sys.path.insert(0, scriptPath)
 from ctsbuild.common import *
 
 EXTERNAL_DIR = os.path.realpath(os.path.normpath(os.path.dirname(__file__)))
-SHA1 = "a83863a61ecaa72a38361c6f0ca6291970d1d240"
+SHA1 = "05025a1aa6707063b1f4a72acd02cb56c7311413"
 
 PACKAGES = [
     GitRepo(

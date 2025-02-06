@@ -48,8 +48,7 @@ void checkConditionalRenderingCapabilities(vkt::Context &context, const Conditio
     if (data.secondaryCommandBufferNested)
     {
         context.requireDeviceFunctionality("VK_EXT_nested_command_buffer");
-        const auto &features =
-            *vk::findStructure<vk::VkPhysicalDeviceNestedCommandBufferFeaturesEXT>(&context.getDeviceFeatures2());
+        const auto &features = context.getNestedCommandBufferFeaturesEXT();
         if (!features.nestedCommandBuffer)
             TCU_THROW(NotSupportedError, "nestedCommandBuffer is not supported");
     }
@@ -58,21 +57,22 @@ void checkConditionalRenderingCapabilities(vkt::Context &context, const Conditio
 void checkNestedRenderPassCapabilities(vkt::Context &context)
 {
     context.requireDeviceFunctionality("VK_EXT_nested_command_buffer");
-    const auto &features =
-        *vk::findStructure<vk::VkPhysicalDeviceNestedCommandBufferFeaturesEXT>(&context.getDeviceFeatures2());
+    const auto &features = context.getNestedCommandBufferFeaturesEXT();
     if (!features.nestedCommandBuffer)
         TCU_THROW(NotSupportedError, "nestedCommandBuffer is not supported");
     if (!features.nestedCommandBufferRendering)
         TCU_THROW(NotSupportedError, "nestedCommandBufferRendering is not supported");
 }
 
-de::SharedPtr<Draw::Buffer> createConditionalRenderingBuffer(vkt::Context &context, const ConditionalData &data)
+de::SharedPtr<Draw::Buffer> createConditionalRenderingBuffer(vkt::Context &context, const ConditionalData &data,
+                                                             bool computeQueue)
 {
-    const auto &vk        = context.getDeviceInterface();
-    const auto device     = context.getDevice();
-    const auto queueIndex = context.getUniversalQueueFamilyIndex();
-    const auto queue      = context.getUniversalQueue();
-    auto &alloc           = context.getDefaultAllocator();
+    const auto &vk    = context.getDeviceInterface();
+    const auto device = context.getDevice();
+    const auto queueIndex =
+        (computeQueue ? context.getComputeQueueFamilyIndex() : context.getUniversalQueueFamilyIndex());
+    const auto queue = (computeQueue ? context.getComputeQueue() : context.getUniversalQueue());
+    auto &alloc      = context.getDefaultAllocator();
 
     // When padding the condition value, it will be surounded by two additional values with nonzero bytes in them.
     // When choosing to apply an offset to the allocation, the offset will be four times the size of the condition variable.

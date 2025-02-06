@@ -40,6 +40,7 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
     VkPhysicalDevicePageableDeviceLocalMemoryFeaturesEXT *pageableDeviceLocalMemoryFeatures = nullptr;
     VkPhysicalDeviceMutableDescriptorTypeFeaturesEXT *mutableDescriptorTypeFeatures         = nullptr;
     VkPhysicalDeviceLegacyDitheringFeaturesEXT *legacyDitheringFeatures                     = nullptr;
+    VkPhysicalDeviceFaultFeaturesEXT *deviceFaultFeatures                                   = nullptr;
 #endif // CTS_USES_VULKANSC
 
     m_coreFeatures2    = initVulkanStructure();
@@ -47,6 +48,7 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
     m_vulkan12Features = initVulkanStructure();
 #ifndef CTS_USES_VULKANSC
     m_vulkan13Features = initVulkanStructure();
+    m_vulkan14Features = initVulkanStructure();
 #endif // CTS_USES_VULKANSC
 #ifdef CTS_USES_VULKANSC
     m_vulkanSC10Features = initVulkanStructure();
@@ -55,10 +57,11 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
     if (isInstanceExtensionSupported(apiVersion, instanceExtensions, "VK_KHR_get_physical_device_properties2"))
     {
         const std::vector<VkExtensionProperties> deviceExtensionProperties =
-            enumerateDeviceExtensionProperties(vki, physicalDevice, DE_NULL);
+            enumerateDeviceExtensionProperties(vki, physicalDevice, nullptr);
         void **nextPtr = &m_coreFeatures2.pNext;
         std::vector<FeatureStructWrapperBase *> featuresToFillFromBlob;
 #ifndef CTS_USES_VULKANSC
+        bool vk14Supported = (apiVersion >= VK_MAKE_API_VERSION(0, 1, 4, 0));
         bool vk13Supported = (apiVersion >= VK_MAKE_API_VERSION(0, 1, 3, 0));
 #endif // CTS_USES_VULKANSC
         bool vk12Supported = (apiVersion >= VK_MAKE_API_VERSION(0, 1, 2, 0));
@@ -76,6 +79,8 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
 #ifndef CTS_USES_VULKANSC
             if (vk13Supported)
                 addToChainVulkanStructure(&nextPtr, m_vulkan13Features);
+            if (vk14Supported)
+                addToChainVulkanStructure(&nextPtr, m_vulkan14Features);
 #endif // CTS_USES_VULKANSC
         }
 #ifdef CTS_USES_VULKANSC
@@ -106,7 +111,7 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
                 verifyFeatureAddCriteria(featureStructCreationData, deviceExtensionProperties))
             {
                 FeatureStructWrapperBase *p = (*featureStructCreationData.creatorFunction)();
-                if (p == DE_NULL)
+                if (p == nullptr)
                     continue;
 
 #ifdef CTS_USES_VULKANSC
@@ -115,7 +120,7 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
                     continue;
 #endif // CTS_USES_VULKANSC
 
-                // if feature struct is part of VkPhysicalDeviceVulkan1{1,2,3}Features
+                // if feature struct is part of VkPhysicalDeviceVulkan1{1,2,3,4}Features
                 // we dont add it to the chain but store and fill later from blob data
                 bool featureFilledFromBlob = false;
                 if (vk12Supported)
@@ -156,6 +161,8 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
                     else if (structType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_LEGACY_DITHERING_FEATURES_EXT)
                         legacyDitheringFeatures =
                             reinterpret_cast<VkPhysicalDeviceLegacyDitheringFeaturesEXT *>(rawStructPtr);
+                    else if (structType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FAULT_FEATURES_EXT)
+                        deviceFaultFeatures = reinterpret_cast<VkPhysicalDeviceFaultFeaturesEXT *>(rawStructPtr);
 #endif // CTS_USES_VULKANSC
                     // add to chain
                     *nextPtr = rawStructPtr;
@@ -167,12 +174,10 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
             {
 #ifndef CTS_USES_VULKANSC
                 // Some non-standard promotions may need feature structs filled in anyway.
-                if (!strcmp(featureName, "VK_EXT_extended_dynamic_state") &&
-                    (de::contains(allDeviceExtensions.begin(), allDeviceExtensions.end(),
-                                  "VK_EXT_extended_dynamic_state")))
+                if (!strcmp(featureName, "VK_EXT_extended_dynamic_state") && vk13Supported)
                 {
                     FeatureStructWrapperBase *p = (*featureStructCreationData.creatorFunction)();
-                    if (p == DE_NULL)
+                    if (p == nullptr)
                         continue;
 
                     auto f =
@@ -180,12 +185,10 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
                     f->extendedDynamicState = true;
                     m_features.push_back(p);
                 }
-                if (!strcmp(featureName, "VK_EXT_extended_dynamic_state2") &&
-                    (de::contains(allDeviceExtensions.begin(), allDeviceExtensions.end(),
-                                  "VK_EXT_extended_dynamic_state2")))
+                if (!strcmp(featureName, "VK_EXT_extended_dynamic_state2") && vk13Supported)
                 {
                     FeatureStructWrapperBase *p = (*featureStructCreationData.creatorFunction)();
-                    if (p == DE_NULL)
+                    if (p == nullptr)
                         continue;
 
                     auto f =
@@ -199,13 +202,13 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
 
         vki.getPhysicalDeviceFeatures2(physicalDevice, &m_coreFeatures2);
 
-        // fill data from VkPhysicalDeviceVulkan1{1,2,3}Features
+        // fill data from VkPhysicalDeviceVulkan1{1,2,3,4}Features
         if (vk12Supported)
         {
             AllFeaturesBlobs allBlobs = {
                 m_vulkan11Features, m_vulkan12Features,
 #ifndef CTS_USES_VULKANSC
-                m_vulkan13Features,
+                m_vulkan13Features, m_vulkan14Features,
 #endif // CTS_USES_VULKANSC
                 // add blobs from future vulkan versions here
             };
@@ -265,6 +268,13 @@ DeviceFeatures::DeviceFeatures(const InstanceInterface &vki, const uint32_t apiV
         // when DR is used togehrt with legacy dithering.
         if (legacyDitheringFeatures)
             legacyDitheringFeatures->legacyDithering = false;
+
+        // Disable deviceFaultVendorBinary by default because it can impact
+        // performance.
+        if (deviceFaultFeatures)
+        {
+            deviceFaultFeatures->deviceFaultVendorBinary = false;
+        }
 #endif // CTS_USES_VULKANSC
     }
 }
@@ -273,11 +283,11 @@ bool DeviceFeatures::verifyFeatureAddCriteria(const FeatureStructCreationData &i
                                               const std::vector<VkExtensionProperties> &properties)
 {
 #ifndef CTS_USES_VULKANSC
-    if (deStringEqual(item.name, VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME))
+    if (strcmp(item.name, VK_KHR_VULKAN_MEMORY_MODEL_EXTENSION_NAME) == 0)
     {
         for (const auto &property : properties)
         {
-            if (deStringEqual(property.extensionName, item.name))
+            if (strcmp(property.extensionName, item.name) == 0)
                 return (property.specVersion == item.specVersion);
         }
     }
@@ -293,7 +303,7 @@ bool DeviceFeatures::contains(const std::string &feature, bool throwIfNotExists)
 {
     for (const auto f : m_features)
     {
-        if (deStringEqual(f->getFeatureDesc().name, feature.c_str()))
+        if (strcmp(f->getFeatureDesc().name, feature.c_str()) == 0)
             return true;
     }
 

@@ -253,6 +253,14 @@ inline uint8_t randomScalar(de::Random &rnd, uint8_t minValue, uint8_t maxValue)
     return (uint8_t)(minValue + rnd.getUint8() % (maxValue - minValue + 1));
 }
 
+void fillWithRandomData(de::Random &rnd, void *data, size_t size);
+
+template <typename T>
+void fillWithRandomData(de::Random &rnd, T *something)
+{
+    fillWithRandomData(rnd, something, sizeof(T));
+}
+
 } // namespace de
 
 #endif // _DERANDOM_HPP

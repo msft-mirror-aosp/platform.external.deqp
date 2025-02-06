@@ -41,6 +41,7 @@
 #include "vkDefs.hpp"
 #include "vkStrUtil.hpp"
 #include "vkBarrierUtil.hpp"
+#include "vkObjUtil.hpp"
 
 #include <unordered_set>
 #include <algorithm>
@@ -395,6 +396,7 @@ VideoBaseDecoder::VideoBaseDecoder(Parameters &&params)
     , m_profile(*params.profile)
     , m_framesToCheck(params.framesToCheck)
     , m_dpb(3)
+    , m_layeredDpb(params.layeredDpb)
     , m_videoFrameBuffer(params.framebuffer)
     , m_decodeFramesData(params.context->getDeviceDriver(), params.context->device,
                          params.context->decodeQueueFamilyIdx())
@@ -568,11 +570,20 @@ void VideoBaseDecoder::StartVideoSequence(const VkParserDetectedVideoFormat *pVi
         m_useSeparateOutputImages = true;
     }
 
-    if (!(m_videoCaps.flags & VK_VIDEO_CAPABILITY_SEPARATE_REFERENCE_IMAGES_BIT_KHR))
+    if (!(m_videoCaps.flags & VK_VIDEO_CAPABILITY_SEPARATE_REFERENCE_IMAGES_BIT_KHR) && !m_layeredDpb)
     {
-        // The implementation does not support individual images for DPB and so must use arrays
+        TCU_THROW(NotSupportedError, "separate reference images are not supported");
+    }
+
+    if (m_layeredDpb)
+    {
         m_useImageArray     = true;
         m_useImageViewArray = true;
+    }
+    else
+    {
+        m_useImageArray     = false;
+        m_useImageViewArray = false;
     }
 
     bool useLinearOutput = false;
@@ -775,7 +786,7 @@ bool VideoBaseDecoder::AllocPictureBuffer(VkPicIf **ppNvidiaVulkanPicture, uint3
 
     if (!result)
     {
-        *ppNvidiaVulkanPicture = (VkPicIf *)nullptr;
+        *ppNvidiaVulkanPicture = nullptr;
     }
 
     return result;
@@ -1414,12 +1425,13 @@ bool VideoBaseDecoder::DecodePicture(VkParserPictureData *pd, vkPicBuffBase * /*
                        p->tileSizes[i], p->tileInfo.pWidthInSbsMinus1[i] + 1, p->tileInfo.pHeightInSbsMinus1[i] + 1,
                        p->tileInfo.pMiColStarts[i], p->tileInfo.pMiRowStarts[i]);
 
-                VkDeviceSize maxSize        = 0;
-                uint32_t adjustedTileOffset = p->tileOffsets[i] + pCurrFrameDecParams->bitstreamDataOffset;
+                VkDeviceSize maxSize = 0;
+                uint32_t adjustedTileOffset =
+                    p->tileOffsets[i] + static_cast<uint32_t>(pCurrFrameDecParams->bitstreamDataOffset);
                 const uint8_t *bitstreamBytes =
                     pCurrFrameDecParams->bitstreamData->GetReadOnlyDataPtr(adjustedTileOffset, maxSize);
 
-                for (int j = 0; j < std::min(p->tileSizes[i], 16u); j++)
+                for (uint32_t j = 0; j < std::min(p->tileSizes[i], 16u); j++)
                 {
                     printf("%02x ", bitstreamBytes[j]);
                 }
@@ -1495,9 +1507,13 @@ int32_t VideoBaseDecoder::DecodePictureWithParameters(MovePtr<CachedDecodeParame
                                                       pPicParams->decodeFrameInfo.srcBufferOffset,
                                                       pPicParams->decodeFrameInfo.srcBufferRange};
 
-    uint32_t baseArrayLayer = (m_useImageArray || m_useImageViewArray) ? pPicParams->currPicIdx : 0;
-    const VkImageSubresourceRange imageSubresourceRange =
-        makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, baseArrayLayer, 1);
+    bool isLayeredDpb          = m_useImageArray || m_useImageViewArray;
+    uint32_t currPicArrayLayer = isLayeredDpb ? pPicParams->currPicIdx : 0;
+    const VkImageSubresourceRange currPicSubresourceRange =
+        makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, currPicArrayLayer, 1);
+    // The destination image is never layered.
+    const VkImageSubresourceRange dstSubresourceRange =
+        makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1);
 
     cachedParameters->currentDpbPictureResourceInfo    = VulkanVideoFrameBuffer::PictureResourceInfo();
     cachedParameters->currentOutputPictureResourceInfo = VulkanVideoFrameBuffer::PictureResourceInfo();
@@ -1566,7 +1582,7 @@ int32_t VideoBaseDecoder::DecodePictureWithParameters(MovePtr<CachedDecodeParame
                 VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR, VK_ACCESS_2_VIDEO_DECODE_READ_BIT_KHR,
                 VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR, VK_ACCESS_2_VIDEO_DECODE_WRITE_BIT_KHR,
                 pOutputPictureResourceInfo->currentImageLayout, VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR,
-                pOutputPictureResourceInfo->image, imageSubresourceRange);
+                pOutputPictureResourceInfo->image, dstSubresourceRange);
             cachedParameters->imageBarriers.push_back(dstBarrier);
         }
     }
@@ -1577,7 +1593,7 @@ int32_t VideoBaseDecoder::DecodePictureWithParameters(MovePtr<CachedDecodeParame
             VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR, VK_ACCESS_2_VIDEO_DECODE_READ_BIT_KHR,
             VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR, VK_ACCESS_2_VIDEO_DECODE_WRITE_BIT_KHR,
             pOutputPictureResourceInfo->currentImageLayout, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR,
-            cachedParameters->currentDpbPictureResourceInfo.image, imageSubresourceRange);
+            cachedParameters->currentDpbPictureResourceInfo.image, currPicSubresourceRange);
         cachedParameters->imageBarriers.push_back(dpbBarrier);
     }
 
@@ -1596,12 +1612,15 @@ int32_t VideoBaseDecoder::DecodePictureWithParameters(MovePtr<CachedDecodeParame
         }
         for (int32_t resId = 0; resId < pPicParams->numGopReferenceSlots; resId++)
         {
-            VkImageMemoryBarrier2KHR gopBarrier = makeImageMemoryBarrier2(
+            const VkImageSubresourceRange dpbSubresourceRange = makeImageSubresourceRange(
+                VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, isLayeredDpb ? pGopReferenceImagesIndexes[resId] : 0, 1);
+
+            VkImageMemoryBarrier2KHR dpbBarrier = makeImageMemoryBarrier2(
                 VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR, VK_ACCESS_2_VIDEO_DECODE_WRITE_BIT_KHR,
                 VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR, VK_ACCESS_2_VIDEO_DECODE_READ_BIT_KHR,
                 cachedParameters->pictureResourcesInfo[resId].currentImageLayout, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR,
-                cachedParameters->pictureResourcesInfo[resId].image, imageSubresourceRange);
-            cachedParameters->imageBarriers.push_back(gopBarrier);
+                cachedParameters->pictureResourcesInfo[resId].image, dpbSubresourceRange);
+            cachedParameters->imageBarriers.push_back(dpbBarrier);
         }
 
         if (videoLoggingEnabled())
@@ -1933,7 +1952,7 @@ bool VideoBaseDecoder::DisplayPicture(VkPicIf *pNvidiaVulkanPicture, int64_t /*l
 {
     vkPicBuffBase *pVkPicBuff = GetPic(pNvidiaVulkanPicture);
 
-    DE_ASSERT(pVkPicBuff != DE_NULL);
+    DE_ASSERT(pVkPicBuff != nullptr);
     int32_t picIdx = pVkPicBuff ? pVkPicBuff->m_picIdx : -1;
     DE_ASSERT(picIdx != -1);
     DE_ASSERT(m_videoFrameBuffer != nullptr);
@@ -2739,6 +2758,7 @@ VkResult VkImageResource::Create(DeviceContext &vkDevCtx, const VkImageCreateInf
 }
 
 VkResult VkImageResourceView::Create(DeviceContext &vkDevCtx, VkSharedBaseObj<VkImageResource> &imageResource,
+                                     const VkImageCreateInfo *pImageCreateInfo,
                                      VkImageSubresourceRange &imageSubresourceRange,
                                      VkSharedBaseObj<VkImageResourceView> &imageResourceView)
 {
@@ -2749,8 +2769,8 @@ VkResult VkImageResourceView::Create(DeviceContext &vkDevCtx, VkSharedBaseObj<Vk
     viewInfo.sType                 = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.pNext                 = nullptr;
     viewInfo.image                 = imageResource->GetImage();
-    viewInfo.viewType              = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format                = imageResource->GetImageCreateInfo().format;
+    viewInfo.viewType   = pImageCreateInfo->arrayLayers > 1 ? VK_IMAGE_VIEW_TYPE_2D_ARRAY : VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.format     = imageResource->GetImageCreateInfo().format;
     viewInfo.components = {VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY, VK_COMPONENT_SWIZZLE_IDENTITY,
                            VK_COMPONENT_SWIZZLE_IDENTITY};
     viewInfo.subresourceRange = imageSubresourceRange;
@@ -3305,6 +3325,158 @@ int32_t VkParserVideoPictureParameters::Release()
         delete this;
     }
     return ret;
+}
+
+shared_ptr<VideoBaseDecoder> createBasicDecoder(DeviceContext *deviceContext, const VkVideoCoreProfile *profile,
+                                                size_t framesToCheck, bool resolutionChange)
+{
+    VkSharedBaseObj<VulkanVideoFrameBuffer> vkVideoFrameBuffer;
+
+    VK_CHECK(VulkanVideoFrameBuffer::Create(deviceContext,
+                                            false, // UseResultStatusQueries
+                                            false, // ResourcesWithoutProfiles
+                                            vkVideoFrameBuffer));
+
+    VideoBaseDecoder::Parameters params;
+
+    params.profile            = profile;
+    params.context            = deviceContext;
+    params.framebuffer        = vkVideoFrameBuffer;
+    params.framesToCheck      = framesToCheck;
+    params.queryDecodeStatus  = false;
+    params.outOfOrderDecoding = false;
+    params.alwaysRecreateDPB  = resolutionChange;
+    params.layeredDpb         = true;
+
+    return std::make_shared<VideoBaseDecoder>(std::move(params));
+}
+
+de::MovePtr<vkt::ycbcr::MultiPlaneImageData> getDecodedImageFromContext(DeviceContext &deviceContext,
+                                                                        VkImageLayout layout, const DecodedFrame *frame)
+{
+    auto &videoDeviceDriver       = deviceContext.getDeviceDriver();
+    auto device                   = deviceContext.device;
+    auto queueFamilyIndexDecode   = deviceContext.decodeQueueFamilyIdx();
+    auto queueFamilyIndexTransfer = deviceContext.transferQueueFamilyIdx();
+    const VkExtent2D imageExtent{(uint32_t)frame->displayWidth, (uint32_t)frame->displayHeight};
+    const VkImage image      = frame->outputImageView->GetImageResource()->GetImage();
+    const VkFormat format    = frame->outputImageView->GetImageResource()->GetImageCreateInfo().format;
+    uint32_t imageLayerIndex = frame->imageLayerIndex;
+
+    MovePtr<vkt::ycbcr::MultiPlaneImageData> multiPlaneImageData(
+        new vkt::ycbcr::MultiPlaneImageData(format, tcu::UVec2(imageExtent.width, imageExtent.height)));
+    const VkQueue queueDecode   = getDeviceQueue(videoDeviceDriver, device, queueFamilyIndexDecode, 0u);
+    const VkQueue queueTransfer = getDeviceQueue(videoDeviceDriver, device, queueFamilyIndexTransfer, 0u);
+    const VkImageSubresourceRange imageSubresourceRange =
+        makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, imageLayerIndex, 1);
+
+    const VkImageMemoryBarrier2KHR imageBarrierDecode =
+        makeImageMemoryBarrier2(VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR, VK_ACCESS_2_VIDEO_DECODE_WRITE_BIT_KHR,
+                                VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT_KHR, VK_ACCESS_NONE_KHR, layout,
+                                VK_IMAGE_LAYOUT_GENERAL, image, imageSubresourceRange);
+
+    const VkImageMemoryBarrier2KHR imageBarrierOwnershipDecode = makeImageMemoryBarrier2(
+        VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT_KHR, VK_ACCESS_NONE_KHR, VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT_KHR,
+        VK_ACCESS_NONE_KHR, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, image, imageSubresourceRange,
+        queueFamilyIndexDecode, queueFamilyIndexTransfer);
+
+    const VkImageMemoryBarrier2KHR imageBarrierOwnershipTransfer = makeImageMemoryBarrier2(
+        VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT_KHR, VK_ACCESS_NONE_KHR, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+        VK_ACCESS_NONE_KHR, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL, image, imageSubresourceRange,
+        queueFamilyIndexDecode, queueFamilyIndexTransfer);
+
+    const VkImageMemoryBarrier2KHR imageBarrierTransfer = makeImageMemoryBarrier2(
+        VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_ACCESS_MEMORY_WRITE_BIT, VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR,
+        VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+        imageSubresourceRange);
+
+    const Move<VkCommandPool> cmdDecodePool(makeCommandPool(videoDeviceDriver, device, queueFamilyIndexDecode));
+    const Move<VkCommandBuffer> cmdDecodeBuffer(
+        allocateCommandBuffer(videoDeviceDriver, device, *cmdDecodePool, VK_COMMAND_BUFFER_LEVEL_PRIMARY));
+    const Move<VkCommandPool> cmdTransferPool(makeCommandPool(videoDeviceDriver, device, queueFamilyIndexTransfer));
+    const Move<VkCommandBuffer> cmdTransferBuffer(
+        allocateCommandBuffer(videoDeviceDriver, device, *cmdTransferPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY));
+
+    Move<VkSemaphore> semaphore                 = createSemaphore(videoDeviceDriver, device);
+    Move<VkFence> decodeFence                   = createFence(videoDeviceDriver, device);
+    Move<VkFence> transferFence                 = createFence(videoDeviceDriver, device);
+    VkFence fences[]                            = {*decodeFence, *transferFence};
+    const VkPipelineStageFlags waitDstStageMask = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+
+    VkSubmitInfo decodeSubmitInfo = {
+        VK_STRUCTURE_TYPE_SUBMIT_INFO, //  VkStructureType sType;
+        nullptr,                       //  const void* pNext;
+        0u,                            //  uint32_t waitSemaphoreCount;
+        nullptr,                       //  const VkSemaphore* pWaitSemaphores;
+        nullptr,                       //  const VkPipelineStageFlags* pWaitDstStageMask;
+        1u,                            //  uint32_t commandBufferCount;
+        &*cmdDecodeBuffer,             //  const VkCommandBuffer* pCommandBuffers;
+        1u,                            //  uint32_t signalSemaphoreCount;
+        &*semaphore,                   //  const VkSemaphore* pSignalSemaphores;
+    };
+    if (frame->frameCompleteSemaphore != VK_NULL_HANDLE)
+    {
+        decodeSubmitInfo.waitSemaphoreCount = 1;
+        decodeSubmitInfo.pWaitSemaphores    = &frame->frameCompleteSemaphore;
+        decodeSubmitInfo.pWaitDstStageMask  = &waitDstStageMask;
+    }
+    const VkSubmitInfo transferSubmitInfo = {
+        VK_STRUCTURE_TYPE_SUBMIT_INFO, //  VkStructureType sType;
+        nullptr,                       //  const void* pNext;
+        1u,                            //  uint32_t waitSemaphoreCount;
+        &*semaphore,                   //  const VkSemaphore* pWaitSemaphores;
+        &waitDstStageMask,             //  const VkPipelineStageFlags* pWaitDstStageMask;
+        1u,                            //  uint32_t commandBufferCount;
+        &*cmdTransferBuffer,           //  const VkCommandBuffer* pCommandBuffers;
+        0u,                            //  uint32_t signalSemaphoreCount;
+        nullptr,                       //  const VkSemaphore* pSignalSemaphores;
+    };
+
+    beginCommandBuffer(videoDeviceDriver, *cmdDecodeBuffer, 0u);
+    cmdPipelineImageMemoryBarrier2(videoDeviceDriver, *cmdDecodeBuffer, &imageBarrierDecode);
+    cmdPipelineImageMemoryBarrier2(videoDeviceDriver, *cmdDecodeBuffer, &imageBarrierOwnershipDecode);
+    endCommandBuffer(videoDeviceDriver, *cmdDecodeBuffer);
+
+    beginCommandBuffer(videoDeviceDriver, *cmdTransferBuffer, 0u);
+    cmdPipelineImageMemoryBarrier2(videoDeviceDriver, *cmdTransferBuffer, &imageBarrierOwnershipTransfer);
+    cmdPipelineImageMemoryBarrier2(videoDeviceDriver, *cmdTransferBuffer, &imageBarrierTransfer);
+    endCommandBuffer(videoDeviceDriver, *cmdTransferBuffer);
+
+    VK_CHECK(videoDeviceDriver.queueSubmit(queueDecode, 1u, &decodeSubmitInfo, *decodeFence));
+    VK_CHECK(videoDeviceDriver.queueSubmit(queueTransfer, 1u, &transferSubmitInfo, *transferFence));
+
+    VK_CHECK(videoDeviceDriver.waitForFences(device, DE_LENGTH_OF_ARRAY(fences), fences, true, ~0ull));
+
+    vkt::ycbcr::downloadImage(videoDeviceDriver, device, queueFamilyIndexTransfer, deviceContext.allocator(), image,
+                              multiPlaneImageData.get(), 0, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, imageLayerIndex);
+
+    const VkImageMemoryBarrier2KHR imageBarrierTransfer2 =
+        makeImageMemoryBarrier2(VK_PIPELINE_STAGE_2_TRANSFER_BIT_KHR, VK_ACCESS_2_TRANSFER_WRITE_BIT_KHR,
+                                VK_PIPELINE_STAGE_2_BOTTOM_OF_PIPE_BIT_KHR, VK_ACCESS_NONE_KHR,
+                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, layout, image, imageSubresourceRange);
+
+    videoDeviceDriver.resetCommandBuffer(*cmdTransferBuffer, 0u);
+    videoDeviceDriver.resetFences(device, 1, &*transferFence);
+    beginCommandBuffer(videoDeviceDriver, *cmdTransferBuffer, 0u);
+    cmdPipelineImageMemoryBarrier2(videoDeviceDriver, *cmdTransferBuffer, &imageBarrierTransfer2);
+    endCommandBuffer(videoDeviceDriver, *cmdTransferBuffer);
+
+    const VkSubmitInfo transferSubmitInfo2 = {
+        VK_STRUCTURE_TYPE_SUBMIT_INFO, // VkStructureType sType;
+        nullptr,                       //  const void* pNext;
+        0u,                            //  uint32_t waitSemaphoreCount;
+        nullptr,                       //  const VkSemaphore* pWaitSemaphores;
+        nullptr,                       //  const VkPipelineStageFlags* pWaitDstStageMask;
+        1u,                            //  uint32_t commandBufferCount;
+        &*cmdTransferBuffer,           //  const VkCommandBuffer* pCommandBuffers;
+        0u,                            //  uint32_t signalSemaphoreCount;
+        nullptr,                       // const VkSemaphore* pSignalSemaphores;
+    };
+
+    VK_CHECK(videoDeviceDriver.queueSubmit(queueTransfer, 1u, &transferSubmitInfo2, *transferFence));
+    VK_CHECK(videoDeviceDriver.waitForFences(device, 1, &*transferFence, true, ~0ull));
+
+    return multiPlaneImageData;
 }
 
 } // namespace video

@@ -48,6 +48,8 @@ bool pixelThresholdCompare(TestLog &log, const char *imageSetName, const char *i
                            const Surface &result, const RGBA &threshold, CompareLogMode logMode);
 bool fuzzyCompare(TestLog &log, const char *imageSetName, const char *imageSetDesc, const Surface &reference,
                   const Surface &result, float threshold, CompareLogMode logMode);
+bool fuzzyCompareMaxError(TestLog &log, const char *imageSetName, const char *imageSetDesc, const Surface &reference,
+                          const Surface &result, float threshold, CompareLogMode logMode);
 int measurePixelDiffAccuracy(TestLog &log, const char *imageSetName, const char *imageSetDesc, const Surface &reference,
                              const Surface &result, int bestScoreDiff, int worstScoreDiff, CompareLogMode logMode);
 
@@ -57,6 +59,9 @@ bool fuzzyCompare(TestLog &log, const char *imageSetName, const char *imageSetDe
 bool bitwiseCompare(TestLog &log, const char *imageSetName, const char *imageSetDesc,
                     const ConstPixelBufferAccess &reference, const ConstPixelBufferAccess &result,
                     CompareLogMode logMode);
+bool fuzzyCompareMaxError(TestLog &log, const char *imageSetName, const char *imageSetDesc,
+                          const ConstPixelBufferAccess &reference, const ConstPixelBufferAccess &result,
+                          float threshold, CompareLogMode logMode);
 bool floatUlpThresholdCompare(TestLog &log, const char *imageSetName, const char *imageSetDesc,
                               const ConstPixelBufferAccess &reference, const ConstPixelBufferAccess &result,
                               const UVec4 &threshold, CompareLogMode logMode);

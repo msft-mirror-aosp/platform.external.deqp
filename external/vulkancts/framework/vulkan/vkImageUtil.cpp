@@ -2315,6 +2315,28 @@ PlanarFormatDescription getCorePlanarFormatDescription(VkFormat format)
         return desc;
     }
 
+    case VK_FORMAT_R16G16B16A16_SFLOAT:
+    {
+        const PlanarFormatDescription desc = {1, // planes
+                                              chanR | chanG | chanB | chanA,
+                                              1,
+                                              1,
+                                              {
+                                                  //        Size    WDiv    HDiv    planeCompatibleFormat
+                                                  {8, 1, 1, VK_FORMAT_R16G16B16A16_SFLOAT},
+                                                  {0, 0, 0, VK_FORMAT_UNDEFINED},
+                                                  {0, 0, 0, VK_FORMAT_UNDEFINED},
+                                              },
+                                              {
+                                                  //        Plane    Type    Offs    Size    Stride
+                                                  {0, sfloat, 0, 16, 8},  // R
+                                                  {0, sfloat, 16, 16, 8}, // G
+                                                  {0, sfloat, 32, 16, 8}, // B
+                                                  {0, sfloat, 48, 16, 8}  // A
+                                              }};
+        return desc;
+    }
+
     case VK_FORMAT_R32G32B32A32_SFLOAT:
     {
         const PlanarFormatDescription desc = {1, // planes
@@ -3954,6 +3976,7 @@ uint32_t getFormatComponentWidth(const VkFormat format, const uint32_t component
         case tcu::TextureFormat::SNORM_INT16:
         case tcu::TextureFormat::UNSIGNED_INT16:
         case tcu::TextureFormat::SIGNED_INT16:
+        case tcu::TextureFormat::HALF_FLOAT:
             return 16;
 
         case tcu::TextureFormat::UNORM_INT24:
@@ -4224,7 +4247,7 @@ VkSamplerCreateInfo mapSampler(const tcu::Sampler &sampler, const tcu::TextureFo
 
     const VkSamplerCreateInfo createInfo = {
         VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
-        DE_NULL,
+        nullptr,
         flags,
         mapFilterMode(sampler.magFilter),                          // magFilter
         mapFilterMode(sampler.minFilter),                          // minFilter
@@ -4275,7 +4298,7 @@ tcu::Sampler mapVkSampler(const VkSamplerCreateInfo &samplerCreateInfo)
     rr::GenericVec4 borderColorValue;
 
     void const *pNext = samplerCreateInfo.pNext;
-    while (pNext != DE_NULL)
+    while (pNext != nullptr)
     {
         const VkStructureType nextType = *reinterpret_cast<const VkStructureType *>(pNext);
         switch (nextType)
@@ -4582,7 +4605,7 @@ void copyBufferToImage(const DeviceInterface &vk, const VkCommandBuffer &cmdBuff
     // Barriers for copying buffer to image
     const VkBufferMemoryBarrier preBufferBarrier = {
         VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                 // const void* pNext;
+        nullptr,                                 // const void* pNext;
         VK_ACCESS_HOST_WRITE_BIT,                // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_READ_BIT,             // VkAccessFlags dstAccessMask;
         VK_QUEUE_FAMILY_IGNORED,                 // uint32_t srcQueueFamilyIndex;
@@ -4593,7 +4616,7 @@ void copyBufferToImage(const DeviceInterface &vk, const VkCommandBuffer &cmdBuff
     };
 
     const VkImageMemoryBarrier preImageBarrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-                                                  DE_NULL,                                // const void* pNext;
+                                                  nullptr,                                // const void* pNext;
                                                   0u,                                   // VkAccessFlags srcAccessMask;
                                                   VK_ACCESS_TRANSFER_WRITE_BIT,         // VkAccessFlags dstAccessMask;
                                                   VK_IMAGE_LAYOUT_UNDEFINED,            // VkImageLayout oldLayout;
@@ -4611,7 +4634,7 @@ void copyBufferToImage(const DeviceInterface &vk, const VkCommandBuffer &cmdBuff
                                                   }};
 
     const VkImageMemoryBarrier postImageBarrier = {VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-                                                   DE_NULL,                                // const void* pNext;
+                                                   nullptr,                                // const void* pNext;
                                                    VK_ACCESS_TRANSFER_WRITE_BIT,         // VkAccessFlags srcAccessMask;
                                                    destImageDstAccessMask,               // VkAccessFlags dstAccessMask;
                                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, // VkImageLayout oldLayout;
@@ -4630,12 +4653,11 @@ void copyBufferToImage(const DeviceInterface &vk, const VkCommandBuffer &cmdBuff
 
     // Copy buffer to image
     vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0,
-                          0, (const VkMemoryBarrier *)DE_NULL, 1, &preBufferBarrier, 1, &preImageBarrier);
+                          0, nullptr, 1, &preBufferBarrier, 1, &preImageBarrier);
     vk.cmdCopyBufferToImage(cmdBuffer, buffer, destImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                             (uint32_t)copyRegions.size(), copyRegions.data());
     vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, destImageDstStageFlags, (VkDependencyFlags)0, 0,
-                          (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &postImageBarrier);
+                          nullptr, 0, nullptr, 1, &postImageBarrier);
 }
 
 void copyBufferToImage(const DeviceInterface &vk, VkDevice device, VkQueue queue, uint32_t queueFamilyIndex,
@@ -4648,7 +4670,7 @@ void copyBufferToImage(const DeviceInterface &vk, VkDevice device, VkQueue queue
 {
     Move<VkCommandPool> cmdPool;
     VkCommandPool activeCmdPool;
-    if (externalCommandPool == DE_NULL)
+    if (externalCommandPool == nullptr)
     {
         // Create local command pool
         cmdPool       = createCommandPool(vk, device, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, queueFamilyIndex);
@@ -4665,9 +4687,9 @@ void copyBufferToImage(const DeviceInterface &vk, VkDevice device, VkQueue queue
 
     const VkCommandBufferBeginInfo cmdBufferBeginInfo = {
         VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO, // VkStructureType sType;
-        DE_NULL,                                     // const void* pNext;
+        nullptr,                                     // const void* pNext;
         VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT, // VkCommandBufferUsageFlags flags;
-        (const VkCommandBufferInheritanceInfo *)DE_NULL,
+        nullptr,
     };
 
     VK_CHECK(vk.beginCommandBuffer(*cmdBuffer, &cmdBufferBeginInfo));
@@ -4679,14 +4701,14 @@ void copyBufferToImage(const DeviceInterface &vk, VkDevice device, VkQueue queue
 
     const VkSubmitInfo submitInfo = {
         VK_STRUCTURE_TYPE_SUBMIT_INFO, // VkStructureType sType;
-        DE_NULL,                       // const void* pNext;
+        nullptr,                       // const void* pNext;
         waitSemaphore ? 1u : 0u,       // uint32_t waitSemaphoreCount;
         waitSemaphore,                 // const VkSemaphore* pWaitSemaphores;
         &pipelineStageFlags,           // const VkPipelineStageFlags* pWaitDstStageMask;
         1u,                            // uint32_t commandBufferCount;
         &cmdBuffer.get(),              // const VkCommandBuffer* pCommandBuffers;
         0u,                            // uint32_t signalSemaphoreCount;
-        DE_NULL                        // const VkSemaphore* pSignalSemaphores;
+        nullptr                        // const VkSemaphore* pSignalSemaphores;
     };
 
     try
@@ -4708,7 +4730,7 @@ void copyImageToBuffer(const DeviceInterface &vk, VkCommandBuffer cmdBuffer, VkI
 {
     const VkImageMemoryBarrier imageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                        // VkStructureType sType;
-        DE_NULL,                                                       // const void* pNext;
+        nullptr,                                                       // const void* pNext;
         srcAccessMask,                                                 // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_READ_BIT,                                   // VkAccessFlags dstAccessMask;
         oldLayout,                                                     // VkImageLayout oldLayout;
@@ -4719,7 +4741,7 @@ void copyImageToBuffer(const DeviceInterface &vk, VkCommandBuffer cmdBuffer, VkI
         makeImageSubresourceRange(barrierAspect, 0u, 1u, 0, numLayers) // VkImageSubresourceRange subresourceRange;
     };
 
-    vk.cmdPipelineBarrier(cmdBuffer, srcStageMask, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, DE_NULL, 0u, DE_NULL, 1u,
+    vk.cmdPipelineBarrier(cmdBuffer, srcStageMask, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u, nullptr, 0u, nullptr, 1u,
                           &imageBarrier);
 
     const VkImageSubresourceLayers subresource = {
@@ -4742,7 +4764,7 @@ void copyImageToBuffer(const DeviceInterface &vk, VkCommandBuffer cmdBuffer, VkI
 
     const VkBufferMemoryBarrier bufferBarrier = {
         VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                 // const void* pNext;
+        nullptr,                                 // const void* pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,            // VkAccessFlags srcAccessMask;
         VK_ACCESS_HOST_READ_BIT,                 // VkAccessFlags dstAccessMask;
         VK_QUEUE_FAMILY_IGNORED,                 // uint32_t srcQueueFamilyIndex;
@@ -4752,8 +4774,8 @@ void copyImageToBuffer(const DeviceInterface &vk, VkCommandBuffer cmdBuffer, VkI
         VK_WHOLE_SIZE                            // VkDeviceSize size;
     };
 
-    vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 0u, DE_NULL, 1u,
-                          &bufferBarrier, 0u, DE_NULL);
+    vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 0u, nullptr, 1u,
+                          &bufferBarrier, 0u, nullptr);
 }
 
 void copyImageToBuffer(const DeviceInterface &vk, vk::VkCommandBuffer cmdBuffer, vk::VkImage image, vk::VkBuffer buffer,
@@ -4763,7 +4785,7 @@ void copyImageToBuffer(const DeviceInterface &vk, vk::VkCommandBuffer cmdBuffer,
 {
     const VkImageMemoryBarrier imageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         srcAccessMask,                          // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_READ_BIT,            // VkAccessFlags dstAccessMask;
         oldLayout,                              // VkImageLayout oldLayout;
@@ -4776,7 +4798,7 @@ void copyImageToBuffer(const DeviceInterface &vk, vk::VkCommandBuffer cmdBuffer,
     };
 
     vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                          DE_NULL, 0u, DE_NULL, 1u, &imageBarrier);
+                          nullptr, 0u, nullptr, 1u, &imageBarrier);
 
     const VkImageSubresourceLayers subresource = {
         copyAspect, // VkImageAspectFlags aspectMask;
@@ -4810,7 +4832,7 @@ void copyImageToBuffer(const DeviceInterface &vk, vk::VkCommandBuffer cmdBuffer,
 
     const VkBufferMemoryBarrier bufferBarrier = {
         VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                 // const void* pNext;
+        nullptr,                                 // const void* pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,            // VkAccessFlags srcAccessMask;
         VK_ACCESS_HOST_READ_BIT,                 // VkAccessFlags dstAccessMask;
         VK_QUEUE_FAMILY_IGNORED,                 // uint32_t srcQueueFamilyIndex;
@@ -4820,8 +4842,8 @@ void copyImageToBuffer(const DeviceInterface &vk, vk::VkCommandBuffer cmdBuffer,
         VK_WHOLE_SIZE                            // VkDeviceSize size;
     };
 
-    vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 0u, DE_NULL, 1u,
-                          &bufferBarrier, 0u, DE_NULL);
+    vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 0u, nullptr, 1u,
+                          &bufferBarrier, 0u, nullptr);
 }
 
 void clearColorImage(const DeviceInterface &vk, const VkDevice device, const VkQueue queue, uint32_t queueFamilyIndex,
@@ -4842,7 +4864,7 @@ void clearColorImage(const DeviceInterface &vk, const VkDevice device, const VkQ
 
     const VkImageMemoryBarrier preImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         0u,                                     // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags dstAccessMask;
         oldLayout,                              // VkImageLayout oldLayout;
@@ -4855,7 +4877,7 @@ void clearColorImage(const DeviceInterface &vk, const VkDevice device, const VkQ
 
     const VkImageMemoryBarrier postImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags srcAccessMask;
         dstAccessFlags,                         // VkAccessFlags dstAccessMask;
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // VkImageLayout oldLayout;
@@ -4868,12 +4890,10 @@ void clearColorImage(const DeviceInterface &vk, const VkDevice device, const VkQ
 
     beginCommandBuffer(vk, *cmdBuffer);
     vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0,
-                          0, (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &preImageBarrier);
+                          0, nullptr, 0, nullptr, 1, &preImageBarrier);
     vk.cmdClearColorImage(*cmdBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearColor, 1, &subresourceRange);
-    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0,
-                          (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &postImageBarrier);
+    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0, nullptr,
+                          0, nullptr, 1, &postImageBarrier);
     endCommandBuffer(vk, *cmdBuffer);
 
     submitCommandsAndWait(vk, device, queue, *cmdBuffer);
@@ -4960,7 +4980,7 @@ void initColorImageChessboardPattern(const DeviceInterface &vk, const VkDevice d
 
     const VkImageMemoryBarrier preImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         0u,                                     // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags dstAccessMask;
         oldLayout,                              // VkImageLayout oldLayout;
@@ -4973,7 +4993,7 @@ void initColorImageChessboardPattern(const DeviceInterface &vk, const VkDevice d
 
     const VkImageMemoryBarrier postImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags srcAccessMask;
         VK_ACCESS_SHADER_WRITE_BIT,             // VkAccessFlags dstAccessMask;
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // VkImageLayout oldLayout;
@@ -4990,13 +5010,13 @@ void initColorImageChessboardPattern(const DeviceInterface &vk, const VkDevice d
 
     const VkBufferCreateInfo bufferParams = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType        sType
-        DE_NULL,                              // const void*            pNext
+        nullptr,                              // const void*            pNext
         0u,                                   // VkBufferCreateFlags    flags
         (VkDeviceSize)bufferSize,             // VkDeviceSize            size
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,     // VkBufferUsageFlags    usage
         VK_SHARING_MODE_EXCLUSIVE,            // VkSharingMode        sharingMode
         0u,                                   // uint32_t                queueFamilyIndexCount
-        DE_NULL                               // const uint32_t*        pQueueFamilyIndices
+        nullptr                               // const uint32_t*        pQueueFamilyIndices
     };
 
     for (uint32_t bufferIdx = 0; bufferIdx < 2; bufferIdx++)
@@ -5019,8 +5039,7 @@ void initColorImageChessboardPattern(const DeviceInterface &vk, const VkDevice d
 
     beginCommandBuffer(vk, *cmdBuffer);
     vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0,
-                          0, (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &preImageBarrier);
+                          0, nullptr, 0, nullptr, 1, &preImageBarrier);
 
     for (uint32_t bufferIdx = 0; bufferIdx < 2; bufferIdx++)
     {
@@ -5031,9 +5050,8 @@ void initColorImageChessboardPattern(const DeviceInterface &vk, const VkDevice d
                                 (uint32_t)copyRegions.size(), copyRegions.data());
     }
 
-    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0,
-                          (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &postImageBarrier);
+    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0, nullptr,
+                          0, nullptr, 1, &postImageBarrier);
 
     endCommandBuffer(vk, *cmdBuffer);
 
@@ -5047,7 +5065,7 @@ void copyDepthStencilImageToBuffers(const DeviceInterface &vk, VkCommandBuffer c
     const VkImageAspectFlags aspect         = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
     const VkImageMemoryBarrier imageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,                 // VkStructureType sType;
-        DE_NULL,                                                // const void* pNext;
+        nullptr,                                                // const void* pNext;
         srcAccessMask,                                          // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_READ_BIT,                            // VkAccessFlags dstAccessMask;
         oldLayout,                                              // VkImageLayout oldLayout;
@@ -5059,7 +5077,7 @@ void copyDepthStencilImageToBuffers(const DeviceInterface &vk, VkCommandBuffer c
     };
 
     vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 0u,
-                          DE_NULL, 0u, DE_NULL, 1u, &imageBarrier);
+                          nullptr, 0u, nullptr, 1u, &imageBarrier);
 
     const VkImageSubresourceLayers subresourceDepth = {
         VK_IMAGE_ASPECT_DEPTH_BIT, // VkImageAspectFlags aspectMask;
@@ -5099,7 +5117,7 @@ void copyDepthStencilImageToBuffers(const DeviceInterface &vk, VkCommandBuffer c
     const VkBufferMemoryBarrier bufferBarriers[] = {
         {
             VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, // VkStructureType sType;
-            DE_NULL,                                 // const void* pNext;
+            nullptr,                                 // const void* pNext;
             VK_ACCESS_TRANSFER_WRITE_BIT,            // VkAccessFlags srcAccessMask;
             VK_ACCESS_HOST_READ_BIT,                 // VkAccessFlags dstAccessMask;
             VK_QUEUE_FAMILY_IGNORED,                 // uint32_t srcQueueFamilyIndex;
@@ -5110,7 +5128,7 @@ void copyDepthStencilImageToBuffers(const DeviceInterface &vk, VkCommandBuffer c
         },
         {
             VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER, // VkStructureType sType;
-            DE_NULL,                                 // const void* pNext;
+            nullptr,                                 // const void* pNext;
             VK_ACCESS_TRANSFER_WRITE_BIT,            // VkAccessFlags srcAccessMask;
             VK_ACCESS_HOST_READ_BIT,                 // VkAccessFlags dstAccessMask;
             VK_QUEUE_FAMILY_IGNORED,                 // uint32_t srcQueueFamilyIndex;
@@ -5120,8 +5138,8 @@ void copyDepthStencilImageToBuffers(const DeviceInterface &vk, VkCommandBuffer c
             VK_WHOLE_SIZE                            // VkDeviceSize size;
         }};
 
-    vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 0u, DE_NULL, 2u,
-                          bufferBarriers, 0u, DE_NULL);
+    vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_HOST_BIT, 0u, 0u, nullptr, 2u,
+                          bufferBarriers, 0u, nullptr);
 }
 
 void clearDepthStencilImage(const DeviceInterface &vk, const VkDevice device, const VkQueue queue,
@@ -5145,7 +5163,7 @@ void clearDepthStencilImage(const DeviceInterface &vk, const VkDevice device, co
 
     const VkImageMemoryBarrier preImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         0u,                                     // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags dstAccessMask;
         oldLayout,                              // VkImageLayout oldLayout;
@@ -5158,7 +5176,7 @@ void clearDepthStencilImage(const DeviceInterface &vk, const VkDevice device, co
 
     const VkImageMemoryBarrier postImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags srcAccessMask;
         dstAccessFlags,                         // VkAccessFlags dstAccessMask;
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // VkImageLayout oldLayout;
@@ -5171,13 +5189,11 @@ void clearDepthStencilImage(const DeviceInterface &vk, const VkDevice device, co
 
     beginCommandBuffer(vk, *cmdBuffer);
     vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0,
-                          0, (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &preImageBarrier);
+                          0, nullptr, 0, nullptr, 1, &preImageBarrier);
     vk.cmdClearDepthStencilImage(*cmdBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &clearValue, 1,
                                  &subresourceRange);
-    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0,
-                          (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &postImageBarrier);
+    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0, nullptr,
+                          0, nullptr, 1, &postImageBarrier);
     endCommandBuffer(vk, *cmdBuffer);
 
     submitCommandsAndWait(vk, device, queue, *cmdBuffer);
@@ -5209,7 +5225,7 @@ void initDepthStencilImageChessboardPattern(const DeviceInterface &vk, const VkD
 
     const VkImageMemoryBarrier preImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         0u,                                     // VkAccessFlags srcAccessMask;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags dstAccessMask;
         oldLayout,                              // VkImageLayout oldLayout;
@@ -5222,7 +5238,7 @@ void initDepthStencilImageChessboardPattern(const DeviceInterface &vk, const VkD
 
     const VkImageMemoryBarrier postImageBarrier = {
         VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
-        DE_NULL,                                // const void* pNext;
+        nullptr,                                // const void* pNext;
         VK_ACCESS_TRANSFER_WRITE_BIT,           // VkAccessFlags srcAccessMask;
         VK_ACCESS_SHADER_WRITE_BIT,             // VkAccessFlags dstAccessMask;
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,   // VkImageLayout oldLayout;
@@ -5241,24 +5257,24 @@ void initDepthStencilImageChessboardPattern(const DeviceInterface &vk, const VkD
 
     const VkBufferCreateInfo depthBufferParams = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType        sType
-        DE_NULL,                              // const void*            pNext
+        nullptr,                              // const void*            pNext
         0u,                                   // VkBufferCreateFlags    flags
         (VkDeviceSize)depthBufferSize,        // VkDeviceSize            size
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,     // VkBufferUsageFlags    usage
         VK_SHARING_MODE_EXCLUSIVE,            // VkSharingMode        sharingMode
         0u,                                   // uint32_t                queueFamilyIndexCount
-        DE_NULL                               // const uint32_t*        pQueueFamilyIndices
+        nullptr                               // const uint32_t*        pQueueFamilyIndices
     };
 
     const VkBufferCreateInfo stencilBufferParams = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType        sType
-        DE_NULL,                              // const void*            pNext
+        nullptr,                              // const void*            pNext
         0u,                                   // VkBufferCreateFlags    flags
         (VkDeviceSize)stencilBufferSize,      // VkDeviceSize            size
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT,     // VkBufferUsageFlags    usage
         VK_SHARING_MODE_EXCLUSIVE,            // VkSharingMode        sharingMode
         0u,                                   // uint32_t                queueFamilyIndexCount
-        DE_NULL                               // const uint32_t*        pQueueFamilyIndices
+        nullptr                               // const uint32_t*        pQueueFamilyIndices
     };
 
     for (uint32_t bufferIdx = 0; bufferIdx < 2; bufferIdx++)
@@ -5300,8 +5316,7 @@ void initDepthStencilImageChessboardPattern(const DeviceInterface &vk, const VkD
 
     beginCommandBuffer(vk, *cmdBuffer);
     vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, (VkDependencyFlags)0,
-                          0, (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &preImageBarrier);
+                          0, nullptr, 0, nullptr, 1, &preImageBarrier);
 
     for (uint32_t bufferIdx = 0; bufferIdx < 2; bufferIdx++)
     {
@@ -5316,9 +5331,8 @@ void initDepthStencilImageChessboardPattern(const DeviceInterface &vk, const VkD
                                 (uint32_t)copyRegionsStencil.size(), copyRegionsStencil.data());
     }
 
-    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0,
-                          (const VkMemoryBarrier *)DE_NULL, 0, (const VkBufferMemoryBarrier *)DE_NULL, 1,
-                          &postImageBarrier);
+    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, dstStageFlags, (VkDependencyFlags)0, 0, nullptr,
+                          0, nullptr, 1, &postImageBarrier);
 
     endCommandBuffer(vk, *cmdBuffer);
 
@@ -5400,32 +5414,32 @@ ImageWithBuffer::ImageWithBuffer(const DeviceInterface &vkd, const VkDevice devi
     size = verificationBufferSize;
 }
 
-VkImage ImageWithBuffer::getImage()
+VkImage ImageWithBuffer::getImage() const
 {
     return (*image).get();
 }
 
-VkImageView ImageWithBuffer::getImageView()
+VkImageView ImageWithBuffer::getImageView() const
 {
     return imageView.get();
 }
 
-VkBuffer ImageWithBuffer::getBuffer()
+VkBuffer ImageWithBuffer::getBuffer() const
 {
     return (*buffer).get();
 }
 
-VkDeviceSize ImageWithBuffer::getBufferSize()
+VkDeviceSize ImageWithBuffer::getBufferSize() const
 {
     return size;
 }
 
-Allocation &ImageWithBuffer::getImageAllocation()
+Allocation &ImageWithBuffer::getImageAllocation() const
 {
     return (*image).getAllocation();
 }
 
-Allocation &ImageWithBuffer::getBufferAllocation()
+Allocation &ImageWithBuffer::getBufferAllocation() const
 {
     return (*buffer).getAllocation();
 }
@@ -5448,7 +5462,7 @@ void allocateAndBindSparseImage(const DeviceInterface &vk, VkDevice device, cons
     if (!checkSparseImageFormatSupport(physicalDevice, instance, imageCreateInfo))
         TCU_THROW(NotSupportedError, "The image format does not support sparse operations.");
 
-    vk.getImageSparseMemoryRequirements(device, destImage, &sparseMemoryReqCount, DE_NULL);
+    vk.getImageSparseMemoryRequirements(device, destImage, &sparseMemoryReqCount, nullptr);
 
     DE_ASSERT(sparseMemoryReqCount != 0);
 
@@ -5637,15 +5651,15 @@ void allocateAndBindSparseImage(const DeviceInterface &vk, VkDevice device, cons
 
     VkBindSparseInfo bindSparseInfo = {
         VK_STRUCTURE_TYPE_BIND_SPARSE_INFO, //VkStructureType sType;
-        DE_NULL,                            //const void* pNext;
+        nullptr,                            //const void* pNext;
         0u,                                 //uint32_t waitSemaphoreCount;
-        DE_NULL,                            //const VkSemaphore* pWaitSemaphores;
+        nullptr,                            //const VkSemaphore* pWaitSemaphores;
         0u,                                 //uint32_t bufferBindCount;
-        DE_NULL,                            //const VkSparseBufferMemoryBindInfo* pBufferBinds;
+        nullptr,                            //const VkSparseBufferMemoryBindInfo* pBufferBinds;
         0u,                                 //uint32_t imageOpaqueBindCount;
-        DE_NULL,                            //const VkSparseImageOpaqueMemoryBindInfo* pImageOpaqueBinds;
+        nullptr,                            //const VkSparseImageOpaqueMemoryBindInfo* pImageOpaqueBinds;
         0u,                                 //uint32_t imageBindCount;
-        DE_NULL,                            //const VkSparseImageMemoryBindInfo* pImageBinds;
+        nullptr,                            //const VkSparseImageMemoryBindInfo* pImageBinds;
         1u,                                 //uint32_t signalSemaphoreCount;
         &signalSemaphore                    //const VkSemaphore* pSignalSemaphores;
     };
@@ -5673,7 +5687,7 @@ void allocateAndBindSparseImage(const DeviceInterface &vk, VkDevice device, cons
         bindSparseInfo.pImageOpaqueBinds    = &imageMipTailBindInfo;
     }
 
-    VK_CHECK(vk.queueBindSparse(queue, 1u, &bindSparseInfo, DE_NULL));
+    VK_CHECK(vk.queueBindSparse(queue, 1u, &bindSparseInfo, VK_NULL_HANDLE));
 }
 
 bool checkSparseImageFormatSupport(const VkPhysicalDevice physicalDevice, const InstanceInterface &instance,

@@ -270,7 +270,7 @@ float fuzzyCompare(const FuzzyCompareParams &params, const ConstPixelBufferAcces
     DE_ASSERT(errorMask.getWidth() == ref.getWidth() && errorMask.getHeight() == ref.getHeight());
 
     if (!isFormatSupported(ref.getFormat()) || !isFormatSupported(cmp.getFormat()))
-        throw InternalError("Unsupported format in fuzzy comparison", DE_NULL, __FILE__, __LINE__);
+        throw InternalError("Unsupported format in fuzzy comparison", nullptr, __FILE__, __LINE__);
 
     int width  = ref.getWidth();
     int height = ref.getHeight();
@@ -312,6 +312,7 @@ float fuzzyCompare(const FuzzyCompareParams &params, const ConstPixelBufferAcces
 
     int numSamples    = 0;
     uint64_t distSum4 = 0ull;
+    uint32_t distMax2 = 0u;
 
     // Clear error mask to green.
     clear(errorMask, Vec4(0.0f, 1.0f, 0.0f, 1.0f));
@@ -331,6 +332,7 @@ float fuzzyCompare(const FuzzyCompareParams &params, const ConstPixelBufferAcces
             const uint64_t newSum4  = distSum4 + minDist2 * minDist2;
 
             distSum4 = (newSum4 >= distSum4) ? newSum4 : ~0ull; // In case of overflow
+            distMax2 = de::max(distMax2, minDist2);
             numSamples += 1;
 
             // Build error image.
@@ -347,6 +349,11 @@ float fuzzyCompare(const FuzzyCompareParams &params, const ConstPixelBufferAcces
         }
     }
 
+    if (params.returnMaxError)
+    {
+        return sqrtf(float(distMax2)) / 255.0f;
+    }
+    else
     {
         // Scale error sum based on number of samples taken
         const double pSamples    = double((width - 2) * (height - 2)) / double(numSamples);
