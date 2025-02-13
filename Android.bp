@@ -133,6 +133,10 @@ cc_defaults {
             ],
         },
     },
+    ldflags: [
+        // b/358374878 workaround suspected 32b linker bug
+        "-Wl,-icf=none",
+    ],
 }
 
 cc_library_shared {
