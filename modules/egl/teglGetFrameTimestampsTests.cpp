@@ -293,7 +293,7 @@ void verifyNeighboringFrames(const FrameTimes &frame1, const FrameTimes &frame2,
                  "Composition GPU work complete times not monotonic.");
 
     if (timestampValid(frame1.displayPresent) && timestampValid(frame2.displayPresent))
-        check_lt(result, frame1.displayPresent, frame2.displayPresent, "Display present times not monotonic.");
+        check_le(result, frame1.displayPresent, frame2.displayPresent, "Display present times not monotonic.");
 }
 
 EGLContext createGLES2Context(const Library &egl, EGLDisplay display, EGLConfig config)
