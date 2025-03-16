@@ -1911,6 +1911,7 @@ public class DeqpTestRunner
         CLog.d("    2022-03-01 -> 132514561");
         CLog.d("    2023-03-01 -> 132580097");
         CLog.d("    2024-03-01 -> 132645633");
+	CLog.d("    2025-03-01 -> 132711169");
 
         CLog.d("Minimum level required to run this caselist is %d",
                minimumLevel);
