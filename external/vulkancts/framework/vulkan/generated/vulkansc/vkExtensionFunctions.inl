@@ -304,8 +304,10 @@ void getInstanceExtensionFunctions (uint32_t apiVersion, ::std::string extName, 
 	DE_FATAL("Extension name not found");
 }
 
-void getDeviceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)
+void getDeviceExtensionFunctions (uint32_t apiVersion, const std::vector<std::string>& vIEP, const std::vector<std::string>& vDEP, ::std::string extName, ::std::vector<const char*>& functions)
 {
+(void) vIEP;
+(void) vDEP;
 	if (extName == "VK_KHR_surface")
 	{
 		return;

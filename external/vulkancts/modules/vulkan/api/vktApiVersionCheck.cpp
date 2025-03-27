@@ -138,6 +138,7 @@ public:
     virtual tcu::TestStatus iterate(void)
     {
         tcu::TestLog &log            = m_context.getTestContext().getLog();
+        const uint32_t instanceApiVersion = m_context.getAvailableInstanceVersion();
         const uint32_t apiVersion    = m_context.getUsedApiVersion();
         const vk::Platform &platform = m_context.getTestContext().getPlatform().getVulkanPlatform();
 #ifdef DE_PLATFORM_USE_LIBRARY_TYPE
@@ -233,10 +234,11 @@ public:
 
         // Tests with instance and device with extensions
         {
-            CustomInstance instance = createCustomInstanceWithExtensions(
-                m_context, getSupportedInstanceExtensions(apiVersion), DE_NULL, false);
-            Move<VkDevice> device =
-                createTestDevice(m_context, instance, getSupportedDeviceExtensions(apiVersion), false);
+            const vector<string> supportedInstanceExtensions = getSupportedInstanceExtensions(instanceApiVersion);
+            CustomInstance instance =
+                createCustomInstanceWithExtensions(m_context, supportedInstanceExtensions, DE_NULL, false);
+            const vector<string> supportedDeviceExtensions = getSupportedDeviceExtensions(apiVersion);
+            Move<VkDevice> device = createTestDevice(m_context, instance, supportedDeviceExtensions, false);
             GetInstanceProcAddrFunc getInstanceProcAddr =
                 reinterpret_cast<GetInstanceProcAddrFunc>(funcLibrary.getFunction("vkGetInstanceProcAddr"));
             GetDeviceProcAddrFunc getDeviceProcAddr =
@@ -256,10 +258,10 @@ public:
 
                     if (isSupportedInstanceExt(instanceExtensionNames[instanceExtNdx], apiVersion))
                     {
-                        getInstanceExtensionFunctions(apiVersion, instanceExtensionNames[instanceExtNdx],
+                        getInstanceExtensionFunctions(instanceApiVersion, instanceExtensionNames[instanceExtNdx],
                                                       instanceExtFunctions);
-                        getDeviceExtensionFunctions(apiVersion, instanceExtensionNames[instanceExtNdx],
-                                                    deviceExtFunctions);
+                        getDeviceExtensionFunctions(apiVersion, supportedInstanceExtensions, supportedDeviceExtensions,
+                                                    instanceExtensionNames[instanceExtNdx], deviceExtFunctions);
                     }
 
                     for (size_t instanceFuncNdx = 0; instanceFuncNdx < instanceExtFunctions.size(); instanceFuncNdx++)
@@ -276,7 +278,8 @@ public:
                     vector<const char *> deviceExtFunctions;
 
                     if (isSupportedDeviceExt(deviceExtensionNames[deviceExtNdx], apiVersion))
-                        getDeviceExtensionFunctions(apiVersion, deviceExtensionNames[deviceExtNdx], deviceExtFunctions);
+                        getDeviceExtensionFunctions(apiVersion, supportedInstanceExtensions, supportedDeviceExtensions,
+                                                    deviceExtensionNames[deviceExtNdx], deviceExtFunctions);
 
                     for (size_t deviceFuncNdx = 0; deviceFuncNdx < deviceExtFunctions.size(); deviceFuncNdx++)
                         extFunctions.push_back(FunctionInfo(deviceExtFunctions[deviceFuncNdx], FUNCTIONORIGIN_DEVICE));

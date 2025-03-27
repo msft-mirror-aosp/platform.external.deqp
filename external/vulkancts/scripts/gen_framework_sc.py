@@ -1884,8 +1884,10 @@ def writeExtensionFunctions (api, filename):
             yield 'void getInstanceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)\n{'
             dg_list = ["vkGetPhysicalDevicePresentRectanglesKHR"]
         elif functionType == Function.TYPE_DEVICE:
-            yield 'void getDeviceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)\n{'
+            yield 'void getDeviceExtensionFunctions (uint32_t apiVersion, const std::vector<std::string>& vIEP, const std::vector<std::string>& vDEP, ::std::string extName, ::std::vector<const char*>& functions)\n{'
             dg_list = ["vkGetDeviceGroupPresentCapabilitiesKHR", "vkGetDeviceGroupSurfacePresentModesKHR", "vkAcquireNextImage2KHR"]
+            yield '(void) vIEP;'
+            yield '(void) vDEP;'
         for ext in api.extensions:
             funcNames = []
             if ext.name:
