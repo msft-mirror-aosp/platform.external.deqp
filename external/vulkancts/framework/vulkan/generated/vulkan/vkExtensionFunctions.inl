@@ -4,6 +4,26 @@
  */
 
 
+bool checkVersion(uint32_t major, uint32_t minor, const uint32_t testedApiVersion)
+{
+    uint32_t testedMajor = VK_API_VERSION_MAJOR(testedApiVersion);
+    uint32_t testedMinor = VK_API_VERSION_MINOR(testedApiVersion);
+    // return true when tested api version is greater
+    // or equal to version represented by two uints
+    if (major == testedMajor)
+        return minor <= testedMinor;
+    return major < testedMajor;
+}
+
+bool extensionIsSupported(const std::vector<std::string>& extNames, const std::string& ext)
+{
+    for (const std::string & supportedExtension : extNames)
+    {
+        if (supportedExtension == ext) return true;
+    }
+    return false;
+}
+
 void getInstanceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)
 {
 	if (extName == "VK_KHR_surface")
@@ -1354,8 +1374,10 @@ void getInstanceExtensionFunctions (uint32_t apiVersion, ::std::string extName, 
 	DE_FATAL("Extension name not found");
 }
 
-void getDeviceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)
+void getDeviceExtensionFunctions (uint32_t apiVersion, const ::std::vector<::std::string> &vIEP, const ::std::vector<::std::string>& vDEP, ::std::string extName, ::std::vector<const char*>& functions)
 {
+(void) vIEP;
+(void) vDEP;
 	if (extName == "VK_KHR_surface")
 	{
 		return;
@@ -2785,7 +2807,8 @@ void getDeviceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::
 	}
 	if (extName == "VK_EXT_extended_dynamic_state3")
 	{
-		functions.push_back("vkCmdSetTessellationDomainOriginEXT");
+		if(checkVersion(1, 1, apiVersion) || extensionIsSupported(vDEP, "VK_KHR_maintenance2"))
+			functions.push_back("vkCmdSetTessellationDomainOriginEXT");
 		functions.push_back("vkCmdSetDepthClampEnableEXT");
 		functions.push_back("vkCmdSetPolygonModeEXT");
 		functions.push_back("vkCmdSetRasterizationSamplesEXT");
@@ -2796,16 +2819,26 @@ void getDeviceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::
 		functions.push_back("vkCmdSetColorBlendEnableEXT");
 		functions.push_back("vkCmdSetColorBlendEquationEXT");
 		functions.push_back("vkCmdSetColorWriteMaskEXT");
-		functions.push_back("vkCmdSetRasterizationStreamEXT");
-		functions.push_back("vkCmdSetConservativeRasterizationModeEXT");
-		functions.push_back("vkCmdSetExtraPrimitiveOverestimationSizeEXT");
-		functions.push_back("vkCmdSetDepthClipEnableEXT");
-		functions.push_back("vkCmdSetSampleLocationsEnableEXT");
-		functions.push_back("vkCmdSetColorBlendAdvancedEXT");
-		functions.push_back("vkCmdSetProvokingVertexModeEXT");
-		functions.push_back("vkCmdSetLineRasterizationModeEXT");
-		functions.push_back("vkCmdSetLineStippleEnableEXT");
-		functions.push_back("vkCmdSetDepthClipNegativeOneToOneEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_transform_feedback"))
+			functions.push_back("vkCmdSetRasterizationStreamEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_conservative_rasterization"))
+			functions.push_back("vkCmdSetConservativeRasterizationModeEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_conservative_rasterization"))
+			functions.push_back("vkCmdSetExtraPrimitiveOverestimationSizeEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_depth_clip_enable"))
+			functions.push_back("vkCmdSetDepthClipEnableEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_sample_locations"))
+			functions.push_back("vkCmdSetSampleLocationsEnableEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_blend_operation_advanced"))
+			functions.push_back("vkCmdSetColorBlendAdvancedEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_provoking_vertex"))
+			functions.push_back("vkCmdSetProvokingVertexModeEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_line_rasterization"))
+			functions.push_back("vkCmdSetLineRasterizationModeEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_line_rasterization"))
+			functions.push_back("vkCmdSetLineStippleEnableEXT");
+		if(extensionIsSupported(vDEP, "VK_EXT_depth_clip_control"))
+			functions.push_back("vkCmdSetDepthClipNegativeOneToOneEXT");
 		return;
 	}
 	if (extName == "VK_EXT_subpass_merge_feedback")

@@ -1835,6 +1835,29 @@ def writeSupportedExtensions(apiName, api, filename):
 
 def writeExtensionFunctions (api, filename):
 
+    def writeHelperFunctions ():
+        # helpers for backported extension dependency check
+        yield 'bool checkVersion(uint32_t major, uint32_t minor, const uint32_t testedApiVersion)'
+        yield '{'
+        yield '    uint32_t testedMajor = VK_API_VERSION_MAJOR(testedApiVersion);'
+        yield '    uint32_t testedMinor = VK_API_VERSION_MINOR(testedApiVersion);'
+        yield '    // return true when tested api version is greater'
+        yield '    // or equal to version represented by two uints'
+        yield '    if (major == testedMajor)'
+        yield '        return minor <= testedMinor;'
+        yield '    return major < testedMajor;'
+        yield '}'
+        yield ''
+        yield 'bool extensionIsSupported(const std::vector<std::string>& extNames, const std::string& ext)'
+        yield '{'
+        yield '    for (const std::string & supportedExtension : extNames)'
+        yield '    {'
+        yield '        if (supportedExtension == ext) return true;'
+        yield '    }'
+        yield '    return false;'
+        yield '}'
+        yield ''
+
     def writeExtensionNameArrays ():
         instanceExtensionNames = [f"\t\"{ext.name}\"," for ext in api.extensions if ext.type == "instance"]
         deviceExtensionNames = [f"\t\"{ext.name}\"," for ext in api.extensions if ext.type == "device"]
@@ -1850,11 +1873,34 @@ def writeExtensionFunctions (api, filename):
     def writeExtensionFunctions (functionType):
         isFirstWrite = True
         dg_list = []    # Device groups functions need special casing, as Vulkan 1.0 keeps them in VK_KHR_device_groups whereas 1.1 moved them into VK_KHR_swapchain
+        # proper dependency data not available in this version, include it here instead
+        extra_dependencies = {
+            "vkCmdSetTessellationDomainOriginEXT": ["VK_VERSION_1_1", "VK_KHR_maintenance2"],
+            "vkCmdSetRasterizationStreamEXT": ["VK_EXT_transform_feedback"],
+            "vkCmdSetConservativeRasterizationModeEXT": ["VK_EXT_conservative_rasterization"],
+            "vkCmdSetExtraPrimitiveOverestimationSizeEXT": ["VK_EXT_conservative_rasterization"],
+            "vkCmdSetDepthClipEnableEXT": ["VK_EXT_depth_clip_enable"],
+            "vkCmdSetSampleLocationsEnableEXT": ["VK_EXT_sample_locations"],
+            "vkCmdSetColorBlendAdvancedEXT": ["VK_EXT_blend_operation_advanced"],
+            "vkCmdSetProvokingVertexModeEXT": ["VK_EXT_provoking_vertex"],
+            "vkCmdSetLineRasterizationModeEXT": ["VK_EXT_line_rasterization"],
+            "vkCmdSetLineStippleEnableEXT": ["VK_EXT_line_rasterization"],
+            "vkCmdSetDepthClipNegativeOneToOneEXT": ["VK_EXT_depth_clip_control"],
+        }
+
+        def makeExtensionCheck(name):
+            if (name == "VK_VERSION_1_1"):
+                return "checkVersion(1, 1, apiVersion)"
+            else:
+                return "extensionIsSupported(vDEP, \"%s\")" % name
+
         if functionType == Function.TYPE_INSTANCE:
             yield 'void getInstanceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)\n{'
             dg_list = ["vkGetPhysicalDevicePresentRectanglesKHR"]
         elif functionType == Function.TYPE_DEVICE:
-            yield 'void getDeviceExtensionFunctions (uint32_t apiVersion, ::std::string extName, ::std::vector<const char*>& functions)\n{'
+            yield 'void getDeviceExtensionFunctions (uint32_t apiVersion, const ::std::vector<::std::string> &vIEP, const ::std::vector<::std::string>& vDEP, ::std::string extName, ::std::vector<const char*>& functions)\n{'
+            yield '(void) vIEP;'
+            yield '(void) vDEP;'
             dg_list = ["vkGetDeviceGroupPresentCapabilitiesKHR", "vkGetDeviceGroupSurfacePresentModesKHR", "vkAcquireNextImage2KHR"]
         for ext in api.extensions:
             funcNames = []
@@ -1884,7 +1930,10 @@ def writeExtensionFunctions (api, filename):
                 yield '\tif (extName == "%s")' % ext.name
                 yield '\t{'
                 for funcName in funcNames:
-                    if funcName in dg_list:
+                    if funcName in extra_dependencies:
+                        yield '\t\tif(%s)' % ' || '.join(makeExtensionCheck(x) for x in extra_dependencies[funcName])
+                        yield '\t\t\tfunctions.push_back("%s");' % funcName
+                    elif funcName in dg_list:
                         yield '\t\tif(apiVersion >= VK_API_VERSION_1_1) functions.push_back("%s");' % funcName
                     else:
                         yield '\t\tfunctions.push_back("%s");' % funcName
@@ -1899,6 +1948,9 @@ def writeExtensionFunctions (api, filename):
             yield '}'
 
     lines = ['']
+    for line in writeHelperFunctions():
+        lines += [line]
+
     for line in writeExtensionFunctions(Function.TYPE_INSTANCE):
         lines += [line]
     lines += ['']
