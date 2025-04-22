@@ -86,21 +86,21 @@ public class KhronosCTSInstrumentation extends Instrumentation{
         {
             KhronosCTSLog.d(LOG_TAG, "onStart");
             String fileToParse = "";
-            if (m_testName.equals("org.khronos.gl_cts/org.khronos.cts.ES32GetTestParamActivity"))
-            {
-                if (m_testParamFileName.isEmpty())
-                {
-                    throw new Exception ("activity org.khronos.cts.ES32GetTestParamActivity requires khronosCTSTestParamFileName arg");
-                }
-                fileToParse = m_testParamFileName;
-            }
-            else
+            if (m_testName.equals("org.khronos.gl_cts/android.app.NativeActivity"))
             {
                 if (m_logFileName.isEmpty())
                 {
                     throw new Exception ("activity android.app.NativeActivity requires khronosCTSLogFileName arg");
                 }
                 fileToParse = m_logFileName;
+            }
+            else
+            {
+                if (m_testParamFileName.isEmpty())
+                {
+                    throw new Exception ("activity " + m_testName + " requires khronosCTSTestParamFileName arg");
+                }
+                fileToParse = m_testParamFileName;
             }
             final File logFile = new File(fileToParse);
             if (logFile.exists())
