@@ -18,6 +18,7 @@ package org.khronos.cts.runner;
 import com.android.ddmlib.MultiLineReceiver;
 import com.drawelements.deqp.runner.DeqpTestRunner;
 import com.drawelements.deqp.runner.BatchRunConfiguration;
+import com.android.tradefed.config.Option;
 import com.android.tradefed.config.OptionClass;
 import com.android.tradefed.result.ITestInvocationListener;
 import com.android.tradefed.device.DeviceNotAvailableException;
@@ -56,6 +57,27 @@ public class KhronosCTSRunner extends DeqpTestRunner {
     private static final String KHRONOS_CTS_ONDEVICE_PKG = "org.khronos.gl_cts";
 
     private static final String TEST_ID_NAME = "KhronosGLCTS";
+
+    private static enum OpenGLESConformanceVersion {
+        ES2_0,
+        ES3_0,
+        ES3_1,
+        ES3_2,
+    }
+
+    private static final Map<String, OpenGLESConformanceVersion> sOpenGLESVersionMap = new HashMap<> ();
+    static {
+        sOpenGLESVersionMap.put("ES20", OpenGLESConformanceVersion.ES2_0);
+        sOpenGLESVersionMap.put("ES30", OpenGLESConformanceVersion.ES3_0);
+        sOpenGLESVersionMap.put("ES31", OpenGLESConformanceVersion.ES3_1);
+        sOpenGLESVersionMap.put("ES32", OpenGLESConformanceVersion.ES3_2);
+    }
+
+    @Option(
+        name = "gles-version",
+        description =
+            "OpenGL ES Conformance Version")
+    private String mOpenGLESConformanceVersion = "ES32";
 
     @Nullable
     private Map<TestDescription, Set<KhronosCTSBatchRunConfiguration>> mTestInstances = null;
@@ -713,7 +735,7 @@ public class KhronosCTSRunner extends DeqpTestRunner {
     }
 
     /**
-    * Run Android activity org.khronos.cts.ES32GetTestParamActivity through instrumentation process
+    * Run Android activity org.khronos.cts.ES*GetTestParamActivity through instrumentation process
     */
     private void runGetTestsParamsActivity() throws DeviceNotAvailableException {
         if (mTestRunParams != null) throw new AssertionError("Re-load of test run params not supported");
@@ -721,8 +743,28 @@ public class KhronosCTSRunner extends DeqpTestRunner {
         checkInterrupted(); // throws if interrupted
         final String instrumentationName =
             "org.khronos.gl_cts/org.khronos.cts.testercore.KhronosCTSInstrumentation";
-        final String getTestsParamsActivity =
-            "org.khronos.gl_cts/org.khronos.cts.ES32GetTestParamActivity";
+        String getTestsParamsActivity = null;
+        CLog.i("mOpenGLESConformanceVersion is %s", mOpenGLESConformanceVersion);
+        OpenGLESConformanceVersion glesConformanceVersion = sOpenGLESVersionMap.get(mOpenGLESConformanceVersion);
+        assert(glesConformanceVersion!=null);
+        switch (glesConformanceVersion) {
+            case OpenGLESConformanceVersion.ES2_0:
+                getTestsParamsActivity = "org.khronos.gl_cts/org.khronos.cts.ES20GetTestParamActivity";
+                break;
+            case OpenGLESConformanceVersion.ES3_0:
+                getTestsParamsActivity = "org.khronos.gl_cts/org.khronos.cts.ES30GetTestParamActivity";
+                break;
+            case OpenGLESConformanceVersion.ES3_1:
+                getTestsParamsActivity = "org.khronos.gl_cts/org.khronos.cts.ES31GetTestParamActivity";
+                break;
+            case OpenGLESConformanceVersion.ES3_2:
+                getTestsParamsActivity = "org.khronos.gl_cts/org.khronos.cts.ES32GetTestParamActivity";
+                break;
+            default:
+                CLog.i("Failed to find a valid GLES conformance version, fall back to default GLES 3.2");
+                getTestsParamsActivity = "org.khronos.gl_cts/org.khronos.cts.ES32GetTestParamActivity";
+        }
+        assert(getTestsParamsActivity!=null);
         final String testsParamsFileName =
             "/sdcard/cts-test-params.xml";
         final String command = String.format(
