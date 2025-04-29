@@ -52558,10 +52558,6 @@ dEQP-VK.api.frame_boundary.sync2.single_frame_multi_submissions
 dEQP-VK.api.frame_boundary.wsi.android
 dEQP-VK.api.frame_boundary.wsi.direct_drm
 dEQP-VK.api.frame_boundary.wsi.headless
-dEQP-VK.api.frame_boundary.wsi.wayland
-dEQP-VK.api.frame_boundary.wsi.win32
-dEQP-VK.api.frame_boundary.wsi.xcb
-dEQP-VK.api.frame_boundary.wsi.xlib
 dEQP-VK.api.get_device_proc_addr.non_enabled
 dEQP-VK.api.granularity.in_dynamic_render_pass.a1r5g5b5_unorm_pack16
 dEQP-VK.api.granularity.in_dynamic_render_pass.a2b10g10r10_sint_pack32
