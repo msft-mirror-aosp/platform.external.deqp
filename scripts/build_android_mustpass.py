@@ -364,8 +364,18 @@ MAIN_GLES31_PKG = Package(module = GLES31_MODULE, configurations = [
                       runByDefault = False),
     ])
 
+# Tests that needs to be included in the "current year" list.
+# This should be moved to the newest configuration whenever a new one is added.
+LATEST_MAIN_LIST = [
+    include("vk-main.txt"),
+]
+# There is a test list for each year and a device has to pass the combination of tests lists up to
+# that year. For example a device released in 2023 needs to pass all the tests until and including
+# the year 2023 i.e. all the tests from 2019, 2020, 2021, 2022, 2023.
+# The list of filtered tests needs to be applied retroactively to all lists, since a "bad" test may
+# be included in a previous year's test list, if the determination to skip the test was made after
+# it was already included.
 MAIN_VULKAN_FILTERS = [
-        include("vk-main.txt"),
         exclude("vk-not-applicable.txt"),
         exclude("vk-excluded-tests.txt"),
         exclude("vk-test-issues.txt"),
@@ -373,31 +383,32 @@ MAIN_VULKAN_FILTERS = [
     ]
 MAIN_VULKAN_PKG = Package(module = VULKAN_MODULE, configurations = [
         Configuration(name = "main-2019-03-01",
-                      filters = [include("vk-main-2019-03-01.txt")],
+                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2019-03-01.txt")],
                       runtime = "2h29m",
                       listOfGroupsToSplit = ["dEQP-VK"]),
         Configuration(name = "main-2020-03-01",
-                      filters = [include("vk-main-2020-03-01.txt")],
+                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2020-03-01.txt")],
                       runtime = "2h29m",
                       listOfGroupsToSplit = ["dEQP-VK"]),
         Configuration(name = "main-2021-03-01",
-                      filters = [include("vk-main-2021-03-01.txt")],
+                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2021-03-01.txt")],
                       runtime = "2h29m",
                       listOfGroupsToSplit = ["dEQP-VK"]),
         Configuration(name = "main-2022-03-01",
-                      filters = [include("vk-main-2022-03-01.txt")],
+                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2022-03-01.txt")],
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2023-03-01",
-                      filters = [include("vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt")],
+                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt")],
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2024-03-01",
-                      filters = [include("vk-main-2024-03-01.txt")],
+                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2024-03-01.txt")],
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2025-03-01",
-                      filters = MAIN_VULKAN_FILTERS + [exclude("vk-main-2019-03-01.txt", "vk-main-2020-03-01.txt", "vk-main-2021-03-01.txt", "vk-main-2022-03-01.txt", "vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt", "vk-main-2024-03-01.txt")],
+                      # Move LATEST_MAIN_LIST to the newest/latest Configuration.
+                      filters = LATEST_MAIN_LIST + MAIN_VULKAN_FILTERS + [exclude("vk-main-2019-03-01.txt", "vk-main-2020-03-01.txt", "vk-main-2021-03-01.txt", "vk-main-2022-03-01.txt", "vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt", "vk-main-2024-03-01.txt")],
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "incremental-deqp",
