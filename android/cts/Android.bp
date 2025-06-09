@@ -63,7 +63,6 @@ java_test_host {
         ":deqp_binary_data_graphicsfuzz",
         ":deqp_main_caselists",
         ":deqp_angle_exclude_caselists",
-        ":llvm-tools",
     ],
     device_common_data: [
         ":com.drawelements.deqp",
