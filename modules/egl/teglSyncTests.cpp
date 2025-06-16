@@ -124,6 +124,9 @@ public:
     virtual void deinit(void);
     bool hasRequiredEGLVersion(int requiredMajor, int requiredMinor);
     bool hasEGLFenceSyncExtension(void);
+#if (DE_OS == DE_OS_ANDROID)
+    bool hasEGLAndroidNativeFenceSyncExtension(void);
+#endif
     bool hasEGLWaitSyncExtension(void);
     EGLDisplay getEglDisplay()
     {
@@ -209,6 +212,21 @@ bool SyncTest::hasEGLFenceSyncExtension(void)
 
     return true;
 }
+
+#if (DE_OS == DE_OS_ANDROID)
+bool SyncTest::hasEGLAndroidNativeFenceSyncExtension(void)
+{
+    TestLog &log = m_testCtx.getLog();
+
+    if (!eglu::hasExtension(m_eglTestCtx.getLibrary(), m_eglDisplay, "EGL_ANDROID_native_fence_sync"))
+    {
+        log << TestLog::Message << "EGL_ANDROID_native_fence_sync not supported" << TestLog::EndMessage;
+        return false;
+    }
+
+    return true;
+}
+#endif
 
 bool SyncTest::hasEGLWaitSyncExtension(void)
 {
@@ -716,12 +734,15 @@ public:
                 "EGL_FOREVER", EGL_CONDITION_SATISFIED);
 
 #if (DE_OS == DE_OS_ANDROID)
-            m_testCtx.touchWatchdog();
+            if (hasEGLAndroidNativeFenceSyncExtension())
+            {
+                m_testCtx.touchWatchdog();
 
-            test<createSyncKHR, clientWaitSyncKHR, destroySyncKHR>(
-                m_funcNames, &Library::createSyncKHR, &Library::clientWaitSyncKHR, &Library::destroySyncKHR,
-                EGL_SYNC_NATIVE_FENCE_ANDROID, EGL_SYNC_FLUSH_COMMANDS_BIT, "EGL_SYNC_FLUSH_COMMANDS_BIT", EGL_FOREVER,
-                "EGL_FOREVER", EGL_CONDITION_SATISFIED);
+                test<createSyncKHR, clientWaitSyncKHR, destroySyncKHR>(
+                    m_funcNames, &Library::createSyncKHR, &Library::clientWaitSyncKHR, &Library::destroySyncKHR,
+                    EGL_SYNC_NATIVE_FENCE_ANDROID, EGL_SYNC_FLUSH_COMMANDS_BIT, "EGL_SYNC_FLUSH_COMMANDS_BIT", EGL_FOREVER,
+                    "EGL_FOREVER", EGL_CONDITION_SATISFIED);
+            }
 #endif
         }
         else if (!hasRequiredEGLVersion(1, 5))
