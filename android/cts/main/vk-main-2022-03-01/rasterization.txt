@@ -32,7 +32,6 @@ dEQP-VK.rasterization.primitives.no_stipple.smooth_lines_wide_factor_0
 dEQP-VK.rasterization.primitives.no_stipple.smooth_lines_wide_factor_large
 dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.all
 dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_draw
-dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_draw_barriers
 dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_instances
 dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_primitives
 dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_16.all
@@ -277,7 +276,6 @@ dEQP-VK.rasterization.rasterization_order_attachment_access.format_integer.attac
 dEQP-VK.rasterization.rasterization_order_attachment_access.format_integer.attachments_8_samples_8.multi_primitives
 dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.all
 dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.multi_draw
-dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.multi_draw_barriers
 dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.multi_instances
 dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.multi_primitives
 dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_16.all

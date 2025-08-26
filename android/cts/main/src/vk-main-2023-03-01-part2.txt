@@ -128436,3 +128436,5 @@ dEQP-VK.api.info.get_physical_device_properties2.features.create_device_with_pro
 dEQP-VK.api.info.get_physical_device_properties2.features.create_device_with_promoted13_structures
 dEQP-VK.api.info.vulkan1p2_limits_validation.robustness2
 dEQP-VK.info.instance_extension_device_functions
+dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_draw_barriers
+dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.multi_draw_barriers

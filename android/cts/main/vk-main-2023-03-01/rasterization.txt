@@ -15,3 +15,5 @@ dEQP-VK.rasterization.primitives.dynamic_stipple_and_topology.smooth_line_strip
 dEQP-VK.rasterization.primitives.dynamic_stipple_and_topology.smooth_line_strip_wide
 dEQP-VK.rasterization.primitives.dynamic_stipple_and_topology.smooth_lines
 dEQP-VK.rasterization.primitives.dynamic_stipple_and_topology.smooth_lines_wide
+dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_draw_barriers
+dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.multi_draw_barriers
