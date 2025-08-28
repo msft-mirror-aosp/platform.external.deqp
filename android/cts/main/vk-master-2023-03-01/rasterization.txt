@@ -1,3 +1,5 @@
+dEQP-VK.rasterization.rasterization_order_attachment_access.depth.samples_1.multi_draw_barriers
+dEQP-VK.rasterization.rasterization_order_attachment_access.stencil.samples_1.multi_draw_barriers
 dEQP-VK.rasterization.primitives.dynamic_stipple_and_topology.lines
 dEQP-VK.rasterization.primitives.dynamic_stipple_and_topology.line_strip
 dEQP-VK.rasterization.primitives.dynamic_stipple_and_topology.lines_wide
