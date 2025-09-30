@@ -1528,7 +1528,9 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
     , m_testParams(testParams)
 {
     m_renderSize = tcu::UVec2(
-        deFloorFloatToInt32(m_testParams.renderMultiplier * static_cast<float>(m_testParams.densityMapSize.x())),
+        de::roundDown(
+            deFloorFloatToInt32(m_testParams.renderMultiplier * static_cast<float>(m_testParams.densityMapSize.x())),
+            (int)m_testParams.viewCount),
         deFloorFloatToInt32(m_testParams.renderMultiplier * static_cast<float>(m_testParams.densityMapSize.y())));
     m_densityValue = tcu::Vec2(1.0f / static_cast<float>(m_testParams.fragmentArea.x()),
                                1.0f / static_cast<float>(m_testParams.fragmentArea.y()));
@@ -2082,8 +2084,8 @@ FragmentDensityMapTestInstance::FragmentDensityMapTestInstance(Context &context,
                 1u,                                  // const uint32_t                                    subpass
                 &multisampleStateCreateInfo, // const VkPipelineMultisampleStateCreateInfo*        multisampleStateCreateInfo
                 pNextForCopySubsampledImage, // const void*                                        pNext
-                false,  // const bool                                        useDensityMapAttachment
-                false); // const bool                                        useDepthAttachment
+                isDynamicRendering, // const bool                                        useDensityMapAttachment
+                false);             // const bool                                        useDepthAttachment
         if (m_testParams.subsampledLoads)
             m_graphicsPipelineUpdateSubsampledImage = buildGraphicsPipeline(
                 vk,                                        // const DeviceInterface&                            vk
