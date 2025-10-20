@@ -4232,7 +4232,13 @@ TestStatus runAndVerifyDefaultPipeline(Context &context, InstanceContext instanc
         0u,                      // int32_t basePipelineIndex;
     };
 
+    // Disable watchdog timeout around compilation to avoid timeouts on extremely low clocked cpus
+    context.getTestContext().touchWatchdogAndDisableIntervalTimeLimit();
+
     const Unique<VkPipeline> pipeline(createGraphicsPipeline(vk, device, VK_NULL_HANDLE, &pipelineParams));
+
+    // Re-enable watchdog timeout
+    context.getTestContext().touchWatchdogAndEnableIntervalTimeLimit();
 
     if (needInterface)
     {
