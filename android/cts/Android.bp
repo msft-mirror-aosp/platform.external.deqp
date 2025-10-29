@@ -39,6 +39,25 @@ filegroup {
     path: "angle",
 }
 
+genrule {
+    name: "llvm-strip-tools",
+    srcs: [
+        ":llvm-tools",
+    ],
+    out: [
+        "llvm_strip/bin/llvm-objcopy",
+        "llvm_strip/bin/llvm-strip",
+        "llvm_strip/lib/libc++.so.1",
+    ],
+    cmd: "mkdir -p $(genDir)/llvm_strip && " +
+         "mkdir -p $(genDir)/llvm_strip/bin && " +
+         "mkdir -p $(genDir)/llvm_strip/lib && " +
+         "cp -f prebuilts/clang/host/linux-x86/*/bin/llvm-objcopy $(genDir)/llvm_strip/bin && " +
+         "cp -f prebuilts/clang/host/linux-x86/*/bin/llvm-strip $(genDir)/llvm_strip/bin && " +
+         "cp -f prebuilts/clang/host/linux-x86/*/lib/libc++.so.1 $(genDir)/llvm_strip/lib",
+    visibility: [":__subpackages__"],
+}
+
 java_test_host {
     name: "CtsDeqpTestCases",
 
@@ -66,7 +85,7 @@ java_test_host {
         ":deqp_binary_data_graphicsfuzz",
         ":deqp_main_caselists",
         ":deqp_angle_exclude_caselists",
-        ":llvm-tools",
+        ":llvm-strip-tools",
     ],
     data_device_bins_both: [
         "deqp-binary",
