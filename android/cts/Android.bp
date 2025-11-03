@@ -60,6 +60,7 @@ java_test_host {
     // Tag this module as a cts test artifact
     test_suites: [
         "cts",
+        "dts",
         "general-tests",
         "automotive-general-tests",
     ],
