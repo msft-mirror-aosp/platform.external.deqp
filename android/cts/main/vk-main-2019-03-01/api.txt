@@ -83665,7 +83665,6 @@ dEQP-VK.api.image_clearing.dedicated_allocation.partial_clear_depth_stencil_atta
 dEQP-VK.api.image_clearing.dedicated_allocation.partial_clear_depth_stencil_attachment.single_layer.x8_d24_unorm_pack32
 dEQP-VK.api.info.android.mandatory_extensions
 dEQP-VK.api.info.android.no_layers
-dEQP-VK.api.info.android.no_unknown_extensions
 dEQP-VK.api.info.format_properties.a1r5g5b5_unorm_pack16
 dEQP-VK.api.info.format_properties.a2b10g10r10_sint_pack32
 dEQP-VK.api.info.format_properties.a2b10g10r10_snorm_pack32
