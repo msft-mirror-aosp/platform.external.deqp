@@ -279,3 +279,6 @@ dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler2d_vec4
 dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler3d_bias_fragment
 dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler3d_fragment
 dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler3d_vertex
+
+# VK-GL-CTS 4090
+dEQP-VK.shader_object.performance.*

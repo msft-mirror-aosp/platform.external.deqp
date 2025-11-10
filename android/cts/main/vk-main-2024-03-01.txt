@@ -40,7 +40,6 @@ vk-main-2024-03-01/shader-object/binding.txt
 vk-main-2024-03-01/shader-object/create.txt
 vk-main-2024-03-01/shader-object/link.txt
 vk-main-2024-03-01/shader-object/misc.txt
-vk-main-2024-03-01/shader-object/performance.txt
 vk-main-2024-03-01/shader-object/pipeline-interaction.txt
 vk-main-2024-03-01/shader-object/rendering.txt
 vk-main-2024-03-01/sparse-resources.txt
