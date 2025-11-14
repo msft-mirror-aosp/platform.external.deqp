@@ -73,6 +73,15 @@ With CMake out-of-source builds are always recommended. Create a build directory
 of your choosing, and in that directory generate Makefiles or IDE project
 using cmake.
 
+If you intend to run the Vulkan CTS video decode or encode tests, you must first
+download the required sample clips by running the two helper scripts in the
+`external/` directory:
+
+	python3 external/fetch_video_decode_samples.py
+	python3 external/fetch_video_encode_samples.py
+
+Each script will pull down the necessary video files into the CTS data tree.
+Both scripts support the `--help` flag to list all available options.
 
 ### Windows x86-32
 
@@ -126,6 +135,47 @@ To pick which ABI to use at _install time_, use the following command instead:
 
 	adb install -g --abi <ABI name> <build-root>/package/dEQP.apk
 
+
+### Note on Debug Build Link Times
+
+Some CTS binaries like `deqp-vk` and `deqp-vksc` are notably large when built
+with debug information. For example, as of the time this text is being written,
+`deqp-vk` is over 700 MiB big. As a consequence of this and the number of
+symbols, linking these binaries takes a long time on some environments. For
+example, on Linux with the BFD or Gold linkers, which are still the default in
+many distributions, linking these binaries in debug mode may take over 10
+seconds even on a relatively fast CPU, and many more if the CPU is slow.
+
+Typically on Linux, both the LLD linker from the LLVM project and the Mold
+linker are able to link these binaries much faster, in less than a second on the
+same fast CPU, using varying amounts of memory and threads.
+
+On both Ubuntu and Fedora, the LLD linker is provided by the "lld" package and
+the Mold linker is provided by the "mold" package. Once installed, there are
+several ways to use them when building CTS.
+
+#### Using lld or mold as the default system-wide linkers
+
+Under both Ubuntu and Fedora, `update-alternatives` can be used to set the
+default link for the `ld` tool and make it point to `ld.lld` or `ld.mold`
+instead of `ld.bfd` or `ld.gold`. Once set, the linker will be used by default
+when linking any binary.
+
+#### Using lld or mold only when building CTS
+
+Both GCC and Clang can be told to use a different linker with the
+`-fuse-ld=LINKER` command-line option at link time. For example, `-fuse-ld=lld`
+or `-fuse-ld=mold`. CMake will automatically pick up that option and use it when
+set in the `LDFLAGS` environment variable before configuring the project, so the
+following example should work:
+
+```
+LDFLAGS="-fuse-ld=lld ${LDFLAGS}"
+export LDFLAGS
+<cmake configuration command>
+```
+
+Note in this case the linker name is passed without the `ld.` prefix.
 
 Building Mustpass
 -----------------
@@ -275,6 +325,10 @@ There is also one option used by CTS internally and should not be used manually.
 It informs deqp-vksc application that it works as subprocess:
 
 	--deqp-subprocess=[enable|disable]
+
+For platforms where it is needed to override the default loader library path, this option can be used (e.g. loader library vulkan-1.dll):
+
+	--deqp-vk-library-path=<path>
 
 No other command line options are allowed.
 
@@ -775,8 +829,12 @@ OpenGL and OpenCL parameters not affecting Vulkan API were suppressed.
     default: '1'
 
   --deqp-log-images=[enable|disable]
-    Enable or disable logging of result images
+    When disabled, prevent any image from being logged into the test results file
     default: 'enable'
+
+  --deqp-log-all-images=[enable|disable]
+    When enabled, log all images from image comparison routines as if COMPARE_LOG_EVERYTHING was used in the code
+    default: 'disable'
 
   --deqp-log-shader-sources=[enable|disable]
     Enable or disable logging of shader sources
@@ -931,6 +989,18 @@ OpenGL and OpenCL parameters not affecting Vulkan API were suppressed.
   --deqp-pipeline-prefix=<value>
     Prefix for input pipeline compiler files (Vulkan SC only, do not use manually)
     default: ''
+
+  --deqp-vk-video-log-print=[enable|disable]
+    Print log messages of vulkan video tests to stdout
+    default: 'disable'
+
+  --deqp-vk-video-decode-dump=[disable|single|separate]
+    Dump mode for output of vulkan video decoding tests
+    default: 'disable'
+
+  --deqp-vk-video-encode-dump=[disable|yuv|bitstream|all]
+    Dump mode for output of vulkan video encoding tests
+    default: 'disable'
 
 Full list of parameters for the `vksc-server` application:
 

@@ -24,6 +24,7 @@
 #include "vktMemoryTests.hpp"
 
 #include "vktMemoryAllocationTests.hpp"
+#include "vktMemoryConcurrentAccessTests.hpp"
 #include "vktMemoryPipelineBarrierTests.hpp"
 #include "vktMemoryRequirementsTests.hpp"
 #include "vktMemoryBindingTests.hpp"
@@ -34,6 +35,7 @@
 #include "vktMemoryAddressBindingTests.hpp"
 #include "vktMemoryExternalMemoryAcquireUnmodifiedTests.hpp"
 #include "vktMemoryDeviceMemoryReportTests.hpp"
+#include "vktMemoryZeroInitializeDeviceMemoryTests.hpp"
 #endif // CTS_USES_VULKANSC
 
 namespace vkt
@@ -58,12 +60,14 @@ void createChildren(tcu::TestCaseGroup *memoryTests)
     memoryTests->addChild(createMappingTests(testCtx));
     memoryTests->addChild(createPipelineBarrierTests(testCtx));
 #endif // CTS_USES_VULKANSC
+    memoryTests->addChild(createConcurrentAccessTests(testCtx));
     memoryTests->addChild(createRequirementsTests(testCtx));
     memoryTests->addChild(createMemoryBindingTests(testCtx));
     memoryTests->addChild(createMemoryExternalMemoryHostTests(testCtx));
 #ifndef CTS_USES_VULKANSC
     memoryTests->addChild(createDeviceMemoryReportTests(testCtx));
     memoryTests->addChild(createAddressBindingReportTests(testCtx));
+    memoryTests->addChild(createClearedAllocationControlTests(testCtx));
 #endif
 }
 

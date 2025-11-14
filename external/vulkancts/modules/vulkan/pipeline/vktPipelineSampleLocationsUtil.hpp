@@ -46,7 +46,7 @@ public:
         , m_sampleLocations(gridSize.x() * gridSize.y() * numSamples)
     {
         DE_ASSERT(gridSize.x() > 0 && gridSize.y() > 0);
-        DE_ASSERT(numSamples > 1);
+        DE_ASSERT(numSamples > 0);
     }
 
     //! If grid x,y is larger than gridSize, then each coordinate is wrapped, x' = x % size_x
@@ -115,6 +115,9 @@ inline vk::VkSampleLocationsInfoEXT makeSampleLocationsInfo(const MultisamplePix
 
 //! Fill each grid pixel with a distinct samples pattern, rounding locations based on subPixelBits
 void fillSampleLocationsRandom(MultisamplePixelGrid &grid, const uint32_t subPixelBits, const uint32_t seed = 142u);
+
+//! Fill using the standard sample locations.
+void fillSampleLocationsStd(MultisamplePixelGrid &grid);
 
 } // namespace pipeline
 } // namespace vkt

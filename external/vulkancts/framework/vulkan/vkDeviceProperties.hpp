@@ -39,7 +39,6 @@ struct PropertyDesc
 {
     VkStructureType sType;
     const char *name;
-    const uint32_t specVersion;
 };
 
 // Structure containg all property blobs - this simplifies generated code
@@ -70,8 +69,7 @@ using PropertyStructWrapperCreator = PropertyStructWrapperBase *(*)(void);
 struct PropertyStructCreationData
 {
     PropertyStructWrapperCreator creatorFunction;
-    const char *name;
-    uint32_t specVersion;
+    const std::string name;
 };
 
 template <class PropertyType>
@@ -140,6 +138,8 @@ public:
     bool isDevicePropertyInitialized(VkStructureType sType) const;
 
 private:
+    static bool verifyPropertyAddCriteria(const PropertyStructCreationData &item,
+                                          const std::vector<std::string> &allDeviceExtensions);
     static void addToChainStructWrapper(void ***chainPNextPtr, PropertyStructWrapperBase *structWrapper);
 
 private:

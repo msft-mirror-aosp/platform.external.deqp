@@ -1616,7 +1616,7 @@ tcu::TestStatus ConcurrentPrimitivesGeneratedQueryTestInstance::iterate(void)
                         m_parameters.queryResultType == QUERY_RESULT_TYPE_PGQ_64_XFB_32);
     const bool xfb64                           = (m_parameters.queryResultType == QUERY_RESULT_TYPE_64_BIT ||
                         m_parameters.queryResultType == QUERY_RESULT_TYPE_PGQ_32_XFB_64);
-    const size_t pgqResultSize                 = pgq64 ? sizeof(uint64_t) : sizeof(uint32_t);
+    const size_t pgqResultSize                 = pgq64 ? sizeof(uint64_t) * 2 : sizeof(uint32_t) * 2;
     const size_t xfbResultSize                 = xfb64 ? sizeof(uint64_t) * 2 : sizeof(uint32_t) * 2;
     const size_t psResultsSize                 = sizeof(uint64_t);
     const VkQueryResultFlags pgqResultWidthBit = pgq64 ? VK_QUERY_RESULT_64_BIT : 0;
@@ -2417,6 +2417,13 @@ void ConcurrentPrimitivesGeneratedQueryTestCase::checkSupport(vkt::Context &cont
     {
         if (!context.getDeviceFeatures().pipelineStatisticsQuery)
             TCU_THROW(NotSupportedError, "pipelineStatisticsQuery not supported");
+    }
+
+    if (m_parameters.concurrentTestType == CONCURRENT_TEST_TYPE_PIPELINE_STATISTICS_3)
+    {
+        // VUID-vkCmdExecuteCommands-commandBuffer-00101
+        if (!context.getDeviceFeatures().inheritedQueries)
+            TCU_THROW(NotSupportedError, "inheritedQueries not supported");
     }
 }
 

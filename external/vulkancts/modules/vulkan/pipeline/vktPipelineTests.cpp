@@ -77,6 +77,7 @@
 #include "vktPipelineRobustnessCacheTests.hpp"
 #include "vktPipelineInputAttributeOffsetTests.hpp"
 #include "vktPipelineEmptyFSTests.hpp"
+#include "vktPipelineNoQueuesTests.hpp"
 #include "vktTestGroupUtil.hpp"
 
 namespace vkt
@@ -121,6 +122,7 @@ void createChildren(tcu::TestCaseGroup *group, PipelineConstructionType pipeline
     group->addChild(createImage2DViewOf3DTests(testCtx, pipelineConstructionType));
 #endif // CTS_USES_VULKANSC
     group->addChild(createLogicOpTests(testCtx, pipelineConstructionType));
+    group->addChild(createLogicOpInapplicableFormatsTests(testCtx, pipelineConstructionType));
 #ifndef CTS_USES_VULKANSC
     group->addChild(createPushConstantTests(testCtx, pipelineConstructionType));
     group->addChild(createPushDescriptorTests(testCtx, pipelineConstructionType));
@@ -255,6 +257,7 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
     mainGroup->addChild(shaderObjectUnlinkedBinaryGroup.release());
     mainGroup->addChild(shaderObjectLinkedSpirvGroup.release());
     mainGroup->addChild(shaderObjectLinkedBinaryGroup.release());
+    mainGroup->addChild(vkt::no_queues::createNoQueuesTests(testCtx));
 #endif
     return mainGroup.release();
 }

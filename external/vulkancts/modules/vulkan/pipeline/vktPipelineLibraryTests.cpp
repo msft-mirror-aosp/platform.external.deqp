@@ -50,14 +50,14 @@
 #include "deRandom.hpp"
 #include "deClock.h"
 
+#include <sstream>
 #include <vector>
 #include <chrono>
 #include <set>
+#include <any>
 #include <limits>
 
-namespace vkt
-{
-namespace pipeline
+namespace vkt::pipeline
 {
 namespace
 {
@@ -1347,23 +1347,98 @@ enum class MiscTestMode
     SHADER_MODULE_CREATE_INFO_RT,
     SHADER_MODULE_CREATE_INFO_RT_LIB,
     NULL_RENDERING_CREATE_INFO,
+    BAD_RENDERING_CREATE_INFO,
     COMMON_FRAG_LIBRARY,
-    VIEW_INDEX_FROM_DEVICE_INDEX_IN_ALL_STAGES,
-    VIEW_INDEX_FROM_DEVICE_INDEX_IN_PRE_RASTERIZATION,
-    VIEW_INDEX_FROM_DEVICE_INDEX_IN_FRAGMENT,
-    VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES,
-    VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION,
-    VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT,
+    VIEW_INDEX_FROM_DEVICE_INDEX,
     UNUSUAL_MULTISAMPLE_STATE,
+    DESTROY_RESOURCES_BEFORE_LINK
+};
+
+// params used in BIND_NULL_DESCRIPTOR_SET mode
+struct NullDescriptorSetParams
+{
+    uint32_t layoutsCount;
+    uint32_t layoutsBits;
+
+    NullDescriptorSetParams(uint32_t layoutsCount_, uint32_t layoutsBits_)
+        : layoutsCount(layoutsCount_)
+        , layoutsBits(layoutsBits_)
+    {
+    }
+};
+
+enum class PipelineStateMode
+{
+    ALL_STAGES = 0,
+    PRE_RASTERIZATION,
+    FRAGMENT,
+};
+
+// params used in VIEW_INDEX_FROM_DEVICE_INDEX
+struct ViewIndexFromDeviceIndexParams
+{
+    PipelineStateMode pipelineStateMode;
+    bool useMeshShading;
+    bool useLinkTimeOptimization;
+
+    ViewIndexFromDeviceIndexParams(PipelineStateMode pipelineStateMode_, bool useMeshShading_,
+                                   bool useLinkTimeOptimization_)
+        : pipelineStateMode(pipelineStateMode_)
+        , useMeshShading(useMeshShading_)
+        , useLinkTimeOptimization(useLinkTimeOptimization_)
+    {
+    }
+};
+
+struct DestroyBeforeLinkParams
+{
+    uint32_t numSamplers;
+
+    DestroyBeforeLinkParams(uint32_t numSamplers_) : numSamplers(numSamplers_)
+    {
+    }
 };
 
 struct MiscTestParams
 {
+    // miscellaneous test mode
     MiscTestMode mode;
 
-    // attributes used in BIND_NULL_DESCRIPTOR_SET mode
-    uint32_t layoutsCount;
-    uint32_t layoutsBits;
+    // some misc test require different addditional params
+    std::any modeParams;
+
+    MiscTestParams(MiscTestMode mode_) : mode(mode_)
+    {
+    }
+
+    // constructor used for BIND_NULL_DESCRIPTOR_SET test mode
+    MiscTestParams(MiscTestMode mode_, uint32_t layoutsCount_, uint32_t layoutsBits_)
+        : mode(mode_)
+        , modeParams(std::in_place_type<NullDescriptorSetParams>, layoutsCount_, layoutsBits_)
+    {
+    }
+
+    // constructor used for VIEW_INDEX_FROM_DEVICE_INDEX test mode
+    MiscTestParams(MiscTestMode mode_, PipelineStateMode pipelineStateMode_, bool useMeshShading_,
+                   bool useLinkTimeOptimization_)
+        : mode(mode_)
+        , modeParams(std::in_place_type<ViewIndexFromDeviceIndexParams>, pipelineStateMode_, useMeshShading_,
+                     useLinkTimeOptimization_)
+    {
+    }
+
+    // constructor used for DESTROY_RESOURCES_BEFORE_LINK test mode
+    MiscTestParams(MiscTestMode mode_, uint32_t numSamplers_)
+        : mode(mode_)
+        , modeParams(std::in_place_type<DestroyBeforeLinkParams>, numSamplers_)
+    {
+    }
+
+    template <typename T>
+    const T &get() const
+    {
+        return std::any_cast<const T &>(modeParams);
+    }
 };
 
 class PipelineLibraryMiscTestInstance : public TestInstance
@@ -1379,6 +1454,7 @@ protected:
     tcu::TestStatus runIndependentPipelineLayoutSets(bool useLinkTimeOptimization = false);
     tcu::TestStatus runCompareLinkTimes(void);
     tcu::TestStatus runCommonFragLibraryTest(void);
+    tcu::TestStatus runDestroyResourcesBeforeLinkTest(void);
 
     struct VerificationData
     {
@@ -1455,6 +1531,8 @@ tcu::TestStatus PipelineLibraryMiscTestInstance::iterate(void)
         return runCompareLinkTimes();
     else if (m_testParams.mode == MiscTestMode::COMMON_FRAG_LIBRARY)
         return runCommonFragLibraryTest();
+    else if (m_testParams.mode == MiscTestMode::DESTROY_RESOURCES_BEFORE_LINK)
+        return runDestroyResourcesBeforeLinkTest();
 
     DE_ASSERT(false);
     return tcu::TestStatus::fail("Fail");
@@ -1492,7 +1570,8 @@ tcu::TestStatus PipelineLibraryMiscTestInstance::runNullDescriptorSet(void)
         flushAlloc(vk, device, uniformBuffer[i]->getAllocation());
     }
 
-    const uint32_t maxBitsCount = 8 * sizeof(m_testParams.layoutsBits);
+    const auto &modeParams      = m_testParams.get<NullDescriptorSetParams>();
+    const uint32_t maxBitsCount = 8 * sizeof(modeParams.layoutsBits);
     VkDescriptorSetLayout vertDescriptorSetLayouts[maxBitsCount];
     VkDescriptorSetLayout fragDescriptorSetLayouts[maxBitsCount];
     VkDescriptorSetLayout allDescriptorSetLayouts[maxBitsCount];
@@ -1514,7 +1593,7 @@ tcu::TestStatus PipelineLibraryMiscTestInstance::runNullDescriptorSet(void)
     // needs to always be the complete pipeline layout with no holes; we can put NULLs in
     // DescriptorSetLayouts used by partial pipelines (vertDescriptorSetLayouts and fragDescriptorSetLayouts)
     Move<VkDescriptorSetLayout> unusedDescriptorSetLayouts[maxBitsCount];
-    for (uint32_t i = 0u; i < m_testParams.layoutsCount; ++i)
+    for (uint32_t i = 0u; i < modeParams.layoutsCount; ++i)
     {
         unusedDescriptorSetLayouts[i] = DescriptorSetLayoutBuilder().build(vk, device);
 
@@ -1528,9 +1607,9 @@ tcu::TestStatus PipelineLibraryMiscTestInstance::runNullDescriptorSet(void)
 
     // find set bits
     std::vector<uint32_t> bitsThatAreSet;
-    for (uint32_t i = 0u; i < m_testParams.layoutsCount; ++i)
+    for (uint32_t i = 0u; i < modeParams.layoutsCount; ++i)
     {
-        if (m_testParams.layoutsBits & (1 << (maxBitsCount - 1 - i)))
+        if (modeParams.layoutsBits & (1 << (maxBitsCount - 1 - i)))
             bitsThatAreSet.push_back(i);
     }
 
@@ -1599,7 +1678,7 @@ tcu::TestStatus PipelineLibraryMiscTestInstance::runNullDescriptorSet(void)
             .update(vk, device);
     }
 
-    pipelineLayoutCreateInfo.setLayoutCount    = m_testParams.layoutsCount;
+    pipelineLayoutCreateInfo.setLayoutCount    = modeParams.layoutsCount;
     pipelineLayoutCreateInfo.pSetLayouts       = allDescriptorSetLayouts;
     Move<VkPipelineLayout> finalPipelineLayout = createPipelineLayout(vk, device, &pipelineLayoutCreateInfo);
 
@@ -2524,6 +2603,205 @@ tcu::TestStatus PipelineLibraryMiscTestInstance::runCommonFragLibraryTest(void)
     return (testOk == true ? tcu::TestStatus::pass("OK") : tcu::TestStatus::fail("Rendered image(s) are incorrect"));
 }
 
+VkSamplerCreateInfo makeSamplerCreateInfo()
+{
+    const VkSamplerCreateInfo defaultSamplerParams = {
+        VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,   // VkStructureType sType;
+        nullptr,                                 // const void* pNext;
+        0u,                                      // VkSamplerCreateFlags flags;
+        VK_FILTER_NEAREST,                       // VkFilter magFilter;
+        VK_FILTER_NEAREST,                       // VkFilter minFilter;
+        VK_SAMPLER_MIPMAP_MODE_NEAREST,          // VkSamplerMipmapMode mipmapMode;
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,   // VkSamplerAddressMode addressModeU;
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,   // VkSamplerAddressMode addressModeV;
+        VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE,   // VkSamplerAddressMode addressModeW;
+        0.0f,                                    // float mipLodBias;
+        VK_FALSE,                                // VkBool32 anisotropyEnable;
+        0.0f,                                    // float maxAnisotropy;
+        VK_FALSE,                                // VkBool32 compareEnable;
+        VK_COMPARE_OP_NEVER,                     // VkCompareOp compareOp;
+        0.0f,                                    // float minLod;
+        1.0f,                                    // float maxLod;
+        VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK, // VkBorderColor borderColor;
+        VK_FALSE                                 // VkBool32 unnormalizedCoordinates;
+    };
+
+    return defaultSamplerParams;
+}
+
+tcu::TestStatus PipelineLibraryMiscTestInstance::runDestroyResourcesBeforeLinkTest(void)
+{
+    const DeviceInterface &vk = m_context.getDeviceInterface();
+    const VkDevice device     = m_context.getDevice();
+    Allocator &allocator      = m_context.getDefaultAllocator();
+
+    const DestroyBeforeLinkParams testParams = m_testParams.get<DestroyBeforeLinkParams>();
+
+    // Create immutable samplers
+    VkSamplerCreateInfo samplerCreateInfo = makeSamplerCreateInfo();
+    std::vector<Move<VkSampler>> samplers(testParams.numSamplers);
+    for (uint32_t idx = 0u; idx < testParams.numSamplers; idx++)
+    {
+        samplers[idx] = createSampler(vk, device, &samplerCreateInfo);
+    }
+
+    // Create descriptor set layouts
+    std::vector<Move<VkDescriptorSetLayout>> descriptorSetLayouts(testParams.numSamplers);
+    for (uint32_t idx = 0u; idx < testParams.numSamplers; idx++)
+    {
+        descriptorSetLayouts[idx] =
+            DescriptorSetLayoutBuilder()
+                .addSingleSamplerBinding(VK_DESCRIPTOR_TYPE_SAMPLER, VK_SHADER_STAGE_ALL, &samplers[idx].get())
+                .build(vk, device);
+    }
+
+    // VkDescriptorSetLayout allDescriptorSetLayouts[]  = {*descriptorSetLayout1, *descriptorSetLayout2};
+
+    // Create pipeline layouts
+    std::vector<Move<VkPipelineLayout>> pipelineLayouts(testParams.numSamplers);
+    for (uint32_t idx = 0u; idx < testParams.numSamplers; idx++)
+    {
+        pipelineLayouts[idx] = makePipelineLayout(vk, device, 1u, &descriptorSetLayouts[idx].get(),
+                                                  VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT);
+    }
+
+    // Create descriptor sets
+    Move<VkDescriptorPool> allDescriptorPool =
+        DescriptorPoolBuilder()
+            .addType(VK_DESCRIPTOR_TYPE_SAMPLER, testParams.numSamplers)
+            .build(vk, device, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, testParams.numSamplers);
+
+    std::vector<Move<VkDescriptorSet>> descriptorSetPtrs(testParams.numSamplers);
+    std::vector<VkDescriptorSet> descriptorSets(testParams.numSamplers);
+    for (uint32_t idx = 0u; idx < testParams.numSamplers; idx++)
+    {
+        descriptorSetPtrs[idx] = makeDescriptorSet(vk, device, *allDescriptorPool, descriptorSetLayouts[idx].get());
+        descriptorSets[idx]    = descriptorSetPtrs[idx].get();
+    }
+
+    uint32_t commonPipelinePartFlags = uint32_t(VK_PIPELINE_CREATE_LIBRARY_BIT_KHR);
+
+    // Create info for each part
+    GraphicsPipelineCreateInfo partialPipelineCreateInfo[]{
+        {VK_NULL_HANDLE, *m_renderPass, 0, commonPipelinePartFlags},
+        {*pipelineLayouts[0], *m_renderPass, 0, commonPipelinePartFlags},
+        {*pipelineLayouts[1], *m_renderPass, 0, commonPipelinePartFlags},
+        {VK_NULL_HANDLE, *m_renderPass, 0, commonPipelinePartFlags}};
+
+    // Fill proper portion of pipeline state
+    updateVertexInputInterface(m_context, partialPipelineCreateInfo[0], VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP, 0u);
+    updatePreRasterization(m_context, partialPipelineCreateInfo[1], false);
+    updatePostRasterization(m_context, partialPipelineCreateInfo[2], false);
+    updateFragmentOutputInterface(m_context, partialPipelineCreateInfo[3]);
+
+    // Extend pNext chain and create all partial pipelines
+    std::vector<VkPipeline> rawParts(4u, VK_NULL_HANDLE);
+    std::vector<Move<VkPipeline>> pipelineParts;
+    pipelineParts.reserve(4u);
+    VkGraphicsPipelineLibraryCreateInfoEXT libraryCreateInfo =
+        makeGraphicsPipelineLibraryCreateInfo(VK_GRAPHICS_PIPELINE_LIBRARY_VERTEX_INPUT_INTERFACE_BIT_EXT);
+    for (uint32_t i = 0; i < 4u; ++i)
+    {
+        libraryCreateInfo.flags = GRAPHICS_PIPELINE_LIBRARY_FLAGS[i];
+        appendStructurePtrToVulkanChain(&partialPipelineCreateInfo[i].pNext, &libraryCreateInfo);
+        pipelineParts.emplace_back(createGraphicsPipeline(vk, device, VK_NULL_HANDLE, &partialPipelineCreateInfo[i]));
+        rawParts[i] = *pipelineParts[i];
+    }
+
+    // Destroy pipeline layout and samplers leaving the last one
+    // Maintenance 4 suggests we can destroy them now as libraries have been created
+    const uint32_t idxLast = testParams.numSamplers - 1;
+    for (uint32_t idx = 0u; idx < idxLast; idx++)
+    {
+        // Destroy pipeline layout
+        vk.destroyPipelineLayout(device, pipelineLayouts[idx].get(), nullptr);
+        pipelineLayouts[idx].disown();
+
+        // Destroy sampler
+        vk.destroySampler(device, samplers[idx].get(), nullptr);
+        samplers[idx].disown();
+    }
+
+    // Create final pipeline out of four parts
+    const uint32_t finalPipelineFlag               = 0u;
+    VkPipelineLibraryCreateInfoKHR linkingInfo     = makePipelineLibraryCreateInfo(rawParts);
+    VkGraphicsPipelineCreateInfo finalPipelineInfo = initVulkanStructure();
+
+    finalPipelineInfo.flags = finalPipelineFlag;
+    // Use the last undestroyed layout
+    finalPipelineInfo.layout = pipelineLayouts[idxLast].get();
+
+    appendStructurePtrToVulkanChain(&finalPipelineInfo.pNext, &linkingInfo);
+    Move<VkPipeline> pipeline = createGraphicsPipeline(vk, device, VK_NULL_HANDLE, &finalPipelineInfo);
+
+    const VkDescriptorSet descriptorSet = descriptorSets[idxLast];
+    // Output
+    const VkDeviceSize colorBufferDataSize = static_cast<VkDeviceSize>(
+        m_renderArea.extent.width * m_renderArea.extent.height * tcu::getPixelSize(mapVkFormat(m_colorFormat)));
+    const VkBufferCreateInfo colorBufferCreateInfo = makeBufferCreateInfo(
+        colorBufferDataSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT);
+    const BufferWithMemory colorBuffer(vk, device, allocator, colorBufferCreateInfo, MemoryRequirement::HostVisible);
+
+    vk::beginCommandBuffer(vk, *m_cmdBuffer, 0u);
+    {
+        // change color image layout
+        const VkImageMemoryBarrier initialImageBarrier = makeImageMemoryBarrier(
+            0,                                          // VkAccessFlags srcAccessMask;
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,       // VkAccessFlags dstAccessMask;
+            VK_IMAGE_LAYOUT_UNDEFINED,                  // VkImageLayout oldLayout;
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,   // VkImageLayout newLayout;
+            **m_colorImage,                             // VkImage image;
+            {VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u} // VkImageSubresourceRange subresourceRange;
+        );
+        vk.cmdPipelineBarrier(*m_cmdBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+                              VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, (VkDependencyFlags)0, 0, nullptr, 0,
+                              nullptr, 1, &initialImageBarrier);
+
+        beginRenderPass(vk, *m_cmdBuffer, *m_renderPass, *m_framebuffer, m_renderArea, m_colorClearColor);
+
+        vk.cmdBindPipeline(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
+        vk.cmdBindDescriptorSets(*m_cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts[idxLast].get(), 0u, 1u,
+                                 &descriptorSet, 0u, nullptr);
+        vk.cmdDraw(*m_cmdBuffer, 6u, 1u, 0u, 0u);
+
+        endRenderPass(vk, *m_cmdBuffer);
+
+        const tcu::IVec2 size{(int32_t)m_renderArea.extent.width, (int32_t)m_renderArea.extent.height};
+        copyImageToBuffer(vk, *m_cmdBuffer, **m_colorImage, *colorBuffer, size);
+    }
+    vk::endCommandBuffer(vk, *m_cmdBuffer);
+    vk::submitCommandsAndWait(vk, device, m_context.getUniversalQueue(), *m_cmdBuffer);
+
+    vk::invalidateAlloc(vk, device, colorBuffer.getAllocation());
+    const tcu::ConstPixelBufferAccess colorPixelAccess(mapVkFormat(m_colorFormat), m_renderArea.extent.width,
+                                                       m_renderArea.extent.height, 1,
+                                                       colorBuffer.getAllocation().getHostPtr());
+
+    tcu::TextureLevel referenceImage(mapVkFormat(m_colorFormat), m_renderArea.extent.width, m_renderArea.extent.height);
+    tcu::PixelBufferAccess referencePixelAccess = referenceImage.getAccess();
+    const int edge                              = 3 * referenceImage.getWidth() / 4;
+    const Vec4 green                            = RGBA::green().toVec();
+    const Vec4 black                            = RGBA::black().toVec();
+
+    for (int y = 0; y < referenceImage.getHeight(); ++y)
+    {
+        for (int x = 0; x < referenceImage.getWidth(); ++x)
+        {
+            if (x < edge)
+                referencePixelAccess.setPixel(green, x, y);
+            else
+                referencePixelAccess.setPixel(black, x, y);
+        }
+    }
+
+    const tcu::Vec4 threshold(0.0f);
+    if (!tcu::floatThresholdCompare(m_context.getTestContext().getLog(), "Comparison result", "Image comparison result",
+                                    referenceImage.getAccess(), colorPixelAccess, threshold, COMPARE_LOG_ON_ERROR))
+        return tcu::TestStatus::fail("Fail");
+
+    return tcu::TestStatus::pass("Pass");
+}
+
 tcu::TestStatus PipelineLibraryMiscTestInstance::verifyResult(const std::vector<VerificationData> &verificationData,
                                                               const tcu::ConstPixelBufferAccess &colorPixelAccess) const
 {
@@ -2907,18 +3185,21 @@ tcu::TestStatus PipelineLibraryShaderModuleInfoRTInstance::iterate(void)
     return tcu::TestStatus::pass("Pass");
 }
 
-class NullRenderingCreateInfoInstance : public vkt::TestInstance
+class UnusualRenderingCreateInfoInstance : public vkt::TestInstance
 {
 public:
-    NullRenderingCreateInfoInstance(Context &context) : vkt::TestInstance(context)
+    UnusualRenderingCreateInfoInstance(Context &context, MiscTestMode mode) : vkt::TestInstance(context), m_mode(mode)
     {
     }
-    virtual ~NullRenderingCreateInfoInstance(void) = default;
+    virtual ~UnusualRenderingCreateInfoInstance(void) = default;
 
     tcu::TestStatus iterate(void) override;
+
+private:
+    MiscTestMode m_mode;
 };
 
-tcu::TestStatus NullRenderingCreateInfoInstance::iterate(void)
+tcu::TestStatus UnusualRenderingCreateInfoInstance::iterate(void)
 {
     const auto ctx = m_context.getContextCommonData();
     const tcu::IVec3 colorExtent(1, 1, 1);
@@ -2957,9 +3238,18 @@ tcu::TestStatus NullRenderingCreateInfoInstance::iterate(void)
     const auto vertModule = createShaderModule(ctx.vkd, ctx.device, binaries.get("vert"));
     const auto fragModule = createShaderModule(ctx.vkd, ctx.device, binaries.get("frag"));
 
-    // We will use a null-filled pipeline rendering info structure for all substates except the fragment output state.
-    VkPipelineRenderingCreateInfo nullRenderingInfo = initVulkanStructure();
-    nullRenderingInfo.colorAttachmentCount          = 0;
+    VkPipelineRenderingCreateInfo unusualRenderingInfo = initVulkanStructure();
+
+    // We will use a null-filled pipeline rendering info structure
+    // for all substates except the fragment output state
+    if (m_mode == MiscTestMode::NULL_RENDERING_CREATE_INFO)
+        unusualRenderingInfo.colorAttachmentCount = 0;
+    else // MiscTestMode::BAD_RENDERING_CREATE_INFO
+    {
+        // use bad VkPipelineRenderingCreateInfo when it is not required
+        unusualRenderingInfo.colorAttachmentCount    = 2;
+        unusualRenderingInfo.pColorAttachmentFormats = reinterpret_cast<VkFormat *>(0xdeadbeef);
+    }
 
     VkPipelineRenderingCreateInfo finalRenderingInfo = initVulkanStructure();
     finalRenderingInfo.colorAttachmentCount          = 1u;
@@ -3055,7 +3345,7 @@ tcu::TestStatus NullRenderingCreateInfoInstance::iterate(void)
     // Pre-rasterization shader state library.
     {
         VkGraphicsPipelineLibraryCreateInfoEXT preRasterShaderLibInfo =
-            initVulkanStructure(&nullRenderingInfo); // What we're testing.
+            initVulkanStructure(&unusualRenderingInfo); // What we're testing.
         preRasterShaderLibInfo.flags |= VK_GRAPHICS_PIPELINE_LIBRARY_PRE_RASTERIZATION_SHADERS_BIT_EXT;
 
         VkGraphicsPipelineCreateInfo preRasterShaderPipelineInfo = initVulkanStructure(&preRasterShaderLibInfo);
@@ -3074,7 +3364,7 @@ tcu::TestStatus NullRenderingCreateInfoInstance::iterate(void)
     // Fragment shader stage library.
     {
         VkGraphicsPipelineLibraryCreateInfoEXT fragShaderLibInfo =
-            initVulkanStructure(&nullRenderingInfo); // What we're testing.
+            initVulkanStructure(&unusualRenderingInfo); // What we're testing.
         fragShaderLibInfo.flags |= VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_SHADER_BIT_EXT;
 
         VkGraphicsPipelineCreateInfo fragShaderPipelineInfo = initVulkanStructure(&fragShaderLibInfo);
@@ -3208,26 +3498,22 @@ tcu::TestStatus CreateViewIndexFromDeviceIndexInstance::iterate()
     Allocator &allocator      = useDeviceGroup ? *m_deviceGroupAllocator : m_context.getDefaultAllocator();
     uint32_t queueFamilyIndex =
         useDeviceGroup ? m_deviceGroupQueueFamilyIndex : m_context.getUniversalQueueFamilyIndex();
+    const auto &modeParams = m_testParams.get<ViewIndexFromDeviceIndexParams>();
     const auto deviceCount = useDeviceGroup ? m_deviceGroupPhysicalDevices.size() : 1u;
     const auto viewCount   = 3u;
     const auto imageSize   = 8u;
     const auto colorFormat = VK_FORMAT_R8G8B8A8_UINT;
     const auto extent      = makeExtent3D(imageSize, imageSize, 1u);
 
-    bool useMeshShader = (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES) ||
-                         (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION) ||
-                         (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT);
-    VkPipelineCreateFlags preRasterPipelineFlags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
-    VkPipelineCreateFlags fragmentPipelineFlags  = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
-    if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_ALL_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_PRE_RASTERIZATION) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION))
+    VkPipelineCreateFlags basePipelineFlags = VK_PIPELINE_CREATE_LIBRARY_BIT_KHR;
+    if (modeParams.useLinkTimeOptimization)
+        basePipelineFlags |= VK_PIPELINE_CREATE_RETAIN_LINK_TIME_OPTIMIZATION_INFO_BIT_EXT;
+
+    VkPipelineCreateFlags preRasterPipelineFlags = basePipelineFlags;
+    VkPipelineCreateFlags fragmentPipelineFlags  = basePipelineFlags;
+    if (modeParams.pipelineStateMode != PipelineStateMode::FRAGMENT)
         preRasterPipelineFlags |= VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT;
-    if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_ALL_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_FRAGMENT) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT))
+    if (modeParams.pipelineStateMode != PipelineStateMode::PRE_RASTERIZATION)
         fragmentPipelineFlags |= VK_PIPELINE_CREATE_VIEW_INDEX_FROM_DEVICE_INDEX_BIT;
 
     // fill structures that are needed for pipeline creation
@@ -3281,7 +3567,7 @@ tcu::TestStatus CreateViewIndexFromDeviceIndexInstance::iterate()
     Move<VkShaderModule> preRasterModules[4];
     VkPipelineShaderStageCreateInfo preRasterShaderInfos[4];
 
-    if (useMeshShader)
+    if (modeParams.useMeshShading)
     {
         preRasterModules[0]     = createShaderModule(vk, device, bc.get("mesh"));
         preRasterShaderInfos[0] = makePipelineShaderStageCreateInfo(VK_SHADER_STAGE_MESH_BIT_EXT, *preRasterModules[0]);
@@ -3379,6 +3665,8 @@ tcu::TestStatus CreateViewIndexFromDeviceIndexInstance::iterate()
     linkedPipelineLibraryInfo.pLibraries                     = libraryHandles;
     VkGraphicsPipelineCreateInfo linkedPipelineInfo          = initVulkanStructure(&linkedPipelineLibraryInfo);
     linkedPipelineInfo.layout                                = *pipelineLayout;
+    if (modeParams.useLinkTimeOptimization)
+        linkedPipelineInfo.flags = VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
     const auto pipeline = createGraphicsPipeline(vk, device, VK_NULL_HANDLE, &linkedPipelineInfo);
 
     const auto cmdPool(
@@ -3391,7 +3679,7 @@ tcu::TestStatus CreateViewIndexFromDeviceIndexInstance::iterate()
     beginRenderPass(vk, *cmdBuffer, *renderPass, *framebuffer, scissor, 1, &clearValue);
     vk.cmdBindPipeline(*cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipeline);
 
-    if (useMeshShader)
+    if (modeParams.useMeshShading)
         vk.cmdDrawMeshTasksEXT(*cmdBuffer, 1u, 1u, 1u);
     else
         vk.cmdDraw(*cmdBuffer, 3u, 1u, 0u, 0u);
@@ -3445,9 +3733,9 @@ tcu::TestStatus CreateViewIndexFromDeviceIndexInstance::iterate()
             }
 
             // ignore tesselation and/or geometry stages when those features are not available
-            if (!multiviewFeatures.multiviewTessellationShader || useMeshShader)
+            if (!multiviewFeatures.multiviewTessellationShader || modeParams.useMeshShading)
                 allowedValuesPtr[1] = 0;
-            if (!multiviewFeatures.multiviewGeometryShader || useMeshShader)
+            if (!multiviewFeatures.multiviewGeometryShader || modeParams.useMeshShading)
                 allowedValuesPtr[2] = 0;
         }
 
@@ -3537,12 +3825,14 @@ bool CreateViewIndexFromDeviceIndexInstance::createDeviceGroup(void)
     meshShaderFeatures.pNext = nullptr;
     multiviewFeatures.pNext  = nullptr;
     gplFeatures.pNext        = &multiviewFeatures;
-    if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT))
+    if (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX)
     {
-        deviceExtensions.push_back("VK_EXT_mesh_shader");
-        multiviewFeatures.pNext = &meshShaderFeatures;
+        const auto &modeParams = m_testParams.get<ViewIndexFromDeviceIndexParams>();
+        if (modeParams.useMeshShading)
+        {
+            deviceExtensions.push_back("VK_EXT_mesh_shader");
+            multiviewFeatures.pNext = &meshShaderFeatures;
+        }
     }
     deviceFeatures2.pNext = &gplFeatures;
 
@@ -3884,7 +4174,8 @@ void PipelineLibraryMiscTestCase::checkSupport(Context &context) const
     if (m_testParams.mode == MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB)
         context.requireDeviceFunctionality("VK_KHR_pipeline_library");
 
-    if (m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO)
+    if ((m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO) ||
+        (m_testParams.mode == MiscTestMode::BAD_RENDERING_CREATE_INFO))
         context.requireDeviceFunctionality("VK_KHR_dynamic_rendering");
 
     if (m_testParams.mode == MiscTestMode::COMMON_FRAG_LIBRARY)
@@ -3902,19 +4193,24 @@ void PipelineLibraryMiscTestCase::checkSupport(Context &context) const
             TCU_THROW(NotSupportedError, "Specified values of clip or cull distances are not supported");
     }
 
-    if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_ALL_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_PRE_RASTERIZATION) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_FRAGMENT))
-        context.requireDeviceFunctionality("VK_KHR_multiview");
-    else if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES) ||
-             (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION) ||
-             (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT))
+    if (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX)
     {
-        context.requireDeviceFunctionality("VK_KHR_multiview");
-        context.requireDeviceFunctionality("VK_EXT_mesh_shader");
-        const auto &meshShaderFeatures = context.getMeshShaderFeaturesEXT();
-        if (!meshShaderFeatures.multiviewMeshShader)
-            TCU_THROW(NotSupportedError, "multiviewMeshShader not supported");
+        const auto &modeParams = m_testParams.get<ViewIndexFromDeviceIndexParams>();
+        if (modeParams.useMeshShading)
+        {
+            context.requireDeviceFunctionality("VK_KHR_multiview");
+            context.requireDeviceFunctionality("VK_EXT_mesh_shader");
+            const auto &meshShaderFeatures = context.getMeshShaderFeaturesEXT();
+            if (!meshShaderFeatures.multiviewMeshShader)
+                TCU_THROW(NotSupportedError, "multiviewMeshShader not supported");
+        }
+        else
+            context.requireDeviceFunctionality("VK_KHR_multiview");
+    }
+
+    if (m_testParams.mode == MiscTestMode::DESTROY_RESOURCES_BEFORE_LINK)
+    {
+        context.requireDeviceFunctionality("VK_KHR_maintenance4");
     }
 }
 
@@ -3944,28 +4240,33 @@ void PipelineLibraryMiscTestCase::initPrograms(SourceCollections &programCollect
             fragDefinition = constructBufferDefinition(1);
             fragValue      = "";
         }
-        else if (m_testParams.layoutsBits > 0u)
+        else
         {
-            std::vector<uint32_t> bitsThatAreSet;
-            const uint32_t maxBitsCount = 8 * sizeof(m_testParams.layoutsBits);
+            const auto &modeParams = m_testParams.get<NullDescriptorSetParams>();
 
-            // find set bits
-            for (uint32_t i = 0u; i < m_testParams.layoutsCount; ++i)
+            if (modeParams.layoutsBits > 0u)
             {
-                if (m_testParams.layoutsBits & (1 << (maxBitsCount - 1 - i)))
-                    bitsThatAreSet.push_back(i);
-            }
+                std::vector<uint32_t> bitsThatAreSet;
+                const uint32_t maxBitsCount = 8 * sizeof(modeParams.layoutsBits);
 
-            // there should be 1 or 2 bits set
-            DE_ASSERT((bitsThatAreSet.size() > 0) && (bitsThatAreSet.size() < 3));
+                // find set bits
+                for (uint32_t i = 0u; i < modeParams.layoutsCount; ++i)
+                {
+                    if (modeParams.layoutsBits & (1 << (maxBitsCount - 1 - i)))
+                        bitsThatAreSet.push_back(i);
+                }
 
-            vertDefinition = constructBufferDefinition(bitsThatAreSet[0]);
-            vertValue      = "";
+                // there should be 1 or 2 bits set
+                DE_ASSERT((bitsThatAreSet.size() > 0) && (bitsThatAreSet.size() < 3));
 
-            if (bitsThatAreSet.size() == 2u)
-            {
-                fragDefinition = constructBufferDefinition(bitsThatAreSet[1]);
-                fragValue      = "";
+                vertDefinition = constructBufferDefinition(bitsThatAreSet[0]);
+                vertValue      = "";
+
+                if (bitsThatAreSet.size() == 2u)
+                {
+                    fragDefinition = constructBufferDefinition(bitsThatAreSet[1]);
+                    fragValue      = "";
+                }
             }
         }
 
@@ -4104,7 +4405,8 @@ void PipelineLibraryMiscTestCase::initPrograms(SourceCollections &programCollect
              << "}\n";
         programCollection.glslSources.add("rgen") << glu::RaygenSource(rgen.str()) << buildOptions;
     }
-    else if (m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO)
+    else if ((m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO) ||
+             (m_testParams.mode == MiscTestMode::BAD_RENDERING_CREATE_INFO))
     {
         std::ostringstream vert;
         vert << "#version 460\n"
@@ -4233,120 +4535,120 @@ void PipelineLibraryMiscTestCase::initPrograms(SourceCollections &programCollect
         }
         programCollection.glslSources.add("frag") << glu::FragmentSource(frag.str());
     }
-    else if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_ALL_STAGES) ||
-             (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_PRE_RASTERIZATION) ||
-             (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_FRAGMENT))
+    else if (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX)
     {
-        std::string vert("#version 460\n"
-                         "#extension GL_EXT_multiview : require\n"
-                         "layout(location = 0) flat out uvec4 vViewIndex;"
-                         "void main() {\n"
-                         "  const float x = -1.0 + 4.0 * ((gl_VertexIndex & 2)>>1);\n"
-                         "  const float y = -1.0 + 4.0 * (gl_VertexIndex % 2);\n"
-                         "  gl_Position = vec4(x, y, 0.0, 1.0);\n"
-                         "  vViewIndex = uvec4(0);\n"
-                         "  vViewIndex.x = gl_ViewIndex;\n"
-                         "}\n");
-        programCollection.glslSources.add("vert") << glu::VertexSource(vert);
-
-        std::string tesc("#version 450\n"
-                         "#extension GL_EXT_multiview : require\n"
-                         "layout (vertices = 3) out;\n"
-                         "layout(location = 0) flat in uvec4 vViewIndex[];\n"
-                         "layout(location = 0) flat out uvec4 vtcViewIndex[];\n"
-                         "void main (void)\n"
-                         "{\n"
-                         "  gl_TessLevelInner[0] = 1.0;\n"
-                         "  gl_TessLevelInner[1] = 1.0;\n"
-                         "  gl_TessLevelOuter[0] = 1.0;\n"
-                         "  gl_TessLevelOuter[1] = 1.0;\n"
-                         "  gl_TessLevelOuter[2] = 1.0;\n"
-                         "  gl_TessLevelOuter[3] = 1.0;\n"
-                         "  vtcViewIndex[gl_InvocationID] = vViewIndex[gl_InvocationID];\n"
-                         "  vtcViewIndex[gl_InvocationID].y = gl_ViewIndex;\n"
-                         "  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
-                         "}\n");
-        programCollection.glslSources.add("tesc") << glu::TessellationControlSource(tesc);
-
-        std::string tese("#version 450\n"
-                         "#extension GL_EXT_multiview : require\n"
-                         "layout(triangles, fractional_odd_spacing, cw) in;\n"
-                         "layout(location = 0) flat in uvec4 vtcViewIndex[];\n"
-                         "layout(location = 0) flat out uvec4 vtViewIndex;\n"
-                         "void main (void)\n"
-                         "{\n"
-                         "  gl_Position = (gl_TessCoord.x * gl_in[0].gl_Position) +\n"
-                         "                (gl_TessCoord.y * gl_in[1].gl_Position) +\n"
-                         "                (gl_TessCoord.z * gl_in[2].gl_Position);\n"
-                         "  vtViewIndex = vtcViewIndex[0];\n"
-                         "  vtViewIndex.y += gl_ViewIndex;\n"
-                         "}\n");
-        programCollection.glslSources.add("tese") << glu::TessellationEvaluationSource(tese);
-
-        std::string geom("#version 450\n"
-                         "#extension GL_EXT_multiview : require\n"
-                         "layout (triangles) in;\n"
-                         "layout (triangle_strip, max_vertices=3) out;\n"
-                         "layout(location = 0) flat in uvec4 vtViewIndex[];\n"
-                         "layout(location = 0) flat out uvec4 vtgViewIndex;\n"
-                         "void main (void)\n"
-                         "{\n"
-                         "  for (int i = 0; i < 3; i++)\n"
-                         "  {\n"
-                         "    gl_Position = gl_in[i].gl_Position;\n"
-                         "    vtgViewIndex = vtViewIndex[i];\n"
-                         "    vtgViewIndex.z = gl_ViewIndex;\n"
-                         "    EmitVertex();\n"
-                         "  }\n"
-                         "}\n");
-        programCollection.glslSources.add("geom") << glu::GeometrySource(geom);
-
-        std::string frag("#version 460\n"
-                         "#extension GL_EXT_multiview : require\n"
-                         "layout(location = 0) flat in uvec4 vtgViewIndex;\n"
-                         "layout (location=0) out uvec4 color;\n"
-                         "void main () {\n"
-                         "  color = vtgViewIndex;\n"
-                         "  color.a = gl_ViewIndex;\n"
-                         "}\n");
-        programCollection.glslSources.add("frag") << glu::FragmentSource(frag);
-    }
-    else if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES) ||
-             (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION) ||
-             (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT))
-    {
+        const auto &modeParams = m_testParams.get<ViewIndexFromDeviceIndexParams>();
         const auto buildOptions =
             vk::ShaderBuildOptions(programCollection.usedVulkanVersion, vk::SPIRV_VERSION_1_4, 0, true);
 
-        std::string mesh("#version 450\n"
-                         "#extension GL_EXT_mesh_shader : enable\n"
-                         "#extension GL_EXT_multiview : require\n"
-                         "layout(local_size_x=3) in;\n"
-                         "layout(triangles) out;\n"
-                         "layout(max_vertices=3, max_primitives=1) out;\n"
-                         "layout(location = 0) perprimitiveEXT flat out uvec4 mViewIndex[];\n"
-                         "void main() {\n"
-                         "  SetMeshOutputsEXT(3u, 1u);\n"
-                         "  const uint idx = gl_LocalInvocationIndex;\n"
-                         "  const float x = -1.0 + 4.0 * ((idx & 2)>>1);\n"
-                         "  const float y = -1.0 + 4.0 * (idx % 2);\n"
-                         "  gl_MeshVerticesEXT[idx].gl_Position = vec4(x, y, 0.0, 1.0);\n"
-                         "  gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);\n"
-                         "  mViewIndex[idx] = uvec4(0);\n"
-                         "  mViewIndex[idx].x = gl_ViewIndex;\n"
-                         "}\n");
-        programCollection.glslSources.add("mesh") << glu::MeshSource(mesh) << buildOptions;
+        if (modeParams.useMeshShading)
+        {
+            std::string mesh("#version 450\n"
+                             "#extension GL_EXT_mesh_shader : enable\n"
+                             "#extension GL_EXT_multiview : require\n"
+                             "layout(local_size_x=3) in;\n"
+                             "layout(triangles) out;\n"
+                             "layout(max_vertices=3, max_primitives=1) out;\n"
+                             "layout(location = 0) perprimitiveEXT flat out uvec4 mViewIndex[];\n"
+                             "void main() {\n"
+                             "  SetMeshOutputsEXT(3u, 1u);\n"
+                             "  const uint idx = gl_LocalInvocationIndex;\n"
+                             "  const float x = -1.0 + 4.0 * ((idx & 2)>>1);\n"
+                             "  const float y = -1.0 + 4.0 * (idx % 2);\n"
+                             "  gl_MeshVerticesEXT[idx].gl_Position = vec4(x, y, 0.0, 1.0);\n"
+                             "  gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);\n"
+                             "  mViewIndex[idx] = uvec4(0);\n"
+                             "  mViewIndex[idx].x = gl_ViewIndex;\n"
+                             "}\n");
+            programCollection.glslSources.add("mesh") << glu::MeshSource(mesh) << buildOptions;
 
-        std::string frag("#version 460\n"
-                         "#extension GL_EXT_multiview : require\n"
-                         "#extension GL_EXT_mesh_shader : enable\n"
-                         "layout(location = 0) perprimitiveEXT flat in uvec4 mViewIndex;\n"
-                         "layout (location=0) out uvec4 color;\n"
-                         "void main () {\n"
-                         "  color = mViewIndex;\n"
-                         "  color.a = gl_ViewIndex;\n"
-                         "}\n");
-        programCollection.glslSources.add("frag") << glu::FragmentSource(frag) << buildOptions;
+            std::string frag("#version 460\n"
+                             "#extension GL_EXT_multiview : require\n"
+                             "#extension GL_EXT_mesh_shader : enable\n"
+                             "layout(location = 0) perprimitiveEXT flat in uvec4 mViewIndex;\n"
+                             "layout (location=0) out uvec4 color;\n"
+                             "void main () {\n"
+                             "  color = mViewIndex;\n"
+                             "  color.a = gl_ViewIndex;\n"
+                             "}\n");
+            programCollection.glslSources.add("frag") << glu::FragmentSource(frag) << buildOptions;
+        }
+        else
+        {
+            std::string vert("#version 460\n"
+                             "#extension GL_EXT_multiview : require\n"
+                             "layout(location = 0) flat out uvec4 vViewIndex;"
+                             "void main() {\n"
+                             "  const float x = -1.0 + 4.0 * ((gl_VertexIndex & 2)>>1);\n"
+                             "  const float y = -1.0 + 4.0 * (gl_VertexIndex % 2);\n"
+                             "  gl_Position = vec4(x, y, 0.0, 1.0);\n"
+                             "  vViewIndex = uvec4(0);\n"
+                             "  vViewIndex.x = gl_ViewIndex;\n"
+                             "}\n");
+            programCollection.glslSources.add("vert") << glu::VertexSource(vert);
+
+            std::string tesc("#version 450\n"
+                             "#extension GL_EXT_multiview : require\n"
+                             "layout (vertices = 3) out;\n"
+                             "layout(location = 0) flat in uvec4 vViewIndex[];\n"
+                             "layout(location = 0) flat out uvec4 vtcViewIndex[];\n"
+                             "void main (void)\n"
+                             "{\n"
+                             "  gl_TessLevelInner[0] = 1.0;\n"
+                             "  gl_TessLevelInner[1] = 1.0;\n"
+                             "  gl_TessLevelOuter[0] = 1.0;\n"
+                             "  gl_TessLevelOuter[1] = 1.0;\n"
+                             "  gl_TessLevelOuter[2] = 1.0;\n"
+                             "  gl_TessLevelOuter[3] = 1.0;\n"
+                             "  vtcViewIndex[gl_InvocationID] = vViewIndex[gl_InvocationID];\n"
+                             "  vtcViewIndex[gl_InvocationID].y = gl_ViewIndex;\n"
+                             "  gl_out[gl_InvocationID].gl_Position = gl_in[gl_InvocationID].gl_Position;\n"
+                             "}\n");
+            programCollection.glslSources.add("tesc") << glu::TessellationControlSource(tesc);
+
+            std::string tese("#version 450\n"
+                             "#extension GL_EXT_multiview : require\n"
+                             "layout(triangles, fractional_odd_spacing, cw) in;\n"
+                             "layout(location = 0) flat in uvec4 vtcViewIndex[];\n"
+                             "layout(location = 0) flat out uvec4 vtViewIndex;\n"
+                             "void main (void)\n"
+                             "{\n"
+                             "  gl_Position = (gl_TessCoord.x * gl_in[0].gl_Position) +\n"
+                             "                (gl_TessCoord.y * gl_in[1].gl_Position) +\n"
+                             "                (gl_TessCoord.z * gl_in[2].gl_Position);\n"
+                             "  vtViewIndex = vtcViewIndex[0];\n"
+                             "  vtViewIndex.y += gl_ViewIndex;\n"
+                             "}\n");
+            programCollection.glslSources.add("tese") << glu::TessellationEvaluationSource(tese);
+
+            std::string geom("#version 450\n"
+                             "#extension GL_EXT_multiview : require\n"
+                             "layout (triangles) in;\n"
+                             "layout (triangle_strip, max_vertices=3) out;\n"
+                             "layout(location = 0) flat in uvec4 vtViewIndex[];\n"
+                             "layout(location = 0) flat out uvec4 vtgViewIndex;\n"
+                             "void main (void)\n"
+                             "{\n"
+                             "  for (int i = 0; i < 3; i++)\n"
+                             "  {\n"
+                             "    gl_Position = gl_in[i].gl_Position;\n"
+                             "    vtgViewIndex = vtViewIndex[i];\n"
+                             "    vtgViewIndex.z = gl_ViewIndex;\n"
+                             "    EmitVertex();\n"
+                             "  }\n"
+                             "}\n");
+            programCollection.glslSources.add("geom") << glu::GeometrySource(geom);
+
+            std::string frag("#version 460\n"
+                             "#extension GL_EXT_multiview : require\n"
+                             "layout(location = 0) flat in uvec4 vtgViewIndex;\n"
+                             "layout (location=0) out uvec4 color;\n"
+                             "void main () {\n"
+                             "  color = vtgViewIndex;\n"
+                             "  color.a = gl_ViewIndex;\n"
+                             "}\n");
+            programCollection.glslSources.add("frag") << glu::FragmentSource(frag);
+        }
     }
     else if (m_testParams.mode == MiscTestMode::UNUSUAL_MULTISAMPLE_STATE)
     {
@@ -4384,6 +4686,35 @@ void PipelineLibraryMiscTestCase::initPrograms(SourceCollections &programCollect
             "    }\n"
             "}\n");
     }
+    else if (m_testParams.mode == MiscTestMode::DESTROY_RESOURCES_BEFORE_LINK)
+    {
+        std::ostringstream vert;
+        {
+            vert << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_450) << "\n"
+                 << "vec2 positions[6] = vec2[](\n"
+                 << "    vec2(-1.0, -1.0),\n"
+                 << "    vec2(-1.0,  1.0),\n"
+                 << "    vec2( 1.0, -1.0),\n"
+                 << "    vec2( 1.0, -1.0),\n"
+                 << "    vec2(-1.0,  1.0),\n"
+                 << "    vec2(1.0,  1.0)\n"
+                 << ");\n"
+                 << "void main() {\n"
+                 << "    gl_Position = vec4(positions[gl_VertexIndex], 0.0, 1.0);\n"
+                 << "}\n";
+        }
+        programCollection.glslSources.add("vert") << glu::VertexSource(vert.str());
+
+        std::ostringstream frag;
+        {
+            frag << glu::getGLSLVersionDeclaration(glu::GLSL_VERSION_450) << "\n"
+                 << "layout (location=0) out vec4 color;\n"
+                 << "void main () {\n"
+                 << "    color = vec4(0.0, 1.0, 0.0, 1.0); // green\n"
+                 << "}\n";
+        }
+        programCollection.glslSources.add("frag") << glu::FragmentSource(frag.str());
+    }
     else
     {
         DE_ASSERT(false);
@@ -4401,15 +4732,11 @@ TestInstance *PipelineLibraryMiscTestCase::createInstance(Context &context) cons
     if (m_testParams.mode == MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB)
         return new PipelineLibraryShaderModuleInfoRTInstance(context, true /*withLibrary*/);
 
-    if (m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO)
-        return new NullRenderingCreateInfoInstance(context);
+    if ((m_testParams.mode == MiscTestMode::NULL_RENDERING_CREATE_INFO) ||
+        (m_testParams.mode == MiscTestMode::BAD_RENDERING_CREATE_INFO))
+        return new UnusualRenderingCreateInfoInstance(context, m_testParams.mode);
 
-    if ((m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_ALL_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_PRE_RASTERIZATION) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_FRAGMENT) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION) ||
-        (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT))
+    if (m_testParams.mode == MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX)
         return new CreateViewIndexFromDeviceIndexInstance(context, m_testParams);
 
     if (m_testParams.mode == MiscTestMode::UNUSUAL_MULTISAMPLE_STATE)
@@ -4619,48 +4946,62 @@ tcu::TestCaseGroup *createPipelineLibraryTests(tcu::TestContext &testCtx)
     {
         de::MovePtr<tcu::TestCaseGroup> otherTests(new tcu::TestCaseGroup(testCtx, "other"));
         otherTests->addChild(
-            new PipelineLibraryMiscTestCase(testCtx, "compare_link_times", {MiscTestMode::COMPARE_LINK_TIMES, 0u, 0u}));
+            new PipelineLibraryMiscTestCase(testCtx, "compare_link_times", {MiscTestMode::COMPARE_LINK_TIMES}));
         otherTests->addChild(
             new PipelineLibraryMiscTestCase(testCtx, "null_descriptor_set_in_monolithic_pipeline",
-                                            {MiscTestMode::BIND_NULL_DESCRIPTOR_SET_IN_MONOLITHIC_PIPELINE, 0u, 0u}));
+                                            {MiscTestMode::BIND_NULL_DESCRIPTOR_SET_IN_MONOLITHIC_PIPELINE}));
         otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "null_rendering_create_info",
-                                                             {MiscTestMode::NULL_RENDERING_CREATE_INFO, 0u, 0u}));
+                                                             {MiscTestMode::NULL_RENDERING_CREATE_INFO}));
+        otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "bad_rendering_create_info",
+                                                             {MiscTestMode::BAD_RENDERING_CREATE_INFO}));
         otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "common_frag_pipeline_library",
-                                                             {MiscTestMode::COMMON_FRAG_LIBRARY, 0u, 0u}));
+                                                             {MiscTestMode::COMMON_FRAG_LIBRARY}));
 
-        otherTests->addChild(
-            new PipelineLibraryMiscTestCase(testCtx, "view_index_from_device_index_in_all_stages",
-                                            {MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_ALL_STAGES, 0u, 0u}));
-        otherTests->addChild(
-            new PipelineLibraryMiscTestCase(testCtx, "view_index_from_device_index_in_pre_rasterization",
-                                            {MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_PRE_RASTERIZATION, 0u, 0u}));
-        otherTests->addChild(
-            new PipelineLibraryMiscTestCase(testCtx, "view_index_from_device_index_in_fragment",
-                                            {MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_FRAGMENT, 0u, 0u}));
-        otherTests->addChild(
-            new PipelineLibraryMiscTestCase(testCtx, "view_index_from_device_index_in_mesh_stages",
-                                            {MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_STAGES, 0u, 0u}));
-        otherTests->addChild(new PipelineLibraryMiscTestCase(
-            testCtx, "view_index_from_device_index_in_mesh_pre_rasterization",
-            {MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_PRE_RASTERIZATION, 0u, 0u}));
-        otherTests->addChild(
-            new PipelineLibraryMiscTestCase(testCtx, "view_index_from_device_index_in_mesh_fragment",
-                                            {MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX_IN_MESH_FRAGMENT, 0u, 0u}));
+        std::pair<std::string, PipelineStateMode> pipelineStateModes[]{
+            {"in_all_stages", PipelineStateMode::ALL_STAGES},
+            {"in_pre_rasterization", PipelineStateMode::PRE_RASTERIZATION},
+            {"in_fragment", PipelineStateMode::FRAGMENT}};
+        std::string baseName;
+        baseName.reserve(60);
+        for (const auto &pipelineStateMode : pipelineStateModes)
+        {
+            baseName = "view_index_from_device_index_" + pipelineStateMode.first;
+            for (uint32_t combination = 0; combination < 4; ++combination)
+            {
+                std::string name    = baseName;
+                bool useMeshShading = (combination > 1);
+                if (useMeshShading)
+                    name += "_mesh_shading";
+                bool useLinkTimeOpt = (combination % 2);
+                if (useLinkTimeOpt)
+                    name += "_link_time_opt";
+
+                otherTests->addChild(
+                    new PipelineLibraryMiscTestCase(testCtx, name.c_str(),
+                                                    {MiscTestMode::VIEW_INDEX_FROM_DEVICE_INDEX,
+                                                     pipelineStateMode.second, useMeshShading, useLinkTimeOpt}));
+            }
+        }
 
         otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "unusual_multisample_state",
                                                              {MiscTestMode::UNUSUAL_MULTISAMPLE_STATE, 0u, 0u}));
+
+        otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "destroy_resources_before_link_samplers_2",
+                                                             {MiscTestMode::DESTROY_RESOURCES_BEFORE_LINK, 2u}));
+        otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "destroy_resources_before_link_samplers_3",
+                                                             {MiscTestMode::DESTROY_RESOURCES_BEFORE_LINK, 3u}));
 
         miscTests->addChild(otherTests.release());
     }
 
     {
         de::MovePtr<tcu::TestCaseGroup> nonGraphicsTests(new tcu::TestCaseGroup(testCtx, "non_graphics"));
-        nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(
-            testCtx, "shader_module_info_comp", {MiscTestMode::SHADER_MODULE_CREATE_INFO_COMP, 0u, 0u}));
-        nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(
-            testCtx, "shader_module_info_rt", {MiscTestMode::SHADER_MODULE_CREATE_INFO_RT, 0u, 0u}));
-        nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(
-            testCtx, "shader_module_info_rt_lib", {MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB, 0u, 0u}));
+        nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "shader_module_info_comp",
+                                                                   {MiscTestMode::SHADER_MODULE_CREATE_INFO_COMP}));
+        nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "shader_module_info_rt",
+                                                                   {MiscTestMode::SHADER_MODULE_CREATE_INFO_RT}));
+        nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "shader_module_info_rt_lib",
+                                                                   {MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB}));
         miscTests->addChild(nonGraphicsTests.release());
     }
 
@@ -4669,6 +5010,4 @@ tcu::TestCaseGroup *createPipelineLibraryTests(tcu::TestContext &testCtx)
     return group.release();
 }
 
-} // namespace pipeline
-
-} // namespace vkt
+} // namespace vkt::pipeline
