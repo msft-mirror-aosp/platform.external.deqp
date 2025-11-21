@@ -1,6 +1,5 @@
 dEQP-VK.info.build
 dEQP-VK.info.device
-dEQP-VK.info.device_extensions
 dEQP-VK.info.device_features
 dEQP-VK.info.device_group_peer_memory_features
 dEQP-VK.info.device_layers
