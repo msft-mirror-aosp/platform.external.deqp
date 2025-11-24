@@ -3,3 +3,4 @@
 
 # Issue: b/458608295
 dEQP-VK.api.info.android.no_unknown_extensions
+dEQP-VK.info.device_extensions
