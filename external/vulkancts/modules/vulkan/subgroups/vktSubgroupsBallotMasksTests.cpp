@@ -1362,12 +1362,10 @@ TestStatus test(Context &context, const CaseDefinition caseDef)
         uint32_t maxSubgroupSize = min(subgroupSizeControlProperties.maxSubgroupSize, 64U);
 
         log << TestLog::Message << "Testing required subgroup size range ["
-            << subgroupSizeControlProperties.minSubgroupSize << ", " << maxSubgroupSize
-            << "]" << TestLog::EndMessage;
+            << subgroupSizeControlProperties.minSubgroupSize << ", " << maxSubgroupSize << "]" << TestLog::EndMessage;
 
         // According to the spec, requiredSubgroupSize must be a power-of-two integer.
-        for (uint32_t size = subgroupSizeControlProperties.minSubgroupSize;
-             size <= maxSubgroupSize; size *= 2)
+        for (uint32_t size = subgroupSizeControlProperties.minSubgroupSize; size <= maxSubgroupSize; size *= 2)
         {
             TestStatus result(QP_TEST_RESULT_INTERNAL_ERROR, "Internal Error");
 

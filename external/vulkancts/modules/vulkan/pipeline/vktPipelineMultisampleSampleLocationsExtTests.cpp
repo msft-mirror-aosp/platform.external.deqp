@@ -21,7 +21,7 @@
  *
  *//*!
  * \file
- * \brief Tests for VK_EXT_sample_locations
+ * \brief Tests for VK_EXT_sample_locations and std sample locations
  *//*--------------------------------------------------------------------*/
 
 #include "vktPipelineMultisampleSampleLocationsExtTests.hpp"
@@ -31,7 +31,6 @@
 #include "vktTestGroupUtil.hpp"
 #include "vktTestCaseUtil.hpp"
 
-#include "vkPlatform.hpp"
 #include "vkMemUtil.hpp"
 #include "vkQueryUtil.hpp"
 #include "vkTypeUtil.hpp"
@@ -56,6 +55,7 @@
 #include <vector>
 #include <set>
 #include <algorithm>
+#include <cmath>
 
 namespace vkt
 {
@@ -65,7 +65,6 @@ namespace
 {
 using namespace vk;
 using de::MovePtr;
-using de::UniquePtr;
 using tcu::RGBA;
 using tcu::UVec2;
 using tcu::UVec4;
@@ -145,9 +144,21 @@ void addInstanceTestCaseWithPrograms(tcu::TestCaseGroup *group, const std::strin
             typename FunctionSupport1<Arg0>::Args(checkSupport, arg0)));
 }
 
-void checkSupportSampleLocations(Context &context)
+void checkSampleLocationsExt(Context &context)
 {
     context.requireDeviceFunctionality("VK_EXT_sample_locations");
+}
+
+void checkSupportSampleLocations(Context &context, bool useStdLocations)
+{
+    if (useStdLocations)
+    {
+        const auto &limits = context.getDeviceProperties().limits;
+        if (!limits.standardSampleLocations)
+            TCU_THROW(NotSupportedError, "standardSampleLocations not supported");
+    }
+    else
+        checkSampleLocationsExt(context);
 }
 
 std::string getString(const VkSampleCountFlagBits sampleCount)
@@ -569,7 +580,7 @@ void preparePipelineWrapper(GraphicsPipelineWrapper &gpw, const std::vector<VkDy
                             const VkSampleLocationsInfoEXT &sampleLocationsInfo, const bool useDepth,
                             const bool useStencil, const VertexInputConfig vertexInputConfig,
                             const VkPrimitiveTopology topology, const VkStencilOpState &stencilOpState,
-                            const bool useFragmentShadingRate)
+                            const bool useFragmentShadingRate, const bool useStdLocations)
 {
     std::vector<VkVertexInputBindingDescription> vertexInputBindingDescriptions;
     std::vector<VkVertexInputAttributeDescription> vertexInputAttributeDescriptions;
@@ -621,9 +632,11 @@ void preparePipelineWrapper(GraphicsPipelineWrapper &gpw, const std::vector<VkDy
         sampleLocationsInfo, // VkSampleLocationsInfoEXT    sampleLocationsInfo;
     };
 
+    const auto pNext = (useStdLocations ? nullptr : &pipelineSampleLocationsCreateInfo);
+
     const VkPipelineMultisampleStateCreateInfo pipelineMultisampleStateInfo = {
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO, // VkStructureType sType;
-        &pipelineSampleLocationsCreateInfo,                       // const void* pNext;
+        pNext,                                                    // const void* pNext;
         (VkPipelineMultisampleStateCreateFlags)0,                 // VkPipelineMultisampleStateCreateFlags flags;
         numSamples,                                               // VkSampleCountFlagBits rasterizationSamples;
         VK_TRUE,                                                  // VkBool32 sampleShadingEnable;
@@ -697,20 +710,18 @@ void preparePipelineWrapper(GraphicsPipelineWrapper &gpw, const std::vector<VkDy
         .buildPipeline();
 }
 
-void preparePipelineWrapperSinglePassColor(GraphicsPipelineWrapper &gpw,
-                                           const std::vector<VkDynamicState> &dynamicState,
-                                           const PipelineLayoutWrapper &pipelineLayout, const VkRenderPass renderPass,
-                                           const ShaderWrapper vertexModule, const ShaderWrapper fragmentModule,
-                                           const VkViewport &viewport, const VkRect2D scissor,
-                                           const VkSampleCountFlagBits numSamples, const bool useSampleLocations,
-                                           const VkSampleLocationsInfoEXT &sampleLocationsInfo,
-                                           const VertexInputConfig vertexInputConfig,
-                                           const VkPrimitiveTopology topology, const bool useFragmentShadingRate)
+void preparePipelineWrapperSinglePassColor(
+    GraphicsPipelineWrapper &gpw, const std::vector<VkDynamicState> &dynamicState,
+    const PipelineLayoutWrapper &pipelineLayout, const VkRenderPass renderPass, const ShaderWrapper vertexModule,
+    const ShaderWrapper fragmentModule, const VkViewport &viewport, const VkRect2D scissor,
+    const VkSampleCountFlagBits numSamples, const bool useSampleLocations,
+    const VkSampleLocationsInfoEXT &sampleLocationsInfo, const VertexInputConfig vertexInputConfig,
+    const VkPrimitiveTopology topology, const bool useFragmentShadingRate, const bool useStdLocations)
 {
     preparePipelineWrapper(gpw, dynamicState, pipelineLayout, renderPass, vertexModule, fragmentModule,
                            /*subpass*/ 0u, viewport, scissor, numSamples, useSampleLocations, sampleLocationsInfo,
                            /*depth test*/ false, /*stencil test*/ false, vertexInputConfig, topology,
-                           stencilOpStateIncrement(), useFragmentShadingRate);
+                           stencilOpStateIncrement(), useFragmentShadingRate, useStdLocations);
 }
 
 //! Utility to build and maintain render pass, framebuffer and related resources.
@@ -912,24 +923,19 @@ public:
     }
 
     void recordBeginRenderPass(const DeviceInterface &vk, const VkCommandBuffer cmdBuffer, const VkRect2D &renderArea,
-                               const VkSubpassContents subpassContents) const
+                               const VkSubpassContents subpassContents, bool useStdLocations) const
     {
         const VkRenderPassSampleLocationsBeginInfoEXT renderPassSampleLocationsBeginInfo = {
-            VK_STRUCTURE_TYPE_RENDER_PASS_SAMPLE_LOCATIONS_BEGIN_INFO_EXT, // VkStructureType                          sType;
-            nullptr, // const void*                              pNext;
-            static_cast<uint32_t>(
-                m_attachmentSampleLocations
-                    .size()), // uint32_t                                 attachmentInitialSampleLocationsCount;
-            dataOrNullPtr(
-                m_attachmentSampleLocations), // const VkAttachmentSampleLocationsEXT*    pAttachmentInitialSampleLocations;
-            static_cast<uint32_t>(
-                m_subpassSampleLocations
-                    .size()), // uint32_t                                 postSubpassSampleLocationsCount;
-            dataOrNullPtr(
-                m_subpassSampleLocations), // const VkSubpassSampleLocationsEXT*       pPostSubpassSampleLocations;
+            VK_STRUCTURE_TYPE_RENDER_PASS_SAMPLE_LOCATIONS_BEGIN_INFO_EXT,
+            nullptr,
+            de::sizeU32(m_attachmentSampleLocations),
+            de::dataOrNull(m_attachmentSampleLocations),
+            de::sizeU32(m_subpassSampleLocations),
+            de::dataOrNull(m_subpassSampleLocations),
         };
+        const auto pLocationsBeginInfo = (useStdLocations ? nullptr : &renderPassSampleLocationsBeginInfo);
         m_renderPass.begin(vk, cmdBuffer, renderArea, static_cast<uint32_t>(m_clearValues.size()),
-                           dataOrNullPtr(m_clearValues), subpassContents, &renderPassSampleLocationsBeginInfo);
+                           dataOrNullPtr(m_clearValues), subpassContents, pLocationsBeginInfo);
     }
 
     void nextSubpass(const DeviceInterface &vk, const VkCommandBuffer cmdBuffer,
@@ -1024,9 +1030,28 @@ void recordWaitEventWithImage(const DeviceInterface &vk, const VkCommandBuffer c
 }
 
 void recordCopyImageToBuffer(const DeviceInterface &vk, const VkCommandBuffer cmdBuffer, const UVec2 &imageSize,
-                             const VkImage srcImage, const VkBuffer dstBuffer)
+                             const VkImage srcImage, const VkBuffer dstBuffer,
+                             const VkImageLayout layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL)
 {
-    // Resolve image -> host buffer
+    // Image read barrier
+    {
+        const VkImageMemoryBarrier barrier = {
+            VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType sType;
+            nullptr,                                // const void* pNext;
+            VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,   // VkAccessFlags srcAccessMask;
+            VK_ACCESS_TRANSFER_READ_BIT,            // VkAccessFlags dstAccessMask;
+            layout,                                 // VkImageLayout oldLayout;
+            VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,   // VkImageLayout newLayout;
+            VK_QUEUE_FAMILY_IGNORED,                // uint32_t     srcQueueFamilyIndex;
+            VK_QUEUE_FAMILY_IGNORED,                // uint32_t     dstQueueFamilyIndex;
+            srcImage,                               // VkImage image;
+            makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u,
+                                      1u) // VkImageSubresourceRange subresourceRange;
+        };
+        vk.cmdPipelineBarrier(cmdBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                              (VkDependencyFlags)0, 0u, nullptr, 0u, nullptr, 1u, &barrier);
+    }
+    // Color/Resolve image -> host buffer
     {
         const VkBufferImageCopy region = {
             0ull, // VkDeviceSize                bufferOffset;
@@ -1148,13 +1173,13 @@ tcu::TestStatus testQuerySampleLocationProperties(Context &context)
                                       << tcu::TestLog::EndSection;
 
     const VkSampleCountFlags allowedSampleCounts =
-        (VK_SAMPLE_COUNT_2_BIT | VK_SAMPLE_COUNT_4_BIT | VK_SAMPLE_COUNT_8_BIT | VK_SAMPLE_COUNT_16_BIT |
-         VK_SAMPLE_COUNT_32_BIT | VK_SAMPLE_COUNT_64_BIT);
+        (VK_SAMPLE_COUNT_1_BIT | VK_SAMPLE_COUNT_2_BIT | VK_SAMPLE_COUNT_4_BIT | VK_SAMPLE_COUNT_8_BIT |
+         VK_SAMPLE_COUNT_16_BIT | VK_SAMPLE_COUNT_32_BIT | VK_SAMPLE_COUNT_64_BIT);
 
     if ((sampleLocationsProperties.sampleLocationSampleCounts & allowedSampleCounts) == 0)
     {
-        return tcu::TestStatus::fail("VkPhysicalDeviceSampleLocationsPropertiesEXT: sampleLocationSampleCounts should "
-                                     "specify at least one MSAA sample count");
+        TCU_FAIL("VkPhysicalDeviceSampleLocationsPropertiesEXT: sampleLocationSampleCounts should specify at least one "
+                 "MSAA sample count");
     }
 
     if (sampleLocationsProperties.maxSampleLocationGridSize.width == 0u ||
@@ -1163,8 +1188,7 @@ tcu::TestStatus testQuerySampleLocationProperties(Context &context)
             16384u || // max not specified, but try to catch nonsense values like -1
         sampleLocationsProperties.maxSampleLocationGridSize.height > 16384u)
     {
-        return tcu::TestStatus::fail(
-            "VkPhysicalDeviceSampleLocationsPropertiesEXT: maxSampleLocationGridSize must be at least (1,1) size");
+        TCU_FAIL("VkPhysicalDeviceSampleLocationsPropertiesEXT: maxSampleLocationGridSize must be at least (1,1) size");
     }
 
     for (int i = 0; i < 2; ++i)
@@ -1172,8 +1196,8 @@ tcu::TestStatus testQuerySampleLocationProperties(Context &context)
         if (sampleLocationsProperties.sampleLocationCoordinateRange[i] < 0.0f ||
             sampleLocationsProperties.sampleLocationCoordinateRange[i] > 1.0f)
         {
-            return tcu::TestStatus::fail("VkPhysicalDeviceSampleLocationsPropertiesEXT: "
-                                         "sampleLocationCoordinateRange[] values must be in [0, 1] range");
+            TCU_FAIL("VkPhysicalDeviceSampleLocationsPropertiesEXT: sampleLocationCoordinateRange[] values must be in "
+                     "[0, 1] range");
         }
     }
 
@@ -1181,8 +1205,7 @@ tcu::TestStatus testQuerySampleLocationProperties(Context &context)
         sampleLocationsProperties.sampleLocationSubPixelBits >
             64u) // max not specified, but try to catch nonsense values
     {
-        return tcu::TestStatus::fail(
-            "VkPhysicalDeviceSampleLocationsPropertiesEXT: sampleLocationSubPixelBits should be greater than 0");
+        TCU_FAIL("VkPhysicalDeviceSampleLocationsPropertiesEXT: sampleLocationSubPixelBits should be greater than 0");
     }
 
     return tcu::TestStatus::pass("Pass");
@@ -1250,7 +1273,10 @@ tcu::TestStatus testQueryMultisampleProperties(Context &context)
         log << tcu::TestLog::EndSection;
     }
 
-    return allOk ? tcu::TestStatus::pass("Pass") : tcu::TestStatus::fail("Some values were incorrect");
+    if (!allOk)
+        TCU_FAIL("Some values were incorrect");
+
+    return tcu::TestStatus::pass("Pass");
 }
 
 // These tests only use a color attachment and focus on per-sample data
@@ -1287,10 +1313,11 @@ static T *sampleData(void *const basePtr)
 
 enum TestOptionFlagBits
 {
-    TEST_OPTION_DYNAMIC_STATE_BIT             = 0x1, //!< Use dynamic pipeline state to pass in sample locations
-    TEST_OPTION_CLOSELY_PACKED_BIT            = 0x2, //!< Place samples as close as possible to each other
-    TEST_OPTION_FRAGMENT_SHADING_RATE_BIT     = 0x4, //!< Use VK_KHR_fragment_shading_rate
-    TEST_OPTION_VARIABLE_SAMPLE_LOCATIONS_BIT = 0x8  //!< Use variable sample locations
+    TEST_OPTION_DYNAMIC_STATE_BIT             = (1 << 0), //!< Use dynamic pipeline state to pass in sample locations
+    TEST_OPTION_CLOSELY_PACKED_BIT            = (1 << 1), //!< Place samples as close as possible to each other
+    TEST_OPTION_FRAGMENT_SHADING_RATE_BIT     = (1 << 2), //!< Use VK_KHR_fragment_shading_rate
+    TEST_OPTION_VARIABLE_SAMPLE_LOCATIONS_BIT = (1 << 3), //!< Use variable sample locations
+    TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT      = (1 << 4), //!< Use std sample locations. Incompatible with all but FSR.
 };
 typedef uint32_t TestOptionFlags;
 
@@ -1299,18 +1326,26 @@ struct TestParams
     PipelineConstructionType pipelineConstructionType;
     VkSampleCountFlagBits numSamples;
     TestOptionFlags options;
+
+    bool useStdLocations() const
+    {
+        return (options & TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT);
+    }
 };
 
 void checkSupportVerifyTests(Context &context, const TestParams params)
 {
-    checkSupportSampleLocations(context);
+    const bool useStdLocations = params.useStdLocations();
+
+    checkSupportSampleLocations(context, useStdLocations);
 
     context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_SAMPLE_RATE_SHADING);
 
     if ((context.getDeviceProperties().limits.framebufferColorSampleCounts & params.numSamples) == 0u)
         TCU_THROW(NotSupportedError, "framebufferColorSampleCounts: sample count not supported");
 
-    if ((getSampleLocationsPropertiesEXT(context).sampleLocationSampleCounts & params.numSamples) == 0u)
+    if (!useStdLocations &&
+        (getSampleLocationsPropertiesEXT(context).sampleLocationSampleCounts & params.numSamples) == 0u)
         TCU_THROW(NotSupportedError, "VkPhysicalDeviceSampleLocationsPropertiesEXT: sample count not supported");
 
     if (TEST_OPTION_FRAGMENT_SHADING_RATE_BIT & params.options)
@@ -1323,6 +1358,13 @@ void checkSupportVerifyTests(Context &context, const TestParams params)
 
     checkPipelineConstructionRequirements(context.getInstanceInterface(), context.getPhysicalDevice(),
                                           params.pipelineConstructionType);
+}
+
+void checkSupportVerifyTestsPrimID(Context &context, const TestParams params)
+{
+    // Some tests use gl_PrimitiveID from the fragment shader, which requires the Geometry capability.
+    context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_GEOMETRY_SHADER);
+    checkSupportVerifyTests(context, params);
 }
 
 std::string declareSampleDataSSBO(void)
@@ -1439,35 +1481,41 @@ public:
     TestBase(Context &context, const TestParams params)
         : TestInstance(context)
         , m_params(params)
-        , m_sampleLocationsProperties(getSampleLocationsPropertiesEXT(context))
+        , m_sampleLocationsProperties(params.useStdLocations() ? initVulkanStructure() :
+                                                                 getSampleLocationsPropertiesEXT(context))
         , m_colorFormat(VK_FORMAT_R8G8B8A8_UNORM)
         , m_numVertices(0)
         , m_currentGridNdx(0)
     {
-        VkMultisamplePropertiesEXT multisampleProperties = {
-            VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT, // VkStructureType    sType;
-            nullptr,                                      // void*              pNext;
-            VkExtent2D(),                                 // VkExtent2D         maxSampleLocationGridSize;
-        };
+        if (params.useStdLocations())
+            m_gridSizes.push_back(UVec2(1u, 1u));
+        else
+        {
+            VkMultisamplePropertiesEXT multisampleProperties = {
+                VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT, // VkStructureType    sType;
+                nullptr,                                      // void*              pNext;
+                VkExtent2D(),                                 // VkExtent2D         maxSampleLocationGridSize;
+            };
 
-        m_context.getInstanceInterface().getPhysicalDeviceMultisamplePropertiesEXT(
-            m_context.getPhysicalDevice(), m_params.numSamples, &multisampleProperties);
+            m_context.getInstanceInterface().getPhysicalDeviceMultisamplePropertiesEXT(
+                m_context.getPhysicalDevice(), m_params.numSamples, &multisampleProperties);
 
-        // Generate grid size combinations
-        for (uint32_t y = multisampleProperties.maxSampleLocationGridSize.height; y >= 1u; y >>= 1)
-            for (uint32_t x = multisampleProperties.maxSampleLocationGridSize.width; x >= 1u; x >>= 1)
-            {
-                DE_ASSERT(multisampleProperties.maxSampleLocationGridSize.width % x == 0u);
-                DE_ASSERT(multisampleProperties.maxSampleLocationGridSize.height % y == 0u);
-                m_gridSizes.push_back(UVec2(x, y));
-            }
+            // Generate grid size combinations
+            for (uint32_t y = multisampleProperties.maxSampleLocationGridSize.height; y >= 1u; y >>= 1)
+                for (uint32_t x = multisampleProperties.maxSampleLocationGridSize.width; x >= 1u; x >>= 1)
+                {
+                    DE_ASSERT(multisampleProperties.maxSampleLocationGridSize.width % x == 0u);
+                    DE_ASSERT(multisampleProperties.maxSampleLocationGridSize.height % y == 0u);
+                    m_gridSizes.push_back(UVec2(x, y));
+                }
+        }
     }
 
     tcu::TestStatus iterate(void)
     {
         // Will be executed several times, for all possible pixel grid sizes
         if (!(currentGridSize().x() >= 1 && currentGridSize().y() >= 1))
-            return tcu::TestStatus::fail("maxSampleLocationGridSize is invalid");
+            TCU_FAIL("maxSampleLocationGridSize is invalid");
 
         // Prepare the pixel grid
         {
@@ -1478,10 +1526,15 @@ public:
             m_pixelGrid =
                 MovePtr<MultisamplePixelGrid>(new MultisamplePixelGrid(currentGridSize(), m_params.numSamples));
 
-            if ((m_params.options & TEST_OPTION_CLOSELY_PACKED_BIT) != 0u)
-                fillSampleLocationsPacked(*m_pixelGrid, m_sampleLocationsProperties.sampleLocationSubPixelBits);
+            if ((m_params.options & TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT) != 0u)
+                fillSampleLocationsStd(*m_pixelGrid);
             else
-                fillSampleLocationsRandom(*m_pixelGrid, m_sampleLocationsProperties.sampleLocationSubPixelBits);
+            {
+                if ((m_params.options & TEST_OPTION_CLOSELY_PACKED_BIT) != 0u)
+                    fillSampleLocationsPacked(*m_pixelGrid, m_sampleLocationsProperties.sampleLocationSubPixelBits);
+                else
+                    fillSampleLocationsRandom(*m_pixelGrid, m_sampleLocationsProperties.sampleLocationSubPixelBits);
+            }
 
             logPixelGrid(m_context.getTestContext().getLog(), m_sampleLocationsProperties, *m_pixelGrid);
         }
@@ -1494,8 +1547,12 @@ public:
 
             // Images and staging buffers
 
+            const VkImageUsageFlags colorImageUsageFlags =
+                (isMSAA() ? VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT :
+                            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+
             m_colorImage      = makeImage(vk, device, (VkImageCreateFlags)0, m_colorFormat, m_renderSize,
-                                          m_params.numSamples, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT);
+                                          m_params.numSamples, colorImageUsageFlags);
             m_colorImageAlloc = bindImage(vk, device, allocator, *m_colorImage, MemoryRequirement::Any);
             m_colorImageView  = makeImageView(vk, device, *m_colorImage, VK_IMAGE_VIEW_TYPE_2D, m_colorFormat,
                                               makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u));
@@ -1514,7 +1571,7 @@ public:
         }
 
         if (!testPixelGrid())
-            return tcu::TestStatus::fail("Fail");
+            TCU_FAIL("Fail");
 
         if (shrinkCurrentGrid())
             return tcu::TestStatus::incomplete();
@@ -1541,6 +1598,11 @@ protected:
         return true;
     }
 
+    bool isMSAA(void) const
+    {
+        return (m_params.numSamples != VK_SAMPLE_COUNT_1_BIT);
+    }
+
     void drawSinglePass(const VertexInputConfig vertexInputConfig)
     {
         DE_ASSERT(m_descriptorSetLayout);
@@ -1552,6 +1614,7 @@ protected:
         const VkViewport viewport             = makeViewport(m_renderSize);
         const VkRect2D renderArea             = makeRect2D(m_renderSize);
         const VkRect2D scissor                = makeRect2D(m_renderSize);
+        const bool useStdLocations            = (m_params.options & TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT);
         const ShaderWrapper vertexModule(ShaderWrapper(vk, device, m_context.getBinaryCollection().get("vert"), 0u));
         const ShaderWrapper fragmentModule(ShaderWrapper(vk, device, m_context.getBinaryCollection().get("frag"), 0u));
         const PipelineLayoutWrapper pipelineLayout(m_params.pipelineConstructionType, vk, device,
@@ -1576,28 +1639,36 @@ protected:
                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
                          makeClearValueColor(CLEAR_COLOR_0));      // VkClearValue                    clearValue,
 
-        rt.addAttachment(*m_resolveImage,                      // VkImage                        image
-                         *m_resolveImageView,                  // VkImageView                    imageView,
-                         (VkAttachmentDescriptionFlags)0,      // VkAttachmentDescriptionFlags    flags,
-                         m_colorFormat,                        // VkFormat                        format,
-                         VK_SAMPLE_COUNT_1_BIT,                // VkSampleCountFlagBits        numSamples,
-                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            loadOp,
-                         VK_ATTACHMENT_STORE_OP_STORE,         // VkAttachmentStoreOp            storeOp,
-                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            stencilLoadOp,
-                         VK_ATTACHMENT_STORE_OP_DONT_CARE,     // VkAttachmentStoreOp            stencilStoreOp,
-                         VK_IMAGE_LAYOUT_UNDEFINED,            // VkImageLayout                initialLayout,
-                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // VkImageLayout                finalLayout,
-                         VkClearValue());                      // VkClearValue                    clearValue,
+        rt.addAttachment(*m_resolveImage,                          // VkImage                        image
+                         *m_resolveImageView,                      // VkImageView                    imageView,
+                         (VkAttachmentDescriptionFlags)0,          // VkAttachmentDescriptionFlags   flags,
+                         m_colorFormat,                            // VkFormat                       format,
+                         VK_SAMPLE_COUNT_1_BIT,                    // VkSampleCountFlagBits          numSamples,
+                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp             loadOp,
+                         VK_ATTACHMENT_STORE_OP_STORE,             // VkAttachmentStoreOp            storeOp,
+                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp             stencilLoadOp,
+                         VK_ATTACHMENT_STORE_OP_DONT_CARE,         // VkAttachmentStoreOp            stencilStoreOp,
+                         VK_IMAGE_LAYOUT_UNDEFINED,                // VkImageLayout                  initialLayout,
+                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                  finalLayout,
+                         VkClearValue());                          // VkClearValue                   clearValue,
 
-        if (TEST_OPTION_VARIABLE_SAMPLE_LOCATIONS_BIT & m_params.options)
+        if (isMSAA())
         {
-            rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
-                                                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, &sampleLocationsInfo);
+            if (TEST_OPTION_VARIABLE_SAMPLE_LOCATIONS_BIT & m_params.options)
+            {
+                DE_ASSERT(!useStdLocations);
+                rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
+                                                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, &sampleLocationsInfo);
+            }
+            else
+            {
+                rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
+                                                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            }
         }
         else
         {
-            rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
-                                                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            rt.addSubpassColorAttachment(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
         }
 
         rt.bake(vk, device, m_params.pipelineConstructionType, m_renderSize);
@@ -1607,20 +1678,23 @@ protected:
 
         if (useDynamicStateSampleLocations)
         {
+            DE_ASSERT(!useStdLocations);
+
             std::vector<VkDynamicState> dynamicState;
             dynamicState.push_back(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
 
             preparePipelineWrapperSinglePassColor(
                 pipeline, dynamicState, pipelineLayout, rt.getRenderPass(), vertexModule, fragmentModule, viewport,
                 scissor, m_params.numSamples, /*use sample locations*/ true, makeEmptySampleLocationsInfo(),
-                vertexInputConfig, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, useFragmentShadingRate);
+                vertexInputConfig, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, useFragmentShadingRate, useStdLocations);
         }
         else
         {
             preparePipelineWrapperSinglePassColor(
                 pipeline, std::vector<VkDynamicState>(), pipelineLayout, rt.getRenderPass(), vertexModule,
                 fragmentModule, viewport, scissor, m_params.numSamples, /*use sample locations*/ true,
-                sampleLocationsInfo, vertexInputConfig, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, useFragmentShadingRate);
+                sampleLocationsInfo, vertexInputConfig, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, useFragmentShadingRate,
+                useStdLocations);
         }
 
         const Unique<VkCommandPool> cmdPool(createCommandPool(
@@ -1629,14 +1703,17 @@ protected:
 
         beginCommandBuffer(vk, *cmdBuffer);
 
-        rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE);
+        rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE, useStdLocations);
 
         vk.cmdBindVertexBuffers(*cmdBuffer, /*first binding*/ 0u, /*num bindings*/ 1u, &m_vertexBuffer.get(),
                                 /*offsets*/ &ZERO);
         pipeline.bind(*cmdBuffer);
 
         if (useDynamicStateSampleLocations)
+        {
+            DE_ASSERT(!useStdLocations);
             vk.cmdSetSampleLocationsEXT(*cmdBuffer, &sampleLocationsInfo);
+        }
 
         if (m_descriptorSet)
             vk.cmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, *pipelineLayout, 0u, 1u,
@@ -1645,7 +1722,12 @@ protected:
         vk.cmdDraw(*cmdBuffer, m_numVertices, 1u, 0u, 0u);
         rt.endRenderPass(vk, *cmdBuffer);
 
-        recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, *m_resolveImage, *m_colorBuffer);
+        // Color/Resolve image -> host buffer
+        {
+            const VkImage sourceImage = (isMSAA() ? *m_resolveImage : *m_colorImage);
+
+            recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, sourceImage, *m_colorBuffer);
+        }
 
         endCommandBuffer(vk, *cmdBuffer);
         submitCommandsAndWait(vk, device, m_context.getUniversalQueue(), *cmdBuffer);
@@ -1748,9 +1830,13 @@ public:
         {
             // For each sample location (in the whole framebuffer), create a sub-pixel triangle that contains it.
             // NDC viewport size is 2.0 in X and Y and NDC pixel width/height depends on the framebuffer resolution.
-            const Vec2 pixelSize = Vec2(2.0f) / m_renderSize.cast<float>();
-            const Vec2 offset =
-                pixelSize / UVec2(1u << m_sampleLocationsProperties.sampleLocationSubPixelBits).cast<float>();
+            const Vec2 pixelSize      = Vec2(2.0f) / m_renderSize.cast<float>();
+            const auto isStdLocations = ((m_params.options & TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT) != 0u);
+            const uint32_t stdPrecision =
+                static_cast<uint32_t>(std::log2(static_cast<float>(m_params.numSamples * 2u)) + 0.5f);
+            const uint32_t subPixelBits =
+                std::max(1u, (isStdLocations ? stdPrecision : m_sampleLocationsProperties.sampleLocationSubPixelBits));
+            const Vec2 offset = pixelSize / UVec2(1u << subPixelBits).cast<float>();
             std::vector<Vec4> vertices;
 
             // Surround with a roughly centered triangle
@@ -1829,8 +1915,8 @@ public:
 
 template <typename Test, typename ProgramsFunc>
 void addCases(tcu::TestCaseGroup *group, const VkSampleCountFlagBits numSamples,
-              PipelineConstructionType pipelineConstructionType, bool useFragmentShadingRate,
-              const ProgramsFunc initPrograms)
+              PipelineConstructionType pipelineConstructionType, bool useFragmentShadingRate, bool useStdLocations,
+              const ProgramsFunc initPrograms, bool usesPrimitiveID)
 {
     TestParams params;
     deMemset(&params, 0, sizeof(params));
@@ -1844,26 +1930,45 @@ void addCases(tcu::TestCaseGroup *group, const VkSampleCountFlagBits numSamples,
         TestOptionFlags testFlags;
     };
 
-    TestOptions testOpts[] = {
-        {"", useFragmentShadingRate ? (TestOptionFlags)TEST_OPTION_FRAGMENT_SHADING_RATE_BIT :
-                                      (TestOptionFlags)0 | (TestOptionFlags)TEST_OPTION_VARIABLE_SAMPLE_LOCATIONS_BIT},
-        {"_invariable",
-         useFragmentShadingRate ? (TestOptionFlags)TEST_OPTION_FRAGMENT_SHADING_RATE_BIT : (TestOptionFlags)0}};
+    std::vector<TestOptions> testOpts;
+
+    uint32_t baseFlags = 0u;
+
+    if (useFragmentShadingRate)
+        baseFlags |= TEST_OPTION_FRAGMENT_SHADING_RATE_BIT;
+
+    if (useStdLocations)
+        baseFlags |= TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT;
+
+    if (!useStdLocations)
+        testOpts.push_back(TestOptions{"", (baseFlags | TEST_OPTION_VARIABLE_SAMPLE_LOCATIONS_BIT)});
+    testOpts.push_back(TestOptions{"_invariable", baseFlags});
+
+    const auto supportCheck = (usesPrimitiveID ? checkSupportVerifyTestsPrimID : checkSupportVerifyTests);
 
     for (const auto &options : testOpts)
     {
         params.options = options.testFlags;
 
-        addInstanceTestCaseWithPrograms<Test>(group, (getString(numSamples) + options.testSuffix).c_str(),
-                                              checkSupportVerifyTests, initPrograms, params);
+        addInstanceTestCaseWithPrograms<Test>(group, (getString(numSamples) + options.testSuffix).c_str(), supportCheck,
+                                              initPrograms, params);
 
-        params.options |= (TestOptionFlags)TEST_OPTION_DYNAMIC_STATE_BIT;
-        addInstanceTestCaseWithPrograms<Test>(group, (getString(numSamples) + "_dynamic" + options.testSuffix).c_str(),
-                                              checkSupportVerifyTests, initPrograms, params);
+        if (!useStdLocations)
+        {
+            params.options |= TEST_OPTION_DYNAMIC_STATE_BIT;
+            addInstanceTestCaseWithPrograms<Test>(group,
+                                                  (getString(numSamples) + "_dynamic" + options.testSuffix).c_str(),
+                                                  supportCheck, initPrograms, params);
 
-        params.options |= (TestOptionFlags)TEST_OPTION_CLOSELY_PACKED_BIT;
-        addInstanceTestCaseWithPrograms<Test>(group, (getString(numSamples) + "_packed" + options.testSuffix).c_str(),
-                                              checkSupportVerifyTests, initPrograms, params);
+            // This is redundant for single-sampled.
+            if (numSamples != VK_SAMPLE_COUNT_1_BIT)
+            {
+                params.options |= TEST_OPTION_CLOSELY_PACKED_BIT;
+                addInstanceTestCaseWithPrograms<Test>(group,
+                                                      (getString(numSamples) + "_packed" + options.testSuffix).c_str(),
+                                                      supportCheck, initPrograms, params);
+            }
+        }
     }
 }
 
@@ -1877,14 +1982,15 @@ namespace Draw
 //! Options common to all test cases
 enum TestOptionFlagBits
 {
-    TEST_OPTION_SAME_PATTERN_BIT  = 1u << 0, //!< Use the same sample pattern for all operations
-    TEST_OPTION_DYNAMIC_STATE_BIT = 1u << 1, //!< Use dynamic pipeline state to pass in sample locations
-    TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT =
-        1u << 2, //!< Put drawing commands in a secondary buffer, including sample locations change (if dynamic)
-    TEST_OPTION_GENERAL_LAYOUT_BIT = 1u << 3, //!< Transition the image to general layout at some point in rendering
-    TEST_OPTION_WAIT_EVENTS_BIT =
-        1u << 4, //!< Use image memory barriers with vkCmdWaitEvents rather than vkCmdPipelineBarrier
-    TEST_OPTION_FRAGMENT_SHADING_RATE_BIT = 1u << 5, //!< Use VK_KHR_fragment_shading_rate
+    // clang-format off
+    TEST_OPTION_SAME_PATTERN_BIT             = (1 << 0), //!< Use the same sample pattern for all operations
+    TEST_OPTION_DYNAMIC_STATE_BIT            = (1 << 1), //!< Use dynamic pipeline state to pass in sample locations
+    TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT = (1 << 2), //!< Put drawing commands in a secondary buffer, including sample locations change (if dynamic)
+    TEST_OPTION_GENERAL_LAYOUT_BIT           = (1 << 3), //!< Transition the image to general layout at some point in rendering
+    TEST_OPTION_WAIT_EVENTS_BIT              = (1 << 4), //!< Use image memory barriers with vkCmdWaitEvents rather than vkCmdPipelineBarrier
+    TEST_OPTION_FRAGMENT_SHADING_RATE_BIT    = (1 << 5), //!< Use VK_KHR_fragment_shading_rate
+    TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT     = (1 << 6), //!< Use std locations. Incompatible with dynamic state, requires same pattern.
+    // clang-format on
 };
 typedef uint32_t TestOptionFlags;
 
@@ -1925,12 +2031,14 @@ struct TestParams
 
 void checkSupportDrawTests(Context &context, const TestParams params)
 {
-    checkSupportSampleLocations(context);
+    const bool useStdLocations = (params.options & TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT);
+    checkSupportSampleLocations(context, useStdLocations);
 
     if ((context.getDeviceProperties().limits.framebufferColorSampleCounts & params.numSamples) == 0u)
         TCU_THROW(NotSupportedError, "framebufferColorSampleCounts: sample count not supported");
 
-    if ((getSampleLocationsPropertiesEXT(context).sampleLocationSampleCounts & params.numSamples) == 0u)
+    if (!useStdLocations &&
+        (getSampleLocationsPropertiesEXT(context).sampleLocationSampleCounts & params.numSamples) == 0u)
         TCU_THROW(NotSupportedError, "VkPhysicalDeviceSampleLocationsPropertiesEXT: sample count not supported");
 
     // Are we allowed to modify the sample pattern within the same subpass?
@@ -2077,32 +2185,39 @@ public:
     DrawTest(Context &context, const TestParams params)
         : TestInstance(context)
         , m_params(params)
-        , m_sampleLocationsProperties(getSampleLocationsPropertiesEXT(context))
+        , m_sampleLocationsProperties(useStdLocations() ? initVulkanStructure() :
+                                                          getSampleLocationsPropertiesEXT(context))
         , m_renderSize(64, 32)
         , m_numVertices(0)
         , m_colorFormat(VK_FORMAT_R8G8B8A8_UNORM)
         , m_depthStencilFormat(VK_FORMAT_UNDEFINED)
         , m_depthStencilAspect(0)
     {
-        VkMultisamplePropertiesEXT multisampleProperties = {
-            VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT, // VkStructureType    sType;
-            nullptr,                                      // void*              pNext;
-            VkExtent2D(),                                 // VkExtent2D         maxSampleLocationGridSize;
-        };
+        if (useStdLocations())
+        {
+            m_gridSize = UVec2(1u, 1u);
+        }
+        else
+        {
+            VkMultisamplePropertiesEXT multisampleProperties = {
+                VK_STRUCTURE_TYPE_MULTISAMPLE_PROPERTIES_EXT, // VkStructureType    sType;
+                nullptr,                                      // void*              pNext;
+                VkExtent2D(),                                 // VkExtent2D         maxSampleLocationGridSize;
+            };
 
-        // For this test always use the full pixel grid
-
-        m_context.getInstanceInterface().getPhysicalDeviceMultisamplePropertiesEXT(
-            m_context.getPhysicalDevice(), m_params.numSamples, &multisampleProperties);
-        m_gridSize.x() = multisampleProperties.maxSampleLocationGridSize.width;
-        m_gridSize.y() = multisampleProperties.maxSampleLocationGridSize.height;
+            // For this test always use the full pixel grid
+            m_context.getInstanceInterface().getPhysicalDeviceMultisamplePropertiesEXT(
+                m_context.getPhysicalDevice(), m_params.numSamples, &multisampleProperties);
+            m_gridSize.x() = multisampleProperties.maxSampleLocationGridSize.width;
+            m_gridSize.y() = multisampleProperties.maxSampleLocationGridSize.height;
+        }
     }
 
     tcu::TestStatus iterate(void)
     {
         // Requirements
         if (!(m_gridSize.x() >= 1 && m_gridSize.y() >= 1))
-            return tcu::TestStatus::fail("maxSampleLocationGridSize is invalid");
+            TCU_FAIL("maxSampleLocationGridSize is invalid");
 
         // Images
         {
@@ -2133,13 +2248,14 @@ public:
             {
                 const VkImageUsageFlags depthStencilImageUsageFlags =
                     VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+                const auto createFlags =
+                    (useStdLocations() ? 0 : VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT);
 
                 m_depthStencilFormat = findSupportedDepthStencilFormat(m_context, useDepth(), useStencil());
                 m_depthStencilAspect = (useDepth() ? VK_IMAGE_ASPECT_DEPTH_BIT : (VkImageAspectFlagBits)0) |
                                        (useStencil() ? VK_IMAGE_ASPECT_STENCIL_BIT : (VkImageAspectFlagBits)0);
-                m_depthStencilImage =
-                    makeImage(vk, device, VK_IMAGE_CREATE_SAMPLE_LOCATIONS_COMPATIBLE_DEPTH_BIT_EXT,
-                              m_depthStencilFormat, m_renderSize, m_params.numSamples, depthStencilImageUsageFlags);
+                m_depthStencilImage = makeImage(vk, device, createFlags, m_depthStencilFormat, m_renderSize,
+                                                m_params.numSamples, depthStencilImageUsageFlags);
                 m_depthStencilImageAlloc =
                     bindImage(vk, device, allocator, *m_depthStencilImage, MemoryRequirement::Any);
                 m_depthStencilImageView =
@@ -2189,12 +2305,22 @@ public:
             const uint32_t numGrids = (useSameSamplePattern() ? 1u : NUM_PASSES);
             m_pixelGrids.reserve(numGrids);
 
+            if (!useSameSamplePattern())
+                DE_ASSERT(!useStdLocations());
+
             for (uint32_t passNdx = 0u; passNdx < numGrids; ++passNdx)
             {
-                const uint32_t seed = 142u + 75u * passNdx;
                 m_pixelGrids.push_back(MultisamplePixelGrid(m_gridSize, m_params.numSamples));
-                fillSampleLocationsRandom(m_pixelGrids.back(), m_sampleLocationsProperties.sampleLocationSubPixelBits,
-                                          seed);
+
+                if (useStdLocations())
+                    fillSampleLocationsStd(m_pixelGrids.back());
+                else
+                {
+                    const uint32_t seed = 142u + 75u * passNdx;
+                    fillSampleLocationsRandom(m_pixelGrids.back(),
+                                              m_sampleLocationsProperties.sampleLocationSubPixelBits, seed);
+                }
+
                 logPixelGrid(m_context.getTestContext().getLog(), m_sampleLocationsProperties, m_pixelGrids.back());
             }
         }
@@ -2271,7 +2397,7 @@ public:
 
                 m_context.getTestContext().getLog() << tcu::TestLog::Message << msg.str() << tcu::TestLog::EndMessage;
 
-                return tcu::TestStatus::fail("Resolved image has incorrect pixels");
+                TCU_FAIL("Resolved image has incorrect pixels");
             }
 
             if (hasLeftSideImage)
@@ -2282,10 +2408,9 @@ public:
                     tcu::getSubregion(image, m_renderSize.x() / 2, 0, m_renderSize.x() / 2, m_renderSize.y()),
                     UVec4(2u));
                 if (useSameSamplePattern() && !match)
-                    return tcu::TestStatus::fail("Multisample pattern should be identical in both image halves");
+                    TCU_FAIL("Multisample pattern should be identical in both image halves");
                 else if (!useSameSamplePattern() && match)
-                    return tcu::TestStatus::fail(
-                        "Multisample pattern doesn't seem to change between left and right image halves");
+                    TCU_FAIL("Multisample pattern doesn't seem to change between left and right image halves");
             }
             else if (!useSameSamplePattern())
             {
@@ -2295,9 +2420,8 @@ public:
                                       m_renderSize.y()),
                     tcu::getSubregion(image, m_renderSize.x() / 2, 0, m_renderSize.x() / 2, m_renderSize.y()),
                     UVec4(2u));
-
                 if (match)
-                    return tcu::TestStatus::fail("Multisample pattern doesn't seem to change between passes");
+                    TCU_FAIL("Multisample pattern doesn't seem to change between passes");
             }
         }
 
@@ -2338,6 +2462,16 @@ protected:
         return (m_params.options & TEST_OPTION_FRAGMENT_SHADING_RATE_BIT) != 0u;
     }
 
+    bool useStdLocations(void) const
+    {
+        return (m_params.options & TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT) != 0u;
+    }
+
+    bool isMSAA(void) const
+    {
+        return (m_params.numSamples != VK_SAMPLE_COUNT_1_BIT);
+    }
+
     //! Draw the second pass image, but with sample pattern from the first pass -- used to verify that the pattern is different
     void drawPatternChangeReference(void)
     {
@@ -2357,37 +2491,46 @@ protected:
 
         RenderTarget rt;
 
-        rt.addAttachment(*m_colorImage,                            // VkImage                        image
-                         *m_colorImageView,                        // VkImageView                    imageView,
-                         (VkAttachmentDescriptionFlags)0,          // VkAttachmentDescriptionFlags    flags,
-                         m_colorFormat,                            // VkFormat                        format,
+        rt.addAttachment(*m_colorImage,                            // VkImage                      image
+                         *m_colorImageView,                        // VkImageView                  imageView,
+                         (VkAttachmentDescriptionFlags)0,          // VkAttachmentDescriptionFlags flags,
+                         m_colorFormat,                            // VkFormat                     format,
                          m_params.numSamples,                      // VkSampleCountFlagBits        numSamples,
-                         VK_ATTACHMENT_LOAD_OP_CLEAR,              // VkAttachmentLoadOp            loadOp,
-                         VK_ATTACHMENT_STORE_OP_STORE,             // VkAttachmentStoreOp            storeOp,
-                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp            stencilLoadOp,
-                         VK_ATTACHMENT_STORE_OP_DONT_CARE,         // VkAttachmentStoreOp            stencilStoreOp,
+                         VK_ATTACHMENT_LOAD_OP_CLEAR,              // VkAttachmentLoadOp           loadOp,
+                         VK_ATTACHMENT_STORE_OP_STORE,             // VkAttachmentStoreOp          storeOp,
+                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp           stencilLoadOp,
+                         VK_ATTACHMENT_STORE_OP_DONT_CARE,         // VkAttachmentStoreOp          stencilStoreOp,
                          VK_IMAGE_LAYOUT_UNDEFINED,                // VkImageLayout                initialLayout,
                          VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
-                         clearColor0);                             // VkClearValue                    clearValue,
+                         clearColor0);                             // VkClearValue                 clearValue,
 
-        rt.addAttachment(*m_resolveImage,                      // VkImage                        image
-                         *m_resolveImageView,                  // VkImageView                    imageView,
-                         (VkAttachmentDescriptionFlags)0,      // VkAttachmentDescriptionFlags    flags,
-                         m_colorFormat,                        // VkFormat                        format,
-                         VK_SAMPLE_COUNT_1_BIT,                // VkSampleCountFlagBits        numSamples,
-                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            loadOp,
-                         VK_ATTACHMENT_STORE_OP_STORE,         // VkAttachmentStoreOp            storeOp,
-                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            stencilLoadOp,
-                         VK_ATTACHMENT_STORE_OP_DONT_CARE,     // VkAttachmentStoreOp            stencilStoreOp,
-                         VK_IMAGE_LAYOUT_UNDEFINED,            // VkImageLayout                initialLayout,
-                         VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // VkImageLayout                finalLayout,
-                         VkClearValue());                      // VkClearValue                    clearValue,
+        rt.addAttachment(*m_resolveImage,                          // VkImage                      image
+                         *m_resolveImageView,                      // VkImageView                  imageView,
+                         (VkAttachmentDescriptionFlags)0,          // VkAttachmentDescriptionFlags flags,
+                         m_colorFormat,                            // VkFormat                     format,
+                         VK_SAMPLE_COUNT_1_BIT,                    // VkSampleCountFlagBits        numSamples,
+                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp           loadOp,
+                         VK_ATTACHMENT_STORE_OP_STORE,             // VkAttachmentStoreOp          storeOp,
+                         VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp           stencilLoadOp,
+                         VK_ATTACHMENT_STORE_OP_DONT_CARE,         // VkAttachmentStoreOp          stencilStoreOp,
+                         VK_IMAGE_LAYOUT_UNDEFINED,                // VkImageLayout                initialLayout,
+                         VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
+                         VkClearValue());                          // VkClearValue                 clearValue,
 
-        rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
-                                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        if (isMSAA())
+        {
+            rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
+                                                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
+        else
+        {
+            rt.addSubpassColorAttachment(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+        }
 
         if (useDepth() || useStencil())
         {
+            const auto sampleLocationsPtr = (useStdLocations() ? nullptr : &sampleLocationsInfo);
+
             rt.addAttachment(
                 *m_depthStencilImage,                             // VkImage                        image
                 *m_depthStencilImageView,                         // VkImageView                    imageView,
@@ -2402,10 +2545,10 @@ protected:
                 VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
                 makeClearValueDepthStencil(DEPTH_CLEAR,
                                            STENCIL_REFERENCE), // VkClearValue                    clearValue,
-                &sampleLocationsInfo);                         // VkSampleLocationsInfoEXT*    pInitialSampleLocations
+                sampleLocationsPtr);                           // VkSampleLocationsInfoEXT*    pInitialSampleLocations
 
             rt.addSubpassDepthStencilAttachment(2u, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                &sampleLocationsInfo);
+                                                sampleLocationsPtr);
         }
 
         rt.bake(vk, device, m_params.pipelineConstructionType, m_renderSize);
@@ -2416,7 +2559,7 @@ protected:
             pipeline, std::vector<VkDynamicState>(), pipelineLayout, rt.getRenderPass(), vertexModule, fragmentModule,
             /*subpass index*/ 0u, viewport, scissor, m_params.numSamples, /*use sample locations*/ true,
             sampleLocationsInfo, useDepth(), useStencil(), VERTEX_INPUT_VEC4_VEC4, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-            stencilOpStateDrawOnce(), useFragmentShadingRate());
+            stencilOpStateDrawOnce(), useFragmentShadingRate(), useStdLocations());
 
         const Unique<VkCommandPool> cmdPool(createCommandPool(
             vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_context.getUniversalQueueFamilyIndex()));
@@ -2427,7 +2570,8 @@ protected:
         beginCommandBuffer(vk, currentCmdBuffer);
         rt.recordBeginRenderPass(
             vk, currentCmdBuffer, renderArea,
-            (useSecondaryCmdBuffer() ? VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : VK_SUBPASS_CONTENTS_INLINE));
+            (useSecondaryCmdBuffer() ? VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS : VK_SUBPASS_CONTENTS_INLINE),
+            useStdLocations());
 
         // For maximum consistency also use a secondary command buffer, if the two-pass path uses it
         if (useSecondaryCmdBuffer())
@@ -2456,7 +2600,12 @@ protected:
 
         rt.endRenderPass(vk, *cmdBuffer);
 
-        recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, *m_resolveImage, *m_colorBuffer);
+        // Color/Resolve image -> host buffer
+        {
+            const VkImage sourceImage = (isMSAA() ? *m_resolveImage : *m_colorImage);
+
+            recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, sourceImage, *m_colorBuffer);
+        }
 
         endCommandBuffer(vk, *cmdBuffer);
         submitCommandsAndWait(vk, device, m_context.getUniversalQueue(), *cmdBuffer);
@@ -2505,40 +2654,42 @@ protected:
 
         // First render pass - no resolves
         {
-            rt[0].addAttachment(*m_colorImage,                    // VkImage                        image
-                                *m_colorImageView,                // VkImageView                    imageView,
-                                (VkAttachmentDescriptionFlags)0,  // VkAttachmentDescriptionFlags    flags,
-                                m_colorFormat,                    // VkFormat                        format,
+            rt[0].addAttachment(*m_colorImage,                    // VkImage                      image
+                                *m_colorImageView,                // VkImageView                  imageView,
+                                (VkAttachmentDescriptionFlags)0,  // VkAttachmentDescriptionFlags flags,
+                                m_colorFormat,                    // VkFormat                     format,
                                 m_params.numSamples,              // VkSampleCountFlagBits        numSamples,
-                                VK_ATTACHMENT_LOAD_OP_CLEAR,      // VkAttachmentLoadOp            loadOp,
-                                VK_ATTACHMENT_STORE_OP_STORE,     // VkAttachmentStoreOp            storeOp,
-                                VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // VkAttachmentLoadOp            stencilLoadOp,
-                                VK_ATTACHMENT_STORE_OP_DONT_CARE, // VkAttachmentStoreOp            stencilStoreOp,
+                                VK_ATTACHMENT_LOAD_OP_CLEAR,      // VkAttachmentLoadOp           loadOp,
+                                VK_ATTACHMENT_STORE_OP_STORE,     // VkAttachmentStoreOp          storeOp,
+                                VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // VkAttachmentLoadOp           stencilLoadOp,
+                                VK_ATTACHMENT_STORE_OP_DONT_CARE, // VkAttachmentStoreOp          stencilStoreOp,
                                 VK_IMAGE_LAYOUT_UNDEFINED,        // VkImageLayout                initialLayout,
-                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
-                                clearColor0);                             // VkClearValue                    clearValue,
+                                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout        finalLayout,
+                                clearColor0);                             // VkClearValue         clearValue,
 
             rt[0].addSubpassColorAttachment(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
             if (useDepth() || useStencil())
             {
+                const auto pInitialSampleLocations = (useStdLocations() ? nullptr : &sampleLocationsInfo[0]);
+
                 rt[0].addAttachment(
-                    *m_depthStencilImage,                             // VkImage                        image
-                    *m_depthStencilImageView,                         // VkImageView                    imageView,
-                    (VkAttachmentDescriptionFlags)0,                  // VkAttachmentDescriptionFlags    flags,
-                    m_depthStencilFormat,                             // VkFormat                        format,
+                    *m_depthStencilImage,                             // VkImage                      image
+                    *m_depthStencilImageView,                         // VkImageView                  imageView,
+                    (VkAttachmentDescriptionFlags)0,                  // VkAttachmentDescriptionFlags flags,
+                    m_depthStencilFormat,                             // VkFormat                     format,
                     m_params.numSamples,                              // VkSampleCountFlagBits        numSamples,
-                    VK_ATTACHMENT_LOAD_OP_CLEAR,                      // VkAttachmentLoadOp            loadOp,
-                    VK_ATTACHMENT_STORE_OP_STORE,                     // VkAttachmentStoreOp            storeOp,
-                    VK_ATTACHMENT_LOAD_OP_CLEAR,                      // VkAttachmentLoadOp            stencilLoadOp,
-                    VK_ATTACHMENT_STORE_OP_STORE,                     // VkAttachmentStoreOp            stencilStoreOp,
+                    VK_ATTACHMENT_LOAD_OP_CLEAR,                      // VkAttachmentLoadOp           loadOp,
+                    VK_ATTACHMENT_STORE_OP_STORE,                     // VkAttachmentStoreOp          storeOp,
+                    VK_ATTACHMENT_LOAD_OP_CLEAR,                      // VkAttachmentLoadOp           stencilLoadOp,
+                    VK_ATTACHMENT_STORE_OP_STORE,                     // VkAttachmentStoreOp          stencilStoreOp,
                     VK_IMAGE_LAYOUT_UNDEFINED,                        // VkImageLayout                initialLayout,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
-                    clearDepthStencil0,                               // VkClearValue                    clearValue,
-                    &sampleLocationsInfo[0]); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
+                    clearDepthStencil0,                               // VkClearValue                 clearValue,
+                    pInitialSampleLocations); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
 
                 rt[0].addSubpassDepthStencilAttachment(1u, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                       &sampleLocationsInfo[0]);
+                                                       pInitialSampleLocations);
             }
 
             rt[0].bake(vk, device, m_params.pipelineConstructionType, m_renderSize);
@@ -2563,23 +2714,32 @@ protected:
                                 colorLayout1,                     // VkImageLayout                finalLayout,
                                 clearColor1);                     // VkClearValue                    clearValue,
 
-            rt[1].addAttachment(*m_resolveImage,                      // VkImage                        image
-                                *m_resolveImageView,                  // VkImageView                    imageView,
-                                (VkAttachmentDescriptionFlags)0,      // VkAttachmentDescriptionFlags    flags,
-                                m_colorFormat,                        // VkFormat                        format,
-                                VK_SAMPLE_COUNT_1_BIT,                // VkSampleCountFlagBits        numSamples,
-                                VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            loadOp,
-                                VK_ATTACHMENT_STORE_OP_STORE,         // VkAttachmentStoreOp            storeOp,
-                                VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            stencilLoadOp,
-                                VK_ATTACHMENT_STORE_OP_DONT_CARE,     // VkAttachmentStoreOp            stencilStoreOp,
-                                VK_IMAGE_LAYOUT_UNDEFINED,            // VkImageLayout                initialLayout,
-                                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // VkImageLayout                finalLayout,
-                                VkClearValue());                      // VkClearValue                    clearValue,
+            rt[1].addAttachment(*m_resolveImage,                  // VkImage                        image
+                                *m_resolveImageView,              // VkImageView                    imageView,
+                                (VkAttachmentDescriptionFlags)0,  // VkAttachmentDescriptionFlags    flags,
+                                m_colorFormat,                    // VkFormat                        format,
+                                VK_SAMPLE_COUNT_1_BIT,            // VkSampleCountFlagBits        numSamples,
+                                VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // VkAttachmentLoadOp            loadOp,
+                                VK_ATTACHMENT_STORE_OP_STORE,     // VkAttachmentStoreOp            storeOp,
+                                VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // VkAttachmentLoadOp            stencilLoadOp,
+                                VK_ATTACHMENT_STORE_OP_DONT_CARE, // VkAttachmentStoreOp            stencilStoreOp,
+                                VK_IMAGE_LAYOUT_UNDEFINED,        // VkImageLayout                initialLayout,
+                                colorLayout1,                     // VkImageLayout                finalLayout,
+                                VkClearValue());                  // VkClearValue                    clearValue,
 
-            rt[1].addSubpassColorAttachmentWithResolve(0u, colorLayout1, 1u, colorLayout1);
+            if (isMSAA())
+            {
+                rt[1].addSubpassColorAttachmentWithResolve(0u, colorLayout1, 1u, colorLayout1);
+            }
+            else
+            {
+                rt[1].addSubpassColorAttachment(0u, colorLayout1);
+            }
 
             if (useDepth() || useStencil())
             {
+                const auto pInitialSampleLocations = (useStdLocations() ? nullptr : &sampleLocationsInfo[1]);
+
                 rt[1].addAttachment(*m_depthStencilImage,            // VkImage                        image
                                     *m_depthStencilImageView,        // VkImageView                    imageView,
                                     (VkAttachmentDescriptionFlags)0, // VkAttachmentDescriptionFlags    flags,
@@ -2592,9 +2752,9 @@ protected:
                                     depthStencilLayout1,             // VkImageLayout                initialLayout,
                                     depthStencilLayout1,             // VkImageLayout                finalLayout,
                                     clearDepthStencil0,              // VkClearValue                    clearValue,
-                                    &sampleLocationsInfo[1]); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
+                                    pInitialSampleLocations); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
 
-                rt[1].addSubpassDepthStencilAttachment(2u, depthStencilLayout1, &sampleLocationsInfo[1]);
+                rt[1].addSubpassDepthStencilAttachment(2u, depthStencilLayout1, pInitialSampleLocations);
             }
 
             rt[1].bake(vk, device, m_params.pipelineConstructionType, m_renderSize);
@@ -2604,6 +2764,8 @@ protected:
         pipelines.reserve(NUM_PASSES);
         if (useDynamicState())
         {
+            DE_ASSERT(!useStdLocations());
+
             std::vector<VkDynamicState> dynamicState;
             dynamicState.push_back(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
 
@@ -2616,7 +2778,7 @@ protected:
                                        /*subpass index*/ 0u, viewport, scissor, m_params.numSamples,
                                        /*use sample locations*/ true, makeEmptySampleLocationsInfo(), useDepth(),
                                        useStencil(), VERTEX_INPUT_VEC4_VEC4, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                                       stencilOpStateDrawOnce(), useFragmentShadingRate());
+                                       stencilOpStateDrawOnce(), useFragmentShadingRate(), useStdLocations());
             }
         }
         else
@@ -2629,7 +2791,7 @@ protected:
                                        /*subpass index*/ 0u, viewport, scissor, m_params.numSamples,
                                        /*use sample locations*/ true, sampleLocationsInfo[passNdx], useDepth(),
                                        useStencil(), VERTEX_INPUT_VEC4_VEC4, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                                       stencilOpStateDrawOnce(), useFragmentShadingRate());
+                                       stencilOpStateDrawOnce(), useFragmentShadingRate(), useStdLocations());
             }
 
         // Record secondary command buffers
@@ -2661,14 +2823,15 @@ protected:
         // First render pass
         if (useSecondaryCmdBuffer())
         {
-            rt[0].recordBeginRenderPass(vk, currentCmdBuffer, renderArea,
-                                        VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+            rt[0].recordBeginRenderPass(vk, currentCmdBuffer, renderArea, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS,
+                                        useStdLocations());
             vk.cmdExecuteCommands(currentCmdBuffer, 1u, &secondaryCmdBuffer[0].get());
             rt[0].endRenderPass(vk, currentCmdBuffer);
         }
         else
         {
-            rt[0].recordBeginRenderPass(vk, currentCmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE);
+            rt[0].recordBeginRenderPass(vk, currentCmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE,
+                                        useStdLocations());
             recordFirstPassContents(currentCmdBuffer, pipelines[0], sampleLocationsInfo[0]);
             rt[0].endRenderPass(vk, currentCmdBuffer);
         }
@@ -2715,6 +2878,8 @@ protected:
                 const VkImageLayout finalLayout =
                     (useWaitEvents() ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL : depthStencilLayout1);
 
+                const auto pSampleLocations = (useStdLocations() ? nullptr : &sampleLocationsInfo[0]);
+
                 recordImageBarrier(vk, currentCmdBuffer, *m_depthStencilImage,
                                    getImageAspectFlags(m_depthStencilFormat),    // VkImageAspectFlags    aspect,
                                    VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,    // VkPipelineStageFlags srcStageMask,
@@ -2723,7 +2888,7 @@ protected:
                                    VK_ACCESS_TRANSFER_WRITE_BIT,                 // VkAccessFlags        dstAccessMask,
                                    VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, // VkImageLayout        oldLayout,
                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,             // VkImageLayout        newLayout)
-                                   &sampleLocationsInfo[0]);                         // VkSampleLocationsInfoEXT
+                                   pSampleLocations);                                // VkSampleLocationsInfoEXT
 
                 const VkImageSubresourceRange subresourceRange =
                     makeImageSubresourceRange(m_depthStencilAspect, 0u, 1u, 0u, 1u);
@@ -2740,7 +2905,7 @@ protected:
                                     VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT), // VkAccessFlags        dstAccessMask,
                                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,          // VkImageLayout        oldLayout,
                                    finalLayout,                                   // VkImageLayout        newLayout)
-                                   &sampleLocationsInfo[0]);                      // VkSampleLocationsInfoEXT
+                                   pSampleLocations);                             // VkSampleLocationsInfoEXT
             }
         }
         else if (!useWaitEvents())
@@ -2793,6 +2958,8 @@ protected:
                 event[1] = makeEvent(vk, device);
                 vk.cmdSetEvent(currentCmdBuffer, *event[1], VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
 
+                const auto pSampleLocations = (useStdLocations() ? nullptr : &sampleLocationsInfo[0]);
+
                 recordWaitEventWithImage(
                     vk, currentCmdBuffer, *event[1], *m_depthStencilImage,
                     getImageAspectFlags(m_depthStencilFormat),    // VkImageAspectFlags        aspect,
@@ -2802,28 +2969,34 @@ protected:
                     (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT |
                      VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT),    // VkAccessFlags            dstAccessMask,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, // VkImageLayout            oldLayout,
-                    depthStencilLayout1);                             // VkImageLayout            newLayout,
+                    depthStencilLayout1,                              // VkImageLayout            newLayout,
+                    pSampleLocations);
             }
         }
 
         // Second render pass
         if (useSecondaryCmdBuffer())
         {
-            rt[1].recordBeginRenderPass(vk, currentCmdBuffer, renderArea,
-                                        VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+            rt[1].recordBeginRenderPass(vk, currentCmdBuffer, renderArea, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS,
+                                        useStdLocations());
             vk.cmdExecuteCommands(currentCmdBuffer, 1u, &secondaryCmdBuffer[1].get());
             rt[1].endRenderPass(vk, currentCmdBuffer);
         }
         else
         {
-            rt[1].recordBeginRenderPass(vk, currentCmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE);
+            rt[1].recordBeginRenderPass(vk, currentCmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE,
+                                        useStdLocations());
             recordSecondPassContents(currentCmdBuffer, pipelines[1], sampleLocationsInfo[1], clearColor1,
                                      clearDepthStencil0, scissor);
             rt[1].endRenderPass(vk, currentCmdBuffer);
         }
 
-        // Resolve image -> host buffer
-        recordCopyImageToBuffer(vk, currentCmdBuffer, m_renderSize, *m_resolveImage, *m_colorBuffer);
+        // Color/Resolve image -> host buffer
+        {
+            const VkImage sourceImage = (isMSAA() ? *m_resolveImage : *m_colorImage);
+
+            recordCopyImageToBuffer(vk, currentCmdBuffer, m_renderSize, sourceImage, *m_colorBuffer, colorLayout1);
+        }
 
         endCommandBuffer(vk, currentCmdBuffer);
 
@@ -2863,7 +3036,10 @@ protected:
         pipeline.bind(cmdBuffer);
 
         if (useDynamicState())
+        {
+            DE_ASSERT(!useStdLocations());
             vk.cmdSetSampleLocationsEXT(cmdBuffer, &sampleLocationsInfo);
+        }
 
         if (m_params.clears == TEST_CLEARS_NO_CLEAR)
             vk.cmdDraw(cmdBuffer, m_numVertices, /*instance count*/ 1u, /*first vertex*/ 0u,
@@ -2887,7 +3063,10 @@ protected:
             recordClearAttachments(vk, cmdBuffer, 0u, clearColor, m_depthStencilAspect, clearDepthStencil, clearRect);
 
         if (useDynamicState())
+        {
+            DE_ASSERT(!useStdLocations());
             vk.cmdSetSampleLocationsEXT(cmdBuffer, &sampleLocationsInfo);
+        }
 
         // Draw the right shape only
         vk.cmdDraw(cmdBuffer, m_numVertices, /*instance count*/ 1u, /*first vertex*/ 0u, /*first instance*/ 1u);
@@ -2948,24 +3127,26 @@ protected:
                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
                              clearColor0);                             // VkClearValue                    clearValue,
 
-            rt.addAttachment(*m_resolveImage,                      // VkImage                        image
-                             *m_resolveImageView,                  // VkImageView                    imageView,
-                             (VkAttachmentDescriptionFlags)0,      // VkAttachmentDescriptionFlags    flags,
-                             m_colorFormat,                        // VkFormat                        format,
-                             VK_SAMPLE_COUNT_1_BIT,                // VkSampleCountFlagBits        numSamples,
-                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            loadOp,
-                             VK_ATTACHMENT_STORE_OP_STORE,         // VkAttachmentStoreOp            storeOp,
-                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            stencilLoadOp,
-                             VK_ATTACHMENT_STORE_OP_DONT_CARE,     // VkAttachmentStoreOp            stencilStoreOp,
-                             VK_IMAGE_LAYOUT_UNDEFINED,            // VkImageLayout                initialLayout,
-                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // VkImageLayout                finalLayout,
-                             VkClearValue());                      // VkClearValue                    clearValue,
+            rt.addAttachment(*m_resolveImage,                  // VkImage                         image
+                             *m_resolveImageView,              // VkImageView                     imageView,
+                             (VkAttachmentDescriptionFlags)0,  // VkAttachmentDescriptionFlags    flags,
+                             m_colorFormat,                    // VkFormat                        format,
+                             VK_SAMPLE_COUNT_1_BIT,            // VkSampleCountFlagBits           numSamples,
+                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // VkAttachmentLoadOp              loadOp,
+                             VK_ATTACHMENT_STORE_OP_STORE,     // VkAttachmentStoreOp             storeOp,
+                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,  // VkAttachmentLoadOp              stencilLoadOp,
+                             VK_ATTACHMENT_STORE_OP_DONT_CARE, // VkAttachmentStoreOp             stencilStoreOp,
+                             VK_IMAGE_LAYOUT_UNDEFINED,        // VkImageLayout                   initialLayout,
+                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                   finalLayout,
+                             VkClearValue());                          // VkClearValue                    clearValue,
 
             // First subpass
             rt.addSubpassColorAttachment(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
 
             if (useDepth() || useStencil())
             {
+                const auto pInitialSampleLocations = (useStdLocations() ? nullptr : &sampleLocationsInfo[0]);
+
                 rt.addAttachment(
                     *m_depthStencilImage,                             // VkImage                        image
                     *m_depthStencilImageView,                         // VkImageView                    imageView,
@@ -2979,18 +3160,29 @@ protected:
                     VK_IMAGE_LAYOUT_UNDEFINED,                        // VkImageLayout                initialLayout,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
                     clearDepthStencil0,                               // VkClearValue                    clearValue,
-                    &sampleLocationsInfo[0]); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
+                    pInitialSampleLocations); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
 
                 rt.addSubpassDepthStencilAttachment(2u, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                    &sampleLocationsInfo[0]);
+                                                    pInitialSampleLocations);
             }
 
             // Second subpass
             rt.nextSubpass();
-            rt.addSubpassColorAttachmentWithResolve(0u, colorLayout1, 1u, colorLayout1);
+
+            if (isMSAA())
+            {
+                rt.addSubpassColorAttachmentWithResolve(0u, colorLayout1, 1u, colorLayout1);
+            }
+            else
+            {
+                rt.addSubpassColorAttachment(0u, colorLayout1);
+            }
 
             if (useDepth() || useStencil())
-                rt.addSubpassDepthStencilAttachment(2u, depthStencilLayout1, &sampleLocationsInfo[1]);
+            {
+                const auto pSampleLocations = (useStdLocations() ? nullptr : &sampleLocationsInfo[1]);
+                rt.addSubpassDepthStencilAttachment(2u, depthStencilLayout1, pSampleLocations);
+            }
 
             rt.bake(vk, device, m_params.pipelineConstructionType, m_renderSize);
         }
@@ -2999,6 +3191,8 @@ protected:
         pipelines.reserve(NUM_PASSES);
         if (useDynamicState())
         {
+            DE_ASSERT(!useStdLocations());
+
             std::vector<VkDynamicState> dynamicState;
             dynamicState.push_back(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
 
@@ -3006,11 +3200,12 @@ protected:
             {
                 pipelines.emplace_back(vki, vk, physicalDevice, device, m_context.getDeviceExtensions(),
                                        m_params.pipelineConstructionType);
-                preparePipelineWrapper(
-                    pipelines.back(), dynamicState, pipelineLayout, rt.getRenderPass(), vertexModule, fragmentModule,
-                    /*subpass*/ passNdx, viewport, scissor, m_params.numSamples, /*use sample locations*/ true,
-                    makeEmptySampleLocationsInfo(), useDepth(), useStencil(), VERTEX_INPUT_VEC4_VEC4,
-                    VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, stencilOpStateDrawOnce(), useFragmentShadingRate());
+                preparePipelineWrapper(pipelines.back(), dynamicState, pipelineLayout, rt.getRenderPass(), vertexModule,
+                                       fragmentModule,
+                                       /*subpass*/ passNdx, viewport, scissor, m_params.numSamples,
+                                       /*use sample locations*/ true, makeEmptySampleLocationsInfo(), useDepth(),
+                                       useStencil(), VERTEX_INPUT_VEC4_VEC4, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                                       stencilOpStateDrawOnce(), useFragmentShadingRate(), useStdLocations());
             }
         }
         else
@@ -3023,7 +3218,7 @@ protected:
                                        /*subpass*/ passNdx, viewport, scissor, m_params.numSamples,
                                        /*use sample locations*/ true, sampleLocationsInfo[passNdx], useDepth(),
                                        useStencil(), VERTEX_INPUT_VEC4_VEC4, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                                       stencilOpStateDrawOnce(), useFragmentShadingRate());
+                                       stencilOpStateDrawOnce(), useFragmentShadingRate(), useStdLocations());
             }
 
         // Record secondary command buffers
@@ -3053,7 +3248,8 @@ protected:
 
         if (useSecondaryCmdBuffer())
         {
-            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS,
+                                     useStdLocations());
             vk.cmdExecuteCommands(*cmdBuffer, 1u, &secondaryCmdBuffer[0].get());
 
             rt.nextSubpass(vk, *cmdBuffer, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
@@ -3061,7 +3257,7 @@ protected:
         }
         else
         {
-            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE);
+            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE, useStdLocations());
             recordFirstPassContents(*cmdBuffer, pipelines[0], sampleLocationsInfo[0]);
 
             rt.nextSubpass(vk, *cmdBuffer, VK_SUBPASS_CONTENTS_INLINE);
@@ -3071,8 +3267,12 @@ protected:
 
         rt.endRenderPass(vk, *cmdBuffer);
 
-        // Resolve image -> host buffer
-        recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, *m_resolveImage, *m_colorBuffer);
+        // Color/Resolve image -> host buffer
+        {
+            const VkImage sourceImage = (isMSAA() ? *m_resolveImage : *m_colorImage);
+
+            recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, sourceImage, *m_colorBuffer);
+        }
 
         endCommandBuffer(vk, *cmdBuffer);
 
@@ -3105,7 +3305,6 @@ protected:
             makeSampleLocationsInfo(m_pixelGrids[0]),
             makeSampleLocationsInfo(m_pixelGrids[useSameSamplePattern() ? 0 : 1]),
         };
-        const bool useFragmentShadingRate(TEST_OPTION_FRAGMENT_SHADING_RATE_BIT & m_params.options);
         const Unique<VkCommandPool> cmdPool(createCommandPool(
             vk, device, VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT, m_context.getUniversalQueueFamilyIndex()));
         const Unique<VkCommandBuffer> cmdBuffer(makeCommandBuffer(vk, device, *cmdPool));
@@ -3129,24 +3328,33 @@ protected:
                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
                              clearColor0);                             // VkClearValue                    clearValue,
 
-            rt.addAttachment(*m_resolveImage,                      // VkImage                        image
-                             *m_resolveImageView,                  // VkImageView                    imageView,
-                             (VkAttachmentDescriptionFlags)0,      // VkAttachmentDescriptionFlags    flags,
-                             m_colorFormat,                        // VkFormat                        format,
-                             VK_SAMPLE_COUNT_1_BIT,                // VkSampleCountFlagBits        numSamples,
-                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            loadOp,
-                             VK_ATTACHMENT_STORE_OP_STORE,         // VkAttachmentStoreOp            storeOp,
-                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,      // VkAttachmentLoadOp            stencilLoadOp,
-                             VK_ATTACHMENT_STORE_OP_DONT_CARE,     // VkAttachmentStoreOp            stencilStoreOp,
-                             VK_IMAGE_LAYOUT_UNDEFINED,            // VkImageLayout                initialLayout,
-                             VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, // VkImageLayout                finalLayout,
-                             VkClearValue());                      // VkClearValue                    clearValue,
+            rt.addAttachment(*m_resolveImage,                          // VkImage                        image
+                             *m_resolveImageView,                      // VkImageView                    imageView,
+                             (VkAttachmentDescriptionFlags)0,          // VkAttachmentDescriptionFlags   flags,
+                             m_colorFormat,                            // VkFormat                       format,
+                             VK_SAMPLE_COUNT_1_BIT,                    // VkSampleCountFlagBits          numSamples,
+                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp             loadOp,
+                             VK_ATTACHMENT_STORE_OP_STORE,             // VkAttachmentStoreOp            storeOp,
+                             VK_ATTACHMENT_LOAD_OP_DONT_CARE,          // VkAttachmentLoadOp             stencilLoadOp,
+                             VK_ATTACHMENT_STORE_OP_DONT_CARE,         // VkAttachmentStoreOp            stencilStoreOp,
+                             VK_IMAGE_LAYOUT_UNDEFINED,                // VkImageLayout                  initialLayout,
+                             VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, // VkImageLayout                  finalLayout,
+                             VkClearValue());                          // VkClearValue                   clearValue,
 
-            rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
-                                                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            if (isMSAA())
+            {
+                rt.addSubpassColorAttachmentWithResolve(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 1u,
+                                                        VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            }
+            else
+            {
+                rt.addSubpassColorAttachment(0u, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL);
+            }
 
             if (useDepth() || useStencil())
             {
+                const auto pInitialSampleLocations = (useStdLocations() ? nullptr : &sampleLocationsInfo[0]);
+
                 rt.addAttachment(
                     *m_depthStencilImage,                             // VkImage                        image
                     *m_depthStencilImageView,                         // VkImageView                    imageView,
@@ -3160,10 +3368,10 @@ protected:
                     VK_IMAGE_LAYOUT_UNDEFINED,                        // VkImageLayout                initialLayout,
                     VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL, // VkImageLayout                finalLayout,
                     clearDepthStencil0,                               // VkClearValue                    clearValue,
-                    &sampleLocationsInfo[0]); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
+                    pInitialSampleLocations); // VkSampleLocationsInfoEXT*    pInitialSampleLocations
 
                 rt.addSubpassDepthStencilAttachment(2u, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                                                    &sampleLocationsInfo[0]);
+                                                    pInitialSampleLocations);
             }
 
             rt.bake(vk, device, m_params.pipelineConstructionType, m_renderSize);
@@ -3173,6 +3381,8 @@ protected:
         pipelines.reserve(NUM_PASSES);
         if (useDynamicState())
         {
+            DE_ASSERT(!useStdLocations());
+
             std::vector<VkDynamicState> dynamicState;
             dynamicState.push_back(VK_DYNAMIC_STATE_SAMPLE_LOCATIONS_EXT);
 
@@ -3180,11 +3390,12 @@ protected:
             {
                 pipelines.emplace_back(vki, vk, physicalDevice, device, m_context.getDeviceExtensions(),
                                        m_params.pipelineConstructionType);
-                preparePipelineWrapper(
-                    pipelines.back(), dynamicState, pipelineLayout, rt.getRenderPass(), vertexModule, fragmentModule,
-                    /*subpass*/ 0u, viewport, scissor, m_params.numSamples, /*use sample locations*/ true,
-                    makeEmptySampleLocationsInfo(), useDepth(), useStencil(), VERTEX_INPUT_VEC4_VEC4,
-                    VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST, stencilOpStateDrawOnce(), useFragmentShadingRate);
+                preparePipelineWrapper(pipelines.back(), dynamicState, pipelineLayout, rt.getRenderPass(), vertexModule,
+                                       fragmentModule,
+                                       /*subpass*/ 0u, viewport, scissor, m_params.numSamples,
+                                       /*use sample locations*/ true, makeEmptySampleLocationsInfo(), useDepth(),
+                                       useStencil(), VERTEX_INPUT_VEC4_VEC4, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+                                       stencilOpStateDrawOnce(), useFragmentShadingRate(), useStdLocations());
             }
         }
         else
@@ -3197,7 +3408,7 @@ protected:
                                        /*subpass*/ 0u, viewport, scissor, m_params.numSamples,
                                        /*use sample locations*/ true, sampleLocationsInfo[passNdx], useDepth(),
                                        useStencil(), VERTEX_INPUT_VEC4_VEC4, VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-                                       stencilOpStateDrawOnce(), useFragmentShadingRate);
+                                       stencilOpStateDrawOnce(), useFragmentShadingRate(), useStdLocations());
             }
 
         // Record secondary command buffers
@@ -3220,12 +3431,13 @@ protected:
 
         if (useSecondaryCmdBuffer())
         {
-            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS);
+            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_SECONDARY_COMMAND_BUFFERS,
+                                     useStdLocations());
             vk.cmdExecuteCommands(*cmdBuffer, 1u, &secondaryCmdBuffer.get());
         }
         else
         {
-            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE);
+            rt.recordBeginRenderPass(vk, *cmdBuffer, renderArea, VK_SUBPASS_CONTENTS_INLINE, useStdLocations());
             recordFirstPassContents(*cmdBuffer, pipelines[0], sampleLocationsInfo[0]);
             recordSecondPassContents(*cmdBuffer, pipelines[1], sampleLocationsInfo[1], clearColor1, clearDepthStencil0,
                                      scissor);
@@ -3233,8 +3445,12 @@ protected:
 
         rt.endRenderPass(vk, *cmdBuffer);
 
-        // Resolve image -> host buffer
-        recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, *m_resolveImage, *m_colorBuffer);
+        // Color/Resolve image -> host buffer
+        {
+            const VkImage sourceImage = (isMSAA() ? *m_resolveImage : *m_colorImage);
+
+            recordCopyImageToBuffer(vk, *cmdBuffer, m_renderSize, sourceImage, *m_colorBuffer);
+        }
 
         endCommandBuffer(vk, *cmdBuffer);
 
@@ -3268,24 +3484,35 @@ protected:
 
 } // namespace Draw
 
-void createTestsInGroup(tcu::TestCaseGroup *rootGroup, PipelineConstructionType pipelineConstructionType,
-                        bool useFragmentShadingRate)
+struct GroupParams
 {
+    PipelineConstructionType pipelineConstructionType;
+    bool useFragmentShadingRate;
+    bool useStdLocations;
+};
+
+void createTestsInGroup(tcu::TestCaseGroup *rootGroup, GroupParams groupParams)
+{
+    const auto &pipelineConstructionType = groupParams.pipelineConstructionType;
+    const auto &useFragmentShadingRate   = groupParams.useFragmentShadingRate;
+    const auto &useStdLocations          = groupParams.useStdLocations;
+
     // Queries
-    if (!useFragmentShadingRate && (pipelineConstructionType == PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC))
+    if (!useFragmentShadingRate && !useStdLocations &&
+        (pipelineConstructionType == PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC))
     {
         MovePtr<tcu::TestCaseGroup> group(new tcu::TestCaseGroup(rootGroup->getTestContext(), "query"));
 
-        addFunctionCase(group.get(), "sample_locations_properties", checkSupportSampleLocations,
+        addFunctionCase(group.get(), "sample_locations_properties", checkSampleLocationsExt,
                         testQuerySampleLocationProperties);
-        addFunctionCase(group.get(), "multisample_properties", checkSupportSampleLocations,
-                        testQueryMultisampleProperties);
+        addFunctionCase(group.get(), "multisample_properties", checkSampleLocationsExt, testQueryMultisampleProperties);
 
         rootGroup->addChild(group.release());
     }
 
     const VkSampleCountFlagBits sampleCountRange[] = {
-        VK_SAMPLE_COUNT_2_BIT, VK_SAMPLE_COUNT_4_BIT, VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_16_BIT,
+        VK_SAMPLE_COUNT_1_BIT, VK_SAMPLE_COUNT_2_BIT,  VK_SAMPLE_COUNT_4_BIT,
+        VK_SAMPLE_COUNT_8_BIT, VK_SAMPLE_COUNT_16_BIT,
         // There are no implementations that support 32 or 64 programmable samples currently
     };
 
@@ -3302,9 +3529,11 @@ void createTestsInGroup(tcu::TestCaseGroup *rootGroup, PipelineConstructionType 
              pLoopNumSamples < DE_ARRAY_END(sampleCountRange); ++pLoopNumSamples)
         {
             addCases<VerifyLocationTest>(groupLocation.get(), *pLoopNumSamples, pipelineConstructionType,
-                                         useFragmentShadingRate, addProgramsVerifyLocationGeometry);
+                                         useFragmentShadingRate, useStdLocations, addProgramsVerifyLocationGeometry,
+                                         true);
             addCases<VerifyInterpolationTest>(groupInterpolation.get(), *pLoopNumSamples, pipelineConstructionType,
-                                              useFragmentShadingRate, addProgramsVerifyInterpolation);
+                                              useFragmentShadingRate, useStdLocations, addProgramsVerifyInterpolation,
+                                              false);
         }
 
         rootGroup->addChild(groupLocation.release());
@@ -3316,23 +3545,44 @@ void createTestsInGroup(tcu::TestCaseGroup *rootGroup, PipelineConstructionType 
         using namespace Draw;
 
         const uint32_t globalOption =
-            useFragmentShadingRate ? static_cast<uint32_t>(TEST_OPTION_FRAGMENT_SHADING_RATE_BIT) : 0u;
-        const uint32_t optionSets[] = {
-            globalOption | TEST_OPTION_SAME_PATTERN_BIT,
-            globalOption | 0u,
-            globalOption | TEST_OPTION_DYNAMIC_STATE_BIT,
-            globalOption | TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT,
-            globalOption | TEST_OPTION_DYNAMIC_STATE_BIT | TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT,
-            globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT,
-            globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT | TEST_OPTION_DYNAMIC_STATE_BIT,
-            globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT | TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT,
-            globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT | TEST_OPTION_DYNAMIC_STATE_BIT |
-                TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT,
-            globalOption | TEST_OPTION_WAIT_EVENTS_BIT,
-            globalOption | TEST_OPTION_WAIT_EVENTS_BIT | TEST_OPTION_GENERAL_LAYOUT_BIT,
-            globalOption | TEST_OPTION_WAIT_EVENTS_BIT | TEST_OPTION_GENERAL_LAYOUT_BIT |
-                TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT,
-        };
+            ((useFragmentShadingRate ? static_cast<uint32_t>(TEST_OPTION_FRAGMENT_SHADING_RATE_BIT) : 0u) |
+             (useStdLocations ? static_cast<uint32_t>(TEST_OPTION_STD_SAMPLE_LOCATIONS_BIT) : 0u));
+
+        std::vector<uint32_t> optionSets;
+
+        if (useStdLocations)
+        {
+            const auto baseOptions = (globalOption | TEST_OPTION_SAME_PATTERN_BIT);
+
+            optionSets.push_back(baseOptions);
+            optionSets.push_back(baseOptions | TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+            optionSets.push_back(baseOptions | TEST_OPTION_GENERAL_LAYOUT_BIT);
+            optionSets.push_back(baseOptions | TEST_OPTION_GENERAL_LAYOUT_BIT |
+                                 TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+            optionSets.push_back(baseOptions | TEST_OPTION_WAIT_EVENTS_BIT);
+            optionSets.push_back(baseOptions | TEST_OPTION_WAIT_EVENTS_BIT | TEST_OPTION_GENERAL_LAYOUT_BIT);
+            optionSets.push_back(baseOptions | TEST_OPTION_WAIT_EVENTS_BIT | TEST_OPTION_GENERAL_LAYOUT_BIT |
+                                 TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+        }
+        else
+        {
+            optionSets.push_back(globalOption | TEST_OPTION_SAME_PATTERN_BIT);
+            optionSets.push_back(globalOption | 0u);
+            optionSets.push_back(globalOption | TEST_OPTION_DYNAMIC_STATE_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_DYNAMIC_STATE_BIT |
+                                 TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT | TEST_OPTION_DYNAMIC_STATE_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT |
+                                 TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_GENERAL_LAYOUT_BIT | TEST_OPTION_DYNAMIC_STATE_BIT |
+                                 TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_WAIT_EVENTS_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_WAIT_EVENTS_BIT | TEST_OPTION_GENERAL_LAYOUT_BIT);
+            optionSets.push_back(globalOption | TEST_OPTION_WAIT_EVENTS_BIT | TEST_OPTION_GENERAL_LAYOUT_BIT |
+                                 TEST_OPTION_SECONDARY_COMMAND_BUFFER_BIT);
+        }
 
         const struct
         {
@@ -3368,13 +3618,12 @@ void createTestsInGroup(tcu::TestCaseGroup *rootGroup, PipelineConstructionType 
                     new tcu::TestCaseGroup(aspectGroup->getTestContext(), getString(*pLoopNumSamples).c_str()));
 
                 for (uint32_t loopDrawSetNdx = 0u; loopDrawSetNdx < DE_LENGTH_OF_ARRAY(drawClearSets); ++loopDrawSetNdx)
-                    for (const uint32_t *pLoopOptions = optionSets; pLoopOptions != DE_ARRAY_END(optionSets);
-                         ++pLoopOptions)
+                    for (const auto optionSet : optionSets)
                     {
                         const TestParams params{
                             pipelineConstructionType,             // PipelineConstructionType pipelineConstructionType;
                             *pLoopNumSamples,                     // VkSampleCountFlagBits numSamples;
-                            *pLoopOptions,                        // TestOptionFlags options;
+                            optionSet,                            // TestOptionFlags options;
                             drawClearSets[loopDrawSetNdx].drawIn, // TestDrawIn drawIn;
                             drawClearSets[loopDrawSetNdx].clears, // TestClears clears;
                             *pLoopImageAspect,                    // TestImageAspect imageAspect;
@@ -3416,12 +3665,14 @@ void createTestsInGroup(tcu::TestCaseGroup *rootGroup, PipelineConstructionType 
 
 } // namespace
 
-tcu::TestCaseGroup *createMultisampleSampleLocationsExtTests(tcu::TestContext &testCtx,
-                                                             PipelineConstructionType pipelineConstructionType,
-                                                             bool useFragmentShadingRate)
+tcu::TestCaseGroup *createMultisampleSampleLocationsTests(tcu::TestContext &testCtx,
+                                                          PipelineConstructionType pipelineConstructionType,
+                                                          bool useFragmentShadingRate, bool useStdLocations)
 {
-    return createTestGroup(testCtx, "sample_locations_ext", createTestsInGroup, pipelineConstructionType,
-                           useFragmentShadingRate);
+    const auto groupName = (useStdLocations ? "std_sample_locations" : "sample_locations_ext");
+    const GroupParams groupParams{pipelineConstructionType, useFragmentShadingRate, useStdLocations};
+
+    return createTestGroup(testCtx, groupName, createTestsInGroup, groupParams);
 }
 
 } // namespace pipeline

@@ -115,6 +115,10 @@ CustomInstance::CustomInstance(Context &context, Move<VkInstance> instance)
                                     context.getTestContext().getCommandLine(), context.getResourceInterface()))
 #endif // CTS_USES_VULKANSC
 {
+#ifndef CTS_USES_VULKANSC
+    if (m_recorder)
+        m_context->addExternalDebugReportRecorder(m_recorder.get());
+#endif // CTS_USES_VULKANSC
 }
 
 CustomInstance::CustomInstance()
@@ -138,6 +142,10 @@ CustomInstance::CustomInstance(CustomInstance &&other) : CustomInstance()
 CustomInstance::~CustomInstance()
 {
     collectMessages();
+#ifndef CTS_USES_VULKANSC
+    if (m_recorder)
+        m_context->removeExternalDebugReportRecorder(m_recorder.get());
+#endif // CTS_USES_VULKANSC
 }
 
 CustomInstance &CustomInstance::operator=(CustomInstance &&other)
@@ -512,7 +520,7 @@ vk::VkResult createUncheckedInstance(Context &context, const vk::VkInstanceCreat
     }
 #endif // CTS_USES_VULKANSC
 
-    vk::VkInstance raw_instance = DE_NULL;
+    vk::VkInstance raw_instance = nullptr;
     vk::VkResult result         = vkp.createInstance(&createInfo, pAllocator, &raw_instance);
 
 #ifndef CTS_USES_VULKANSC
@@ -635,6 +643,9 @@ void VideoDevice::checkSupport(Context &context, const VideoCodecOperationFlags 
 
     if ((videoCodecOperation & vk::VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR) != 0)
         context.requireDeviceFunctionality("VK_KHR_video_decode_av1");
+
+    if ((videoCodecOperation & vk::VK_VIDEO_CODEC_OPERATION_DECODE_VP9_BIT_KHR) != 0)
+        context.requireDeviceFunctionality("VK_KHR_video_decode_vp9");
 #else
     DE_UNREF(context);
     DE_UNREF(videoCodecOperation);
@@ -712,9 +723,9 @@ bool VideoDevice::isVideoEncodeOperation(const VideoCodecOperationFlags videoCod
 bool VideoDevice::isVideoDecodeOperation(const VideoCodecOperationFlags videoCodecOperationFlags)
 {
 #ifndef CTS_USES_VULKANSC
-    const vk::VkVideoCodecOperationFlagsKHR decodeOperations = vk::VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR |
-                                                               vk::VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR |
-                                                               vk::VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR;
+    const vk::VkVideoCodecOperationFlagsKHR decodeOperations =
+        vk::VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR | vk::VK_VIDEO_CODEC_OPERATION_DECODE_H265_BIT_KHR |
+        vk::VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR | vk::VK_VIDEO_CODEC_OPERATION_DECODE_VP9_BIT_KHR;
 
     return (decodeOperations & videoCodecOperationFlags) != 0;
 #else
@@ -747,6 +758,7 @@ void VideoDevice::addVideoDeviceExtensions(std::vector<const char *> &deviceExte
     static const char videoEncodeH265[]  = "VK_KHR_video_encode_h265";
     static const char videoDecodeH264[]  = "VK_KHR_video_decode_h264";
     static const char videoDecodeH265[]  = "VK_KHR_video_decode_h265";
+    static const char videoDecodeAV1[]   = "VK_KHR_video_decode_av1";
 
     if (!vk::isCoreDeviceExtension(apiVersion, videoQueue))
         deviceExtensions.push_back(videoQueue);
@@ -774,6 +786,10 @@ void VideoDevice::addVideoDeviceExtensions(std::vector<const char *> &deviceExte
     if ((videoCodecOperationFlags & vk::VK_VIDEO_CODEC_OPERATION_DECODE_H264_BIT_KHR) != 0)
         if (!vk::isCoreDeviceExtension(apiVersion, videoDecodeH264))
             deviceExtensions.push_back(videoDecodeH264);
+
+    if ((videoCodecOperationFlags & vk::VK_VIDEO_CODEC_OPERATION_DECODE_AV1_BIT_KHR) != 0)
+        if (!vk::isCoreDeviceExtension(apiVersion, videoDecodeAV1))
+            deviceExtensions.push_back(videoDecodeAV1);
 #else
     DE_UNREF(deviceExtensions);
     DE_UNREF(apiVersion);
@@ -821,8 +837,11 @@ bool VideoDevice::createDeviceSupportingQueue(const vk::VkQueueFlags queueFlagsR
         (videoDeviceFlags & VIDEO_DEVICE_FLAG_QUERY_WITH_STATUS_FOR_DECODE_SUPPORT) != 0;
     const bool queryWithStatusForEncodeSupport =
         (videoDeviceFlags & VIDEO_DEVICE_FLAG_QUERY_WITH_STATUS_FOR_ENCODE_SUPPORT) != 0;
-    const bool requireMaintenance1        = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_MAINTENANCE_1) != 0;
+    const bool requireMaintenance1 = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_MAINTENANCE_1) != 0;
+    const bool requireMaintenance2 = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_MAINTENANCE_2) != 0;
+    const bool requireVP9Decode    = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_DECODE_VP9) != 0; // requireVP9Decode
     const bool requireQuantizationMap     = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_QUANTIZATION_MAP) != 0;
+    const bool requireIntraRefresh        = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_INTRA_REFRESH) != 0;
     const bool requireYCBCRorNotSupported = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_YCBCR_OR_NOT_SUPPORTED) != 0;
     const bool requireSync2orNotSupported = (videoDeviceFlags & VIDEO_DEVICE_FLAG_REQUIRE_SYNC2_OR_NOT_SUPPORTED) != 0;
     const bool requireTimelineSemOrNotSupported =
@@ -954,9 +973,21 @@ bool VideoDevice::createDeviceSupportingQueue(const vk::VkQueueFlags queueFlagsR
         if (!vk::isCoreDeviceExtension(apiVersion, "VK_KHR_video_maintenance1"))
             deviceExtensions.push_back("VK_KHR_video_maintenance1");
 
+    if (requireMaintenance2)
+        if (!vk::isCoreDeviceExtension(apiVersion, "VK_KHR_video_maintenance2"))
+            deviceExtensions.push_back("VK_KHR_video_maintenance2");
+
     if (requireQuantizationMap)
         if (!vk::isCoreDeviceExtension(apiVersion, "VK_KHR_video_encode_quantization_map"))
             deviceExtensions.push_back("VK_KHR_video_encode_quantization_map");
+
+    if (requireVP9Decode)
+        if (!vk::isCoreDeviceExtension(apiVersion, "VK_KHR_video_decode_vp9"))
+            deviceExtensions.push_back("VK_KHR_video_decode_vp9");
+
+    if (requireIntraRefresh)
+        if (!vk::isCoreDeviceExtension(apiVersion, "VK_KHR_video_encode_intra_refresh"))
+            deviceExtensions.push_back("VK_KHR_video_encode_intra_refresh");
 
     if (requireTimelineSemOrNotSupported)
         if (m_context.isDeviceFunctionalitySupported("VK_KHR_timeline_semaphore"))
@@ -979,10 +1010,28 @@ bool VideoDevice::createDeviceSupportingQueue(const vk::VkQueueFlags queueFlagsR
         false,                                                                  //  VkBool32 videoMaintenance1;
     };
 
+    vk::VkPhysicalDeviceVideoMaintenance2FeaturesKHR maintenance2Features = {
+        vk::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_MAINTENANCE_2_FEATURES_KHR, //  VkStructureType sType;
+        nullptr,                                                                //  void* pNext;
+        false,                                                                  //  VkBool32 videoMaintenance2;
+    };
+
     vk::VkPhysicalDeviceVideoEncodeQuantizationMapFeaturesKHR quantizationMapFeatures = {
         vk::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_ENCODE_QUANTIZATION_MAP_FEATURES_KHR, //  VkStructureType sType;
         nullptr,                                                                          //  void* pNext;
         false, //  VkBool32 videoEncodeQuantizationMap;
+    };
+
+    vk::VkPhysicalDeviceVideoDecodeVP9FeaturesKHR decodeVP9Features = {
+        vk::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_DECODE_VP9_FEATURES_KHR, //  VkStructureType sType;
+        nullptr,                                                             //  void* pNext;
+        false,                                                               //  VkBool32 videoDecodeVP9;
+    };
+
+    vk::VkPhysicalDeviceVideoEncodeIntraRefreshFeaturesKHR intraRefreshFeatures = {
+        vk::VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_ENCODE_INTRA_REFRESH_FEATURES_KHR, //  VkStructureType sType;
+        nullptr,                                                                       //  void* pNext;
+        false, //  VkBool32 videoEncodeIntraRefresh;
     };
 
     vk::VkPhysicalDeviceTimelineSemaphoreFeatures timelineSemaphoreFeatures = {
@@ -1006,8 +1055,17 @@ bool VideoDevice::createDeviceSupportingQueue(const vk::VkQueueFlags queueFlagsR
     if (requireMaintenance1)
         appendStructurePtrToVulkanChain((const void **)&features2.pNext, &maintenance1Features);
 
+    if (requireMaintenance2)
+        appendStructurePtrToVulkanChain((const void **)&features2.pNext, &maintenance2Features);
+
     if (requireQuantizationMap)
         appendStructurePtrToVulkanChain((const void **)&features2.pNext, &quantizationMapFeatures);
+
+    if (requireVP9Decode)
+        appendStructurePtrToVulkanChain((const void **)&features2.pNext, &decodeVP9Features);
+
+    if (requireIntraRefresh)
+        appendStructurePtrToVulkanChain((const void **)&features2.pNext, &intraRefreshFeatures);
 
     if (requireTimelineSemOrNotSupported)
         if (m_context.isDeviceFunctionalitySupported("VK_KHR_timeline_semaphore"))
@@ -1026,6 +1084,15 @@ bool VideoDevice::createDeviceSupportingQueue(const vk::VkQueueFlags queueFlagsR
 
     if (requireMaintenance1 && maintenance1Features.videoMaintenance1 == false)
         TCU_THROW(NotSupportedError, "videoMaintenance1 feature is required");
+
+    if (requireMaintenance2 && maintenance2Features.videoMaintenance2 == false)
+        TCU_THROW(NotSupportedError, "videoMaintenance2 feature is required");
+
+    if (requireVP9Decode && decodeVP9Features.videoDecodeVP9 == false)
+        TCU_THROW(NotSupportedError, "videoDecodeVP9 feature is required");
+
+    if (requireIntraRefresh && intraRefreshFeatures.videoEncodeIntraRefresh == false)
+        TCU_THROW(NotSupportedError, "videoEncodeIntraRefresh feature is required");
 
     features2.features.robustBufferAccess = false;
 

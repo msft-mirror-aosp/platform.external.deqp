@@ -11,6 +11,8 @@ set(DEQP_VK_VKSC_MEMORY_SRCS
 	vktMemoryTests.hpp
 	vktMemoryAllocationTests.cpp
 	vktMemoryAllocationTests.hpp
+	vktMemoryConcurrentAccessTests.cpp
+	vktMemoryConcurrentAccessTests.hpp
 	vktMemoryPipelineBarrierTests.hpp
 	vktMemoryPipelineBarrierTests.cpp
 	vktMemoryRequirementsTests.cpp
@@ -30,6 +32,8 @@ set(DEQP_VK_MEMORY_SRCS
 	vktMemoryDeviceMemoryReportTests.hpp
 	vktMemoryExternalMemoryAcquireUnmodifiedTests.cpp
 	vktMemoryExternalMemoryAcquireUnmodifiedTests.hpp
+	vktMemoryZeroInitializeDeviceMemoryTests.cpp
+	vktMemoryZeroInitializeDeviceMemoryTests.hpp
 	)
 
 PCH(DEQP_VK_MEMORY_SRCS ../pch.cpp)

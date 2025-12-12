@@ -67,6 +67,7 @@ enum class TestType
     RAY_TRACING_PIPELINE_FROM_BINARY_DATA,
     RAY_TRACING_PIPELINE_WITH_ZERO_BINARY_COUNT,
     UNIQUE_KEY_PAIRS,
+    VALID_KEY,
 };
 
 enum class BinariesStatus
@@ -82,6 +83,8 @@ struct TestParams
     TestType type;
     bool usePipelineLibrary;
 };
+
+const uint32_t kNumPipelineLibs = 4;
 
 namespace
 {
@@ -590,10 +593,10 @@ tcu::TestStatus RayTracingPipelineTestInstance::iterate(void)
     const std::pair<VkShaderStageFlagBits, std::string> stageNames[]{
         {VK_SHADER_STAGE_RAYGEN_BIT_KHR, "rgen"},  {VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, "chit"},
         {VK_SHADER_STAGE_MISS_BIT_KHR, "miss"},    {VK_SHADER_STAGE_INTERSECTION_BIT_KHR, "isec"},
-        {VK_SHADER_STAGE_ANY_HIT_BIT_KHR, "ahit"},
+        {VK_SHADER_STAGE_ANY_HIT_BIT_KHR, "ahit"}, {VK_SHADER_STAGE_CALLABLE_BIT_KHR, "call"},
     };
 
-    const uint32_t shaderCount                              = DE_LENGTH_OF_ARRAY(stageNames);
+    const auto shaderCount                                  = de::arrayLength(stageNames);
     VkPipelineShaderStageCreateInfo defaultShaderCreateInfo = initVulkanStructure();
     defaultShaderCreateInfo.pName                           = "main";
     m_shaderCreateInfoVect.resize(shaderCount, defaultShaderCreateInfo);
@@ -610,24 +613,30 @@ tcu::TestStatus RayTracingPipelineTestInstance::iterate(void)
         shaderCreateInfo.module               = *m_shaderModules[index];
     }
 
-    // define three shader groups
+    // Define four shader groups: rgen, hit, miss, call in that order.
+    const size_t shaderGroupCount = 4u;
+
     const VkRayTracingShaderGroupCreateInfoKHR defaultShaderGroupCreateInfo{
         VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR, // VkStructureType sType;
-        DE_NULL,                                                    // const void* pNext;
+        nullptr,                                                    // const void* pNext;
         VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR,               // VkRayTracingShaderGroupTypeKHR type;
         VK_SHADER_UNUSED_KHR,                                       // uint32_t generalShader;
         VK_SHADER_UNUSED_KHR,                                       // uint32_t closestHitShader;
         VK_SHADER_UNUSED_KHR,                                       // uint32_t anyHitShader;
         VK_SHADER_UNUSED_KHR,                                       // uint32_t intersectionShader;
-        DE_NULL,                                                    // const void* pShaderGroupCaptureReplayHandle;
+        nullptr,                                                    // const void* pShaderGroupCaptureReplayHandle;
     };
-    std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroupCreateInfoVect(3, defaultShaderGroupCreateInfo);
+
+    // Fill indices to each shader in the shaders array.
+    std::vector<VkRayTracingShaderGroupCreateInfoKHR> shaderGroupCreateInfoVect(shaderGroupCount,
+                                                                                defaultShaderGroupCreateInfo);
     shaderGroupCreateInfoVect[0].generalShader      = 0u;
     shaderGroupCreateInfoVect[1].type               = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
     shaderGroupCreateInfoVect[1].anyHitShader       = 4u;
     shaderGroupCreateInfoVect[1].intersectionShader = 3u;
     shaderGroupCreateInfoVect[1].closestHitShader   = 1u;
     shaderGroupCreateInfoVect[2].generalShader      = 2u;
+    shaderGroupCreateInfoVect[3].generalShader      = 5u;
 
     VkPipelineCreateFlags2CreateInfoKHR pipelineFlags2CreateInfo = initVulkanStructure();
     pipelineFlags2CreateInfo.flags                               = VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR;
@@ -660,18 +669,18 @@ tcu::TestStatus RayTracingPipelineTestInstance::iterate(void)
     VkRayTracingPipelineCreateInfoKHR pipelineCreateInfo{
         VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR,
         pNext,
-        0,                                // VkPipelineCreateFlags                       flags;
-        shaderCount,                      // uint32_t                                    stageCount;
-        m_shaderCreateInfoVect.data(),    // const VkPipelineShaderStageCreateInfo*      pStages;
-        3u,                               // uint32_t                                    groupCount;
-        shaderGroupCreateInfoVect.data(), // const VkRayTracingShaderGroupCreateInfoKHR* pGroups;
-        1u,                               // uint32_t                                    maxPipelineRayRecursionDepth;
-        DE_NULL,                          // VkPipelineLibraryCreateInfoKHR*             pLibraryInfo;
-        pLibraryInterface,                // VkRayTracingPipelineInterfaceCreateInfoKHR* pLibraryInterface;
-        DE_NULL,                          // const VkPipelineDynamicStateCreateInfo*     pDynamicState;
-        *pipelineLayout,                  // VkPipelineLayout                            layout;
-        VK_NULL_HANDLE,                   // VkPipeline                                  basePipelineHandle;
-        0,                                // int32_t                                     basePipelineIndex;
+        0,                                         // VkPipelineCreateFlags                       flags;
+        de::sizeU32(m_shaderCreateInfoVect),       // uint32_t                                    stageCount;
+        de::dataOrNull(m_shaderCreateInfoVect),    // const VkPipelineShaderStageCreateInfo*      pStages;
+        de::sizeU32(shaderGroupCreateInfoVect),    // uint32_t                                    groupCount;
+        de::dataOrNull(shaderGroupCreateInfoVect), // const VkRayTracingShaderGroupCreateInfoKHR* pGroups;
+        1u,                // uint32_t                                    maxPipelineRayRecursionDepth;
+        nullptr,           // VkPipelineLibraryCreateInfoKHR*             pLibraryInfo;
+        pLibraryInterface, // VkRayTracingPipelineInterfaceCreateInfoKHR* pLibraryInterface;
+        nullptr,           // const VkPipelineDynamicStateCreateInfo*     pDynamicState;
+        *pipelineLayout,   // VkPipelineLayout                            layout;
+        VK_NULL_HANDLE,    // VkPipeline                                  basePipelineHandle;
+        0,                 // int32_t                                     basePipelineIndex;
     };
     m_pipeline = createRayTracingPipelineKHR(vk, device, VK_NULL_HANDLE, VK_NULL_HANDLE, &pipelineCreateInfo);
     BinariesStatus binariesStatus = BinariesStatus::VALID;
@@ -784,12 +793,13 @@ tcu::TestStatus RayTracingPipelineTestInstance::iterate(void)
     auto rgenShaderBT = createShaderBindingTable(*m_pipeline, 0);
     auto chitShaderBT = createShaderBindingTable(*m_pipeline, 1);
     auto missShaderBT = createShaderBindingTable(*m_pipeline, 2);
+    auto callShaderBT = createShaderBindingTable(*m_pipeline, 3);
 
     auto &makeSDARegion     = makeStridedDeviceAddressRegionKHR;
     const auto rgenSBTR     = makeSDARegion(getBufferDeviceAddress(**rgenShaderBT), sgHandleSize, sgHandleSize);
     const auto chitSBTR     = makeSDARegion(getBufferDeviceAddress(**chitShaderBT), sgHandleSize, sgHandleSize);
     const auto missSBTR     = makeSDARegion(getBufferDeviceAddress(**missShaderBT), sgHandleSize, sgHandleSize);
-    const auto callableSBTR = makeSDARegion(DE_NULL, 0, 0);
+    const auto callableSBTR = makeSDARegion(getBufferDeviceAddress(**callShaderBT), sgHandleSize, sgHandleSize);
 
     auto tlas      = makeTopLevelAccelerationStructure();
     auto cmdPool   = createCommandPool(vk, device, 0, m_context.getUniversalQueueFamilyIndex());
@@ -799,16 +809,18 @@ tcu::TestStatus RayTracingPipelineTestInstance::iterate(void)
 
     // build acceleration structure - single, big aabb
     auto blas = makeBottomLevelAccelerationStructure();
+    AccelerationStructBufferProperties bufferProps;
+    bufferProps.props.residency = ResourceResidency::TRADITIONAL;
     blas->setGeometryData(
         {
             {0.0, 0.0, -8.0},
             {8.0, 8.0, -1.0},
         },
         false, 0);
-    blas->createAndBuild(vk, device, *cmdBuffer, memAlloc);
+    blas->createAndBuild(vk, device, *cmdBuffer, memAlloc, bufferProps);
     tlas->setInstanceCount(1);
     tlas->addInstance(de::SharedPtr<BottomLevelAccelerationStructure>(blas.release()));
-    tlas->createAndBuild(vk, device, *cmdBuffer, memAlloc);
+    tlas->createAndBuild(vk, device, *cmdBuffer, memAlloc, bufferProps);
 
     // update descriptor sets
     {
@@ -839,7 +851,7 @@ tcu::TestStatus RayTracingPipelineTestInstance::iterate(void)
 
     // generate result
     vk.cmdBindDescriptorSets(*cmdBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, *pipelineLayout, 0, 1, &*descriptorSet,
-                             0, DE_NULL);
+                             0, nullptr);
     cmdTraceRays(vk, *cmdBuffer, &rgenSBTR, &missSBTR, &chitSBTR, &callableSBTR, imageSize, imageSize, 1);
 
     const VkMemoryBarrier postTraceMemoryBarrier =
@@ -1005,7 +1017,7 @@ tcu::TestStatus UniqueKayPairsTestInstance::iterate(void)
         2u,                                                    // uint32_t mapEntryCount;
         specializationMap,                                     // const VkSpecializationMapEntry* pMapEntries;
         static_cast<uintptr_t>(sizeof(specializationData[0])), // uintptr_t dataSize;
-        DE_NULL,                                               // const void* pData;
+        nullptr,                                               // const void* pData;
     };
 
     for (int32_t i = 0; i < 4; ++i)
@@ -1066,6 +1078,158 @@ tcu::TestStatus UniqueKayPairsTestInstance::iterate(void)
 
     // there is no duplicated pipeline binary data
     return tcu::TestStatus::pass("Pass");
+}
+
+class PipelineBinaryTestWrapper : public PipelineBinaryWrapper
+{
+public:
+    PipelineBinaryTestWrapper(const DeviceInterface &vk, const VkDevice vkDevice) : PipelineBinaryWrapper(vk, vkDevice)
+    {
+    }
+
+    void getPipelineBinaryKeyOnly();
+};
+
+void PipelineBinaryTestWrapper::getPipelineBinaryKeyOnly()
+{
+    // for graphics pipeline libraries not all pipeline stages have to have binaries
+    const std::size_t binaryCount = m_binariesRaw.size();
+    if (binaryCount == 0)
+        return;
+
+    m_binaryKeys.resize(binaryCount);
+
+    for (std::size_t i = 0; i < binaryCount; ++i)
+    {
+        VkPipelineBinaryDataInfoKHR binaryInfo = initVulkanStructure();
+        binaryInfo.pipelineBinary              = m_binariesRaw[i];
+
+        // get binary key and data size
+        size_t binaryDataSize = 0;
+        m_binaryKeys[i]       = initVulkanStructure();
+        VK_CHECK(m_vk.getPipelineBinaryDataKHR(m_device, &binaryInfo, &m_binaryKeys[i], &binaryDataSize, NULL));
+        DE_ASSERT(binaryDataSize > 0);
+    }
+}
+
+class PipelineBinaryKeyTestInstance : public vkt::TestInstance
+{
+public:
+    PipelineBinaryKeyTestInstance(Context &context, const TestParams &testParams);
+    virtual ~PipelineBinaryKeyTestInstance(void) = default;
+    virtual tcu::TestStatus iterate(void) override;
+
+private:
+    const TestParams m_testParams;
+
+protected:
+    PipelineBinaryTestWrapper m_testBinaries[kNumPipelineLibs];
+};
+
+PipelineBinaryKeyTestInstance::PipelineBinaryKeyTestInstance(Context &context, const TestParams &testParams)
+    : TestInstance(context)
+    , m_testParams(testParams)
+    , m_testBinaries{
+          {context.getDeviceInterface(), context.getDevice()},
+          {context.getDeviceInterface(), context.getDevice()},
+          {context.getDeviceInterface(), context.getDevice()},
+          {context.getDeviceInterface(), context.getDevice()},
+      }
+{
+}
+
+tcu::TestStatus PipelineBinaryKeyTestInstance::iterate(void)
+{
+    const InstanceInterface &vki           = m_context.getInstanceInterface();
+    const DeviceInterface &vkd             = m_context.getDeviceInterface();
+    const VkDevice vkDevice                = m_context.getDevice();
+    VkPhysicalDevice vkPhysicalDevice      = m_context.getPhysicalDevice();
+    vk::BinaryCollection &binaryCollection = m_context.getBinaryCollection();
+    tcu::TestLog &log                      = m_context.getTestContext().getLog();
+    const auto Message                     = tcu::TestLog::Message;
+    const auto EndMessage                  = tcu::TestLog::EndMessage;
+    const auto pipelineConstructionType    = m_testParams.pipelineConstructionType;
+    const uint32_t renderSize              = 16;
+    bool testOk                            = true;
+
+    const std::vector<VkViewport> viewport{makeViewport(renderSize, renderSize)};
+    const std::vector<VkRect2D> scissor{makeRect2D(renderSize, renderSize)};
+    const Move<VkRenderPass> renderPass                 = makeRenderPass(vkd, vkDevice, VK_FORMAT_R8G8B8A8_UNORM);
+    const VkPipelineLayoutCreateInfo pipelineLayoutInfo = initVulkanStructure();
+    const PipelineLayoutWrapper pipelineLayout(pipelineConstructionType, vkd, vkDevice, &pipelineLayoutInfo);
+
+    ShaderWrapper vertShaderModule = ShaderWrapper(vkd, vkDevice, binaryCollection.get("vert"), 0);
+    ShaderWrapper fragShaderModule = ShaderWrapper(vkd, vkDevice, binaryCollection.get("frag"), 0);
+    GraphicsPipelineWrapper pipelineWrapper(vki, vkd, vkPhysicalDevice, vkDevice, m_context.getDeviceExtensions(),
+                                            pipelineConstructionType);
+
+    pipelineWrapper.setPipelineCreateFlags2(VK_PIPELINE_CREATE_2_CAPTURE_DATA_BIT_KHR)
+        .setDefaultRasterizationState()
+        .setDefaultColorBlendState()
+        .setDefaultDepthStencilState()
+        .setDefaultMultisampleState()
+        .setMonolithicPipelineLayout(pipelineLayout)
+        .setupVertexInputState()
+        .setupPreRasterizationShaderState(viewport, scissor, pipelineLayout, *renderPass, 0u, vertShaderModule)
+        .setupFragmentShaderState(pipelineLayout, *renderPass, 0u, fragShaderModule, 0, 0)
+        .setupFragmentOutputState(*renderPass)
+        .buildPipeline();
+
+    if (m_testParams.pipelineConstructionType == PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
+    {
+        VkPipeline pipeline = pipelineWrapper.getPipeline();
+        m_testBinaries[0].createPipelineBinariesFromPipeline(pipeline);
+        // read key
+        m_testBinaries[0].getPipelineBinaryKeyOnly();
+
+        const uint32_t keyCount = m_testBinaries[0].getKeyCount();
+        if (!keyCount)
+            log << Message << "Pipeline binary: 0 has no keys" << EndMessage;
+
+        const VkPipelineBinaryKeyKHR *keys = m_testBinaries[0].getBinaryKeys();
+        for (uint32_t keyIdx = 0; keyIdx < keyCount; keyIdx++)
+        {
+            const uint32_t keySize = keys[keyIdx].keySize;
+            log << Message << "Pipeline binary: 0, key: " << keyIdx << " has key size: " << keySize << EndMessage;
+            if ((keySize <= 0u) || (keySize > VK_MAX_PIPELINE_BINARY_KEY_SIZE_KHR))
+            {
+                testOk = false;
+                break;
+            }
+        }
+    }
+    else
+    {
+        for (uint32_t libIdx = 0; libIdx < kNumPipelineLibs; ++libIdx)
+        {
+            VkPipeline partialPipeline = pipelineWrapper.getPartialPipeline(libIdx);
+            m_testBinaries[libIdx].createPipelineBinariesFromPipeline(partialPipeline);
+            // read key
+            m_testBinaries[libIdx].getPipelineBinaryKeyOnly();
+
+            const uint32_t keyCount = m_testBinaries[libIdx].getKeyCount();
+            if (!keyCount)
+                log << Message << "Pipeline binary: " << libIdx << " has no keys" << EndMessage;
+
+            const VkPipelineBinaryKeyKHR *keys = m_testBinaries[libIdx].getBinaryKeys();
+            for (uint32_t keyIdx = 0; keyIdx < keyCount; keyIdx++)
+            {
+                const uint32_t keySize = keys[keyIdx].keySize;
+                log << Message << "Pipeline binary: " << libIdx << ", key: " << keyIdx << " has key size: " << keySize
+                    << EndMessage;
+                if ((keys[keyIdx].keySize <= 0u) || (keys[keyIdx].keySize > VK_MAX_PIPELINE_BINARY_KEY_SIZE_KHR))
+                {
+                    testOk = false;
+                    break;
+                }
+            }
+
+            if (!testOk)
+                break;
+        }
+    }
+
+    return testOk ? tcu::TestStatus::pass("Passed") : tcu::TestStatus::pass("Failed");
 }
 
 class BaseTestCase : public vkt::TestCase
@@ -1138,6 +1302,7 @@ void BaseTestCase::initPrograms(SourceCollections &programCollection) const
                    "#version 460 core\n"
                    "#extension GL_EXT_ray_tracing : require\n"
                    "layout(location = 0) rayPayloadEXT int payload;\n"
+                   "layout(location = 0) callableDataEXT int callableIO;\n"
 
                    "layout(set = 0, binding = 0) uniform accelerationStructureEXT tlas;\n"
                    "layout(set = 0, binding = 1, std430) writeonly buffer Result {\n"
@@ -1156,7 +1321,9 @@ void BaseTestCase::initPrograms(SourceCollections &programCollection) const
                    "tmax, 0);\n"
                    // to be able to display result in cherry this is interpreated as r8g8b8a8 during verification
                    // we are using only red but we need to add alpha (note: r and a may be swapped depending on endianness)
-                   "  result.value[resultIndex] = payload + 0xFF000000;\n"
+                   "  callableIO = 0;\n"
+                   "  executeCallableEXT(0, 0);\n"
+                   "  result.value[resultIndex] = payload + callableIO;\n" // 0xFF000000
                    "};\n")
             << buildOptions;
 
@@ -1200,8 +1367,18 @@ void BaseTestCase::initPrograms(SourceCollections &programCollection) const
                                "  payload = 128;\n"
                                "}\n")
             << buildOptions;
+
+        programCollection.glslSources.add("call")
+            << glu::CallableSource("#version 460 core\n"
+                                   "#extension GL_EXT_ray_tracing : require\n"
+                                   "layout(location = 0) callableDataInEXT int callableIO;\n"
+                                   "void main()\n"
+                                   "{\n"
+                                   "  callableIO = callableIO + 0xFF000000;\n"
+                                   "}\n")
+            << buildOptions;
     }
-    else if (m_testParams.type == TestType::UNIQUE_KEY_PAIRS)
+    else if ((m_testParams.type == TestType::UNIQUE_KEY_PAIRS) || (m_testParams.type == TestType::VALID_KEY))
     {
         programCollection.glslSources.add("vert")
             << glu::VertexSource("#version 450\n"
@@ -1273,6 +1450,8 @@ TestInstance *BaseTestCase::createInstance(Context &context) const
         (m_testParams.type == TestType::RAY_TRACING_PIPELINE_FROM_BINARY_DATA) ||
         (m_testParams.type == TestType::RAY_TRACING_PIPELINE_WITH_ZERO_BINARY_COUNT))
         return new RayTracingPipelineTestInstance(context, m_testParams);
+    if (m_testParams.type == TestType::VALID_KEY)
+        return new PipelineBinaryKeyTestInstance(context, m_testParams);
 
     return new UniqueKayPairsTestInstance(context, m_testParams);
 }
@@ -1289,6 +1468,9 @@ de::MovePtr<tcu::TestCaseGroup> addPipelineBinaryDedicatedTests(tcu::TestContext
     dedicatedTests->addChild(
         new BaseTestCase(testCtx, "graphics_pipeline_from_internal_cache",
                          {pipelineConstructionType, TestType::GRAPHICS_PIPELINE_FROM_INTERNAL_CACHE, false}));
+
+    dedicatedTests->addChild(
+        new BaseTestCase(testCtx, "valid_key", {pipelineConstructionType, TestType::VALID_KEY, false}));
 
     if (pipelineConstructionType == PipelineConstructionType::PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
     {

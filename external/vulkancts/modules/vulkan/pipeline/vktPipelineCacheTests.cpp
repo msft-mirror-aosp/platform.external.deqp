@@ -45,6 +45,7 @@
 #include "deUniquePtr.hpp"
 #include "deMemory.h"
 #include "tcuTestLog.hpp"
+#include "deThread.hpp"
 
 #include <sstream>
 #include <vector>
@@ -265,7 +266,7 @@ protected:
     Move<VkPipelineCache> m_cache;
 
     // binary related structures are used when m_mode is set to TestMode::BINARY
-    PipelineBinaryWrapper m_binaries[4];
+    PipelineBinaryWrapper m_binaries[5];
 };
 
 void BaseTestCase::checkSupport(Context &context) const
@@ -278,9 +279,8 @@ BaseTestInstance::BaseTestInstance(Context &context, const TestParam *param)
     : TestInstance(context)
     , m_param(param)
     , m_binaries{
-          {context.getDeviceInterface(), context.getDevice()},
-          {context.getDeviceInterface(), context.getDevice()},
-          {context.getDeviceInterface(), context.getDevice()},
+          {context.getDeviceInterface(), context.getDevice()}, {context.getDeviceInterface(), context.getDevice()},
+          {context.getDeviceInterface(), context.getDevice()}, {context.getDeviceInterface(), context.getDevice()},
           {context.getDeviceInterface(), context.getDevice()},
       }
 {
@@ -532,11 +532,7 @@ GraphicsTestInstance::GraphicsTestInstance(Context &context, const TestParam *pa
     const DeviceInterface &vk = m_context.getDeviceInterface();
     const VkDevice vkDevice   = m_context.getDevice();
 
-    // pipeline reconstructed from binaries should not use RETAIN_LINK_TIME_OPTIMIZATION/LINK_TIME_OPTIMIZATION
     PipelineConstructionType pipelineConstructionTypeForUseBlobs = param->getPipelineConstructionType();
-    if ((param->getMode() == TestMode::BINARY) &&
-        (pipelineConstructionTypeForUseBlobs == PIPELINE_CONSTRUCTION_TYPE_LINK_TIME_OPTIMIZED_LIBRARY))
-        pipelineConstructionTypeForUseBlobs = PIPELINE_CONSTRUCTION_TYPE_FAST_LINKED_LIBRARY;
 
     m_pipeline[PIPELINE_NDX_NO_BLOBS]  = GraphicsPipelinePtr(new GraphicsPipelineWrapper(
         context.getInstanceInterface(), context.getDeviceInterface(), context.getPhysicalDevice(), context.getDevice(),
@@ -809,20 +805,18 @@ void GraphicsTestInstance::preparePipelineWrapper(GraphicsPipelineWrapper &gpw, 
     // reuse graphics tests to also check if pipeline key is valid when pipeline binaries are tested
     if ((m_param->getMode() == TestMode::BINARY) && useShaderModules)
     {
-        if (m_param->getPipelineConstructionType() == PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
-        {
-            auto &pipelineCreateInfo = gpw.getPipelineCreateInfo();
-            auto pipelineKey         = m_binaries[0].getPipelineKey(&pipelineCreateInfo);
-            if (pipelineKey.keySize == 0)
-                TCU_FAIL("vkGetPipelineKeyKHR returned keySize == 0");
-        }
-        else
+        auto &pipelineCreateInfo = gpw.getPipelineCreateInfo();
+        auto pipelineKey         = m_binaries[0].getPipelineKey(&pipelineCreateInfo);
+        if (pipelineKey.keySize == 0)
+            TCU_FAIL("vkGetPipelineKeyKHR returned keySize == 0");
+
+        if (m_param->getPipelineConstructionType() != PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
         {
             for (uint32_t i = 0; i < 4; ++i)
             {
-                auto &pipelineCreateInfo = gpw.getPartialPipelineCreateInfo(i);
-                auto pipelineKey         = m_binaries[i].getPipelineKey(&pipelineCreateInfo);
-                if (pipelineKey.keySize == 0)
+                auto &partialPipelineCreateInfo = gpw.getPartialPipelineCreateInfo(i);
+                auto partialPipelineKey         = m_binaries[1 + i].getPipelineKey(&partialPipelineCreateInfo);
+                if (partialPipelineKey.keySize == 0)
                     TCU_FAIL("vkGetPipelineKeyKHR returned keySize == 0");
             }
         }
@@ -838,53 +832,48 @@ void GraphicsTestInstance::preparePipelinesForBinaries(bool createFromBlobs = fa
 
     preparePipelineWrapper(*m_pipeline[PIPELINE_NDX_NO_BLOBS], VK_NULL_HANDLE, false, true);
 
-    if (m_param->getPipelineConstructionType() == PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
+    VkPipeline pipeline = m_pipeline[PIPELINE_NDX_NO_BLOBS]->getPipeline();
+    m_binaries[0].createPipelineBinariesFromPipeline(pipeline);
+
+    if (createFromBlobs)
     {
-        VkPipeline pipeline = m_pipeline[PIPELINE_NDX_NO_BLOBS]->getPipeline();
-        m_binaries[0].createPipelineBinariesFromPipeline(pipeline);
+        // read binaries data out of the device
+        std::vector<VkPipelineBinaryDataKHR> pipelineDataInfo;
+        std::vector<std::vector<uint8_t>> pipelineDataBlob;
+        m_binaries[0].getPipelineBinaryData(pipelineDataInfo, pipelineDataBlob);
 
-        if (createFromBlobs)
-        {
-            // read binaries data out of the device
-            std::vector<VkPipelineBinaryDataKHR> pipelineDataInfo;
-            std::vector<std::vector<uint8_t>> pipelineDataBlob;
-            m_binaries[0].getPipelineBinaryData(pipelineDataInfo, pipelineDataBlob);
+        // clear pipeline binaries objects
+        m_binaries[0].deletePipelineBinariesKeepKeys();
 
-            // clear pipeline binaries objects
-            m_binaries[0].deletePipelineBinariesKeepKeys();
-
-            // recreate binaries from data blobs
-            m_binaries[0].createPipelineBinariesFromBinaryData(pipelineDataInfo);
-        }
-        else
-        {
-            VkReleaseCapturedPipelineDataInfoKHR releaseCapturedPipelineDataInfo = initVulkanStructure();
-            releaseCapturedPipelineDataInfo.pipeline                             = pipeline;
-            vk.releaseCapturedPipelineDataKHR(vkDevice, &releaseCapturedPipelineDataInfo, nullptr);
-        }
-
-        VkPipelineBinaryInfoKHR pipelineBinaryInfo = m_binaries[0].preparePipelineBinaryInfo();
-        preparePipelineWrapper(*m_pipeline[PIPELINE_NDX_USE_BLOBS], VK_NULL_HANDLE, false, false, &pipelineBinaryInfo);
+        // recreate binaries from data blobs
+        m_binaries[0].createPipelineBinariesFromBinaryData(pipelineDataInfo);
     }
     else
+    {
+        VkReleaseCapturedPipelineDataInfoKHR releaseCapturedPipelineDataInfo = initVulkanStructure();
+        releaseCapturedPipelineDataInfo.pipeline                             = pipeline;
+        vk.releaseCapturedPipelineDataKHR(vkDevice, &releaseCapturedPipelineDataInfo, nullptr);
+    }
+
+    if (m_param->getPipelineConstructionType() != PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
     {
         for (uint32_t i = 0; i < 4; ++i)
         {
             VkPipeline partialPipeline = m_pipeline[PIPELINE_NDX_NO_BLOBS]->getPartialPipeline(i);
-            m_binaries[i].createPipelineBinariesFromPipeline(partialPipeline);
+            m_binaries[1 + i].createPipelineBinariesFromPipeline(partialPipeline);
 
             if (createFromBlobs)
             {
                 // read binaries data out of the device
                 std::vector<VkPipelineBinaryDataKHR> pipelineDataInfo;
                 std::vector<std::vector<uint8_t>> pipelineDataBlob;
-                m_binaries[i].getPipelineBinaryData(pipelineDataInfo, pipelineDataBlob);
+                m_binaries[1 + i].getPipelineBinaryData(pipelineDataInfo, pipelineDataBlob);
 
                 // clear pipeline binaries objects
-                m_binaries[i].deletePipelineBinariesKeepKeys();
+                m_binaries[1 + i].deletePipelineBinariesKeepKeys();
 
                 // recreate binaries from data blobs
-                m_binaries[i].createPipelineBinariesFromBinaryData(pipelineDataInfo);
+                m_binaries[1 + i].createPipelineBinariesFromBinaryData(pipelineDataInfo);
             }
             else
             {
@@ -893,22 +882,31 @@ void GraphicsTestInstance::preparePipelinesForBinaries(bool createFromBlobs = fa
                 vk.releaseCapturedPipelineDataKHR(vkDevice, &releaseCapturedPipelineDataInfo, nullptr);
             }
         }
+    }
 
-        VkPipelineBinaryInfoKHR pipelinePartsBinaryInfo[4];
-        VkPipelineBinaryInfoKHR *binaryInfoPtr[4];
-        deMemset(binaryInfoPtr, 0, 4 * sizeof(nullptr));
+    VkPipelineBinaryInfoKHR pipelineBinaryInfo[5];
+    VkPipelineBinaryInfoKHR *binaryInfoPtr[5];
+    deMemset(binaryInfoPtr, 0, 5 * sizeof(nullptr));
 
+    if (m_binaries[0].getBinariesCount() > 0U)
+    {
+        pipelineBinaryInfo[0] = m_binaries[0].preparePipelineBinaryInfo();
+        binaryInfoPtr[0]      = &pipelineBinaryInfo[0];
+    }
+
+    if (m_param->getPipelineConstructionType() != PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
+    {
         for (uint32_t i = 0; i < 4; ++i)
         {
-            if (m_binaries[i].getBinariesCount() == 0)
+            if (m_binaries[1 + i].getBinariesCount() == 0)
                 continue;
-            pipelinePartsBinaryInfo[i] = m_binaries[i].preparePipelineBinaryInfo();
-            binaryInfoPtr[i]           = &pipelinePartsBinaryInfo[i];
+            pipelineBinaryInfo[1 + i] = m_binaries[1 + i].preparePipelineBinaryInfo();
+            binaryInfoPtr[1 + i]      = &pipelineBinaryInfo[1 + i];
         };
-
-        preparePipelineWrapper(*m_pipeline[PIPELINE_NDX_USE_BLOBS], VK_NULL_HANDLE, false, false, DE_NULL,
-                               binaryInfoPtr[0], binaryInfoPtr[1], binaryInfoPtr[2], binaryInfoPtr[3]);
     }
+
+    preparePipelineWrapper(*m_pipeline[PIPELINE_NDX_USE_BLOBS], VK_NULL_HANDLE, false, false, binaryInfoPtr[0],
+                           binaryInfoPtr[1], binaryInfoPtr[2], binaryInfoPtr[3], binaryInfoPtr[4]);
 }
 
 void GraphicsTestInstance::preparePipelines(void)
@@ -1321,7 +1319,7 @@ TestInstance *PipelineFromBlobsTest::createInstance(Context &context) const
 
 PipelineFromBlobsTestInstance::PipelineFromBlobsTestInstance(Context &context, const TestParam *param)
     : GraphicsTestInstance(context, param)
-    , m_data(DE_NULL)
+    , m_data(nullptr)
 {
     const DeviceInterface &vk = m_context.getDeviceInterface();
     const VkDevice vkDevice   = m_context.getDevice();
@@ -1400,7 +1398,7 @@ TestInstance *PipelineFromIncompleteBlobsTest::createInstance(Context &context) 
 PipelineFromIncompleteBlobsTestInstance::PipelineFromIncompleteBlobsTestInstance(Context &context,
                                                                                  const TestParam *param)
     : GraphicsTestInstance(context, param)
-    , m_data(DE_NULL)
+    , m_data(nullptr)
 {
     const DeviceInterface &vk = m_context.getDeviceInterface();
     const VkDevice vkDevice   = m_context.getDevice();
@@ -2008,6 +2006,283 @@ InvalidBlobTestInstance::~InvalidBlobTestInstance(void)
     delete[] m_data;
     delete[] m_zeroBlock;
 }
+
+class InternallySynchronizedInstance : public vkt::TestInstance
+{
+public:
+    InternallySynchronizedInstance(Context &context) : vkt::TestInstance(context)
+    {
+    }
+    virtual ~InternallySynchronizedInstance(void)
+    {
+    }
+
+    tcu::TestStatus iterate(void) override;
+};
+
+class CreatePipelineThread : public de::Thread
+{
+public:
+    CreatePipelineThread(const DeviceInterface &vkd, VkDevice device, vk::Move<VkShaderModule> &computeShaderModule,
+                         vk::Move<VkPipelineLayout> &pipelineLayout, vk::Move<VkPipelineCache> &pipelineCache)
+        : de::Thread()
+        , m_vkd(vkd)
+        , m_device(device)
+        , m_computeShaderModule(computeShaderModule)
+        , m_pipelineLayout(pipelineLayout)
+        , m_pipelineCache(pipelineCache)
+    {
+    }
+    virtual ~CreatePipelineThread(void)
+    {
+    }
+
+    virtual void run()
+    {
+        for (uint32_t iterIdx = 0; iterIdx < 1000; iterIdx++)
+        {
+            const VkPipelineShaderStageCreateInfo stageCreateInfo = {
+                VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, // VkStructureType                     sType;
+                nullptr,                                             // const void*                         pNext;
+                0u,                                                  // VkPipelineShaderStageCreateFlags    flags;
+                VK_SHADER_STAGE_COMPUTE_BIT,                         // VkShaderStageFlagBits               stage;
+                *m_computeShaderModule,                              // VkShaderModule                      module;
+                "main",                                              // const char*                         pName;
+                nullptr, // const VkSpecializationInfo*         pSpecializationInfo;
+            };
+
+            VkComputePipelineCreateInfo pipelineCreateInfo{
+                VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, // VkStructureType sType;
+                nullptr,                                        // const void* pNext;
+                0,                                              // VkPipelineCreateFlags flags;
+                stageCreateInfo,                                // VkPipelineShaderStageCreateInfo stage;
+                *m_pipelineLayout,                              // VkPipelineLayout layout;
+                VK_NULL_HANDLE,                                 // VkPipeline basePipelineHandle;
+                0u,                                             // int32_t basePipelineIndex;
+            };
+            auto pipeline = createComputePipeline(m_vkd, m_device, *m_pipelineCache, &pipelineCreateInfo);
+        }
+    }
+
+private:
+    const DeviceInterface &m_vkd;
+    VkDevice m_device;
+    vk::Move<VkShaderModule> &m_computeShaderModule;
+    vk::Move<VkPipelineLayout> &m_pipelineLayout;
+    vk::Move<VkPipelineCache> &m_pipelineCache;
+};
+
+class MergePipelineCacheThread : public de::Thread
+{
+public:
+    MergePipelineCacheThread(const DeviceInterface &vkd, VkDevice device, vk::Move<VkShaderModule> &computeShaderModule,
+                             vk::Move<VkPipelineLayout> &pipelineLayout, vk::Move<VkPipelineCache> &pipelineCache)
+        : de::Thread()
+        , m_vkd(vkd)
+        , m_device(device)
+        , m_computeShaderModule(computeShaderModule)
+        , m_pipelineLayout(pipelineLayout)
+        , m_pipelineCache(pipelineCache)
+    {
+    }
+    virtual ~MergePipelineCacheThread(void)
+    {
+    }
+
+    virtual void run()
+    {
+        for (uint32_t iterIdx = 0; iterIdx < 1000; iterIdx++)
+        {
+            VkPipelineCacheCreateFlags pipelineCacheCreateFlags = 0u;
+            if (iterIdx % 2 == 0)
+                pipelineCacheCreateFlags |= VK_PIPELINE_CACHE_CREATE_EXTERNALLY_SYNCHRONIZED_BIT;
+
+            const VkPipelineCacheCreateInfo pipelineCacheCreateInfo{
+                VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO, // VkStructureType             sType;
+                nullptr,                                      // const void*                 pNext;
+                pipelineCacheCreateFlags,                     // VkPipelineCacheCreateFlags  flags;
+                0u,                                           // uintptr_t                   initialDataSize;
+                nullptr,                                      // const void*                 pInitialData;
+            };
+
+            auto localPipelineCache = createPipelineCache(m_vkd, m_device, &pipelineCacheCreateInfo);
+
+            const VkPipelineShaderStageCreateInfo stageCreateInfo = {
+                VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, // VkStructureType                     sType;
+                nullptr,                                             // const void*                         pNext;
+                0u,                                                  // VkPipelineShaderStageCreateFlags    flags;
+                VK_SHADER_STAGE_COMPUTE_BIT,                         // VkShaderStageFlagBits               stage;
+                *m_computeShaderModule,                              // VkShaderModule                      module;
+                "main",                                              // const char*                         pName;
+                nullptr, // const VkSpecializationInfo*         pSpecializationInfo;
+            };
+
+            VkComputePipelineCreateInfo pipelineCreateInfo{
+                VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, // VkStructureType sType;
+                nullptr,                                        // const void* pNext;
+                0,                                              // VkPipelineCreateFlags flags;
+                stageCreateInfo,                                // VkPipelineShaderStageCreateInfo stage;
+                *m_pipelineLayout,                              // VkPipelineLayout layout;
+                VK_NULL_HANDLE,                                 // VkPipeline basePipelineHandle;
+                0u,                                             // int32_t basePipelineIndex;
+            };
+            auto pipeline = createComputePipeline(m_vkd, m_device, *localPipelineCache, &pipelineCreateInfo);
+
+            m_vkd.mergePipelineCaches(m_device, *m_pipelineCache, 1u, &*localPipelineCache);
+        }
+    }
+
+private:
+    const DeviceInterface &m_vkd;
+    VkDevice m_device;
+    vk::Move<VkShaderModule> &m_computeShaderModule;
+    vk::Move<VkPipelineLayout> &m_pipelineLayout;
+    vk::Move<VkPipelineCache> &m_pipelineCache;
+};
+
+tcu::TestStatus InternallySynchronizedInstance::iterate(void)
+{
+    const vk::VkInstance instance = m_context.getInstance();
+    const vk::InstanceDriver instanceDriver(m_context.getPlatformInterface(), instance);
+    const vk::DeviceInterface &vk = m_context.getDeviceInterface();
+    const vk::VkDevice device     = m_context.getDevice();
+
+    DescriptorSetLayoutBuilder descLayoutBuilder;
+
+    for (uint32_t bindingNdx = 0u; bindingNdx < 2u; bindingNdx++)
+        descLayoutBuilder.addSingleBinding(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT);
+
+    auto descriptorSetLayout = descLayoutBuilder.build(vk, device);
+
+    const VkPipelineLayoutCreateInfo pipelineLayoutCreateInfo = {
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, // VkStructureType                 sType;
+        nullptr,                                       // const void*                     pNext;
+        0u,                                            // VkPipelineLayoutCreateFlags     flags;
+        1u,                                            // uint32_t                        setLayoutCount;
+        &descriptorSetLayout.get(),                    // const VkDescriptorSetLayout*    pSetLayouts;
+        0u,                                            // uint32_t                        pushConstantRangeCount;
+        nullptr,                                       // const VkPushConstantRange*      pPushConstantRanges;
+    };
+
+    auto pipelineLayout = createPipelineLayout(vk, device, &pipelineLayoutCreateInfo);
+
+    uint32_t *shaderCode = (uint32_t *)m_context.getBinaryCollection().get("basic_compute").getBinary();
+    VkShaderModuleCreateInfo shaderModuleCreateInfo = {
+        VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,                    // VkStructureType             sType;
+        nullptr,                                                        // const void*                 pNext;
+        0u,                                                             // VkShaderModuleCreateFlags   flags;
+        m_context.getBinaryCollection().get("basic_compute").getSize(), // uintptr_t                   codeSize;
+        shaderCode,                                                     // const uint32_t*             pCode;
+    };
+    auto computeShaderModule = createShaderModule(vk, device, &shaderModuleCreateInfo);
+
+    VkPipelineCacheCreateInfo pipelineCacheCreateInfo{
+        VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO,                   // VkStructureType             sType;
+        nullptr,                                                        // const void*                 pNext;
+        VK_PIPELINE_CACHE_CREATE_INTERNALLY_SYNCHRONIZED_MERGE_BIT_KHR, // VkPipelineCacheCreateFlags  flags;
+        0u,                                                             // uintptr_t                   initialDataSize;
+        nullptr,                                                        // const void*                 pInitialData;
+    };
+
+    vk::Move<VkPipelineCache> globalPipelineCache = createPipelineCache(vk, device, &pipelineCacheCreateInfo);
+
+    CreatePipelineThread createPipelineThread(vk, device, computeShaderModule, pipelineLayout, globalPipelineCache);
+    MergePipelineCacheThread mergePipelineCacheThread(vk, device, computeShaderModule, pipelineLayout,
+                                                      globalPipelineCache);
+
+    createPipelineThread.start();
+    mergePipelineCacheThread.start();
+
+    createPipelineThread.join();
+    mergePipelineCacheThread.join();
+
+    size_t cacheDataSize;
+    vk.getPipelineCacheData(device, *globalPipelineCache, &cacheDataSize, nullptr);
+    std::vector<uint8_t> cacheData(cacheDataSize);
+    vk.getPipelineCacheData(device, *globalPipelineCache, &cacheDataSize, (void *)cacheData.data());
+
+    globalPipelineCache = {};
+
+    pipelineCacheCreateInfo.initialDataSize = cacheDataSize;
+    pipelineCacheCreateInfo.pInitialData    = (void *)cacheData.data();
+    globalPipelineCache                     = createPipelineCache(vk, device, &pipelineCacheCreateInfo);
+
+    {
+        size_t cacheDataSize2;
+        vk.getPipelineCacheData(device, *globalPipelineCache, &cacheDataSize2, nullptr);
+        std::vector<uint8_t> cacheData2(cacheDataSize2);
+        vk.getPipelineCacheData(device, *globalPipelineCache, &cacheDataSize2, (void *)cacheData2.data());
+    }
+
+    const VkPipelineShaderStageCreateInfo stageCreateInfo = {
+        VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, // VkStructureType                     sType;
+        nullptr,                                             // const void*                         pNext;
+        0u,                                                  // VkPipelineShaderStageCreateFlags    flags;
+        VK_SHADER_STAGE_COMPUTE_BIT,                         // VkShaderStageFlagBits               stage;
+        *computeShaderModule,                                // VkShaderModule                      module;
+        "main",                                              // const char*                         pName;
+        nullptr,                                             // const VkSpecializationInfo*         pSpecializationInfo;
+    };
+
+    VkComputePipelineCreateInfo pipelineCreateInfo{
+        VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO, // VkStructureType sType;
+        nullptr,                                        // const void* pNext;
+        0,                                              // VkPipelineCreateFlags flags;
+        stageCreateInfo,                                // VkPipelineShaderStageCreateInfo stage;
+        *pipelineLayout,                                // VkPipelineLayout layout;
+        VK_NULL_HANDLE,                                 // VkPipeline basePipelineHandle;
+        0u,                                             // int32_t basePipelineIndex;
+    };
+
+    auto pipeline = createComputePipeline(vk, device, *globalPipelineCache, &pipelineCreateInfo);
+    createComputePipeline(vk, device, *globalPipelineCache, &pipelineCreateInfo);
+
+    return tcu::TestStatus::pass("Pass");
+}
+
+class InternallySynchronizedTest : public vkt::TestCase
+{
+public:
+    InternallySynchronizedTest(tcu::TestContext &testCtx, const std::string &name) : vkt::TestCase(testCtx, name)
+    {
+    }
+    virtual ~InternallySynchronizedTest(void)
+    {
+    }
+
+    void checkSupport(vkt::Context &context) const override;
+    virtual void initPrograms(vk::SourceCollections &programCollection) const override;
+    TestInstance *createInstance(Context &context) const override
+    {
+        return new InternallySynchronizedInstance(context);
+    }
+};
+
+void InternallySynchronizedTest::checkSupport(Context &context) const
+{
+    context.requireDeviceFunctionality("VK_KHR_maintenance8");
+}
+
+void InternallySynchronizedTest::initPrograms(vk::SourceCollections &programCollection) const
+{
+    programCollection.glslSources.add("basic_compute") << glu::ComputeSource(
+        "#version 450 core\n"
+        "layout(local_size_x = 1) in;\n"
+        "layout(std430, binding = 0) readonly buffer Input0\n"
+        "{\n"
+        "  vec4 elements[];\n"
+        "} input_data0;\n"
+        "layout(std430, binding = 1) writeonly buffer Output\n"
+        "{\n"
+        "  vec4 elements[];\n"
+        "} output_data;\n"
+        "void main()\n"
+        "{\n"
+        "  uint ident = gl_GlobalInvocationID.x;\n"
+        "  output_data.elements[ident] = input_data0.elements[ident] * input_data0.elements[ident];\n"
+        "}");
+}
+
 } // namespace
 
 de::MovePtr<tcu::TestCaseGroup> createPipelineBlobTestsInternal(tcu::TestContext &testCtx, TestMode testMode,
@@ -2165,6 +2440,11 @@ de::MovePtr<tcu::TestCaseGroup> createPipelineBlobTestsInternal(tcu::TestContext
         miscTests->addChild(new ZeroSizeTest(testCtx, "zero_size_test", &testParam));
 
         miscTests->addChild(new InvalidBlobTest(testCtx, "invalid_blob_test", &testParam));
+
+        if (pipelineConstructionType == PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC)
+        {
+            miscTests->addChild(new InternallySynchronizedTest(testCtx, "internally_synchronized_test"));
+        }
 
         blobTests->addChild(miscTests.release());
     }

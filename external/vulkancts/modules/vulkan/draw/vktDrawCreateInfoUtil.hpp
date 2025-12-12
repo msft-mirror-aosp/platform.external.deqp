@@ -267,11 +267,10 @@ public:
                          uint32_t vertexAttributeDescriptionCount                                  = 0,
                          const vk::VkVertexInputAttributeDescription *pVertexAttributeDescriptions = NULL);
 
-        VertexInputState &addDivisors(
-            uint32_t vertexBindingDivisorCount                                          = 0,
-            const vk::VkVertexInputBindingDivisorDescriptionEXT *pVertexBindingDivisors = NULL);
+        VertexInputState &addDivisors(uint32_t vertexBindingDivisorCount                                       = 0,
+                                      const vk::VkVertexInputBindingDivisorDescription *pVertexBindingDivisors = NULL);
 
-        vk::VkPipelineVertexInputDivisorStateCreateInfoEXT m_divisorState;
+        vk::VkPipelineVertexInputDivisorStateCreateInfo m_divisorState;
     };
 
     class InputAssemblerState : public vk::VkPipelineInputAssemblyStateCreateInfo
@@ -290,7 +289,7 @@ public:
     {
     public:
         ViewportState(uint32_t viewportCount, std::vector<vk::VkViewport> viewports = std::vector<vk::VkViewport>(0),
-                      std::vector<vk::VkRect2D> scissors = std::vector<vk::VkRect2D>(0), const void *pNext = DE_NULL);
+                      std::vector<vk::VkRect2D> scissors = std::vector<vk::VkRect2D>(0), const void *pNext = nullptr);
 
         ViewportState(const ViewportState &other);
         ViewportState &operator=(const ViewportState &other);

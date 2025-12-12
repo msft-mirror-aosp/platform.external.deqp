@@ -1176,6 +1176,9 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
         std::vector<VkDeviceSize> bottomBlasCompactSize;
         std::vector<VkDeviceSize> bottomBlasSerialSize;
 
+        AccelerationStructBufferProperties bufferProps;
+        bufferProps.props.residency = ResourceResidency::TRADITIONAL;
+
         for (size_t idx = 0; idx < bottomLevelAccelerationStructures.size(); ++idx)
         {
             bottomLevelAccelerationStructures[idx]->setBuildFlags(bottomBuildFlags);
@@ -1189,17 +1192,17 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                 bottomLevelAccelerationStructures[idx]->setCreateFlags(
                     VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
             bottomLevelAccelerationStructures[idx]->createAndBuild(
-                vkd, device, *cmdBuffer, *allocator, captureInfo.captureAddr, captureInfo.bufferOpaqueCaptureAddr,
-                captureInfo.memoryOpaqueCaptureAddr);
+                vkd, device, *cmdBuffer, *allocator, bufferProps, captureInfo.captureAddr,
+                captureInfo.bufferOpaqueCaptureAddr, captureInfo.memoryOpaqueCaptureAddr);
             accelerationStructureHandles.push_back(*(bottomLevelAccelerationStructures[idx]->getPtr()));
             if (m_data.testType == TEST_ACCELERATION_STRUCTURES && !replay)
             {
-                const BufferWithMemory *asBackingBuffer = static_cast<const BufferWithMemory *>(
-                    bottomLevelAccelerationStructures[idx]->getAccelerationStructureBuffer());
+                const VkBuffer asBackingBuffer =
+                    bottomLevelAccelerationStructures[idx]->getAccelerationStructureBuffer();
 
                 fillAcclerationStructureOpaqueCaptureAddressInfo(
-                    vkd, device, *(bottomLevelAccelerationStructures[idx]->getPtr()), asBackingBuffer->get(),
-                    asBackingBuffer->getAllocation().getMemory(), captureInfo);
+                    vkd, device, *(bottomLevelAccelerationStructures[idx]->getPtr()), asBackingBuffer,
+                    bottomLevelAccelerationStructures[idx]->getAllocation().getMemory(), captureInfo);
 
                 buildBlasCaptureAddressInfo.push_back(captureInfo);
             }
@@ -1268,19 +1271,19 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                         replay ? copyBlasCaptureAddressInfo[idx] : AcclerationStructureOpaqueCaptureReplayAddressInfo();
                     asCopy->setBuildType(m_data.buildType);
                     asCopy->setCreateFlags(VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
-                    asCopy->createAndCopyFrom(vkd, device, *cmdBuffer, *allocator,
+                    asCopy->createAndCopyFrom(vkd, device, *cmdBuffer, *allocator, bufferProps,
                                               bottomLevelAccelerationStructures[idx].get(), 0u, captureInfo.captureAddr,
                                               captureInfo.bufferOpaqueCaptureAddr, captureInfo.memoryOpaqueCaptureAddr);
                     bottomLevelAccelerationStructureCopies.push_back(
                         de::SharedPtr<BottomLevelAccelerationStructure>(asCopy.release()));
                     if (!replay)
                     {
-                        const BufferWithMemory *asBackingBuffer = static_cast<const BufferWithMemory *>(
-                            bottomLevelAccelerationStructureCopies[idx]->getAccelerationStructureBuffer());
+                        const VkBuffer asBackingBuffer =
+                            bottomLevelAccelerationStructureCopies[idx]->getAccelerationStructureBuffer();
 
                         fillAcclerationStructureOpaqueCaptureAddressInfo(
-                            vkd, device, *(bottomLevelAccelerationStructureCopies[idx]->getPtr()),
-                            asBackingBuffer->get(), asBackingBuffer->getAllocation().getMemory(), captureInfo);
+                            vkd, device, *(bottomLevelAccelerationStructureCopies[idx]->getPtr()), asBackingBuffer,
+                            bottomLevelAccelerationStructureCopies[idx]->getAllocation().getMemory(), captureInfo);
 
                         copyBlasCaptureAddressInfo.push_back(captureInfo);
                     }
@@ -1296,7 +1299,7 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                         replay ? copyBlasCaptureAddressInfo[idx] : AcclerationStructureOpaqueCaptureReplayAddressInfo();
                     asCopy->setBuildType(m_data.buildType);
                     asCopy->setCreateFlags(VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
-                    asCopy->createAndCopyFrom(vkd, device, *cmdBuffer, *allocator,
+                    asCopy->createAndCopyFrom(vkd, device, *cmdBuffer, *allocator, bufferProps,
                                               bottomLevelAccelerationStructures[idx].get(), bottomBlasCompactSize[idx],
                                               captureInfo.captureAddr, captureInfo.bufferOpaqueCaptureAddr,
                                               captureInfo.memoryOpaqueCaptureAddr);
@@ -1304,12 +1307,12 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                         de::SharedPtr<BottomLevelAccelerationStructure>(asCopy.release()));
                     if (!replay)
                     {
-                        const BufferWithMemory *asBackingBuffer = static_cast<const BufferWithMemory *>(
-                            bottomLevelAccelerationStructureCopies[idx]->getAccelerationStructureBuffer());
+                        const VkBuffer asBackingBuffer =
+                            bottomLevelAccelerationStructureCopies[idx]->getAccelerationStructureBuffer();
 
                         fillAcclerationStructureOpaqueCaptureAddressInfo(
-                            vkd, device, *(bottomLevelAccelerationStructureCopies[idx]->getPtr()),
-                            asBackingBuffer->get(), asBackingBuffer->getAllocation().getMemory(), captureInfo);
+                            vkd, device, *(bottomLevelAccelerationStructureCopies[idx]->getPtr()), asBackingBuffer,
+                            bottomLevelAccelerationStructureCopies[idx]->getAllocation().getMemory(), captureInfo);
 
                         copyBlasCaptureAddressInfo.push_back(captureInfo);
                     }
@@ -1340,19 +1343,19 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                         replay ? copyBlasCaptureAddressInfo[idx] : AcclerationStructureOpaqueCaptureReplayAddressInfo();
                     asCopy->setBuildType(m_data.buildType);
                     asCopy->setCreateFlags(VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
-                    asCopy->createAndDeserializeFrom(vkd, device, *cmdBuffer, *allocator, storage.get(),
+                    asCopy->createAndDeserializeFrom(vkd, device, *cmdBuffer, *allocator, bufferProps, storage.get(),
                                                      captureInfo.captureAddr, captureInfo.bufferOpaqueCaptureAddr,
                                                      captureInfo.memoryOpaqueCaptureAddr);
                     bottomLevelAccelerationStructureCopies.push_back(
                         de::SharedPtr<BottomLevelAccelerationStructure>(asCopy.release()));
                     if (!replay)
                     {
-                        const BufferWithMemory *asBackingBuffer = static_cast<const BufferWithMemory *>(
-                            bottomLevelAccelerationStructureCopies[idx]->getAccelerationStructureBuffer());
+                        const VkBuffer asBackingBuffer =
+                            bottomLevelAccelerationStructureCopies[idx]->getAccelerationStructureBuffer();
 
                         fillAcclerationStructureOpaqueCaptureAddressInfo(
-                            vkd, device, *(bottomLevelAccelerationStructureCopies[idx]->getPtr()),
-                            asBackingBuffer->get(), asBackingBuffer->getAllocation().getMemory(), captureInfo);
+                            vkd, device, *(bottomLevelAccelerationStructureCopies[idx]->getPtr()), asBackingBuffer,
+                            bottomLevelAccelerationStructureCopies[idx]->getAllocation().getMemory(), captureInfo);
 
                         copyBlasCaptureAddressInfo.push_back(captureInfo);
                     }
@@ -1384,17 +1387,16 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
             topLevelAccelerationStructure->setCreateFlags(
                 VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
         topLevelAccelerationStructure->createAndBuild(
-            vkd, device, *cmdBuffer, *allocator, buildTlasCaptureAddressInfo.captureAddr,
+            vkd, device, *cmdBuffer, *allocator, bufferProps, buildTlasCaptureAddressInfo.captureAddr,
             buildTlasCaptureAddressInfo.bufferOpaqueCaptureAddr, buildTlasCaptureAddressInfo.memoryOpaqueCaptureAddr);
         topLevelStructureHandles.push_back(*(topLevelAccelerationStructure->getPtr()));
         if (m_data.testType == TEST_ACCELERATION_STRUCTURES && !replay)
         {
-            const BufferWithMemory *asBackingBuffer =
-                static_cast<const BufferWithMemory *>(topLevelAccelerationStructure->getAccelerationStructureBuffer());
+            const VkBuffer asBackingBuffer = topLevelAccelerationStructure->getAccelerationStructureBuffer();
 
             fillAcclerationStructureOpaqueCaptureAddressInfo(
-                vkd, device, *(topLevelAccelerationStructure->getPtr()), asBackingBuffer->get(),
-                asBackingBuffer->getAllocation().getMemory(), buildTlasCaptureAddressInfo);
+                vkd, device, *(topLevelAccelerationStructure->getPtr()), asBackingBuffer,
+                topLevelAccelerationStructure->getAllocation().getMemory(), buildTlasCaptureAddressInfo);
         }
 
         if (topCompact)
@@ -1440,17 +1442,17 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                 topLevelAccelerationStructureCopy->setCreateFlags(
                     VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
                 topLevelAccelerationStructureCopy->createAndCopyFrom(
-                    vkd, device, *cmdBuffer, *allocator, topLevelAccelerationStructure.get(), 0u,
+                    vkd, device, *cmdBuffer, *allocator, bufferProps, topLevelAccelerationStructure.get(), 0u,
                     copyTLASCaptureAddressInfo.captureAddr, copyTLASCaptureAddressInfo.bufferOpaqueCaptureAddr,
                     copyTLASCaptureAddressInfo.memoryOpaqueCaptureAddr);
                 if (!replay)
                 {
-                    const BufferWithMemory *asBackingBuffer = static_cast<const BufferWithMemory *>(
-                        topLevelAccelerationStructureCopy->getAccelerationStructureBuffer());
+                    const VkBuffer asBackingBuffer =
+                        topLevelAccelerationStructureCopy->getAccelerationStructureBuffer();
 
                     fillAcclerationStructureOpaqueCaptureAddressInfo(
-                        vkd, device, *(topLevelAccelerationStructureCopy->getPtr()), asBackingBuffer->get(),
-                        asBackingBuffer->getAllocation().getMemory(), copyTLASCaptureAddressInfo);
+                        vkd, device, *(topLevelAccelerationStructureCopy->getPtr()), asBackingBuffer,
+                        topLevelAccelerationStructureCopy->getAllocation().getMemory(), copyTLASCaptureAddressInfo);
                 }
                 break;
             }
@@ -1461,18 +1463,19 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                 topLevelAccelerationStructureCopy->setCreateFlags(
                     VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
                 topLevelAccelerationStructureCopy->createAndCopyFrom(
-                    vkd, device, *cmdBuffer, *allocator, topLevelAccelerationStructure.get(), topBlasCompactSize[0],
-                    copyTLASCaptureAddressInfo.captureAddr, copyTLASCaptureAddressInfo.bufferOpaqueCaptureAddr,
+                    vkd, device, *cmdBuffer, *allocator, bufferProps, topLevelAccelerationStructure.get(),
+                    topBlasCompactSize[0], copyTLASCaptureAddressInfo.captureAddr,
+                    copyTLASCaptureAddressInfo.bufferOpaqueCaptureAddr,
                     copyTLASCaptureAddressInfo.memoryOpaqueCaptureAddr);
 
                 if (!replay)
                 {
-                    const BufferWithMemory *asBackingBuffer = static_cast<const BufferWithMemory *>(
-                        topLevelAccelerationStructureCopy->getAccelerationStructureBuffer());
+                    const VkBuffer asBackingBuffer =
+                        topLevelAccelerationStructureCopy->getAccelerationStructureBuffer();
 
                     fillAcclerationStructureOpaqueCaptureAddressInfo(
-                        vkd, device, *(topLevelAccelerationStructureCopy->getPtr()), asBackingBuffer->get(),
-                        asBackingBuffer->getAllocation().getMemory(), copyTLASCaptureAddressInfo);
+                        vkd, device, *(topLevelAccelerationStructureCopy->getPtr()), asBackingBuffer,
+                        topLevelAccelerationStructureCopy->getAllocation().getMemory(), copyTLASCaptureAddressInfo);
                 }
 
                 break;
@@ -1499,17 +1502,17 @@ std::vector<uint32_t> RayTracingCaptureReplayTestInstance::runTest(bool replay)
                 topLevelAccelerationStructureCopy->setCreateFlags(
                     VK_ACCELERATION_STRUCTURE_CREATE_DEVICE_ADDRESS_CAPTURE_REPLAY_BIT_KHR);
                 topLevelAccelerationStructureCopy->createAndDeserializeFrom(
-                    vkd, device, *cmdBuffer, *allocator, storage.get(), copyTLASCaptureAddressInfo.captureAddr,
-                    copyTLASCaptureAddressInfo.bufferOpaqueCaptureAddr,
+                    vkd, device, *cmdBuffer, *allocator, bufferProps, storage.get(),
+                    copyTLASCaptureAddressInfo.captureAddr, copyTLASCaptureAddressInfo.bufferOpaqueCaptureAddr,
                     copyTLASCaptureAddressInfo.memoryOpaqueCaptureAddr);
                 if (!replay)
                 {
-                    const BufferWithMemory *asBackingBuffer = static_cast<const BufferWithMemory *>(
-                        topLevelAccelerationStructureCopy->getAccelerationStructureBuffer());
+                    const VkBuffer asBackingBuffer =
+                        topLevelAccelerationStructureCopy->getAccelerationStructureBuffer();
 
                     fillAcclerationStructureOpaqueCaptureAddressInfo(
-                        vkd, device, *(topLevelAccelerationStructureCopy->getPtr()), asBackingBuffer->get(),
-                        asBackingBuffer->getAllocation().getMemory(), copyTLASCaptureAddressInfo);
+                        vkd, device, *(topLevelAccelerationStructureCopy->getPtr()), asBackingBuffer,
+                        topLevelAccelerationStructureCopy->getAllocation().getMemory(), copyTLASCaptureAddressInfo);
                 }
                 break;
             }

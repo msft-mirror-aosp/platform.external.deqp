@@ -3,13 +3,13 @@ vk-default/binding-model.txt
 vk-default/clipping.txt
 vk-default/compute.txt
 vk-default/conditional-rendering.txt
+vk-default/cooperative-vector.txt
 vk-default/depth.txt
 vk-default/descriptor-indexing.txt
 vk-default/device-group.txt
 vk-default/dgc.txt
 vk-default/draw.txt
 vk-default/drm-format-modifiers.txt
-vk-default/dynamic-rendering.txt
 vk-default/dynamic-state.txt
 vk-default/fragment-operations.txt
 vk-default/fragment-shader-interlock.txt
@@ -18,6 +18,7 @@ vk-default/fragment-shading-rate.txt
 vk-default/geometry.txt
 vk-default/glsl.txt
 vk-default/graphicsfuzz.txt
+vk-default/image/2d-array-compatible.txt
 vk-default/image/astc-decode-mode.txt
 vk-default/image/atomic-operations.txt
 vk-default/image/concurrent-copy.txt
@@ -28,6 +29,7 @@ vk-default/image/extend-operands-spirv1p4.txt
 vk-default/image/extended-usage-bit.txt
 vk-default/image/extended-usage-bit-compatibility.txt
 vk-default/image/format-reinterpret.txt
+vk-default/image/general-layout.txt
 vk-default/image/host-image-copy.txt
 vk-default/image/image-size.txt
 vk-default/image/load-store.txt
@@ -37,6 +39,7 @@ vk-default/image/misaligned-cube.txt
 vk-default/image/mismatched-formats.txt
 vk-default/image/mismatched-write-op.txt
 vk-default/image/mutable.txt
+vk-default/image/non-uniform-offset-sample.txt
 vk-default/image/nontemporal-operand.txt
 vk-default/image/qualifiers.txt
 vk-default/image/queue-transfer.txt
@@ -54,6 +57,7 @@ vk-default/mesh-shader.txt
 vk-default/multiview.txt
 vk-default/pipeline/fast-linked-library.txt
 vk-default/pipeline/monolithic.txt
+vk-default/pipeline/no-queues.txt
 vk-default/pipeline/pipeline-library.txt
 vk-default/pipeline/shader-object-linked-binary.txt
 vk-default/pipeline/shader-object-linked-spirv.txt
@@ -65,8 +69,7 @@ vk-default/rasterization.txt
 vk-default/ray-query.txt
 vk-default/ray-tracing-pipeline.txt
 vk-default/reconvergence.txt
-vk-default/renderpass.txt
-vk-default/renderpass2.txt
+vk-default/renderpasses.txt
 vk-default/robustness.txt
 vk-default/shader-object/api.txt
 vk-default/shader-object/binary.txt

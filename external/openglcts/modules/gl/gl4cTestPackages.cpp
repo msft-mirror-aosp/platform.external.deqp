@@ -61,12 +61,16 @@
 #include "gl4cStencilTexturingTests.hpp"
 #include "gl4cSyncTests.hpp"
 #include "gl4cTextureBarrierTests.hpp"
+#include "gl4cTextureBufferTests.hpp"
 #include "gl4cTextureFilterMinmaxTests.hpp"
 #include "gl4cTextureGatherTests.hpp"
 #include "gl4cTextureViewTests.hpp"
 #include "gl4cVertexAttrib64BitTest.hpp"
 #include "gl4cVertexAttribBindingTests.hpp"
+#include "gl4cTextureQueryLevelsTests.hpp"
 #include "glcAggressiveShaderOptimizationsTests.hpp"
+#include "gl4cTextureQueryLodTests.hpp"
+#include "glcBindImageTextureTests.hpp"
 #include "glcBlendEquationAdvancedTests.hpp"
 #include "glcExposedExtensionsTests.hpp"
 #include "glcInfoTests.hpp"
@@ -85,6 +89,8 @@
 #include "glcTextureStencil8Tests.hpp"
 #include "glcViewportArrayTests.hpp"
 #include "glcPixelStorageModesTests.hpp"
+#include "gl4cClearTexImageAndSubImageTests.hpp"
+#include "glcNegativeTextureLookupFunctionsBiasTests.hpp"
 
 #include "../gles31/es31cDrawIndirectTests.hpp"
 #include "../gles31/es31cExplicitUniformLocationTest.hpp"
@@ -102,7 +108,6 @@
 
 namespace gl4cts
 {
-
 // GL40TestPackage
 
 GL40TestPackage::GL40TestPackage(tcu::TestContext &testCtx, const char *packageName, const char *description,
@@ -214,6 +219,7 @@ void GL42TestPackage::init(void)
         addChild(new gl4cts::ShaderImageLoadStoreTests(getContext()));
         addChild(new gl4cts::ShadingLanguage420PackTests(getContext()));
         addChild(new gl4cts::TextureViewTests(getContext()));
+        addChild(new glcts::BindImageTextureTests(getContext()));
         addChild(new GL42ShaderTests(getContext()));
     }
     catch (...)
@@ -309,7 +315,11 @@ void GL43TestPackage::init(void)
         addChild(new gl4cts::IndirectParametersTests(getContext()));
         addChild(new gl4cts::ShaderBallotTests(getContext()));
         addChild(new glcts::ShaderConstExprTests(getContext()));
+        addChild(new gl4cts::ClearTextureImageTestCases(getContext()));
         addChild(new glcts::AggressiveShaderOptimizationsTests(getContext()));
+        addChild(new gl4cts::TextureQueryLevelsTests(getContext()));
+        addChild(new gl4cts::TextureQueryLodTests(getContext()));
+        addChild(new gl4cts::TextureBufferTests(getContext()));
     }
     catch (...)
     {
@@ -439,6 +449,8 @@ void GL45TestPackage::init(void)
         addChild(new glcts::LayoutLocationTests(getContext()));
         addChild(new gl4cts::SpirvExtensionsTests(getContext()));
         addChild(new gl4cts::GlSpirvTests(getContext()));
+        addChild(new gl4cts::es31compatibility::Tests(getContext()));
+        addChild(new glcts::NegativeTextureLookupFunctionsBiasTests(getContext()));
     }
     catch (...)
     {
