@@ -137,7 +137,8 @@ class SingletonDevice
 
         if (FEATURES & RF_ROBUSTNESS2)
         {
-            DE_ASSERT(context.isDeviceFunctionalitySupported("VK_EXT_robustness2"));
+            DE_ASSERT(context.isDeviceFunctionalitySupported("VK_KHR_robustness2") ||
+                      context.isDeviceFunctionalitySupported("VK_EXT_robustness2"));
 
             if (!(FEATURES & RF_PIPELINE_ROBUSTNESS))
                 addFeatures(&robustness2Features);
@@ -256,6 +257,21 @@ PipelineConstructionType getConstructionTypeFromRobustnessCase(PipelineRobustnes
     if (prCase == PipelineRobustnessCase::ENABLED_OPTIMIZED_GPL)
         return PIPELINE_CONSTRUCTION_TYPE_LINK_TIME_OPTIMIZED_LIBRARY;
     return PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC;
+}
+
+VkFlags getAllShaderStages(tcu::TestContext &testCtx)
+{
+    return testCtx.getCommandLine().isComputeOnly() ?
+               VK_SHADER_STAGE_COMPUTE_BIT :
+               VK_SHADER_STAGE_COMPUTE_BIT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+}
+
+VkFlags getAllPipelineStages(tcu::TestContext &testCtx)
+{
+    return testCtx.getCommandLine().isComputeOnly() ?
+               VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT :
+               VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
+                   VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
 }
 
 struct CaseDef
@@ -510,7 +526,9 @@ void RobustnessExtsTestCase::checkSupport(Context &context) const
     if (context.isDeviceFunctionalitySupported("VK_EXT_image_robustness"))
         addFeatures(&imageRobustnessFeatures);
 
-    if (context.isDeviceFunctionalitySupported("VK_EXT_robustness2"))
+    if (context.isDeviceFunctionalitySupported("VK_KHR_robustness2") ||
+        context.isDeviceFunctionalitySupported("VK_EXT_robustness2"))
+
         addFeatures(&robustness2Features);
 
 #ifndef CTS_USES_VULKANSC
@@ -1996,7 +2014,8 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate(void)
     }
 #endif
 
-    if (m_context.isDeviceFunctionalitySupported("VK_EXT_robustness2"))
+    if (m_context.isDeviceFunctionalitySupported("VK_KHR_robustness2") ||
+        m_context.isDeviceFunctionalitySupported("VK_EXT_robustness2"))
     {
         robustness2Properties.pNext = properties.pNext;
         properties.pNext            = &robustness2Properties;
@@ -2467,7 +2486,7 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate(void)
                             clearValue.uint32[0] += 1;
                     }
                 }
-                vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+                vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, m_data.allPipelineStages,
                                       (VkDependencyFlags)0, 0, nullptr, 0, nullptr, 1, &postImageBarrier);
             }
             else
@@ -2523,9 +2542,8 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate(void)
 
                     vk.cmdDispatch(*cmdBuffer, imageInfo.extent.width, imageInfo.extent.height, clearLayers);
 
-                    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-                                          VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, (VkDependencyFlags)0, 0, nullptr, 0,
-                                          nullptr, 1, &imageBarrierPost);
+                    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, m_data.allPipelineStages,
+                                          (VkDependencyFlags)0, 0, nullptr, 0, nullptr, 1, &imageBarrierPost);
                 }
                 else
                 {
@@ -2535,7 +2553,7 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate(void)
                                                                                             0, 0, clearLayers)));
 
                     copyBufferToImage(vk, *cmdBuffer, bufferR64, size, bufferImageCopy, VK_IMAGE_ASPECT_COLOR_BIT, 1,
-                                      clearLayers, img, VK_IMAGE_LAYOUT_GENERAL, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
+                                      clearLayers, img, VK_IMAGE_LAYOUT_GENERAL, m_data.allPipelineStages);
                 }
             }
         }
@@ -3292,7 +3310,7 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate(void)
                                    makeImageSubresourceLayers(VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1)));
         copyBufferToImage(vk, *cmdBuffer, *(*bufferOutputImageR64), sizeOutputR64, bufferImageCopy,
                           VK_IMAGE_ASPECT_COLOR_BIT, 1, 1, **images[0], VK_IMAGE_LAYOUT_GENERAL,
-                          VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT);
+                          m_data.allPipelineStages);
     }
 
     VkMemoryBarrier memBarrier = {
@@ -3303,8 +3321,9 @@ tcu::TestStatus RobustnessExtsTestInstance::iterate(void)
     };
 
     memBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-    memBarrier.dstAccessMask =
-        VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT | VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
+    memBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    if (!m_context.getTestContext().getCommandLine().isComputeOnly())
+        memBarrier.dstAccessMask |= VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
     vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, m_data.allPipelineStages, 0, 1, &memBarrier, 0,
                           nullptr, 0, nullptr);
 
@@ -3490,7 +3509,9 @@ void OutOfBoundsStrideCase::checkSupport(Context &context) const
 
     const auto addFeatures = makeStructChainAdder(&features2);
 
-    if (context.isDeviceFunctionalitySupported("VK_EXT_robustness2"))
+    if (context.isDeviceFunctionalitySupported("VK_KHR_robustness2") ||
+        context.isDeviceFunctionalitySupported("VK_EXT_robustness2"))
+
         addFeatures(&robustness2Features);
 
 #ifndef CTS_USES_VULKANSC
@@ -4033,13 +4054,8 @@ static void createTests(tcu::TestCaseGroup *group, bool robustness2, bool pipeli
                                                      stageNdx++)
                                                 {
                                                     Stage currentStage = static_cast<Stage>(stageCases[stageNdx].count);
-                                                    VkFlags allShaderStages = VK_SHADER_STAGE_COMPUTE_BIT |
-                                                                              VK_SHADER_STAGE_VERTEX_BIT |
-                                                                              VK_SHADER_STAGE_FRAGMENT_BIT;
-                                                    VkFlags allPipelineStages = VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT |
-                                                                                VK_PIPELINE_STAGE_VERTEX_SHADER_BIT |
-                                                                                VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT |
-                                                                                VK_PIPELINE_STAGE_VERTEX_INPUT_BIT;
+                                                    VkFlags allShaderStages   = getAllShaderStages(testCtx);
+                                                    VkFlags allPipelineStages = getAllPipelineStages(testCtx);
 #ifndef CTS_USES_VULKANSC
                                                     if ((Stage)stageCases[stageNdx].count == STAGE_RAYGEN)
                                                     {

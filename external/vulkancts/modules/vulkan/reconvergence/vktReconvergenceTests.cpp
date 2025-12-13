@@ -22,6 +22,7 @@
  *//*--------------------------------------------------------------------*/
 
 #include "vktReconvergenceTests.hpp"
+#include "vktReconvergenceTerminateInvocationTests.hpp"
 
 #include "vkBufferWithMemory.hpp"
 #include "vkImageWithMemory.hpp"
@@ -812,8 +813,11 @@ Move<VkPipeline> ReconvergenceTestInstance::createComputePipeline(const VkPipeli
 {
     const DeviceInterface &vk = m_context.getDeviceInterface();
     const VkDevice device     = m_context.getDevice();
+    const VkBool32 computeFullSubgroups =
+        m_subgroupSize <= 64 && m_context.getSubgroupSizeControlFeatures().computeFullSubgroups;
 
-    const uint32_t specData[2]                                               = {m_data.sizeX, m_data.sizeY};
+    const uint32_t specData[2] = {computeFullSubgroups ? ROUNDUP(m_data.sizeX, m_subgroupSize) : m_data.sizeX,
+                                  m_data.sizeY};
     const vk::VkSpecializationMapEntry entries[DE_LENGTH_OF_ARRAY(specData)] = {
         {0, (uint32_t)(sizeof(uint32_t) * 0), sizeof(uint32_t)},
         {1, (uint32_t)(sizeof(uint32_t) * 1), sizeof(uint32_t)},
@@ -830,9 +834,6 @@ Move<VkPipeline> ReconvergenceTestInstance::createComputePipeline(const VkPipeli
         nullptr,                                                                        // void* pNext;
         m_subgroupSize // uint32_t requiredSubgroupSize;
     };
-
-    const VkBool32 computeFullSubgroups =
-        m_subgroupSize <= 64 && m_context.getSubgroupSizeControlFeatures().computeFullSubgroups;
 
     const void *shaderPNext = computeFullSubgroups ? &subgroupSizeCreateInfo : nullptr;
     VkPipelineShaderStageCreateFlags pipelineShaderStageCreateFlags =
@@ -5276,15 +5277,33 @@ tcu::TestStatus ReconvergenceTestComputeInstance::iterate(void)
     invalidateAlloc(vk, device, buffers[1]->getAllocation());
 
     // Simulate execution on the CPU, and compare against the GPU result
-    try
     {
-        ref.resize(maxLoc, tcu::UVec4());
-    }
-    catch (const std::bad_alloc &)
-    {
-        // Allocation size is unpredictable and can be too large for some systems. Don't treat allocation failure as a test failure.
-        return tcu::TestStatus(QP_TEST_RESULT_NOT_SUPPORTED,
-                               "Failed system memory allocation " + de::toString(maxLoc * sizeof(uint64_t)) + " bytes");
+        typedef decltype(ref) ref_t;
+        const typename ref_t::size_type allocSize = maxLoc * sizeof(ref_t::value_type);
+        // Allocation size is unpredictable and can be too large for some systems.
+        // Don't treat allocation failure as a test failure.
+        const tcu::TestStatus failAlloc(QP_TEST_RESULT_NOT_SUPPORTED,
+                                        "Failed system memory allocation " + de::toString(allocSize) + " bytes");
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+#endif
+        if (maxLoc > ref.max_size())
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
+        {
+            return failAlloc;
+        }
+
+        try
+        {
+            ref.resize(maxLoc, tcu::UVec4());
+        }
+        catch (const std::exception &)
+        {
+            return failAlloc;
+        }
     }
 
     program.execute(m_context.getTestContext().getWatchDog(), false, m_subgroupSize, 0u, invocationStride, ref, log);
@@ -7923,6 +7942,8 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
         }
         group->addChild(ttGroup.release());
     }
+
+    group->addChild(createTerminateInvocationTests(testCtx));
 
     return group.release();
 }

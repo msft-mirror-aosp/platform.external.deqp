@@ -518,9 +518,21 @@ RenderPassWrapper::SubpassDependency::SubpassDependency(const VkSubpassDependenc
 }
 #endif // CTS_USES_VULKANSC
 
-RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructionType, const DeviceInterface &vk,
-                                     VkDevice device, const VkRenderPassCreateInfo *pCreateInfo)
-    : m_isDynamicRendering(vk::isConstructionTypeShaderObject(pipelineConstructionType))
+#ifndef CTS_USES_VULKANSC
+RenderPassWrapper::RenderPassWrapper(const DeviceInterface &vk, VkDevice device,
+                                     const VkRenderPassCreateInfo *pCreateInfo,
+                                     const VkAttachmentFeedbackLoopInfoEXT *attachmentFeedbackLoopInfo)
+    : RenderPassWrapper(vk, device, pCreateInfo, true)
+{
+    m_attachmentFeedbackLoopInfo = *attachmentFeedbackLoopInfo;
+}
+#endif
+
+RenderPassWrapper::RenderPassWrapper(const DeviceInterface &vk, VkDevice device,
+                                     const VkRenderPassCreateInfo *pCreateInfo, bool dynamicRendering)
+    : m_isDynamicRendering(dynamicRendering)
+    , m_renderPassPtr()
+    , m_renderPass(VK_NULL_HANDLE)
 #ifndef CTS_USES_VULKANSC
     , m_renderingInfo()
     , m_secondaryCommandBuffers(false)
@@ -528,7 +540,8 @@ RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructi
 {
     if (!m_isDynamicRendering)
     {
-        m_renderPass = vk::createRenderPass(vk, device, pCreateInfo);
+        m_renderPassPtr = vk::createRenderPass(vk, device, pCreateInfo);
+        m_renderPass    = m_renderPassPtr.get();
     }
     else
     {
@@ -656,6 +669,12 @@ RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructi
 }
 
 RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructionType, const DeviceInterface &vk,
+                                     VkDevice device, const VkRenderPassCreateInfo *pCreateInfo)
+    : RenderPassWrapper(vk, device, pCreateInfo, isConstructionTypeShaderObject(pipelineConstructionType))
+{
+}
+
+RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructionType, const DeviceInterface &vk,
                                      VkDevice device, const VkRenderPassCreateInfo2 *pCreateInfo)
     : RenderPassWrapper(vk, device, pCreateInfo, isConstructionTypeShaderObject(pipelineConstructionType))
 {
@@ -664,6 +683,8 @@ RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructi
 RenderPassWrapper::RenderPassWrapper(const DeviceInterface &vk, VkDevice device,
                                      const VkRenderPassCreateInfo2 *pCreateInfo, bool dynamicRendering)
     : m_isDynamicRendering(dynamicRendering)
+    , m_renderPassPtr()
+    , m_renderPass(VK_NULL_HANDLE)
 #ifndef CTS_USES_VULKANSC
     , m_renderingInfo()
     , m_secondaryCommandBuffers(false)
@@ -672,7 +693,8 @@ RenderPassWrapper::RenderPassWrapper(const DeviceInterface &vk, VkDevice device,
 
     if (!m_isDynamicRendering)
     {
-        m_renderPass = vk::createRenderPass2(vk, device, pCreateInfo);
+        m_renderPassPtr = vk::createRenderPass2(vk, device, pCreateInfo);
+        m_renderPass    = m_renderPassPtr.get();
     }
     else
     {
@@ -814,6 +836,8 @@ RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructi
                                      const VkImageLayout subpassLayoutDepthStencil,
                                      const VkAllocationCallbacks *const allocationCallbacks)
     : m_isDynamicRendering(isConstructionTypeShaderObject(pipelineConstructionType))
+    , m_renderPassPtr()
+    , m_renderPass(VK_NULL_HANDLE)
 #ifndef CTS_USES_VULKANSC
     , m_renderingInfo()
 #endif
@@ -821,9 +845,10 @@ RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructi
 
     if (!m_isDynamicRendering)
     {
-        m_renderPass = vk::makeRenderPass(vk, device, colorFormat, depthStencilFormat, loadOperation, finalLayoutColor,
-                                          finalLayoutDepthStencil, subpassLayoutColor, subpassLayoutDepthStencil,
-                                          allocationCallbacks);
+        m_renderPassPtr = vk::makeRenderPass(vk, device, colorFormat, depthStencilFormat, loadOperation,
+                                             finalLayoutColor, finalLayoutDepthStencil, subpassLayoutColor,
+                                             subpassLayoutDepthStencil, allocationCallbacks);
+        m_renderPass    = m_renderPassPtr.get();
     }
     else
     {
@@ -911,9 +936,11 @@ RenderPassWrapper::RenderPassWrapper(PipelineConstructionType pipelineConstructi
 
 RenderPassWrapper::RenderPassWrapper(RenderPassWrapper &&rhs) noexcept
     : m_isDynamicRendering(rhs.m_isDynamicRendering)
+    , m_renderPassPtr(rhs.m_renderPassPtr)
     , m_renderPass(rhs.m_renderPass)
     , m_framebuffer(rhs.m_framebuffer)
 #ifndef CTS_USES_VULKANSC
+    , m_attachmentFeedbackLoopInfo(rhs.m_attachmentFeedbackLoopInfo)
     , m_subpasses(std::move(rhs.m_subpasses))
     , m_dependencies(std::move(rhs.m_dependencies))
     , m_attachments(std::move(rhs.m_attachments))
@@ -933,23 +960,67 @@ RenderPassWrapper::RenderPassWrapper(RenderPassWrapper &&rhs) noexcept
 RenderPassWrapper &RenderPassWrapper::operator=(RenderPassWrapper &&rhs) noexcept
 {
     m_isDynamicRendering = rhs.m_isDynamicRendering;
+    m_renderPassPtr      = rhs.m_renderPassPtr;
     m_renderPass         = rhs.m_renderPass;
     m_framebuffer        = rhs.m_framebuffer;
 #ifndef CTS_USES_VULKANSC
-    m_subpasses               = std::move(rhs.m_subpasses);
-    m_dependencies            = std::move(rhs.m_dependencies);
-    m_attachments             = std::move(rhs.m_attachments);
-    m_images                  = std::move(rhs.m_images);
-    m_imageViews              = std::move(rhs.m_imageViews);
-    m_clearValues             = std::move(rhs.m_clearValues);
-    m_layouts                 = std::move(rhs.m_layouts);
-    m_activeSubpass           = rhs.m_activeSubpass;
-    m_renderingInfo           = rhs.m_renderingInfo;
-    m_layers                  = rhs.m_layers;
-    m_viewMasks               = std::move(rhs.m_viewMasks);
-    m_secondaryCommandBuffers = rhs.m_secondaryCommandBuffers;
+    m_attachmentFeedbackLoopInfo = rhs.m_attachmentFeedbackLoopInfo;
+    m_subpasses                  = std::move(rhs.m_subpasses);
+    m_dependencies               = std::move(rhs.m_dependencies);
+    m_attachments                = std::move(rhs.m_attachments);
+    m_images                     = std::move(rhs.m_images);
+    m_imageViews                 = std::move(rhs.m_imageViews);
+    m_clearValues                = std::move(rhs.m_clearValues);
+    m_layouts                    = std::move(rhs.m_layouts);
+    m_activeSubpass              = rhs.m_activeSubpass;
+    m_renderingInfo              = rhs.m_renderingInfo;
+    m_layers                     = rhs.m_layers;
+    m_viewMasks                  = std::move(rhs.m_viewMasks);
+    m_secondaryCommandBuffers    = rhs.m_secondaryCommandBuffers;
 #endif
     return *this;
+}
+
+RenderPassWrapper RenderPassWrapper::clone() const
+{
+    RenderPassWrapper cloned;
+
+    cloned.m_isDynamicRendering = m_isDynamicRendering;
+    cloned.m_renderPass         = m_renderPass;
+    // Note m_renderPassPtr is kept empty in the clone. This object will retain ownership.
+    // Note the new wrapper is created without a framebuffer.
+#ifndef CTS_USES_VULKANSC
+    cloned.m_subpasses    = m_subpasses;
+    cloned.m_dependencies = m_dependencies;
+    cloned.m_attachments  = m_attachments;
+    // Images and views are not copied. They would belong to a new framebuffer.
+    // Similar for clear values, since the cloned render pass has not been started yet.
+    cloned.m_layouts                 = m_layouts;
+    cloned.m_activeSubpass           = 0u;                    // The cloned render pass has not started yet.
+    cloned.m_renderingInfo           = initVulkanStructure(); // The cloned render pass has not started yet.
+    cloned.m_layers                  = m_layers;
+    cloned.m_viewMasks               = m_viewMasks;
+    cloned.m_secondaryCommandBuffers = false; // The cloned render pass has not started yet.
+
+    // Reset image view handles.
+    for (auto &subpass : m_subpasses)
+    {
+        for (auto &colorAttachment : subpass.m_colorAttachments)
+        {
+            colorAttachment.attachmentInfo.imageView        = VK_NULL_HANDLE;
+            colorAttachment.attachmentInfo.resolveImageView = VK_NULL_HANDLE;
+        }
+        for (auto &resolveAttachment : subpass.m_resolveAttachments)
+        {
+            resolveAttachment.attachmentInfo.imageView        = VK_NULL_HANDLE;
+            resolveAttachment.attachmentInfo.resolveImageView = VK_NULL_HANDLE;
+        }
+        subpass.m_depthStencilAttachment.attachmentInfo.imageView        = VK_NULL_HANDLE;
+        subpass.m_depthStencilAttachment.attachmentInfo.resolveImageView = VK_NULL_HANDLE;
+    }
+#endif // CTS_USES_VULKANSC
+
+    return cloned;
 }
 
 #ifndef CTS_USES_VULKANSC
@@ -1040,6 +1111,23 @@ void recordImageBarrier(const DeviceInterface &vk, const VkCommandBuffer command
     }
 }
 
+bool isDepthStencilAttachmentLayout(VkImageLayout layout)
+{
+    switch (layout)
+    {
+    case VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL:
+    case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
+    case VK_IMAGE_LAYOUT_STENCIL_ATTACHMENT_OPTIMAL:
+        return true;
+    default:
+        break;
+    }
+
+    return false;
+}
+
 } // anonymous namespace
 
 void RenderPassWrapper::transitionLayouts(const DeviceInterface &vk, const VkCommandBuffer commandBuffer,
@@ -1082,12 +1170,21 @@ void RenderPassWrapper::transitionLayouts(const DeviceInterface &vk, const VkCom
                     const auto subresourceRange = makeImageSubresourceRange(
                         vk::VK_IMAGE_ASPECT_COLOR_BIT, 0u, VK_REMAINING_MIP_LEVELS, 0u, VK_REMAINING_ARRAY_LAYERS);
 
-                    const VkPipelineStageFlags2 srcStageMask =
-                        (vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | externalStageFlags);
-                    const VkAccessFlags2 srcAccessMask       = externalAccessFlags;
+                    VkPipelineStageFlags2 srcStageMask = (vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | externalStageFlags);
+                    VkAccessFlags2 srcAccessMask       = externalAccessFlags;
+                    const VkImageLayout newLayout      = subpass.m_colorAttachments[j].attachmentInfo.imageLayout;
+
+                    if (m_layouts[i] == VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL && m_layouts[i] != newLayout)
+                    {
+                        // It may have been used as a color attachment already, so we need to synchronize writes before
+                        // transitioning the layout.
+                        srcStageMask |= vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+                        srcAccessMask |= vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+                    }
+
                     const VkPipelineStageFlags2 dstStageMask = vk::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-                    const VkAccessFlags2 dstAccessMask       = vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-                    const VkImageLayout newLayout            = subpass.m_colorAttachments[j].attachmentInfo.imageLayout;
+                    const VkAccessFlags2 dstAccessMask =
+                        (vk::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | vk::VK_ACCESS_COLOR_ATTACHMENT_READ_BIT);
 
                     recordImageBarrier(vk, commandBuffer, sync2, srcStageMask, srcAccessMask, dstStageMask,
                                        dstAccessMask, m_layouts[i], newLayout, m_images[i], subresourceRange);
@@ -1110,13 +1207,22 @@ void RenderPassWrapper::transitionLayouts(const DeviceInterface &vk, const VkCom
                 const auto subresourceRange =
                     makeImageSubresourceRange(aspect, 0u, VK_REMAINING_MIP_LEVELS, 0u, VK_REMAINING_ARRAY_LAYERS);
 
-                const VkPipelineStageFlags2 srcStageMask = (vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | externalStageFlags);
-                const VkAccessFlags2 srcAccessMask       = externalAccessFlags;
+                VkPipelineStageFlags2 srcStageMask = (vk::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT | externalStageFlags);
+                VkAccessFlags2 srcAccessMask       = externalAccessFlags;
+                const VkImageLayout newLayout      = subpass.m_depthStencilAttachment.attachmentInfo.imageLayout;
+
+                if (isDepthStencilAttachmentLayout(m_layouts[i]) && m_layouts[i] != newLayout)
+                {
+                    // It may have been used as a depth/stencil attachment already, so we need to synchronize writes.
+                    srcStageMask |= (vk::VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT |
+                                     vk::VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
+                    srcAccessMask |= vk::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+                }
+
                 const VkPipelineStageFlags2 dstStageMask =
                     (vk::VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | vk::VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT);
                 const VkAccessFlags2 dstAccessMask = (vk::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT |
                                                       vk::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT);
-                const VkImageLayout newLayout      = subpass.m_depthStencilAttachment.attachmentInfo.imageLayout;
 
                 recordImageBarrier(vk, commandBuffer, sync2, srcStageMask, srcAccessMask, dstStageMask, dstAccessMask,
                                    m_layouts[i], newLayout, m_images[i], subresourceRange);
@@ -1270,7 +1376,7 @@ void RenderPassWrapper::begin(const DeviceInterface &vk, const VkCommandBuffer c
 {
     if (!m_isDynamicRendering)
     {
-        beginRenderPass(vk, commandBuffer, *m_renderPass, *m_framebuffer, renderArea, clearValueCount, clearValues,
+        beginRenderPass(vk, commandBuffer, m_renderPass, *m_framebuffer, renderArea, clearValueCount, clearValues,
                         contents, pNext);
     }
     else
@@ -1427,7 +1533,9 @@ void RenderPassWrapper::beginRendering(const DeviceInterface &vk, const VkComman
         colorAttachment       = vk::initVulkanStructure();
         if (subpass.m_colorAttachments[i].index == VK_ATTACHMENT_UNUSED)
             continue;
-        colorAttachment        = subpass.m_colorAttachments[i].attachmentInfo;
+        colorAttachment = subpass.m_colorAttachments[i].attachmentInfo;
+        if (m_attachmentFeedbackLoopInfo.sType == VK_STRUCTURE_TYPE_ATTACHMENT_FEEDBACK_LOOP_INFO_EXT)
+            colorAttachment.pNext = &m_attachmentFeedbackLoopInfo;
         colorAttachment.loadOp = vk::VK_ATTACHMENT_LOAD_OP_LOAD;
         if (!subpass.m_resolveAttachments.empty() && subpass.m_resolveAttachments[i].index != VK_ATTACHMENT_UNUSED)
         {
@@ -1613,7 +1721,7 @@ void RenderPassWrapper::createFramebuffer(const DeviceInterface &vk, const VkDev
     {
         VkFramebufferCreateInfo createInfo = initVulkanStructure();
         createInfo.flags                   = (VkFramebufferCreateFlags)0u;
-        createInfo.renderPass              = *m_renderPass;
+        createInfo.renderPass              = m_renderPass;
         createInfo.attachmentCount         = (colorAttachment != VK_NULL_HANDLE) ? 1u : 0u;
         createInfo.pAttachments            = &colorAttachment;
         createInfo.width                   = width;
@@ -1634,6 +1742,7 @@ void RenderPassWrapper::createFramebuffer(const DeviceInterface &vk, const VkDev
                 subpass.m_colorAttachments[0].attachmentInfo.imageView = colorAttachment;
             }
         }
+        m_layers = layers;
 #endif
     }
 }
@@ -1648,7 +1757,7 @@ void RenderPassWrapper::createFramebuffer(const DeviceInterface &vk, const VkDev
     {
         VkFramebufferCreateInfo createInfo = initVulkanStructure();
         createInfo.flags                   = (VkFramebufferCreateFlags)0u;
-        createInfo.renderPass              = *m_renderPass;
+        createInfo.renderPass              = m_renderPass;
         createInfo.attachmentCount         = attachmentCount;
         createInfo.pAttachments            = attachmentsArray;
         createInfo.width                   = width;
@@ -1685,6 +1794,7 @@ void RenderPassWrapper::createFramebuffer(const DeviceInterface &vk, const VkDev
                         attachmentsArray[subpass.m_resolveAttachments[i].index];
             }
         }
+        m_layers = layers;
 #endif
     }
 }
@@ -1835,7 +1945,9 @@ struct GraphicsPipelineWrapper::InternalData
 
 #ifndef CTS_USES_VULKANSC
     VkGraphicsPipelineLibraryCreateInfoEXT pipelinePartLibraryCreateInfo[4];
+    VkPipeline pipelineParts[4];
     VkPipelineLibraryCreateInfoKHR finalPipelineLibraryCreateInfo;
+    VkGraphicsPipelineCreateInfo finalPipelineCreateInfo;
     VkPipelineCreateFlags2CreateInfoKHR pipelinePartFlags2CreateInfo[4];
     VkPipelineCreateFlags2CreateInfoKHR finalPipelineFlags2CreateInfo;
 #endif
@@ -3260,9 +3372,9 @@ GraphicsPipelineWrapper &GraphicsPipelineWrapper::setupFragmentOutputState(
         auto &libraryCreateInfo = m_internalData->pipelinePartLibraryCreateInfo[3];
         libraryCreateInfo =
             makeGraphicsPipelineLibraryCreateInfo(VK_GRAPHICS_PIPELINE_LIBRARY_FRAGMENT_OUTPUT_INTERFACE_BIT_EXT);
-        void *firstStructInChain = m_internalData->pFragmentShadingRateState;
+        void *firstStructInChain = reinterpret_cast<void *>(&libraryCreateInfo);
+        addToChain(&firstStructInChain, m_internalData->pFragmentShadingRateState);
         addToChain(&firstStructInChain, m_internalData->pRenderingState.ptr);
-        addToChain(&firstStructInChain, &libraryCreateInfo);
         addToChain(&firstStructInChain, partCreationFeedback.ptr);
         addToChain(&firstStructInChain, partBinaries.ptr);
         addToChain(&firstStructInChain, m_internalData->pRenderingAttachmentLocation.ptr);
@@ -4000,26 +4112,21 @@ void GraphicsPipelineWrapper::buildPipeline(const VkPipelineCache pipelineCache,
     else
     {
 #ifndef CTS_USES_VULKANSC
-        VkGraphicsPipelineCreateInfo linkedCreateInfo = initVulkanStructure();
-        std::vector<VkPipeline> rawPipelines;
-        VkPipelineLibraryCreateInfoKHR linkingInfo{
-            VK_STRUCTURE_TYPE_PIPELINE_LIBRARY_CREATE_INFO_KHR, // VkStructureType sType;
-            creationFeedback.ptr,                               // const void* pNext;
-            0u,                                                 // uint32_t libraryCount;
-            nullptr,                                            // const VkPipeline* pLibraries;
-        };
-
         if (isConstructionTypeLibrary(m_internalData->pipelineConstructionType))
         {
+            m_internalData->finalPipelineCreateInfo        = initVulkanStructure();
+            m_internalData->finalPipelineLibraryCreateInfo = initVulkanStructure(creationFeedback.ptr);
+
             for (const auto &pipelinePtr : m_pipelineParts)
             {
                 const auto &pipeline = pipelinePtr.get();
                 if (pipeline != VK_NULL_HANDLE)
-                    rawPipelines.push_back(pipeline);
+                    m_internalData->pipelineParts[m_internalData->finalPipelineLibraryCreateInfo.libraryCount++] =
+                        pipeline;
             }
 
-            linkingInfo.libraryCount = static_cast<uint32_t>(rawPipelines.size());
-            linkingInfo.pLibraries   = de::dataOrNull(rawPipelines);
+            m_internalData->finalPipelineLibraryCreateInfo.pLibraries =
+                (m_internalData->finalPipelineLibraryCreateInfo.libraryCount) ? m_internalData->pipelineParts : nullptr;
 
             // If a test hits the following assert, it's likely missing a call
             // to the setMonolithicPipelineLayout() method. Related VUs:
@@ -4029,17 +4136,19 @@ void GraphicsPipelineWrapper::buildPipeline(const VkPipelineCache pipelineCache,
             //   * VUID-VkGraphicsPipelineCreateInfo-flags-06729
             //   * VUID-VkGraphicsPipelineCreateInfo-flags-06730
             DE_ASSERT(m_internalData->monolithicPipelineCreateInfo.layout != VK_NULL_HANDLE);
-            linkedCreateInfo.layout = m_internalData->monolithicPipelineCreateInfo.layout;
-            linkedCreateInfo.flags  = m_internalData->pipelineFlags;
-            linkedCreateInfo.pNext  = &linkingInfo;
+            m_internalData->finalPipelineCreateInfo.layout = m_internalData->monolithicPipelineCreateInfo.layout;
+            m_internalData->finalPipelineCreateInfo.flags  = m_internalData->pipelineFlags;
+            m_internalData->finalPipelineCreateInfo.pNext  = &m_internalData->finalPipelineLibraryCreateInfo;
 
-            pointerToCreateInfo = &linkedCreateInfo;
+            pointerToCreateInfo      = &m_internalData->finalPipelineCreateInfo;
+            void *firstStructInChain = static_cast<void *>(pointerToCreateInfo);
+            addToChain(&firstStructInChain, pNext);
 
             if (m_internalData->pipelineConstructionType == PIPELINE_CONSTRUCTION_TYPE_LINK_TIME_OPTIMIZED_LIBRARY)
-                linkedCreateInfo.flags |= VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
+                pointerToCreateInfo->flags |= VK_PIPELINE_CREATE_LINK_TIME_OPTIMIZATION_BIT_EXT;
 
             if (m_internalData->failOnCompileWhenLinking)
-                linkedCreateInfo.flags |= VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
+                pointerToCreateInfo->flags |= VK_PIPELINE_CREATE_FAIL_ON_PIPELINE_COMPILE_REQUIRED_BIT;
         }
         else
         {
@@ -4152,7 +4261,8 @@ void GraphicsPipelineWrapper::setShaderObjectDynamicStates(vk::VkCommandBuffer c
                 vk.cmdSetScissorWithCount(cmdBuffer, (uint32_t)state->scissors.size(), state->scissors.data());
             break;
         case vk::VK_DYNAMIC_STATE_LINE_WIDTH:
-            if (polygonModeLine || topologyLine)
+            // Mesh shaders can produce line topology so ensure lineWidth is set
+            if (polygonModeLine || topologyLine || meshOrTask)
                 vk.cmdSetLineWidth(cmdBuffer, state->lineWidth);
             break;
         case vk::VK_DYNAMIC_STATE_DEPTH_BIAS:
@@ -4604,7 +4714,12 @@ vk::VkPipeline GraphicsPipelineWrapper::getPartialPipeline(uint32_t part) const
 const VkGraphicsPipelineCreateInfo &GraphicsPipelineWrapper::getPipelineCreateInfo(void) const
 {
     DE_ASSERT(m_internalData);
-    return m_internalData->monolithicPipelineCreateInfo;
+#ifndef CTS_USES_VULKANSC
+    if (isConstructionTypeLibrary(m_internalData->pipelineConstructionType))
+        return m_internalData->finalPipelineCreateInfo;
+    else
+#endif
+        return m_internalData->monolithicPipelineCreateInfo;
 }
 const VkGraphicsPipelineCreateInfo &GraphicsPipelineWrapper::getPartialPipelineCreateInfo(uint32_t part) const
 {

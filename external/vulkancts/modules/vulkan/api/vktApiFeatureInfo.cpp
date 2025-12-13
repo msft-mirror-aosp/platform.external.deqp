@@ -56,6 +56,7 @@
 #include <string>
 #include <limits>
 #include <optional>
+#include <cstring>
 
 namespace vkt
 {
@@ -741,6 +742,89 @@ bool validateLimit(FeatureLimitTableItem limit, TestLog &log)
 #define LIM_MIN_BITI32(X) uint32_t(X), 0, 0, 0.0f, LIMIT_FORMAT_BITMASK, LIMIT_TYPE_MIN
 #define LIM_MAX_BITI32(X) uint32_t(X), 0, 0, 0.0f, LIMIT_FORMAT_BITMASK, LIMIT_TYPE_MAX
 #define LIM_NONE_BITI32 0, 0, 0, 0.0f, LIMIT_FORMAT_BITMASK, LIMIT_TYPE_NONE
+
+static constexpr int E071 = 71; //  VK_KHR_device_group_creation
+static constexpr int E060 = 60; //  VK_KHR_get_physical_device_properties2
+
+template <int InstanceExtensionNumber>
+struct CustomInstanceDeterminant;
+template <>
+struct CustomInstanceDeterminant<E071>
+{
+    static const char *getExtension()
+    {
+        return "VK_KHR_device_group_creation";
+    }
+    static const char *getDeterminant()
+    {
+        return "custom-instance-that-needs-VK_KHR_device_group_creation";
+    }
+};
+template <>
+struct CustomInstanceDeterminant<E060>
+{
+    static const char *getExtension()
+    {
+        return "VK_KHR_get_physical_device_properties2";
+    }
+    static const char *getDeterminant()
+    {
+        return "custom-instance-that-needs-VK_KHR_get_physical_device_properties2";
+    }
+};
+
+typedef InstanceFactory1<FunctionInstance0, FunctionInstance0::Function> CustomInstanceTestBase;
+template <int InstanceExtensionNumber>
+struct CustomInstanceTest : public CustomInstanceTestBase
+{
+    using CustomInstanceTestBase::CustomInstanceTestBase;
+    virtual std::string getInstanceCapabilitiesId() const override
+    {
+        return CustomInstanceDeterminant<InstanceExtensionNumber>::getDeterminant();
+    }
+    virtual void initInstanceCapabilities(InstCaps &caps) override
+    {
+        const std::string extension(CustomInstanceDeterminant<InstanceExtensionNumber>::getExtension());
+        if (!caps.addExtension(extension))
+            TCU_THROW(NotSupportedError, extension + " not supported by device");
+    }
+};
+
+typedef InstanceFactory1WithSupport<FunctionInstance0, FunctionInstance0::Function, FunctionSupport0>
+    CustomInstanceWithSupportTestBase;
+template <int InstanceExtensionNumber>
+struct CustomInstanceWithSupportTest : public CustomInstanceWithSupportTestBase
+{
+    using CustomInstanceWithSupportTestBase::CustomInstanceWithSupportTestBase;
+    virtual std::string getInstanceCapabilitiesId() const override
+    {
+        return CustomInstanceDeterminant<InstanceExtensionNumber>::getDeterminant();
+    }
+    virtual void initInstanceCapabilities(InstCaps &caps) override
+    {
+        const std::string extension(CustomInstanceDeterminant<InstanceExtensionNumber>::getExtension());
+        if (!caps.addExtension(extension))
+            TCU_THROW(NotSupportedError, extension + " not supported by device");
+    }
+};
+
+template <typename Arg0>
+using CustomInstanceArg0TestBase = InstanceFactory1<FunctionInstance1<Arg0>, typename FunctionInstance1<Arg0>::Args>;
+template <typename Arg0, int InstanceExtensionNumber>
+struct CustomInstanceArg0Test : public CustomInstanceArg0TestBase<Arg0>
+{
+    using CustomInstanceArg0TestBase<Arg0>::CustomInstanceArg0TestBase;
+    virtual std::string getInstanceCapabilitiesId() const override
+    {
+        return CustomInstanceDeterminant<InstanceExtensionNumber>::getDeterminant();
+    }
+    virtual void initInstanceCapabilities(InstCaps &caps) override
+    {
+        const std::string extension(CustomInstanceDeterminant<InstanceExtensionNumber>::getExtension());
+        if (!caps.addExtension(extension))
+            TCU_THROW(NotSupportedError, extension + " not supported by device");
+    }
+};
 
 tcu::TestStatus validateLimits12(Context &context)
 {
@@ -1568,18 +1652,20 @@ tcu::TestStatus validateLimitsExtInlineUniformBlock(Context &context)
         return tcu::TestStatus::fail("fail");
 }
 
-#endif // CTS_USES_VULKANSC
-
 void checkSupportExtVertexAttributeDivisorEXT(Context &context)
 {
     context.requireDeviceFunctionality("VK_EXT_vertex_attribute_divisor");
 }
+
+#endif // CTS_USES_VULKANSC
 
 void checkSupportExtVertexAttributeDivisorKHR(Context &context)
 {
     context.requireDeviceFunctionality("VK_KHR_vertex_attribute_divisor");
 }
 
+#ifndef CTS_USES_VULKANSC
+// VK_EXT_vertex_attribute_divisor is not supported for Vulkan SC
 tcu::TestStatus validateLimitsExtVertexAttributeDivisorEXT(Context &context)
 {
     const VkBool32 checkAlways            = VK_TRUE;
@@ -1608,6 +1694,7 @@ tcu::TestStatus validateLimitsExtVertexAttributeDivisorEXT(Context &context)
     else
         return tcu::TestStatus::fail("fail");
 }
+#endif
 
 tcu::TestStatus validateLimitsExtVertexAttributeDivisorKHR(Context &context)
 {
@@ -1865,31 +1952,34 @@ tcu::TestStatus validateLimitsLineRasterization(Context &context)
 
 void checkSupportRobustness2(Context &context)
 {
-    context.requireDeviceFunctionality("VK_EXT_robustness2");
+    if (!context.isDeviceFunctionalitySupported("VK_EXT_robustness2") &&
+        !context.isDeviceFunctionalitySupported("VK_KHR_robustness2"))
+
+        TCU_THROW(NotSupportedError, "VK_EXT_robustness2 and VK_KHR_robustness2 are not supported");
 }
 
 tcu::TestStatus validateLimitsRobustness2(Context &context)
 {
-    const InstanceInterface &vki                                             = context.getInstanceInterface();
-    const VkPhysicalDevice physicalDevice                                    = context.getPhysicalDevice();
-    const VkPhysicalDeviceRobustness2PropertiesEXT &robustness2PropertiesEXT = context.getRobustness2PropertiesEXT();
-    VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features               = initVulkanStructure();
-    VkPhysicalDeviceFeatures2 features2 = initVulkanStructure(&robustness2Features);
+    const InstanceInterface &vki                                          = context.getInstanceInterface();
+    const VkPhysicalDevice physicalDevice                                 = context.getPhysicalDevice();
+    const VkPhysicalDeviceRobustness2PropertiesEXT &robustness2Properties = context.getRobustness2Properties();
+    VkPhysicalDeviceRobustness2FeaturesEXT robustness2Features            = initVulkanStructure();
+    VkPhysicalDeviceFeatures2 features2                                   = initVulkanStructure(&robustness2Features);
 
     vki.getPhysicalDeviceFeatures2(physicalDevice, &features2);
 
     if (robustness2Features.robustBufferAccess2 && !features2.features.robustBufferAccess)
         return tcu::TestStatus::fail("If robustBufferAccess2 is enabled then robustBufferAccess must also be enabled");
 
-    if (robustness2PropertiesEXT.robustStorageBufferAccessSizeAlignment != 1 &&
-        robustness2PropertiesEXT.robustStorageBufferAccessSizeAlignment != 4)
+    if (robustness2Properties.robustStorageBufferAccessSizeAlignment != 1 &&
+        robustness2Properties.robustStorageBufferAccessSizeAlignment != 4)
         return tcu::TestStatus::fail(
-            "robustness2PropertiesEXT.robustStorageBufferAccessSizeAlignment value must be either 1 or 4.");
+            "robustness2Properties.robustStorageBufferAccessSizeAlignment value must be either 1 or 4.");
 
-    if (!de::inRange(robustness2PropertiesEXT.robustUniformBufferAccessSizeAlignment, (VkDeviceSize)1u,
+    if (!de::inRange(robustness2Properties.robustUniformBufferAccessSizeAlignment, (VkDeviceSize)1u,
                      (VkDeviceSize)256u) ||
-        !deIsPowerOfTwo64(robustness2PropertiesEXT.robustUniformBufferAccessSizeAlignment))
-        return tcu::TestStatus::fail("robustness2PropertiesEXT.robustUniformBufferAccessSizeAlignment must be a power "
+        !deIsPowerOfTwo64(robustness2Properties.robustUniformBufferAccessSizeAlignment))
+        return tcu::TestStatus::fail("robustness2Properties.robustUniformBufferAccessSizeAlignment must be a power "
                                      "of two in the range [1, 256]");
 
     return tcu::TestStatus::pass("pass");
@@ -2506,8 +2596,8 @@ tcu::TestStatus enumeratePhysicalDeviceGroups(Context &context)
 {
     TestLog &log = context.getTestContext().getLog();
     tcu::ResultCollector results(log);
-    CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_device_group_creation"));
-    const InstanceDriver &vki(instance.getDriver());
+    const VkInstance instance    = context.getInstance(); // "VK_KHR_device_group_creation"
+    const InstanceInterface &vki = context.getInstanceInterface();
     const vector<VkPhysicalDeviceGroupProperties> devicegroups = enumeratePhysicalDeviceGroups(vki, instance);
 
     log << TestLog::Integer("NumDevices", "Number of device groups", "", QP_KEY_TAG_NONE, int64_t(devicegroups.size()));
@@ -2517,7 +2607,7 @@ tcu::TestStatus enumeratePhysicalDeviceGroups(Context &context)
 
     CheckEnumeratePhysicalDeviceGroupsIncompleteResult(vki, instance)(context, results, devicegroups.size());
 
-    instance.collectMessages();
+    context.collectAndReportDebugMessages();
     return tcu::TestStatus(results.getResult(), results.getMessage());
 }
 
@@ -3328,13 +3418,13 @@ tcu::TestStatus deviceMemoryProperties(Context &context)
 
 tcu::TestStatus deviceGroupPeerMemoryFeatures(Context &context)
 {
-    TestLog &log                 = context.getTestContext().getLog();
-    const PlatformInterface &vkp = context.getPlatformInterface();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_device_group_creation"));
-    const InstanceDriver &vki(instance.getDriver());
+    TestLog &log                    = context.getTestContext().getLog();
+    const PlatformInterface &vkp    = context.getPlatformInterface();
+    const VkInstance instance       = context.getInstance(); // "VK_KHR_device_group_creation"
+    const InstanceInterface &vki    = context.getInstanceInterface();
     const tcu::CommandLine &cmdLine = context.getTestContext().getCommandLine();
     const uint32_t devGroupIdx      = cmdLine.getVKDeviceGroupId() - 1;
-    const uint32_t deviceIdx        = vk::chooseDeviceIndex(context.getInstanceInterface(), instance, cmdLine);
+    const uint32_t deviceIdx        = vk::chooseDeviceIndex(vki, instance, cmdLine);
     const float queuePriority       = 1.0f;
     const char *deviceGroupExtName  = "VK_KHR_device_group";
     VkPhysicalDeviceMemoryProperties memProps;
@@ -3573,7 +3663,11 @@ namespace
 
 tcu::TestStatus deviceMandatoryFeatures(Context &context)
 {
-    bool result = checkBasicMandatoryFeatures(context);
+    std::vector<std::string> failMesages;
+    checkBasicMandatoryFeatures(context, failMesages);
+
+    tcu::TestLog &log           = context.getTestContext().getLog();
+    bool additionalChecksPassed = true;
 
 #if defined(CTS_USES_VULKAN)
     // for vulkan 1.4+ we need to check complex cases that were not generated in vkMandatoryFeatures.inl
@@ -3583,7 +3677,6 @@ tcu::TestStatus deviceMandatoryFeatures(Context &context)
         VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
         const auto &cmdLine             = context.getTestContext().getCommandLine();
         const auto &vulkan14Features    = context.getDeviceVulkan14Features();
-        tcu::TestLog &log               = context.getTestContext().getLog();
 
         if (!cmdLine.isComputeOnly() && (vulkan14Features.hostImageCopy == VK_FALSE))
         {
@@ -3606,16 +3699,31 @@ tcu::TestStatus deviceMandatoryFeatures(Context &context)
                     << "Implementation that has a VK_QUEUE_GRAPHICS_BIT queue must support "
                        "either the hostImageCopy feature or an additional queue that supports VK_QUEUE_TRANSFER_BIT"
                     << tcu::TestLog::EndMessage;
-                result = false;
+                additionalChecksPassed = false;
             }
         }
     }
 #endif // defined(CTS_USES_VULKAN)
 
-    if (result)
-        return tcu::TestStatus::pass("Passed");
+    if (additionalChecksPassed)
+    {
+        if (failMesages.empty())
+            return tcu::TestStatus::pass("Passed");
 
-    return tcu::TestStatus::fail("Not all mandatory features are supported ( see: vkspec.html#features-requirements )");
+        auto constructMessage = [](const std::string &failMesage)
+        { return std::string("Mandatory feature ") + failMesage + " not supported"; };
+
+        // if there is only one failure return the exact message
+        if (failMesages.size() == 1)
+            return tcu::TestStatus::fail(constructMessage(failMesages[0]));
+
+        // log all failures
+        for (const auto &fm : failMesages)
+            log << tcu::TestLog::Message << constructMessage(fm) << tcu::TestLog::EndMessage;
+    }
+
+    return tcu::TestStatus::fail(
+        "Not all mandatory features are supported, see log and vkspec.html#features-requirements");
 }
 
 VkFormatFeatureFlags getBaseRequiredOptimalTilingFeatures(VkFormat format)
@@ -4954,9 +5062,8 @@ bool checkExtension(vector<VkExtensionProperties> &properties, const char *exten
 tcu::TestStatus deviceFeatures2(Context &context)
 {
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki(instance.getDriver());
-    TestLog &log = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    TestLog &log                          = context.getTestContext().getLog();
     VkPhysicalDeviceFeatures coreFeatures;
     VkPhysicalDeviceFeatures2 extFeatures;
 
@@ -4983,10 +5090,9 @@ tcu::TestStatus deviceFeatures2(Context &context)
 
 tcu::TestStatus deviceProperties2(Context &context)
 {
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki(instance.getDriver());
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
-    TestLog &log = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
+    TestLog &log                          = context.getTestContext().getLog();
     VkPhysicalDeviceProperties coreProperties;
     VkPhysicalDeviceProperties2 extProperties;
 
@@ -5768,10 +5874,9 @@ string toString(const VkFormatProperties2 &value)
 
 tcu::TestStatus deviceFormatProperties2(Context &context)
 {
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki(instance.getDriver());
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
-    TestLog &log = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
+    TestLog &log                          = context.getTestContext().getLog();
 
     for (int formatNdx = 0; formatNdx < VK_CORE_FORMAT_LAST; ++formatNdx)
     {
@@ -5820,12 +5925,11 @@ tcu::TestStatus deviceFormatProperties2(Context &context)
 
 tcu::TestStatus deviceQueueFamilyProperties2(Context &context)
 {
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki(instance.getDriver());
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
-    TestLog &log                  = context.getTestContext().getLog();
-    uint32_t numCoreQueueFamilies = ~0u;
-    uint32_t numExtQueueFamilies  = ~0u;
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
+    TestLog &log                          = context.getTestContext().getLog();
+    uint32_t numCoreQueueFamilies         = ~0u;
+    uint32_t numExtQueueFamilies          = ~0u;
 
     vki.getPhysicalDeviceQueueFamilyProperties(physicalDevice, &numCoreQueueFamilies, nullptr);
     vki.getPhysicalDeviceQueueFamilyProperties2(physicalDevice, &numExtQueueFamilies, nullptr);
@@ -5873,10 +5977,9 @@ tcu::TestStatus deviceQueueFamilyProperties2(Context &context)
 
 tcu::TestStatus deviceMemoryProperties2(Context &context)
 {
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki(instance.getDriver());
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
-    TestLog &log = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
+    TestLog &log                          = context.getTestContext().getLog();
     VkPhysicalDeviceMemoryProperties coreProperties;
     VkPhysicalDeviceMemoryProperties2 extProperties;
 
@@ -6029,10 +6132,9 @@ tcu::TestStatus deviceFeaturesVulkan12(Context &context)
         OFFSET_TABLE_ENTRY(VkPhysicalDeviceVulkan12Features, shaderOutputLayer),
         OFFSET_TABLE_ENTRY(VkPhysicalDeviceVulkan12Features, subgroupBroadcastDynamicId),
         {0, 0}};
-    TestLog &log = context.getTestContext().getLog();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki = instance.getDriver();
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
+    TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
     const uint32_t vulkan11FeaturesBufferSize = sizeof(VkPhysicalDeviceVulkan11Features) + GUARD_SIZE;
     const uint32_t vulkan12FeaturesBufferSize = sizeof(VkPhysicalDeviceVulkan12Features) + GUARD_SIZE;
     VkPhysicalDeviceFeatures2 extFeatures;
@@ -6142,9 +6244,8 @@ tcu::TestStatus deviceFeaturesVulkan13(Context &context)
         OFFSET_TABLE_ENTRY(VkPhysicalDeviceVulkan13Features, maintenance4),
         {0, 0}};
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki                 = instance.getDriver();
     const uint32_t vulkan13FeaturesBufferSize = sizeof(VkPhysicalDeviceVulkan13Features) + GUARD_SIZE;
     VkPhysicalDeviceFeatures2 extFeatures;
     uint8_t buffer13a[vulkan13FeaturesBufferSize];
@@ -6239,9 +6340,8 @@ tcu::TestStatus deviceFeaturesVulkan14(Context &context)
         OFFSET_TABLE_ENTRY(VkPhysicalDeviceVulkan14Features, pipelineRobustness),
         {0, 0}};
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki                 = instance.getDriver();
     const uint32_t vulkan14FeaturesBufferSize = sizeof(VkPhysicalDeviceVulkan14Features) + GUARD_SIZE;
     VkPhysicalDeviceFeatures2 extFeatures;
     uint8_t buffer14a[vulkan14FeaturesBufferSize];
@@ -6265,7 +6365,7 @@ tcu::TestStatus deviceFeaturesVulkan14(Context &context)
 
         deMemset(vulkan14Features[ndx], 0xFF * ndx, sizeof(VkPhysicalDeviceVulkan14Features));
         vulkan14Features[ndx]->sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
-        vulkan14Features[ndx]->pNext = DE_NULL;
+        vulkan14Features[ndx]->pNext = nullptr;
 
         vki.getPhysicalDeviceFeatures2(physicalDevice, &extFeatures);
     }
@@ -6381,10 +6481,9 @@ tcu::TestStatus devicePropertiesVulkan12(Context &context)
         // None
         OFFSET_TABLE_ENTRY(VkPhysicalDeviceVulkan12Properties, framebufferIntegerColorSampleCounts),
         {0, 0}};
-    TestLog &log = context.getTestContext().getLog();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki = instance.getDriver();
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
+    TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
     const uint32_t vulkan11PropertiesBufferSize = sizeof(VkPhysicalDeviceVulkan11Properties) + GUARD_SIZE;
     const uint32_t vulkan12PropertiesBufferSize = sizeof(VkPhysicalDeviceVulkan12Properties) + GUARD_SIZE;
     VkPhysicalDeviceProperties2 extProperties;
@@ -6527,9 +6626,9 @@ tcu::TestStatus devicePropertiesVulkan13(Context &context)
         {0, 0}};
 
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki                   = instance.getDriver();
+
     const uint32_t vulkan13PropertiesBufferSize = sizeof(VkPhysicalDeviceVulkan13Properties) + GUARD_SIZE;
     VkPhysicalDeviceProperties2 extProperties;
     uint8_t buffer13a[vulkan13PropertiesBufferSize];
@@ -6613,9 +6712,8 @@ tcu::TestStatus devicePropertiesVulkan14(Context &context)
         {0, 0}};
 
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki                   = instance.getDriver();
     const uint32_t vulkan14PropertiesBufferSize = sizeof(VkPhysicalDeviceVulkan14Properties) + GUARD_SIZE;
     VkPhysicalDeviceProperties2 extProperties;
     uint8_t buffer14a[vulkan14PropertiesBufferSize];
@@ -6635,9 +6733,9 @@ tcu::TestStatus devicePropertiesVulkan14(Context &context)
     {
         deMemset(vulkan14Properties[ndx], 0xFF * ndx, sizeof(VkPhysicalDeviceVulkan14Properties));
         vulkan14Properties[ndx]->sType           = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_PROPERTIES;
-        vulkan14Properties[ndx]->pNext           = DE_NULL;
-        vulkan14Properties[ndx]->pCopySrcLayouts = DE_NULL;
-        vulkan14Properties[ndx]->pCopyDstLayouts = DE_NULL;
+        vulkan14Properties[ndx]->pNext           = nullptr;
+        vulkan14Properties[ndx]->pCopySrcLayouts = nullptr;
+        vulkan14Properties[ndx]->pCopyDstLayouts = nullptr;
 
         extProperties = initVulkanStructure(vulkan14Properties[ndx]);
 
@@ -6680,10 +6778,9 @@ tcu::TestStatus devicePropertiesVulkan14(Context &context)
 
 tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan12(Context &context)
 {
-    TestLog &log = context.getTestContext().getLog();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki = instance.getDriver();
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
+    TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
 
     if (!context.contextSupports(vk::ApiVersion(0, 1, 2, 0)))
         TCU_THROW(NotSupportedError, "At least Vulkan 1.2 required to run test");
@@ -6953,10 +7050,8 @@ tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan12(Context &context)
 tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan14(Context &context)
 {
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance =
-        createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2");
-    const InstanceDriver &vki = instance.getDriver();
 
     if (!context.contextSupports(vk::ApiVersion(0, 1, 4, 0)))
         TCU_THROW(NotSupportedError, "At least Vulkan 1.4 required to run test");
@@ -7078,10 +7173,8 @@ tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan14(Context &context)
 tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan13(Context &context)
 {
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance =
-        createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2");
-    const InstanceDriver &vki = instance.getDriver();
 
     if (!context.contextSupports(vk::ApiVersion(0, 1, 3, 0)))
         TCU_THROW(NotSupportedError, "At least Vulkan 1.3 required to run test");
@@ -7204,10 +7297,9 @@ tcu::TestStatus deviceFeatureExtensionsConsistencyVulkan13(Context &context)
 
 tcu::TestStatus devicePropertyExtensionsConsistencyVulkan12(Context &context)
 {
-    TestLog &log = context.getTestContext().getLog();
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki = instance.getDriver();
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
+    TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
 
     if (!context.contextSupports(vk::ApiVersion(0, 1, 2, 0)))
         TCU_THROW(NotSupportedError, "At least Vulkan 1.2 required to run test");
@@ -7420,9 +7512,8 @@ void checkSupportKhrShaderSubgroupRotate(Context &context)
 
 tcu::TestStatus subgroupRotatePropertyExtensionFeatureConsistency(Context &context)
 {
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki = instance.getDriver();
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
 
     const VkPhysicalDeviceSubgroupProperties &subgroupProperties           = context.getSubgroupProperties();
     VkPhysicalDeviceShaderSubgroupRotateFeaturesKHR subgroupRotateFeatures = initVulkanStructure();
@@ -7469,10 +7560,8 @@ tcu::TestStatus subgroupRotatePropertyExtensionFeatureConsistency(Context &conte
 tcu::TestStatus devicePropertyExtensionsConsistencyVulkan13(Context &context)
 {
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance =
-        createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2");
-    const InstanceDriver &vki = instance.getDriver();
 
     if (!context.contextSupports(vk::ApiVersion(0, 1, 3, 0)))
         TCU_THROW(NotSupportedError, "At least Vulkan 1.3 required to run test");
@@ -7614,10 +7703,8 @@ tcu::TestStatus devicePropertyExtensionsConsistencyVulkan13(Context &context)
 tcu::TestStatus devicePropertyExtensionsConsistencyVulkan14(Context &context)
 {
     TestLog &log                          = context.getTestContext().getLog();
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
     const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
-    const CustomInstance instance =
-        createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2");
-    const InstanceDriver &vki = instance.getDriver();
 
     if (!context.contextSupports(vk::ApiVersion(0, 1, 4, 0)))
         TCU_THROW(NotSupportedError, "At least Vulkan 1.4 required to run test");
@@ -7749,9 +7836,8 @@ tcu::TestStatus imageFormatProperties2(Context &context, const VkFormat format, 
 
     TestLog &log = context.getTestContext().getLog();
 
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki(instance.getDriver());
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
+    const InstanceInterface &vki          = context.getInstanceInterface(); // "VK_KHR_get_physical_device_properties2"
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
 
     const VkImageCreateFlags ycbcrFlags =
         isYCbCrFormat(format) ? (VkImageCreateFlags)VK_IMAGE_CREATE_DISJOINT_BIT : (VkImageCreateFlags)0u;
@@ -7821,9 +7907,8 @@ tcu::TestStatus sparseImageFormatProperties2(Context &context, const VkFormat fo
 {
     TestLog &log = context.getTestContext().getLog();
 
-    const CustomInstance instance(createCustomInstanceWithExtension(context, "VK_KHR_get_physical_device_properties2"));
-    const InstanceDriver &vki(instance.getDriver());
-    const VkPhysicalDevice physicalDevice(chooseDevice(vki, instance, context.getTestContext().getCommandLine()));
+    const InstanceInterface &vki          = context.getInstanceInterface();
+    const VkPhysicalDevice physicalDevice = context.getPhysicalDevice();
 
     const VkImageUsageFlags allUsageFlags =
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT |
@@ -7979,7 +8064,8 @@ void createImageFormatTypeTilingTests(tcu::TestCaseGroup *testGroup, ImageFormat
 
             params.format = format;
 
-            addFunctionCase(testGroup, caseName, execImageFormatTest, params);
+            addFunctionCase<ImageFormatPropertyCase, CustomInstanceArg0Test<ImageFormatPropertyCase, E060>>(
+                testGroup, caseName, execImageFormatTest, params);
         }
     }
 }
@@ -8204,13 +8290,164 @@ tcu::TestStatus testMandatoryExtensions(Context &context)
 
 } // namespace android
 
+enum FormatPropsPNextFlagBits
+{
+    PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST   = 2,
+    PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2 = 1,
+    PNEXT_FORMAT_PROPERTIES_3                   = 4,
+#ifndef CTS_USES_VULKANSC
+    PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY = 8,
+#endif // CTS_USES_VULKANSC
+};
+
+using FormatPropsPNextFlags = uint32_t;
+
+struct FormatPropsPNextParams
+{
+    VkFormat format;
+    FormatPropsPNextFlags pNextFlags;
+};
+
+class FormatPropsTest : public vkt::TestInstance
+{
+public:
+    FormatPropsTest(Context &context, const FormatPropsPNextParams &params)
+        : vkt::TestInstance(context)
+        , m_params(params)
+    {
+    }
+    virtual ~FormatPropsTest(void) = default;
+
+    tcu::TestStatus iterate(void) override;
+
+protected:
+    const FormatPropsPNextParams m_params;
+};
+
+class FormatPropsCase : public vkt::TestCase
+{
+public:
+    FormatPropsCase(tcu::TestContext &testCtx, const std::string &name, const FormatPropsPNextParams &params)
+        : vkt::TestCase(testCtx, name)
+        , m_params(params)
+    {
+    }
+    virtual ~FormatPropsCase(void) = default;
+
+    void checkSupport(Context &context) const override;
+    TestInstance *createInstance(Context &context) const override
+    {
+        return new FormatPropsTest(context, m_params);
+    }
+
+protected:
+    const FormatPropsPNextParams m_params;
+};
+
+void FormatPropsCase::checkSupport(Context &context) const
+{
+    context.requireInstanceFunctionality("VK_KHR_get_physical_device_properties2");
+
+    if ((m_params.pNextFlags & PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST) ||
+        (m_params.pNextFlags & PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2))
+        context.requireDeviceFunctionality("VK_EXT_image_drm_format_modifier");
+
+    if ((m_params.pNextFlags & PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2) ||
+        (m_params.pNextFlags & PNEXT_FORMAT_PROPERTIES_3))
+        context.requireDeviceFunctionality("VK_KHR_format_feature_flags2");
+
+#ifndef CTS_USES_VULKANSC
+    if (m_params.pNextFlags & PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY)
+        context.requireDeviceFunctionality("VK_EXT_multisampled_render_to_single_sampled");
+#endif // CTS_USES_VULKANSC
+}
+
+tcu::TestStatus FormatPropsTest::iterate(void)
+{
+    const auto ctx = m_context.getContextCommonData();
+
+    VkFormatProperties2 basicProps = initVulkanStructure();
+
+    ctx.vki.getPhysicalDeviceFormatProperties2(ctx.physicalDevice, m_params.format, &basicProps);
+
+    VkFormatProperties2 retryProps = initVulkanStructure();
+    const auto addProperties       = makeStructChainAdder(&retryProps);
+
+    VkDrmFormatModifierPropertiesListEXT drmModProps   = initVulkanStructure();
+    VkDrmFormatModifierPropertiesList2EXT drmModProps2 = initVulkanStructure();
+    VkFormatProperties3 props3                         = initVulkanStructure();
+#ifndef CTS_USES_VULKANSC
+    VkSubpassResolvePerformanceQueryEXT subpassResolveProps = initVulkanStructure();
+#endif // CTS_USES_VULKANSC
+
+    if (m_params.pNextFlags & PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST)
+        addProperties(&drmModProps);
+
+    if (m_params.pNextFlags & PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2)
+        addProperties(&drmModProps2);
+
+    if (m_params.pNextFlags & PNEXT_FORMAT_PROPERTIES_3)
+        addProperties(&props3);
+
+#ifndef CTS_USES_VULKANSC
+    if (m_params.pNextFlags & PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY)
+        addProperties(&subpassResolveProps);
+#endif // CTS_USES_VULKANSC
+
+    ctx.vki.getPhysicalDeviceFormatProperties2(ctx.physicalDevice, m_params.format, &retryProps);
+
+    if (basicProps.formatProperties.bufferFeatures != retryProps.formatProperties.bufferFeatures)
+        TCU_FAIL("Mismatch in bufferFeatures");
+
+    if (basicProps.formatProperties.linearTilingFeatures != retryProps.formatProperties.linearTilingFeatures)
+        TCU_FAIL("Mismatch in linearTilingFeatures");
+
+    if (basicProps.formatProperties.optimalTilingFeatures != retryProps.formatProperties.optimalTilingFeatures)
+        TCU_FAIL("Mismatch in optimalTilingFeatures");
+
+    if (m_params.pNextFlags & PNEXT_FORMAT_PROPERTIES_3)
+    {
+        const auto basicBufferFeatures2 =
+            static_cast<VkFormatFeatureFlags2>(basicProps.formatProperties.bufferFeatures);
+        const auto basicLinearTilingFeatures2 =
+            static_cast<VkFormatFeatureFlags2>(basicProps.formatProperties.linearTilingFeatures);
+        const auto basicOptimalTilingFeatures2 =
+            static_cast<VkFormatFeatureFlags2>(basicProps.formatProperties.optimalTilingFeatures);
+
+        if ((basicBufferFeatures2 & props3.bufferFeatures) != basicBufferFeatures2)
+            TCU_FAIL("Mismatch in bufferFeatures from VkFormatProperties3");
+
+        if ((basicLinearTilingFeatures2 & props3.linearTilingFeatures) != basicLinearTilingFeatures2)
+            TCU_FAIL("Mismatch in linearTilingFeatures from VkFormatProperties3");
+
+        if ((basicOptimalTilingFeatures2 & props3.optimalTilingFeatures) != basicOptimalTilingFeatures2)
+            TCU_FAIL("Mismatch in optimalTilingFeatures from VkFormatProperties3");
+    }
+
+    return tcu::TestStatus::pass("Pass");
+}
+
+std::string getFormatSimpleName(VkFormat format)
+{
+    static size_t prefixLen    = std::strlen("VK_FORMAT_");
+    const std::string fullName = getFormatName(format);
+    return de::toLower(fullName.substr(prefixLen));
+}
+
 } // namespace
 
 static inline void addFunctionCaseInNewSubgroup(tcu::TestContext &testCtx, tcu::TestCaseGroup *group,
-                                                const std::string &subgroupName, FunctionInstance0::Function testFunc)
+                                                const std::string &subgroupName, FunctionInstance0::Function testFunc,
+                                                bool needsCustomInstance = true)
 {
     de::MovePtr<tcu::TestCaseGroup> subgroup(new tcu::TestCaseGroup(testCtx, subgroupName.c_str()));
-    addFunctionCase(subgroup.get(), "basic", testFunc);
+    // Actually all the tests that are registered with using this function needs a cusom instance.
+    // It is hard to say what scenario it will be used with in the future so this is a reason for
+    // adding of needsCustomInstance parameter.
+    if (needsCustomInstance)
+        addFunctionCase<CustomInstanceTest<E071>>(subgroup.get(), "basic", testFunc);
+    else
+        addFunctionCase(subgroup.get(), "basic", testFunc);
     group->addChild(subgroup.release());
 }
 
@@ -8239,11 +8476,12 @@ tcu::TestCaseGroup *createFeatureInfoTests(tcu::TestContext &testCtx)
         {
             de::MovePtr<tcu::TestCaseGroup> subgroup(new tcu::TestCaseGroup(testCtx, "features"));
             // Extended Device Features
-            addFunctionCase(subgroup.get(), "core", deviceFeatures2);
+            addFunctionCase<CustomInstanceTest<E060>>(subgroup.get(), "core", deviceFeatures2);
             addSeparateFeatureTests(subgroup.get());
 #ifndef CTS_USES_VULKANSC
-            addFunctionCase(subgroup.get(), "shader_subgroup_rotate_property_consistency_khr",
-                            checkSupportKhrShaderSubgroupRotate, subgroupRotatePropertyExtensionFeatureConsistency);
+            addFunctionCase<CustomInstanceWithSupportTest<E060>>(
+                subgroup.get(), "shader_subgroup_rotate_property_consistency_khr", checkSupportKhrShaderSubgroupRotate,
+                subgroupRotatePropertyExtensionFeatureConsistency);
 #endif // CTS_USES_VULKANSC
             extendedPropertiesTests->addChild(subgroup.release());
         }
@@ -8255,6 +8493,72 @@ tcu::TestCaseGroup *createFeatureInfoTests(tcu::TestContext &testCtx)
         addFunctionCaseInNewSubgroup(testCtx, extendedPropertiesTests.get(), "memory_properties",
                                      deviceMemoryProperties2);
 
+        {
+            de::MovePtr<tcu::TestCaseGroup> formatPropertiesPNextGroup(
+                new tcu::TestCaseGroup(testCtx, "pnext_format_properties"));
+
+            // Test all the basic formats that do not require extensions.
+            const VkFormat lastFomat = VK_FORMAT_ASTC_12x12_SRGB_BLOCK;
+            VkFormat testFormat      = VK_FORMAT_UNDEFINED;
+
+            const struct
+            {
+                FormatPropsPNextFlags pNextFlags;
+                const char *flagsCaseName;
+            } flagsCases[] = {
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST), "drm_format_mod_1"},
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2), "drm_format_mod_2"},
+                {(PNEXT_FORMAT_PROPERTIES_3), "format_props_3"},
+#ifndef CTS_USES_VULKANSC
+                {(PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY), "subpass_resolve_query"},
+#endif // CTS_USES_VULKANSC
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST | PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2),
+                 "drm_format_mod_1_and_2"},
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST | PNEXT_FORMAT_PROPERTIES_3),
+                 "drm_format_mod_1_and_format_props_3"},
+#ifndef CTS_USES_VULKANSC
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST | PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY),
+                 "drm_format_mod_1_and_subpass_resolve_query"},
+#endif // CTS_USES_VULKANSC
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2 | PNEXT_FORMAT_PROPERTIES_3),
+                 "drm_format_mod_2_and_format_props_3"},
+#ifndef CTS_USES_VULKANSC
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2 | PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY),
+                 "drm_format_mod_2_and_subpass_resolve_query"},
+                {(PNEXT_FORMAT_PROPERTIES_3 | PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY),
+                 "format_props_3_and_subpass_resolve_query"},
+#endif // CTS_USES_VULKANSC
+                {(PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST | PNEXT_DRM_FORMAT_MODIFIER_PROPERTIES_LIST_2 |
+                  PNEXT_FORMAT_PROPERTIES_3
+#ifndef CTS_USES_VULKANSC
+                  | PNEXT_SUBPASS_RESOLVE_PERFORMANCE_QUERY
+#endif // CTS_USES_VULKANSC
+                  ),
+                 "all_format_props"},
+            };
+
+            for (;;)
+            {
+                // Pick the next format.
+                testFormat = static_cast<VkFormat>(static_cast<int>(testFormat) + 1);
+                if (testFormat > lastFomat)
+                    break;
+
+                const std::string formatName = getFormatSimpleName(testFormat);
+                de::MovePtr<tcu::TestCaseGroup> formatGroup(new tcu::TestCaseGroup(testCtx, formatName.c_str()));
+
+                for (const auto &flagsCase : flagsCases)
+                {
+                    const FormatPropsPNextParams params{testFormat, flagsCase.pNextFlags};
+                    formatGroup->addChild(new FormatPropsCase(testCtx, flagsCase.flagsCaseName, params));
+                }
+
+                formatPropertiesPNextGroup->addChild(formatGroup.release());
+            }
+
+            extendedPropertiesTests->addChild(formatPropertiesPNextGroup.release());
+        }
+
         infoTests->addChild(extendedPropertiesTests.release());
     }
 
@@ -8262,12 +8566,13 @@ tcu::TestCaseGroup *createFeatureInfoTests(tcu::TestContext &testCtx)
         // Vulkan 1.2 related tests
         de::MovePtr<tcu::TestCaseGroup> extendedPropertiesTests(new tcu::TestCaseGroup(testCtx, "vulkan1p2"));
 
-        addFunctionCase(extendedPropertiesTests.get(), "features", deviceFeaturesVulkan12);
-        addFunctionCase(extendedPropertiesTests.get(), "properties", devicePropertiesVulkan12);
-        addFunctionCase(extendedPropertiesTests.get(), "feature_extensions_consistency",
-                        deviceFeatureExtensionsConsistencyVulkan12);
-        addFunctionCase(extendedPropertiesTests.get(), "property_extensions_consistency",
-                        devicePropertyExtensionsConsistencyVulkan12);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "features", deviceFeaturesVulkan12);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "properties",
+                                                  devicePropertiesVulkan12);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "feature_extensions_consistency",
+                                                  deviceFeatureExtensionsConsistencyVulkan12);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "property_extensions_consistency",
+                                                  devicePropertyExtensionsConsistencyVulkan12);
         addFunctionCase(extendedPropertiesTests.get(), "feature_bits_influence", checkApiVersionSupport<1, 2>,
                         featureBitInfluenceOnDeviceCreate<VK_API_VERSION_1_2>);
 
@@ -8279,12 +8584,13 @@ tcu::TestCaseGroup *createFeatureInfoTests(tcu::TestContext &testCtx)
         // Vulkan 1.3 related tests
         de::MovePtr<tcu::TestCaseGroup> extendedPropertiesTests(new tcu::TestCaseGroup(testCtx, "vulkan1p3"));
 
-        addFunctionCase(extendedPropertiesTests.get(), "features", deviceFeaturesVulkan13);
-        addFunctionCase(extendedPropertiesTests.get(), "properties", devicePropertiesVulkan13);
-        addFunctionCase(extendedPropertiesTests.get(), "feature_extensions_consistency",
-                        deviceFeatureExtensionsConsistencyVulkan13);
-        addFunctionCase(extendedPropertiesTests.get(), "property_extensions_consistency",
-                        devicePropertyExtensionsConsistencyVulkan13);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "features", deviceFeaturesVulkan13);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "properties",
+                                                  devicePropertiesVulkan13);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "feature_extensions_consistency",
+                                                  deviceFeatureExtensionsConsistencyVulkan13);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "property_extensions_consistency",
+                                                  devicePropertyExtensionsConsistencyVulkan13);
         addFunctionCase(extendedPropertiesTests.get(), "feature_bits_influence", checkApiVersionSupport<1, 3>,
                         featureBitInfluenceOnDeviceCreate<VK_API_VERSION_1_3>);
 
@@ -8294,12 +8600,13 @@ tcu::TestCaseGroup *createFeatureInfoTests(tcu::TestContext &testCtx)
         // Vulkan 1.4 related tests
         de::MovePtr<tcu::TestCaseGroup> extendedPropertiesTests(new tcu::TestCaseGroup(testCtx, "vulkan1p4"));
 
-        addFunctionCase(extendedPropertiesTests.get(), "features", deviceFeaturesVulkan14);
-        addFunctionCase(extendedPropertiesTests.get(), "properties", devicePropertiesVulkan14);
-        addFunctionCase(extendedPropertiesTests.get(), "feature_extensions_consistency",
-                        deviceFeatureExtensionsConsistencyVulkan14);
-        addFunctionCase(extendedPropertiesTests.get(), "property_extensions_consistency",
-                        devicePropertyExtensionsConsistencyVulkan14);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "features", deviceFeaturesVulkan14);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "properties",
+                                                  devicePropertiesVulkan14);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "feature_extensions_consistency",
+                                                  deviceFeatureExtensionsConsistencyVulkan14);
+        addFunctionCase<CustomInstanceTest<E060>>(extendedPropertiesTests.get(), "property_extensions_consistency",
+                                                  devicePropertyExtensionsConsistencyVulkan14);
         addFunctionCase(extendedPropertiesTests.get(), "feature_bits_influence", checkApiVersionSupport<1, 4>,
                         featureBitInfluenceOnDeviceCreate<VK_API_VERSION_1_4>);
 
@@ -8337,9 +8644,9 @@ tcu::TestCaseGroup *createFeatureInfoTests(tcu::TestContext &testCtx)
         // Removed from Vulkan SC test set: VK_EXT_inline_uniform_block extension removed from Vulkan SC
         addFunctionCase(limitsValidationTests.get(), "ext_inline_uniform_block", checkSupportExtInlineUniformBlock,
                         validateLimitsExtInlineUniformBlock);
-#endif // CTS_USES_VULKANSC
         addFunctionCase(limitsValidationTests.get(), "ext_vertex_attribute_divisor",
                         checkSupportExtVertexAttributeDivisorEXT, validateLimitsExtVertexAttributeDivisorEXT);
+#endif // CTS_USES_VULKANSC
         addFunctionCase(limitsValidationTests.get(), "khr_vertex_attribute_divisor",
                         checkSupportExtVertexAttributeDivisorKHR, validateLimitsExtVertexAttributeDivisorKHR);
 #ifndef CTS_USES_VULKANSC
@@ -8426,7 +8733,7 @@ tcu::TestCaseGroup *createFeatureInfoTests(tcu::TestContext &testCtx)
 void createFeatureInfoInstanceTests(tcu::TestCaseGroup *testGroup)
 {
     addFunctionCase(testGroup, "physical_devices", enumeratePhysicalDevices);
-    addFunctionCase(testGroup, "physical_device_groups", enumeratePhysicalDeviceGroups);
+    addFunctionCase<CustomInstanceTest<E071>>(testGroup, "physical_device_groups", enumeratePhysicalDeviceGroups);
     addFunctionCase(testGroup, "instance_layers", enumerateInstanceLayers);
     addFunctionCase(testGroup, "instance_extensions", enumerateInstanceExtensions);
     addFunctionCase(testGroup, "instance_extension_device_functions",
@@ -8448,7 +8755,8 @@ void createFeatureInfoDeviceTests(tcu::TestCaseGroup *testGroup)
 
 void createFeatureInfoDeviceGroupTests(tcu::TestCaseGroup *testGroup)
 {
-    addFunctionCase(testGroup, "device_group_peer_memory_features", deviceGroupPeerMemoryFeatures);
+    addFunctionCase<CustomInstanceTest<E071>>(testGroup, "device_group_peer_memory_features",
+                                              deviceGroupPeerMemoryFeatures);
 }
 
 } // namespace api

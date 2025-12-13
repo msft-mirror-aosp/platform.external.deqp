@@ -38,6 +38,7 @@
 
 #include <algorithm>
 #include <iomanip>
+#include <iterator>
 #include <string>
 #include <vector>
 
@@ -14297,14 +14298,21 @@ std::string VaryingBlockAutomaticMemberLocationsTest::getShaderSource(GLuint tes
         var_use   = output_use;
     }
 
-    if (test_case.m_stage == stage)
+    bool needs_vertex_output =
+        stage == Utils::Shader::VERTEX && true == test_case.m_is_input && test_case.m_stage != Utils::Shader::VERTEX;
+    bool needs_fragment_input = stage == Utils::Shader::FRAGMENT && false == test_case.m_is_input &&
+                                test_case.m_stage != Utils::Shader::FRAGMENT;
+
+    if (test_case.m_stage == stage || needs_vertex_output || needs_fragment_input)
     {
         size_t position = 0;
 
         switch (stage)
         {
         case Utils::Shader::FRAGMENT:
-            source = fs_tested;
+            direction = "in";
+            var_use   = input_use;
+            source    = fs_tested;
             break;
         case Utils::Shader::GEOMETRY:
             source = gs_tested;
@@ -14322,7 +14330,9 @@ std::string VaryingBlockAutomaticMemberLocationsTest::getShaderSource(GLuint tes
             index  = test_case.m_is_input ? "[0]" : "";
             break;
         case Utils::Shader::VERTEX:
-            source = vs_tested;
+            direction = "out";
+            var_use   = output_use;
+            source    = vs_tested;
             break;
         default:
             TCU_FAIL("Invalid enum");
@@ -14671,7 +14681,12 @@ std::string VaryingLocationLimitTest::getShaderSource(GLuint test_case_index, Ut
                                                                "};\n"
                                                                "\n";
 
-    if (test_case.m_stage == stage)
+    bool needs_vertex_output =
+        stage == Utils::Shader::VERTEX && true == test_case.m_is_input && test_case.m_stage != Utils::Shader::VERTEX;
+    bool needs_fragment_input = stage == Utils::Shader::FRAGMENT && false == test_case.m_is_input &&
+                                test_case.m_stage != Utils::Shader::FRAGMENT;
+
+    if (test_case.m_stage == stage || needs_fragment_input || needs_vertex_output)
     {
         const GLchar *array = "";
         GLchar buffer[16];
@@ -14683,7 +14698,7 @@ std::string VaryingLocationLimitTest::getShaderSource(GLuint test_case_index, Ut
         Utils::Variable::STORAGE storage = Utils::Variable::VARYING_INPUT;
         const GLchar *var_use            = input_use;
 
-        if (false == test_case.m_is_input)
+        if (false == test_case.m_is_input && !needs_fragment_input)
         {
             direction = "out";
             last      = getLastOutputLocation(stage, test_case.m_type, 0, true);
@@ -14701,6 +14716,11 @@ std::string VaryingLocationLimitTest::getShaderSource(GLuint test_case_index, Ut
         switch (stage)
         {
         case Utils::Shader::FRAGMENT:
+            direction = "in ";
+            last      = getLastInputLocation(stage, test_case.m_type, 0, true);
+            storage   = Utils::Variable::VARYING_INPUT;
+            var_use   = input_use;
+
             source = fs_tested;
             break;
         case Utils::Shader::GEOMETRY:
@@ -14720,6 +14740,11 @@ std::string VaryingLocationLimitTest::getShaderSource(GLuint test_case_index, Ut
             index  = test_case.m_is_input ? "[0]" : "";
             break;
         case Utils::Shader::VERTEX:
+            direction = "out";
+            last      = getLastOutputLocation(stage, test_case.m_type, 0, true);
+            storage   = Utils::Variable::VARYING_OUTPUT;
+            var_use   = output_use;
+
             source = vs_tested;
             break;
         default:
@@ -14834,7 +14859,10 @@ void VaryingLocationLimitTest::testInit()
     testCase test_case_in  = {true, type, (Utils::Shader::STAGES)m_stage};
     testCase test_case_out = {false, type, (Utils::Shader::STAGES)m_stage};
 
-    m_test_cases.push_back(test_case_in);
+    if (Utils::Shader::VERTEX != m_stage)
+    {
+        m_test_cases.push_back(test_case_in);
+    }
 
     if (Utils::Shader::FRAGMENT != m_stage)
     {
@@ -15823,7 +15851,7 @@ void VaryingInvalidValueComponentTest::testInit()
     std::vector<GLuint> invalid_components;
 
     std::set_symmetric_difference(every_component.begin(), every_component.end(), valid_components.begin(),
-                                  valid_components.end(), back_inserter(invalid_components));
+                                  valid_components.end(), std::back_inserter(invalid_components));
 
     for (std::vector<GLuint>::const_iterator it_invalid_components = invalid_components.begin();
          it_invalid_components != invalid_components.end(); ++it_invalid_components)
