@@ -37,6 +37,7 @@
 #include "vkImageWithMemory.hpp"
 #include "vkBuilderUtil.hpp"
 #include "vkRayTracingUtil.hpp"
+#include "vkFormatLists.hpp"
 #include "vktTestCase.hpp"
 #include "vktTestGroupUtil.hpp"
 #include "vktCustomInstancesDevices.hpp"
@@ -821,10 +822,7 @@ VkFormat getSupportedDepthFormat(const InstanceInterface &vk, const VkPhysicalDe
 {
     VkFormatProperties properties;
 
-    const VkFormat DepthFormats[] = {VK_FORMAT_D32_SFLOAT, VK_FORMAT_X8_D24_UNORM_PACK32, VK_FORMAT_D24_UNORM_S8_UINT,
-                                     VK_FORMAT_D32_SFLOAT_S8_UINT};
-
-    for (const auto format : DepthFormats)
+    for (const auto format : formats::depthFormats)
     {
         vk.getPhysicalDeviceFormatProperties(physicalDevice, format, &properties);
 
@@ -1351,6 +1349,7 @@ enum class MiscTestMode
     COMMON_FRAG_LIBRARY,
     VIEW_INDEX_FROM_DEVICE_INDEX,
     UNUSUAL_MULTISAMPLE_STATE,
+    TRANSFORM_FEEDBACK_WITH_FAST_LINK,
     DESTROY_RESOURCES_BEFORE_LINK
 };
 
@@ -4138,6 +4137,255 @@ tcu::TestStatus CreateUnusualMultisampleStatesInstance::iterate()
                                  std::to_string(imageSize * imageSize * colorSamples));
 }
 
+class TransformFeedbackWithFastLinkInstance : public vkt::TestInstance
+{
+public:
+    TransformFeedbackWithFastLinkInstance(Context &context);
+    virtual ~TransformFeedbackWithFastLinkInstance(void) = default;
+
+    tcu::TestStatus iterate(void) override;
+
+protected:
+    GraphicsPipelineWrapper createGrapghicsPipeline(PipelineLayoutWrapper &pipelineLayoutWrapper,
+                                                    PipelineConstructionType pipelineConstructionType);
+
+protected:
+    const uint32_t m_vertexCount = 16u;
+    const uint32_t m_imageSize   = 32u;
+    const VkFormat m_colorFormat = VK_FORMAT_R8G8B8A8_UNORM;
+    const VkExtent3D m_extent    = makeExtent3D(m_imageSize, m_imageSize, 1u);
+
+    const std::vector<VkViewport> m_viewports{makeViewport(m_extent)};
+    const std::vector<VkRect2D> m_scissors{makeRect2D(m_extent)};
+
+    Move<VkRenderPass> m_renderPass;
+    ShaderWrapper m_vertShader;
+    ShaderWrapper m_fragShader;
+
+    VkVertexInputBindingDescription m_vertexBindingDescriptions;
+    VkVertexInputAttributeDescription m_vertexAttributeDescriptions[8];
+    VkPipelineVertexInputStateCreateInfo m_vertexInputStateCreateInfo;
+};
+
+TransformFeedbackWithFastLinkInstance::TransformFeedbackWithFastLinkInstance(Context &context)
+    : vkt::TestInstance(context)
+{
+    const auto &vk    = m_context.getDeviceInterface();
+    const auto device = m_context.getDevice();
+
+    m_renderPass = makeRenderPass(vk, device, m_colorFormat);
+
+    // create shaders
+    auto &bc(m_context.getBinaryCollection());
+    m_vertShader = ShaderWrapper(vk, device, bc.get("vert"));
+    m_fragShader = ShaderWrapper(vk, device, bc.get("frag"));
+
+    // define vertex attributes
+    const auto perVertexSize         = sizeof(Vec4) + 7u * sizeof(int32_t);
+    m_vertexBindingDescriptions      = {0, perVertexSize, VK_VERTEX_INPUT_RATE_VERTEX};
+    m_vertexAttributeDescriptions[0] = {0u, 0u, vk::VK_FORMAT_R32G32B32A32_SFLOAT, 0u};
+    for (uint32_t i = 1; i < 8u; i++)
+        m_vertexAttributeDescriptions[i] = {i, 0u, vk::VK_FORMAT_R32_SINT,
+                                            (uint32_t)(sizeof(Vec4) + (i - 1) * sizeof(int32_t))};
+
+    // define vertex input state - shared between pipelines
+    m_vertexInputStateCreateInfo                                 = initVulkanStructure();
+    m_vertexInputStateCreateInfo.vertexBindingDescriptionCount   = 1u;
+    m_vertexInputStateCreateInfo.pVertexBindingDescriptions      = &m_vertexBindingDescriptions;
+    m_vertexInputStateCreateInfo.vertexAttributeDescriptionCount = (uint32_t)std::size(m_vertexAttributeDescriptions);
+    m_vertexInputStateCreateInfo.pVertexAttributeDescriptions    = m_vertexAttributeDescriptions;
+}
+
+GraphicsPipelineWrapper TransformFeedbackWithFastLinkInstance::createGrapghicsPipeline(
+    PipelineLayoutWrapper &pipelineLayoutWrapper, PipelineConstructionType pipelineConstructionType)
+{
+    const auto &vk            = m_context.getDeviceInterface();
+    const auto &vki           = m_context.getInstanceInterface();
+    const auto device         = m_context.getDevice();
+    const auto physicalDevice = m_context.getPhysicalDevice();
+    const auto &extensions    = m_context.getDeviceExtensions();
+
+    GraphicsPipelineWrapper gpw(vki, vk, physicalDevice, device, extensions, pipelineConstructionType);
+    gpw.setDefaultTopology(VK_PRIMITIVE_TOPOLOGY_LINE_LIST)
+        .setDefaultRasterizationState()
+        .setDefaultDepthStencilState()
+        .setDefaultMultisampleState()
+        .setDefaultColorBlendState()
+        .setMonolithicPipelineLayout(pipelineLayoutWrapper)
+        .setupVertexInputState(&m_vertexInputStateCreateInfo)
+        .setupPreRasterizationShaderState(m_viewports, m_scissors, pipelineLayoutWrapper, *m_renderPass, 0u,
+                                          m_vertShader)
+        .setupFragmentShaderState(pipelineLayoutWrapper, *m_renderPass, 0u, m_fragShader)
+        .setupFragmentOutputState(*m_renderPass, 0u)
+        .buildPipeline();
+    return gpw;
+}
+
+tcu::TestStatus TransformFeedbackWithFastLinkInstance::iterate()
+{
+    const auto &vk            = m_context.getDeviceInterface();
+    const auto device         = m_context.getDevice();
+    Allocator &allocator      = m_context.getDefaultAllocator();
+    uint32_t queueFamilyIndex = m_context.getUniversalQueueFamilyIndex();
+
+    // generate vertex input data
+    struct PerVertexData
+    {
+        Vec4 pos;
+        int32_t var[7]; // used to verify transform feedback and for color
+    };
+    std::vector<PerVertexData> inputDataVect(m_vertexCount);
+    de::Random rnd(1254);
+    for (auto &inData : inputDataVect)
+    {
+        inData.pos = Vec4(rnd.getFloat(-1.2f, 1.2f), rnd.getFloat(-1.2f, 1.2f), 0.1f, 1.0f);
+        for (auto &v : inData.var)
+            v = rnd.getInt(-255, 255);
+    }
+    const auto varCount = std::size(inputDataVect[0].var);
+
+    // create color attachment that will be used for rendering with transform feedback
+    const auto imageSubresRange = makeImageSubresourceRange(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u, 0u, 1u);
+    auto imageInfo              = makeColorImageCreateInfo(m_colorFormat, m_imageSize, m_imageSize);
+    imageInfo.usage             = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+    ImageWithMemory imgWithMemoryA(vk, device, allocator, imageInfo, MemoryRequirement::Local);
+    auto imgViewA = makeImageView(vk, device, *imgWithMemoryA, VK_IMAGE_VIEW_TYPE_2D, m_colorFormat, imageSubresRange);
+
+    // create second color attachment that will be used for rendering without transform feedback
+    ImageWithMemory imgWithMemoryB(vk, device, allocator, imageInfo, MemoryRequirement::Local);
+    auto imgViewB = makeImageView(vk, device, *imgWithMemoryB, VK_IMAGE_VIEW_TYPE_2D, m_colorFormat, imageSubresRange);
+
+    // create buffer that will hold result of transform feedback
+    const auto mrhv = MemoryRequirement::HostVisible;
+    VkBufferUsageFlags bufferUsage(VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
+                                   VK_BUFFER_USAGE_TRANSFORM_FEEDBACK_BUFFER_BIT_EXT);
+    const auto tfBufferInfo = makeBufferCreateInfo(m_vertexCount * 4 * varCount, bufferUsage);
+    BufferWithMemory tfBufferWithMemory(vk, device, allocator, tfBufferInfo, mrhv);
+
+    // create buffer that will store data of both rendered images
+    const auto imageDataSize    = m_imageSize * m_imageSize * 4u;
+    bufferUsage                 = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    const auto resultBufferInfo = makeBufferCreateInfo(imageDataSize * 2u, bufferUsage);
+    BufferWithMemory resultBufferWithMemory(vk, device, allocator, resultBufferInfo, mrhv);
+
+    // create buffer that will hold vertex data
+    const auto perVertexSize    = sizeof(PerVertexData);
+    bufferUsage                 = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT;
+    const auto vertexBufferInfo = makeBufferCreateInfo(m_vertexCount * perVertexSize, bufferUsage);
+    BufferWithMemory vertexBufferWithMemory(vk, device, allocator, vertexBufferInfo, mrhv);
+
+    // uplad vertex data
+    const auto &vertexBufferAllocation = vertexBufferWithMemory.getAllocation();
+    invalidateAlloc(vk, device, vertexBufferAllocation);
+    auto *vertexBufferPtr = static_cast<PerVertexData *>(vertexBufferAllocation.getHostPtr());
+    std::memcpy(vertexBufferPtr, inputDataVect.data(), std::size(inputDataVect) * perVertexSize);
+
+    // create two framebuffers
+    auto framebufferCreateInfo = makeFramebufferCreateInfo(*m_renderPass, 1u, &*imgViewA, m_imageSize, m_imageSize);
+    const auto framebufferA    = createFramebuffer(vk, device, &framebufferCreateInfo);
+    framebufferCreateInfo.pAttachments = &*imgViewB;
+    const auto framebufferB            = createFramebuffer(vk, device, &framebufferCreateInfo);
+
+    // create pipeline layout and pipeline for first draw with transform feedback
+    auto pipelineConstructionType = PIPELINE_CONSTRUCTION_TYPE_FAST_LINKED_LIBRARY;
+    PipelineLayoutWrapper pipelineLayoutA(pipelineConstructionType, vk, device);
+    GraphicsPipelineWrapper pipelineA = createGrapghicsPipeline(pipelineLayoutA, pipelineConstructionType);
+
+    // create pipeline layout and pipeline for second draw without transform feedback (for verification)
+    pipelineConstructionType = PIPELINE_CONSTRUCTION_TYPE_MONOLITHIC;
+    PipelineLayoutWrapper pipelineLayoutB(pipelineConstructionType, vk, device);
+    GraphicsPipelineWrapper pipelineB = createGrapghicsPipeline(pipelineLayoutB, pipelineConstructionType);
+
+    const VkDeviceSize vertexBufferOffset = 0;
+    VkPipelineBindPoint bindPoint         = VK_PIPELINE_BIND_POINT_GRAPHICS;
+    const auto poolCreateFlags            = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+    VkDeviceSize tfBufferOffset           = 0;
+    VkDeviceSize tfBufferSize             = VK_WHOLE_SIZE;
+
+    const auto clearValue(makeClearValueColor(tcu::Vec4(0.2f, 0.2f, 0.2f, 1.0f)));
+    const auto srl(makeImageSubresourceLayers(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 0u, 1u));
+    const auto copyRegionA(makeBufferImageCopy(m_extent, srl));
+    auto copyRegionB         = copyRegionA;
+    copyRegionB.bufferOffset = imageDataSize;
+
+    const auto beforeCopyMemoryBarrier(
+        makeMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT));
+    const VkImageMemoryBarrier beforeCopyImageBarriers[]{
+        makeImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               *imgWithMemoryA, imageSubresRange),
+        makeImageMemoryBarrier(VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                               VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                               *imgWithMemoryB, imageSubresRange),
+    };
+
+    const auto cmdPool(createCommandPool(vk, device, poolCreateFlags, queueFamilyIndex));
+    const auto cmdBuffer(allocateCommandBuffer(vk, device, *cmdPool, VK_COMMAND_BUFFER_LEVEL_PRIMARY));
+
+    beginCommandBuffer(vk, *cmdBuffer);
+
+    // render with transform feedback using pipeline constructed with fast linking
+    beginRenderPass(vk, *cmdBuffer, *m_renderPass, *framebufferA, m_scissors[0], 1, &clearValue);
+    vk.cmdBindPipeline(*cmdBuffer, bindPoint, pipelineA.getPipeline());
+    vk.cmdBindVertexBuffers(*cmdBuffer, 0, 1, &vertexBufferWithMemory.get(), &vertexBufferOffset);
+    vk.cmdBindTransformFeedbackBuffersEXT(*cmdBuffer, 0, 1, &*tfBufferWithMemory, &tfBufferOffset, &tfBufferSize);
+    vk.cmdBeginTransformFeedbackEXT(*cmdBuffer, 0, 0, nullptr, nullptr);
+    vk.cmdDraw(*cmdBuffer, m_vertexCount, 1u, 0u, 0u);
+    vk.cmdEndTransformFeedbackEXT(*cmdBuffer, 0, 0, nullptr, nullptr);
+    endRenderPass(vk, *cmdBuffer);
+
+    // render again without transform feedback and using monothlic pipeline for verification
+    beginRenderPass(vk, *cmdBuffer, *m_renderPass, *framebufferB, m_scissors[0], 1, &clearValue);
+    vk.cmdBindPipeline(*cmdBuffer, bindPoint, pipelineB.getPipeline());
+    vk.cmdBindVertexBuffers(*cmdBuffer, 0, 1, &vertexBufferWithMemory.get(), &vertexBufferOffset);
+    vk.cmdDraw(*cmdBuffer, m_vertexCount, 1u, 0u, 0u);
+    endRenderPass(vk, *cmdBuffer);
+
+    // wait for rendering to finish and transition images to transfer src
+    vk.cmdPipelineBarrier(*cmdBuffer, VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0u, 1,
+                          &beforeCopyMemoryBarrier, 0, 0, 2, beforeCopyImageBarriers);
+
+    // copy both images to different parts of same buffer for verification
+    vk.cmdCopyImageToBuffer(*cmdBuffer, *imgWithMemoryA, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, *resultBufferWithMemory,
+                            1u, &copyRegionA);
+    vk.cmdCopyImageToBuffer(*cmdBuffer, *imgWithMemoryB, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, *resultBufferWithMemory,
+                            1u, &copyRegionB);
+
+    endCommandBuffer(vk, *cmdBuffer);
+
+    const VkQueue queue = getDeviceQueue(vk, device, queueFamilyIndex, 0);
+    submitCommandsAndWait(vk, device, queue, *cmdBuffer);
+
+    const auto &tfBufferAllocation = tfBufferWithMemory.getAllocation();
+    invalidateAlloc(vk, device, tfBufferAllocation);
+    auto *tfBufferPtr = static_cast<int32_t *>(tfBufferAllocation.getHostPtr());
+
+    // verify transform feedback result
+    auto varByteCount = varCount * (size_t)sizeof(int32_t);
+    for (size_t index = 0; index < inputDataVect.size(); ++index)
+    {
+        auto &inData  = inputDataVect[index];
+        auto *outData = tfBufferPtr + (index * 7u);
+        if (std::memcmp(inData.var, outData, varByteCount))
+            return tcu::TestStatus::fail(std::string("Invalid TF result at index: ") + std::to_string(index));
+    }
+
+    const auto &resultBufferAllocation = resultBufferWithMemory.getAllocation();
+    invalidateAlloc(vk, device, resultBufferAllocation);
+    auto *resultBufferPtr = static_cast<std::uint8_t *>(resultBufferAllocation.getHostPtr());
+
+    // compare two renderred images
+    if (std::memcmp(resultBufferPtr, resultBufferPtr + imageDataSize, imageDataSize) == 0)
+        return tcu::TestStatus::pass("Pass");
+
+    // log image
+    tcu::PixelBufferAccess resultAccess(mapVkFormat(VK_FORMAT_R8G8B8A8_UNORM), m_imageSize, m_imageSize, 1,
+                                        resultBufferPtr);
+    m_context.getTestContext().getLog() << tcu::LogImage("image", "", resultAccess);
+
+    return tcu::TestStatus::fail("Rendered images are not the same");
+}
+
 class PipelineLibraryMiscTestCase : public TestCase
 {
 public:
@@ -4207,6 +4455,9 @@ void PipelineLibraryMiscTestCase::checkSupport(Context &context) const
         else
             context.requireDeviceFunctionality("VK_KHR_multiview");
     }
+
+    if (m_testParams.mode == MiscTestMode::TRANSFORM_FEEDBACK_WITH_FAST_LINK)
+        context.requireDeviceFunctionality("VK_EXT_transform_feedback");
 
     if (m_testParams.mode == MiscTestMode::DESTROY_RESOURCES_BEFORE_LINK)
     {
@@ -4715,6 +4966,48 @@ void PipelineLibraryMiscTestCase::initPrograms(SourceCollections &programCollect
         }
         programCollection.glslSources.add("frag") << glu::FragmentSource(frag.str());
     }
+    else if (m_testParams.mode == MiscTestMode::TRANSFORM_FEEDBACK_WITH_FAST_LINK)
+    {
+        // shaders are based on: dEQP-GLES3.functional.transform_feedback.array.interleaved.lines.lowp_int
+        std::string vert(R"(
+            #version 460
+            layout(location = 0) in vec4 a_position;
+            layout(location = 1) in int a_varA_e0;
+            layout(location = 2) in int a_varA_e1;
+            layout(location = 3) in int a_varA_e2;
+            layout(location = 4) in int a_varB_e0;
+            layout(location = 5) in int a_varB_e1;
+            layout(location = 6) in int a_varB_e2;
+            layout(location = 7) in int a_varB_e3;
+            layout(location = 0, xfb_buffer=0, xfb_offset=0, xfb_stride=28) flat out int v_varA[3];
+            layout(location = 3, xfb_buffer=0, xfb_offset=12, xfb_stride=28) flat out int v_varB[4];
+            void main(void)
+            {
+                gl_Position = a_position;
+                v_varA[0]   = a_varA_e0;
+                v_varA[1]   = a_varA_e1;
+                v_varA[2]   = a_varA_e2;
+                v_varB[0]   = a_varB_e0;
+                v_varB[1]   = a_varB_e1;
+                v_varB[2]   = a_varB_e2;
+                v_varB[3]   = a_varB_e3;
+            })");
+        programCollection.glslSources.add("vert") << glu::VertexSource(vert);
+        std::string frag(R"(
+            #version 460
+            layout(location = 0) out vec4 color;
+            layout(location = 0) flat in int v_varA[3];
+            layout(location = 3) flat in int v_varB[4];
+            void main (void)
+            {
+                color.r = (v_varA[0] + v_varB[0]) % 255;
+                color.g = (v_varA[1] + v_varB[1]) % 255;
+                color.b = (v_varA[2] + v_varB[2]) % 255;
+                color.a = v_varB[3];
+                color = abs(color) / 256.0;
+            })");
+        programCollection.glslSources.add("frag") << glu::FragmentSource(frag);
+    }
     else
     {
         DE_ASSERT(false);
@@ -4741,6 +5034,9 @@ TestInstance *PipelineLibraryMiscTestCase::createInstance(Context &context) cons
 
     if (m_testParams.mode == MiscTestMode::UNUSUAL_MULTISAMPLE_STATE)
         return new CreateUnusualMultisampleStatesInstance(context);
+
+    if (m_testParams.mode == MiscTestMode::TRANSFORM_FEEDBACK_WITH_FAST_LINK)
+        return new TransformFeedbackWithFastLinkInstance(context);
 
     return new PipelineLibraryMiscTestInstance(context, m_testParams);
 }
@@ -4896,6 +5192,471 @@ void addPipelineLibraryConfigurationsTests(tcu::TestCaseGroup *group, bool optim
     }
 }
 
+// Virtually all tests use 4 sets, vertex shader and fragment shader. Either we have a common set number in use, or a
+// common set number that is not used. For the first case, we can also trim null set layouts at the end of the arrays.
+enum class CommonNullCase
+{
+    ONE_USED = 0,  // Vertex and fragment both use a single common set and others are null.
+    ONE_USED_TRIM, // Same as ONE_USED, but trimming null set layouts at the end of the array.
+    ONE_UNUSED,    // Vertex and fragment both use all sets except for the chosen one.
+    TWO_USED_TRIM, // Vertex uses a set and fragment uses another set, typically with gaps. Requires second set number.
+};
+
+// Returns true if both vertex and fragment use the same sets.
+bool sameSetsVertFrag(CommonNullCase nullCase)
+{
+    return (nullCase != CommonNullCase::TWO_USED_TRIM);
+}
+
+bool trimList(CommonNullCase nullCase)
+{
+    return (nullCase == CommonNullCase::ONE_USED_TRIM || nullCase == CommonNullCase::TWO_USED_TRIM);
+}
+
+// Returns a vector with the set numbers given a max set, the set number in focus and a boolean indicating the case.
+// maxSets is the maximum number of sets to consider.
+// setNumber is the common set name that's the focus of the case.
+// used indicates if setNumber corresponds to a common set that is used, or unused instead.
+std::vector<uint32_t> getUsedSets(uint32_t maxSets, uint32_t setNumber, bool used)
+{
+    std::vector<uint32_t> usedSets;
+    usedSets.reserve(maxSets);
+
+    if (used)
+        usedSets.push_back(setNumber);
+    else
+    {
+        for (uint32_t i = 0u; i < maxSets; ++i)
+        {
+            if (i != setNumber)
+                usedSets.push_back(i);
+        }
+    }
+
+    return usedSets;
+}
+
+std::vector<uint32_t> allSets(const std::vector<uint32_t> &vertSets, const std::vector<uint32_t> &fragSets)
+{
+    std::set<uint32_t> unionSet;
+    unionSet.insert(begin(vertSets), end(vertSets));
+    unionSet.insert(begin(fragSets), end(fragSets));
+    return std::vector<uint32_t>(begin(unionSet), end(unionSet));
+}
+
+struct AlwaysNullSetLayoutParams
+{
+    PipelineConstructionType constructionType;
+    CommonNullCase nullCase;
+    uint32_t setNumber;                  // The common set number, or the vertex set number in the TWO_USED_TRIM case.
+    tcu::Maybe<uint32_t> otherSetNumber; // Only for the TWO_USED_TRIM case, represents the fragment set number.
+
+    static constexpr uint32_t kMaxSets          = 4u;
+    static constexpr uint32_t kVertValueOffset  = 100u;
+    static constexpr uint32_t kFragValueOffset  = 200u;
+    static constexpr uint32_t kShaderStages     = 2u;
+    static constexpr uint32_t kOutputValueCount = kShaderStages * kMaxSets;
+
+    std::vector<uint32_t> getUsedSetsVert() const
+    {
+        if (sameSetsVertFrag(nullCase))
+            return getUsedSets(kMaxSets, setNumber, (nullCase != CommonNullCase::ONE_UNUSED));
+        return getUsedSets(kMaxSets, setNumber, true);
+    }
+
+    std::vector<uint32_t> getUsedSetsFrag() const
+    {
+        if (sameSetsVertFrag(nullCase))
+            return getUsedSets(kMaxSets, setNumber, (nullCase != CommonNullCase::ONE_UNUSED));
+
+        DE_ASSERT(!!otherSetNumber);
+        return getUsedSets(kMaxSets, *otherSetNumber, true);
+    }
+};
+
+class AlwaysNullSetLayoutInstance : public vkt::TestInstance
+{
+public:
+    AlwaysNullSetLayoutInstance(Context &context, const AlwaysNullSetLayoutParams &params)
+        : vkt::TestInstance(context)
+        , m_params(params)
+    {
+    }
+    virtual ~AlwaysNullSetLayoutInstance(void) = default;
+
+    tcu::TestStatus iterate(void) override;
+
+protected:
+    AlwaysNullSetLayoutParams m_params;
+};
+
+class AlwaysNullSetLayoutCase : public vkt::TestCase
+{
+public:
+    AlwaysNullSetLayoutCase(tcu::TestContext &testCtx, const std::string &name, const AlwaysNullSetLayoutParams &params)
+        : vkt::TestCase(testCtx, name)
+        , m_params(params)
+    {
+    }
+    virtual ~AlwaysNullSetLayoutCase(void) = default;
+
+    void checkSupport(Context &context) const override;
+    void initPrograms(vk::SourceCollections &programCollection) const override;
+    TestInstance *createInstance(Context &context) const override
+    {
+        return new AlwaysNullSetLayoutInstance(context, m_params);
+    }
+
+protected:
+    AlwaysNullSetLayoutParams m_params;
+};
+
+void AlwaysNullSetLayoutCase::checkSupport(Context &context) const
+{
+    const auto ctx = context.getContextCommonData();
+    checkPipelineConstructionRequirements(ctx.vki, ctx.physicalDevice, m_params.constructionType);
+
+    context.requireDeviceCoreFeature(DEVICE_CORE_FEATURE_FRAGMENT_STORES_AND_ATOMICS);
+}
+
+void AlwaysNullSetLayoutCase::initPrograms(vk::SourceCollections &programCollection) const
+{
+    const auto kMaxSets          = AlwaysNullSetLayoutParams::kMaxSets;
+    const auto kVertValueOffset  = AlwaysNullSetLayoutParams::kVertValueOffset;
+    const auto kFragValueOffset  = AlwaysNullSetLayoutParams::kFragValueOffset;
+    const auto kOutputValueCount = AlwaysNullSetLayoutParams::kOutputValueCount;
+
+    const auto usedSetsVert = m_params.getUsedSetsVert();
+    DE_ASSERT(!usedSetsVert.empty());
+    for (const auto setNumber : usedSetsVert)
+    {
+        DE_UNREF(setNumber); // For release builds.
+        DE_ASSERT(setNumber < kMaxSets);
+    }
+
+    // All stores will be done from the fragment shader, and the vertex shader will pass its value down.
+    std::ostringstream vert;
+    vert << "#version 460\n";
+    for (const auto setNum : usedSetsVert)
+    {
+        vert << "layout (set=" << setNum << ", binding=0, std430) readonly buffer InputBuffer" << setNum
+             << " { uint value; } input_ssbo_" << setNum << ";\n"
+             << "layout (location=" << setNum << ") out flat uint output_value_" << setNum << ";\n";
+    }
+    vert << "void main (void) {\n"
+         << "    gl_Position = vec4(0.0, 0.0, 0.0, 1.0);\n"
+         << "    gl_PointSize = 1.0f;\n";
+    for (const auto setNum : usedSetsVert)
+        vert << "    output_value_" << setNum << " = input_ssbo_" << setNum << ".value + " << kVertValueOffset << ";\n";
+    vert << "}\n";
+    programCollection.glslSources.add("vert") << glu::VertexSource(vert.str());
+
+    const auto usedSetsFrag = m_params.getUsedSetsFrag();
+    DE_ASSERT(!usedSetsFrag.empty());
+    for (const auto setNumber : usedSetsFrag)
+    {
+        DE_UNREF(setNumber); // For release builds.
+        DE_ASSERT(setNumber < kMaxSets);
+    }
+
+    std::ostringstream frag;
+    frag << "#version 460\n";
+
+    // Sets used by the fragment shader.
+    for (const auto setNum : usedSetsFrag)
+        frag << "layout (set=" << setNum << ", binding=0, std430) readonly buffer InputBuffer" << setNum
+             << " { uint value; } input_ssbo_" << setNum << ";\n";
+    frag << "layout (set=" << usedSetsFrag.front() << ", binding=1, std430) buffer OutputBuffer { uint values["
+         << kOutputValueCount << "]; } output_ssbo;\n"; // Only for the first set that is used.
+
+    // Inputs from the vertex shader.
+    for (const auto setNum : usedSetsVert)
+        frag << "layout (location=" << setNum << ") in flat uint input_value_" << setNum << ";\n";
+
+    frag << "layout (location=0) out vec4 outColor;\n"
+         << "void main (void) {\n";
+
+    // Store values from the vertex shader.
+    for (const auto setNum : usedSetsVert)
+        frag << "    output_ssbo.values[" << setNum << "] = input_value_" << setNum << ";\n";
+
+    // Store values from this shader.
+    for (const auto setNum : usedSetsFrag)
+        frag << "    output_ssbo.values[" << setNum << "+" << kMaxSets << "] = input_ssbo_" << setNum << ".value + "
+             << kFragValueOffset << ";\n";
+
+    frag << "    outColor = vec4(0.0, 0.0, 1.0, 1.0);\n"
+         << "}\n";
+    programCollection.glslSources.add("frag") << glu::FragmentSource(frag.str());
+}
+
+tcu::TestStatus AlwaysNullSetLayoutInstance::iterate(void)
+{
+    const auto kOutputValueCount = AlwaysNullSetLayoutParams::kOutputValueCount;
+    const auto kMaxSets          = AlwaysNullSetLayoutParams::kMaxSets;
+    const auto kValueOffset      = 50u;
+    const auto usedSetsVert      = m_params.getUsedSetsVert();
+    const auto usedSetsFrag      = m_params.getUsedSetsFrag();
+    const auto usedSetsAll       = allSets(usedSetsVert, usedSetsFrag);
+    const auto ctx               = m_context.getContextCommonData();
+    const auto descType          = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    const auto bufferUsage       = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+
+    const bool optimizedLib    = (m_params.constructionType == PIPELINE_CONSTRUCTION_TYPE_LINK_TIME_OPTIMIZED_LIBRARY);
+    const bool independentSets = (!!m_params.otherSetNumber);
+    const VkPipelineLayoutCreateFlags independentSetsFlag = VK_PIPELINE_LAYOUT_CREATE_INDEPENDENT_SETS_BIT_EXT;
+    const auto libLayoutFlags                             = (independentSets ? independentSetsFlag : 0u);
+    const auto linkLayoutFlags = (independentSets ? (optimizedLib ? 0u : independentSetsFlag) : 0u);
+
+    // Create the set layouts and gather their handles.
+    using SetLayoutPtr = std::unique_ptr<Move<VkDescriptorSetLayout>>;
+
+    std::vector<SetLayoutPtr> setLayouts;
+    setLayouts.reserve(kMaxSets);
+    for (uint32_t i = 0u; i < kMaxSets; ++i)
+        setLayouts.emplace_back(nullptr);
+
+    std::vector<DescriptorSetLayoutBuilder> setLayoutBuilders(kMaxSets);
+
+    for (const auto setNumber : usedSetsAll)
+    {
+        VkShaderStageFlags stages = 0u;
+
+        if (de::contains(begin(usedSetsVert), end(usedSetsVert), setNumber))
+            stages |= VK_SHADER_STAGE_VERTEX_BIT;
+
+        if (de::contains(begin(usedSetsFrag), end(usedSetsFrag), setNumber))
+            stages |= VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        setLayoutBuilders.at(setNumber).addSingleBinding(descType, stages);
+    }
+
+    // Add output buffer to the first used set in the fragment stage.
+    DE_ASSERT(!usedSetsFrag.empty());
+    setLayoutBuilders.at(usedSetsFrag.front()).addSingleBinding(descType, VK_SHADER_STAGE_FRAGMENT_BIT);
+
+    for (const auto setNumber : usedSetsAll)
+        setLayouts.at(setNumber).reset(
+            new Move<VkDescriptorSetLayout>(setLayoutBuilders.at(setNumber).build(ctx.vkd, ctx.device)));
+
+    std::vector<VkDescriptorSetLayout> setLayoutHandlesVert(kMaxSets, VK_NULL_HANDLE);
+    std::vector<VkDescriptorSetLayout> setLayoutHandlesFrag(kMaxSets, VK_NULL_HANDLE);
+    std::vector<VkDescriptorSetLayout> setLayoutHandlesAll(kMaxSets, VK_NULL_HANDLE);
+
+    for (const auto setNumber : usedSetsVert)
+        setLayoutHandlesVert.at(setNumber) = setLayouts.at(setNumber)->get();
+
+    for (const auto setNumber : usedSetsFrag)
+        setLayoutHandlesFrag.at(setNumber) = setLayouts.at(setNumber)->get();
+
+    for (const auto setNumber : usedSetsAll)
+        setLayoutHandlesAll.at(setNumber) = setLayouts.at(setNumber)->get();
+
+    const auto trimSetLayoutList = [](std::vector<VkDescriptorSetLayout> &list)
+    {
+        while (!list.empty() && list.back() == VK_NULL_HANDLE)
+            list.pop_back();
+    };
+
+    if (trimList(m_params.nullCase))
+    {
+        trimSetLayoutList(setLayoutHandlesVert);
+        trimSetLayoutList(setLayoutHandlesFrag);
+        trimSetLayoutList(setLayoutHandlesAll);
+    }
+
+    // Create input buffers.
+    using BufferWithMemoryPtr = std::unique_ptr<BufferWithMemory>;
+    std::vector<BufferWithMemoryPtr> inputBuffers;
+    inputBuffers.reserve(kMaxSets);
+    for (uint32_t i = 0u; i < kMaxSets; ++i)
+        inputBuffers.emplace_back(nullptr);
+
+    const auto inputBufferSize = DE_SIZEOF32(uint32_t);
+    const auto inputBufferInfo = makeBufferCreateInfo(inputBufferSize, bufferUsage);
+    for (const auto setNumber : usedSetsAll)
+    {
+        inputBuffers.at(setNumber).reset(
+            new BufferWithMemory(ctx.vkd, ctx.device, ctx.allocator, inputBufferInfo, HostIntent::W));
+        auto &alloc          = inputBuffers.at(setNumber)->getAllocation();
+        const uint32_t value = kValueOffset + setNumber;
+        memcpy(alloc.getHostPtr(), &value, sizeof(value));
+        flushAlloc(ctx.vkd, ctx.device, alloc);
+    }
+
+    // Create output buffer.
+    const auto outputBufferSize = kOutputValueCount * DE_SIZEOF32(uint32_t);
+    const auto outputBufferInfo = makeBufferCreateInfo(outputBufferSize, bufferUsage);
+    BufferWithMemory outputBuffer(ctx.vkd, ctx.device, ctx.allocator, outputBufferInfo, HostIntent::RW);
+    {
+        auto &alloc = outputBuffer.getAllocation();
+        memset(alloc.getHostPtr(), 0, outputBufferSize);
+        flushAlloc(ctx.vkd, ctx.device, alloc);
+    }
+
+    // Descriptor pool.
+    DescriptorPoolBuilder poolBuilder;
+    poolBuilder.addType(descType, kMaxSets); // At least one set is always missing, but we have the output buffer.
+    const auto descPool =
+        poolBuilder.build(ctx.vkd, ctx.device, VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT, kMaxSets);
+
+    // Descriptor sets.
+    using DescriptorSetPtr = std::unique_ptr<Move<VkDescriptorSet>>;
+    std::vector<DescriptorSetPtr> descriptorSets;
+    descriptorSets.reserve(kMaxSets);
+    for (uint32_t i = 0u; i < kMaxSets; ++i)
+        descriptorSets.emplace_back(nullptr);
+
+    for (const auto setNumber : usedSetsAll)
+        descriptorSets.at(setNumber).reset(new Move<VkDescriptorSet>(
+            makeDescriptorSet(ctx.vkd, ctx.device, *descPool, setLayouts.at(setNumber)->get())));
+
+    // Update descriptor sets.
+    DescriptorSetUpdateBuilder updateBuilder;
+    const auto binding = DescriptorSetUpdateBuilder::Location::binding;
+    for (const auto setNumber : usedSetsAll)
+    {
+        const auto bufferDescInfo = makeDescriptorBufferInfo(inputBuffers.at(setNumber)->get(), 0ull, VK_WHOLE_SIZE);
+        updateBuilder.writeSingle(descriptorSets.at(setNumber)->get(), binding(0u), descType, &bufferDescInfo);
+    }
+    {
+        // Update output buffer in the first used set in the frag shader.
+        const auto bufferDescInfo = makeDescriptorBufferInfo(outputBuffer.get(), 0ull, VK_WHOLE_SIZE);
+        updateBuilder.writeSingle(descriptorSets.at(usedSetsFrag.front())->get(), binding(1u), descType,
+                                  &bufferDescInfo);
+    }
+    updateBuilder.update(ctx.vkd, ctx.device);
+
+    // Descriptor set handles.
+    std::vector<VkDescriptorSet> descriptorSetHandlesAll(kMaxSets, VK_NULL_HANDLE);
+    for (const auto setNumber : usedSetsAll)
+        descriptorSetHandlesAll.at(setNumber) = descriptorSets.at(setNumber)->get();
+    if (trimList(m_params.nullCase))
+    {
+        while (!descriptorSetHandlesAll.empty() && descriptorSetHandlesAll.back() == VK_NULL_HANDLE)
+            descriptorSetHandlesAll.pop_back();
+    }
+
+    // Framebuffer.
+    const tcu::IVec3 extent(1, 1, 1);
+    const auto extentVk  = makeExtent3D(extent);
+    const auto format    = VK_FORMAT_R8G8B8A8_UNORM;
+    const auto usage     = (VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+    const auto imageType = VK_IMAGE_TYPE_2D;
+    ImageWithBuffer colorBuffer(ctx.vkd, ctx.device, ctx.allocator, extentVk, format, usage, imageType);
+
+    RenderPassWrapper renderPass(m_params.constructionType, ctx.vkd, ctx.device, format);
+    renderPass.createFramebuffer(ctx.vkd, ctx.device, colorBuffer.getImage(), colorBuffer.getImageView(),
+                                 extentVk.width, extentVk.height);
+
+    // Pipeline.
+    const auto &binaries = m_context.getBinaryCollection();
+    ShaderWrapper vertShader(ctx.vkd, ctx.device, binaries.get("vert"));
+    ShaderWrapper fragShader(ctx.vkd, ctx.device, binaries.get("frag"));
+    GraphicsPipelineWrapper pipeline(ctx.vki, ctx.vkd, ctx.physicalDevice, ctx.device, m_context.getDeviceExtensions(),
+                                     m_params.constructionType);
+
+    const VkPipelineVertexInputStateCreateInfo vertexInputStateCreateInfo = initVulkanStructure();
+
+    const std::vector<VkViewport> viewports(1u, makeViewport(extent));
+    const std::vector<VkRect2D> scissors(1u, makeRect2D(extent));
+
+    PipelineLayoutWrapper preRasterizationPipelineLayout(
+        m_params.constructionType, ctx.vkd, ctx.device, de::sizeU32(setLayoutHandlesVert),
+        de::dataOrNull(setLayoutHandlesVert), 0u, nullptr, libLayoutFlags);
+    PipelineLayoutWrapper fragmentPipelineLayout(m_params.constructionType, ctx.vkd, ctx.device,
+                                                 de::sizeU32(setLayoutHandlesFrag),
+                                                 de::dataOrNull(setLayoutHandlesFrag), 0u, nullptr, libLayoutFlags);
+    PipelineLayoutWrapper linkPipelineLayout(m_params.constructionType, ctx.vkd, ctx.device,
+                                             de::sizeU32(setLayoutHandlesAll), de::dataOrNull(setLayoutHandlesAll), 0u,
+                                             nullptr, linkLayoutFlags);
+
+    pipeline.setDefaultTopology(VK_PRIMITIVE_TOPOLOGY_POINT_LIST)
+        .setDefaultRasterizationState()
+        .setDefaultDepthStencilState()
+        .setDefaultMultisampleState()
+        .setDefaultColorBlendState()
+        .setMonolithicPipelineLayout(linkPipelineLayout)
+        .setupVertexInputState(&vertexInputStateCreateInfo)
+        .setupPreRasterizationShaderState(viewports, scissors, preRasterizationPipelineLayout, renderPass.get(), 0u,
+                                          vertShader)
+        .setupFragmentShaderState(fragmentPipelineLayout, renderPass.get(), 0u, fragShader)
+        .setupFragmentOutputState(renderPass.get(), 0u)
+        .buildPipeline();
+
+    CommandPoolWithBuffer cmd(ctx.vkd, ctx.device, ctx.qfIndex);
+    const auto cmdBuffer = *cmd.cmdBuffer;
+
+    beginCommandBuffer(ctx.vkd, cmdBuffer);
+    renderPass.begin(ctx.vkd, cmdBuffer, scissors.at(0u), tcu::Vec4(0.0f, 0.0f, 0.0f, 1.0f));
+    ctx.vkd.cmdBindDescriptorSets(cmdBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, linkPipelineLayout.get(), 0u,
+                                  de::sizeU32(descriptorSetHandlesAll), de::dataOrNull(descriptorSetHandlesAll), 0u,
+                                  nullptr);
+    pipeline.bind(cmdBuffer);
+    ctx.vkd.cmdDraw(cmdBuffer, 1u, 1u, 0u, 0u);
+    renderPass.end(ctx.vkd, cmdBuffer);
+    {
+        // Output buffer barrier.
+        const auto barrier = makeMemoryBarrier(VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_HOST_READ_BIT);
+        cmdPipelineMemoryBarrier(ctx.vkd, cmdBuffer, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, VK_PIPELINE_STAGE_HOST_BIT,
+                                 &barrier);
+    }
+    copyImageToBuffer(ctx.vkd, cmdBuffer, colorBuffer.getImage(), colorBuffer.getBuffer(), extent.swizzle(0, 1));
+    endCommandBuffer(ctx.vkd, cmdBuffer);
+    submitCommandsAndWait(ctx.vkd, ctx.device, ctx.queue, cmdBuffer);
+
+    // Check color buffer (just in case).
+    const auto tcuFormat = mapVkFormat(format);
+    tcu::TextureLevel refLevel(tcuFormat, extent.x(), extent.y(), extent.z());
+    tcu::PixelBufferAccess refAccess = refLevel.getAccess();
+    tcu::clear(refAccess, tcu::Vec4(0.0, 0.0f, 1.0f, 1.0f)); // Must match frag shader.
+
+    invalidateAlloc(ctx.vkd, ctx.device, colorBuffer.getBufferAllocation());
+    tcu::ConstPixelBufferAccess resAccess(tcuFormat, extent, colorBuffer.getBufferAllocation().getHostPtr());
+
+    auto &log = m_context.getTestContext().getLog();
+    const tcu::Vec4 threshold(0.0f, 0.0f, 0.0f, 0.0f);
+
+    if (!tcu::floatThresholdCompare(log, "Result", "", refAccess, resAccess, threshold, COMPARE_LOG_ON_ERROR))
+        TCU_FAIL("Unexpected results in color buffer; check log for details --");
+
+    // Check output buffer, which is the main result.
+    std::vector<uint32_t> bufferResult(kOutputValueCount, 0u);
+    std::vector<uint32_t> bufferReference(kOutputValueCount, 0u);
+
+    invalidateAlloc(ctx.vkd, ctx.device, outputBuffer.getAllocation());
+    memcpy(bufferResult.data(), outputBuffer.getAllocation().getHostPtr(), de::dataSize(bufferResult));
+
+    const auto kVertValueOffset = AlwaysNullSetLayoutParams::kVertValueOffset;
+    const auto kFragValueOffset = AlwaysNullSetLayoutParams::kFragValueOffset;
+
+    for (const auto setNumber : usedSetsVert)
+        bufferReference.at(setNumber) = setNumber + kValueOffset + kVertValueOffset;
+
+    for (const auto setNumber : usedSetsFrag)
+        bufferReference.at(setNumber + kMaxSets) = setNumber + kValueOffset + kFragValueOffset;
+
+    bool fail = false;
+    for (uint32_t i = 0u; i < kOutputValueCount; ++i)
+    {
+        const auto &ref = bufferReference.at(i);
+        const auto &res = bufferResult.at(i);
+
+        if (ref != res)
+        {
+            std::ostringstream msg;
+            msg << "Unexpected value in output buffer position " << i << ": expected " << ref << " but found " << res;
+            log << tcu::TestLog::Message << msg.str() << tcu::TestLog::EndMessage;
+            fail = true;
+        }
+    }
+
+    if (fail)
+        TCU_FAIL("Unexpected values found in output buffer; check log for details --");
+
+    return tcu::TestStatus::pass("Pass");
+}
+
 } // namespace
 
 tcu::TestCaseGroup *createPipelineLibraryTests(tcu::TestContext &testCtx)
@@ -4985,6 +5746,8 @@ tcu::TestCaseGroup *createPipelineLibraryTests(tcu::TestContext &testCtx)
 
         otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "unusual_multisample_state",
                                                              {MiscTestMode::UNUSUAL_MULTISAMPLE_STATE, 0u, 0u}));
+        otherTests->addChild(new PipelineLibraryMiscTestCase(
+            testCtx, "transform_feedback_with_fast_link", {MiscTestMode::TRANSFORM_FEEDBACK_WITH_FAST_LINK, 0u, 0u}));
 
         otherTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "destroy_resources_before_link_samplers_2",
                                                              {MiscTestMode::DESTROY_RESOURCES_BEFORE_LINK, 2u}));
@@ -5003,6 +5766,73 @@ tcu::TestCaseGroup *createPipelineLibraryTests(tcu::TestContext &testCtx)
         nonGraphicsTests->addChild(new PipelineLibraryMiscTestCase(testCtx, "shader_module_info_rt_lib",
                                                                    {MiscTestMode::SHADER_MODULE_CREATE_INFO_RT_LIB}));
         miscTests->addChild(nonGraphicsTests.release());
+    }
+
+    // Test cases with descriptor set layouts that are always VK_NULL_HANDLE.
+    {
+        de::MovePtr<tcu::TestCaseGroup> anslGroup(new tcu::TestCaseGroup(testCtx, "always_null_set_layout"));
+        struct
+        {
+            CommonNullCase nullCase;
+            const char *name;
+        } CommonNullCases[] = {
+            {CommonNullCase::ONE_USED, "used"},
+            {CommonNullCase::ONE_USED_TRIM, "used_trim"},
+            {CommonNullCase::ONE_UNUSED, "unused"},
+        };
+
+        struct
+        {
+            PipelineConstructionType constructionType;
+            const char *name;
+        } ConstructionTypeCases[] = {
+            {PipelineConstructionType::PIPELINE_CONSTRUCTION_TYPE_FAST_LINKED_LIBRARY, "fast_lib"},
+            {PipelineConstructionType::PIPELINE_CONSTRUCTION_TYPE_LINK_TIME_OPTIMIZED_LIBRARY, "optimized_lib"},
+        };
+
+        // Cases with the same sets used in vertex and fragment.
+        for (const auto &commonNullCase : CommonNullCases)
+            for (uint32_t i = 0u; i < AlwaysNullSetLayoutParams::kMaxSets; ++i)
+            {
+                // This would produce no gaps.
+                if (trimList(commonNullCase.nullCase) && i == 0u)
+                    continue;
+
+                for (const auto &constructionTypeCase : ConstructionTypeCases)
+                {
+                    const AlwaysNullSetLayoutParams params{
+                        constructionTypeCase.constructionType,
+                        commonNullCase.nullCase,
+                        i,
+                        tcu::Nothing,
+                    };
+                    const std::string testName =
+                        "set_" + std::to_string(i) + "_" + commonNullCase.name + "_" + constructionTypeCase.name;
+                    anslGroup->addChild(new AlwaysNullSetLayoutCase(testCtx, testName, params));
+                }
+            }
+
+        // Cases with two different sets used in vertex and fragment.
+        for (uint32_t i = 0u; i < AlwaysNullSetLayoutParams::kMaxSets; ++i)
+            for (uint32_t j = 0u; j < AlwaysNullSetLayoutParams::kMaxSets; ++j)
+                for (const auto &constructionTypeCase : ConstructionTypeCases)
+                {
+                    // Same set or no gaps: not interesting.
+                    if (i == j || (i == 0u && j == 1u))
+                        continue;
+
+                    const AlwaysNullSetLayoutParams params{
+                        constructionTypeCase.constructionType,
+                        CommonNullCase::TWO_USED_TRIM,
+                        i,
+                        tcu::just(j),
+                    };
+                    const std::string testName =
+                        "sets_" + std::to_string(i) + "_" + std::to_string(j) + "_used_" + constructionTypeCase.name;
+                    anslGroup->addChild(new AlwaysNullSetLayoutCase(testCtx, testName, params));
+                }
+
+        miscTests->addChild(anslGroup.release());
     }
 
     group->addChild(miscTests.release());

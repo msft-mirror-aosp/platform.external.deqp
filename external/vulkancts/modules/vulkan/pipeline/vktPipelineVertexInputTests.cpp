@@ -26,6 +26,7 @@
 
 #include "vktPipelineVertexInputTests.hpp"
 #include "vktPipelineLegacyAttrTests.hpp"
+#include "vktPipelineVertexInputSRGBTests.hpp"
 #include "vktTestGroupUtil.hpp"
 #include "vktPipelineClearUtil.hpp"
 #include "vktPipelineImageUtil.hpp"
@@ -2197,6 +2198,37 @@ void createMaxAttributeTests(tcu::TestCaseGroup *maxAttributeTests, PipelineCons
     }
 }
 
+void createComponentMismatchTests(tcu::TestCaseGroup *componentMismatchTests,
+                                  PipelineConstructionType pipelineConstructionType)
+{
+    const struct
+    {
+        VkFormat format;
+        VertexInputTest::GlslType glslType;
+        const char *name;
+    } testCases[] = {
+        {VK_FORMAT_R64G64_SFLOAT, VertexInputTest::GLSL_TYPE_DOUBLE, "r64g64_to_double"},
+        {VK_FORMAT_R64G64B64_SFLOAT, VertexInputTest::GLSL_TYPE_DOUBLE, "r64g64b64_to_double"},
+        {VK_FORMAT_R64G64B64_SFLOAT, VertexInputTest::GLSL_TYPE_DVEC2, "r64g64b64_to_dvec2"},
+        {VK_FORMAT_R64G64B64A64_SFLOAT, VertexInputTest::GLSL_TYPE_DOUBLE, "r64g64b64a64_to_double"},
+        {VK_FORMAT_R64G64B64A64_SFLOAT, VertexInputTest::GLSL_TYPE_DVEC2, "r64g64b64a64_to_dvec2"},
+        {VK_FORMAT_R64G64B64A64_SFLOAT, VertexInputTest::GLSL_TYPE_DVEC3, "r64g64b64a64_to_dvec3"},
+    };
+
+    for (const auto &testCase : testCases)
+    {
+        VertexInputTest::AttributeInfo attributeInfo;
+        attributeInfo.vkType    = testCase.format;
+        attributeInfo.glslType  = testCase.glslType;
+        attributeInfo.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        componentMismatchTests->addChild(new VertexInputTest(
+            componentMismatchTests->getTestContext(), testCase.name, pipelineConstructionType,
+            std::vector<VertexInputTest::AttributeInfo>(1, attributeInfo), VertexInputTest::BINDING_MAPPING_ONE_TO_ONE,
+            VertexInputTest::ATTRIBUTE_LAYOUT_INTERLEAVED));
+    }
+}
+
 // The goal of the stride change tests are checking a sequence like the following one:
 //
 // CmdBindVertexBuffers()
@@ -2790,6 +2822,7 @@ struct Params
 {
     PipelineConstructionType constructionType;
     bool dynamicInputs;
+    bool integerInput;
 };
 
 void checkSupport(Context &context, Params params)
@@ -2803,16 +2836,17 @@ void checkSupport(Context &context, Params params)
     context.requireDeviceFunctionality("VK_KHR_maintenance9");
 }
 
-void initPrograms(SourceCollections &programCollection, Params)
+void initPrograms(SourceCollections &programCollection, Params params)
 {
     std::ostringstream vert;
     vert << "#version 460\n"
          << "layout (location=0) in vec4 inPos;\n"
-         << "layout (location=1) in vec4 inColor;\n"
+         << "layout (location=1) in " << (params.integerInput ? "i" : "") << "vec4 inColor;\n"
          << "layout (location=0) out vec4 outColor;\n"
          << "void main (void) {\n"
          << "    gl_Position = inPos;\n"
-         << "    outColor = inColor;\n"
+         << "    outColor = " << (params.integerInput ? "vec4(" : "") << "inColor" << (params.integerInput ? ")" : "")
+         << ";\n"
          << "}\n";
     programCollection.glslSources.add("vert") << glu::VertexSource(vert.str());
 
@@ -3043,10 +3077,14 @@ void createMiscVertexInputTests(tcu::TestCaseGroup *miscTests, PipelineConstruct
             addFunctionCaseWithPrograms(miscTests, unusedBindingTestName, UnusedBinding::checkSupport,
                                         UnusedBinding::initPrograms, UnusedBinding::runTest, unusedBindingParams);
 #ifndef CTS_USES_VULKANSC
-            const auto unboundInputTestName = std::string("unbound_input") + (dynamic ? "_dynamic" : "");
-            const UnboundInput::Params unboundInputParams{pipelineConstructionType, dynamic};
-            addFunctionCaseWithPrograms(miscTests, unboundInputTestName, UnboundInput::checkSupport,
-                                        UnboundInput::initPrograms, UnboundInput::runTest, unboundInputParams);
+            for (const auto integerInput : {false, true})
+            {
+                const auto unboundInputTestName =
+                    std::string("unbound_input") + (dynamic ? "_dynamic" : "") + (integerInput ? "_integer" : "");
+                const UnboundInput::Params unboundInputParams{pipelineConstructionType, dynamic, integerInput};
+                addFunctionCaseWithPrograms(miscTests, unboundInputTestName, UnboundInput::checkSupport,
+                                            UnboundInput::initPrograms, UnboundInput::runTest, unboundInputParams);
+            }
 #endif
         }
     }
@@ -3062,7 +3100,8 @@ void createVertexInputTests(tcu::TestCaseGroup *vertexInputTests, PipelineConstr
     addTestGroup(vertexInputTests, "multiple_attributes", createMultipleAttributeTests, pipelineConstructionType);
     // Implementations can use as many vertex input attributes as they advertise
     addTestGroup(vertexInputTests, "max_attributes", createMaxAttributeTests, pipelineConstructionType);
-
+    // Uses formats that has more components than shader expects (legal for 64-bit)
+    addTestGroup(vertexInputTests, "component_mismatch", createComponentMismatchTests, pipelineConstructionType);
     // Miscellaneous tests.
     addTestGroup(vertexInputTests, "misc", createMiscVertexInputTests, pipelineConstructionType);
 
@@ -3073,6 +3112,9 @@ void createVertexInputTests(tcu::TestCaseGroup *vertexInputTests, PipelineConstr
         addTestGroup(vertexInputTests, "legacy_vertex_attributes", createLegacyVertexAttributesTests,
                      pipelineConstructionType);
     }
+
+    auto &testCtx = vertexInputTests->getTestContext();
+    vertexInputTests->addChild(createVertexInputSRGBTests(testCtx, pipelineConstructionType));
 }
 
 } // namespace pipeline
