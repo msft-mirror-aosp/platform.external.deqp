@@ -88,6 +88,10 @@ CustomInstance createInstanceWithWsi(Context &context, const Extensions &support
     if (isDisplaySurface(wsiType))
         extensions.push_back("VK_KHR_display");
 
+    // VUID-VkSwapchainCreateInfoKHR-imageColorSpace-parameter
+    if (isExtensionStructSupported(supportedExtensions, vk::RequiredExtension("VK_EXT_swapchain_colorspace")))
+        extensions.push_back("VK_EXT_swapchain_colorspace");
+
     checkAllSupported(supportedExtensions, extensions);
 
     return vkt::createCustomInstanceWithExtensions(context, extensions);
@@ -111,7 +115,15 @@ vk::Move<vk::VkDevice> createDeviceWithWsi(const vk::PlatformInterface &vkp, vk:
                                                        (vk::VkDeviceQueueCreateFlags)0, queueFamilyIndex,
                                                        DE_LENGTH_OF_ARRAY(queuePriorities), &queuePriorities[0]}};
     const vk::VkPhysicalDeviceFeatures features    = getDeviceNullFeatures();
-    const char *const extensions[]                 = {"VK_KHR_swapchain", "VK_KHR_incremental_present"};
+
+    std::vector<const char *> extensions;
+    extensions.push_back("VK_KHR_swapchain");
+    if (requiresIncrementalPresent)
+        extensions.push_back("VK_KHR_incremental_present");
+
+    // VUID-VkSwapchainCreateInfoKHR-imageColorSpace-parameter
+    if (isExtensionStructSupported(supportedExtensions, vk::RequiredExtension("VK_EXT_swapchain_colorspace")))
+        extensions.push_back("VK_EXT_swapchain_colorspace");
 
     const vk::VkDeviceCreateInfo deviceParams = {vk::VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
                                                  nullptr,
@@ -120,11 +132,11 @@ vk::Move<vk::VkDevice> createDeviceWithWsi(const vk::PlatformInterface &vkp, vk:
                                                  &queueInfos[0],
                                                  0u,
                                                  nullptr,
-                                                 requiresIncrementalPresent ? 2u : 1u,
-                                                 DE_ARRAY_BEGIN(extensions),
+                                                 static_cast<uint32_t>(extensions.size()),
+                                                 extensions.data(),
                                                  &features};
 
-    for (int ndx = 0; ndx < DE_LENGTH_OF_ARRAY(extensions); ++ndx)
+    for (size_t ndx = 0; ndx < extensions.size(); ++ndx)
     {
         if (!isExtensionStructSupported(supportedExtensions, vk::RequiredExtension(extensions[ndx])))
             TCU_THROW(NotSupportedError, (string(extensions[ndx]) + " is not supported").c_str());
@@ -501,6 +513,7 @@ private:
     const CustomInstance m_instance;
     const vk::InstanceDriver &m_vki;
     const vk::VkPhysicalDevice m_physicalDevice;
+    const vk::wsi::Type m_wsiType;
     const de::UniquePtr<vk::wsi::Display> m_nativeDisplay;
     const de::UniquePtr<vk::wsi::Window> m_nativeWindow;
     const vk::Unique<vk::VkSurfaceKHR> m_surface;
@@ -674,6 +687,7 @@ IncrementalPresentTestInstance::IncrementalPresentTestInstance(Context &context,
     , m_instance(createInstanceWithWsi(context, m_instanceExtensions, testConfig.wsiType))
     , m_vki(m_instance.getDriver())
     , m_physicalDevice(vk::chooseDevice(m_vki, m_instance, context.getTestContext().getCommandLine()))
+    , m_wsiType(testConfig.wsiType)
     , m_nativeDisplay(createDisplay(context.getTestContext().getPlatform().getVulkanPlatform(), m_instanceExtensions,
                                     testConfig.wsiType))
     , m_nativeWindow(createWindow(*m_nativeDisplay, tcu::Nothing))
@@ -731,7 +745,7 @@ void IncrementalPresentTestInstance::initSwapchainResources(void)
     const uint32_t imageHeight     = m_swapchainConfigs[m_swapchainConfigNdx].imageExtent.height;
     const vk::VkFormat imageFormat = m_swapchainConfigs[m_swapchainConfigNdx].imageFormat;
 
-    m_swapchain       = vk::createSwapchainKHR(m_vkd, *m_device, &m_swapchainConfigs[m_swapchainConfigNdx]);
+    m_swapchain       = createWsiSwapchain(m_wsiType, m_vkd, *m_device, &m_swapchainConfigs[m_swapchainConfigNdx]);
     m_swapchainImages = vk::wsi::getSwapchainImages(m_vkd, *m_device, *m_swapchain);
 
     m_imageNextFrames.resize(m_swapchainImages.size(), 0);
@@ -797,10 +811,12 @@ void IncrementalPresentTestInstance::deinitSwapchainResources(void)
 
 void IncrementalPresentTestInstance::render(void)
 {
-    const uint64_t foreverNs = 0xFFFFFFFFFFFFFFFFul;
-    const vk::VkFence fence  = m_fences[m_frameNdx % m_fences.size()];
-    const uint32_t width     = m_swapchainConfigs[m_swapchainConfigNdx].imageExtent.width;
-    const uint32_t height    = m_swapchainConfigs[m_swapchainConfigNdx].imageExtent.height;
+    // VUID-vkAcquireNextImageKHR-surface-07783
+    const uint64_t kAcquireImageTimeout = 10000000000ul;
+    const uint64_t foreverNs            = 0xFFFFFFFFFFFFFFFFul;
+    const vk::VkFence fence             = m_fences[m_frameNdx % m_fences.size()];
+    const uint32_t width                = m_swapchainConfigs[m_swapchainConfigNdx].imageExtent.width;
+    const uint32_t height               = m_swapchainConfigs[m_swapchainConfigNdx].imageExtent.height;
     size_t imageNextFrame;
 
     // Throttle execution
@@ -819,8 +835,8 @@ void IncrementalPresentTestInstance::render(void)
     uint32_t imageIndex;
 
     // Acquire next image
-    VK_CHECK_WSI(m_vkd.acquireNextImageKHR(*m_device, *m_swapchain, foreverNs, currentAcquireSemaphore, VK_NULL_HANDLE,
-                                           &imageIndex));
+    VK_CHECK_WSI(m_vkd.acquireNextImageKHR(*m_device, *m_swapchain, kAcquireImageTimeout, currentAcquireSemaphore,
+                                           VK_NULL_HANDLE, &imageIndex));
 
     // Create command buffer
     {

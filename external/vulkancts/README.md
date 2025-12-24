@@ -20,6 +20,9 @@ The following tools must be installed and present in the PATH variable:
  * Git (for checking out sources)
  * Python 3.x (for the build related scripts, some other scripts still use Python 2.7.x)
  * CMake 3.20.0 or newer
+ * The `lxml` Python module.
+     * It can be installed using `pip` with `python3 -m pip install lxml`.
+     * On Linux, many distributions already package the module as `python3-lxml`.
 
 ### Win32
 
@@ -28,9 +31,21 @@ The following tools must be installed and present in the PATH variable:
 ### Linux
 
  * Standard toolchain (make, gcc/clang)
- * If you have X11 installed, then the build assumes you also have the `GL/glx.h` header
-   file.
-    * You can get this from the `mesa-common-dev` Ubuntu package.
+     * For Ubuntu, the `build-essential` package will provide most tools.
+     * For Fedora, `dnf group install development-tools` and the `g++` package
+       will cover the basics.
+ * If you want to use Ninja as the CMake backend, you will need the
+   `ninja-build` package.
+ * If you have X11 installed, then the build assumes you also have the
+   `GL/glx.h` header file.
+    * You can get this from the `mesa-common-devl` Ubuntu package.
+    * For Fedora, this is provided by the `libglvnd-devel` package.
+ * If you prefer to use the `wayland` dEQP target (`-DDEQP_TARGET=wayland` with
+   CMake) you will need some Wayland development packages.
+    * On most distributions, installing the Mesa build dependencies is a good
+      way to get all the required packages.
+       * For Fedora, `dnf builddep mesa` can be used.
+       * For Ubuntu, `apt-get build-dep mesa` can be used.
 
 ### MacOS
 
@@ -55,19 +70,16 @@ you can install the necessary components by running:
 Building CTS
 ------------
 
-To build dEQP, you need first to download sources for zlib, libpng, jsoncpp, glslang,
-vulkan-docs, spirv-headers, and spirv-tools.
+To build dEQP, you need first to download sources for zlib, libpng, jsoncpp,
+glslang, vulkan-docs, spirv-tools and others.
 
 To download sources, run:
 
 	python3 external/fetch_sources.py
 
-You may need to re-run `fetch_sources.py` to update to the latest glslang,
-vulkan-docs and spirv-tools revisions occasionally.
-
-You also need to install lxml python module by running:
-
-	python3 -m pip install lxml
+The required versions of external sources may change from time to time, so you
+should run `fetch_sources.py` when switching branches or pulling changes to make
+sure you have the right versions.
 
 With CMake out-of-source builds are always recommended. Create a build directory
 of your choosing, and in that directory generate Makefiles or IDE project
@@ -116,6 +128,14 @@ If building for 32-bit x86 with GCC, you probably also want to add `-msse2
 
 ### Android
 
+There's two types of builds for Android:
+
+#### App
+
+This builds an APK that needs to be invoked via `adb shell` and the output needs
+to be read via `adb logcat`, it's the preferred way for long-running invocations
+on Android since it doesn't depend on an active connection from the host PC.
+
 Following command will build dEQP.apk:
 
 	python3 scripts/android/build_apk.py --sdk <path to Android SDK> --ndk <path to Android NDK>
@@ -135,6 +155,31 @@ To pick which ABI to use at _install time_, use the following command instead:
 
 	adb install -g --abi <ABI name> <build-root>/package/dEQP.apk
 
+#### Executable
+
+This is identical to the builds on other platforms and is better for iterative
+runs of headless tests as CTS can be invoked and the output can be checked from
+a single interactive terminal.
+
+This build doesn't support WSI tests and shouldn't be used for conformance
+submissions, it also isn't recommended for longer running tests since Android
+will terminate this process as soon as the `adb shell` session ends which may
+happen due to an unintentional device disconnection.
+
+	cmake <path to vulkancts> -GNinja -DCMAKE_BUILD_TYPE=Debug \
+	      -DCMAKE_TOOLCHAIN_FILE=<NDK path>/build/cmake/android.toolchain.cmake \
+	      -DCMAKE_ANDROID_NDK=<NDK path> -DANDROID_ABI=<ABI to build eg: arm64-v8a> \
+	      -DDE_ANDROID_API=<API level> -DDEQP_TARGET_TOOLCHAIN=ndk-modern \
+	      -DDEQP_TARGET=android -DDEQP_ANDROID_EXE=ON
+	ninja all
+
+Optionally, `-DDEQP_ANDROID_EXE_LOGCAT=ON` can be added to also enable printing
+the test output to Android's logcat in addition to the terminal.
+
+The build needs to be transferred to the device via `adb push` to a directory
+under `/data/` on the device, such as `/data/local/tmp/` which should be writeable
+for non-rooted devices. It should be noted that anywhere on `/sdcard/` won't work
+since it's mounted as `noexec`.
 
 ### Note on Debug Build Link Times
 
@@ -365,6 +410,8 @@ Test log will be written into TestResults.qpa
 
 ### Android
 
+#### App
+
 For Android build using SDK 29 or greater, it is recommended to use `/sdcard/Documents/` instead of `/sdcard/` due to scoped storage.
 
 	adb push <vulkancts>/external/vulkancts/mustpass/main/vk-default.txt /sdcard/vk-default.txt
@@ -380,6 +427,13 @@ Test progress will be written to device log and can be displayed with:
 
 Test log will be written into `/sdcard/TestResults.qpa`.
 
+#### Executable
+
+Identical to [Linux](#linux-1), but within `adb shell` instead:
+
+	adb shell
+	> cd <pushed build directory>/external/vulkancts/modules/vulkan
+	> ./deqp-vk --deqp-caselist-file=...
 
 Conformance Submission Package Requirements
 -------------------------------------------
@@ -758,7 +812,7 @@ OpenGL and OpenCL parameters not affecting Vulkan API were suppressed.
     Suppress messages to standard output
 
   -n, --deqp-case=<value>
-    Test case(s) to run, supports wildcards (e.g. dEQP-GLES2.info.*)
+    Test case(s) to run, supports wildcards (e.g. dEQP-GLES2.info.*) and commas to separate multiple patterns
 
   --deqp-caselist=<value>
     Case list to run in trie format (e.g. {dEQP-GLES2{info{version,renderer}}})
