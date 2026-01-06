@@ -219,6 +219,13 @@ public class DeqpTestRunner
             + "'all' enforces all dEQP tests to run")
     private String mForceDeqpLevel = "";
 
+    @Option(
+        name = "run-specific-deqp-level",
+        description =
+            "Run dEQP for a specific level instead of device dEQP level. ")
+    private String mRunSpecificDeqpLevel = "";
+
+
     protected Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances =
         null;
@@ -1916,6 +1923,22 @@ public class DeqpTestRunner
 
         CLog.d("Minimum level required to run this caselist is %d",
                minimumLevel);
+
+        if (!mRunSpecificDeqpLevel.isEmpty()) {
+            CLog.d("The specific year chosen for run is %s",mRunSpecificDeqpLevel);
+            int forcedDepqLevel;
+            try {
+                forcedDepqLevel = Integer.parseInt(mRunSpecificDeqpLevel);
+                CLog.d("%d forced as deqp level", forcedDepqLevel);
+            } catch (NumberFormatException e) {
+                throw new AssertionError(
+                    "Deqp Level is not an acceptable numeric value");
+            }
+
+            final boolean shouldRunCaselist = forcedDepqLevel == year;
+            CLog.d("Running caselist for that specific year? %b", shouldRunCaselist);
+            return shouldRunCaselist;
+        }
 
         if (!mForceDeqpLevel.isEmpty()) {
             int forcedDepqLevel;
