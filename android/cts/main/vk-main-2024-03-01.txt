@@ -13,9 +13,7 @@ vk-main-2024-03-01/glsl.txt
 vk-main-2024-03-01/image/host-image-copy.txt
 vk-main-2024-03-01/image/load-store.txt
 vk-main-2024-03-01/image/subresource-layout.txt
-vk-main-2024-03-01/image/swapchain-mutable.txt
 vk-main-2024-03-01/image/texel-view-compatible.txt
-vk-main-2024-03-01/image-processing.txt
 vk-main-2024-03-01/memory.txt
 vk-main-2024-03-01/mesh-shader.txt
 vk-main-2024-03-01/multiview.txt
@@ -41,7 +39,6 @@ vk-main-2024-03-01/shader-object/link.txt
 vk-main-2024-03-01/shader-object/misc.txt
 vk-main-2024-03-01/shader-object/pipeline-interaction.txt
 vk-main-2024-03-01/shader-object/rendering.txt
-vk-main-2024-03-01/shader-object/tessellation.txt
 vk-main-2024-03-01/sparse-resources.txt
 vk-main-2024-03-01/spirv-assembly.txt
 vk-main-2024-03-01/ssbo.txt
