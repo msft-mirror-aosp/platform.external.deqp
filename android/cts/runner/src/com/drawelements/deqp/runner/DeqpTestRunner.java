@@ -71,6 +71,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -225,6 +226,12 @@ public class DeqpTestRunner
             "Run dEQP for a specific level instead of device dEQP level. ")
     private String mRunSpecificDeqpLevel = "";
 
+    @Option(
+        name = "deqp-tests-count-only",
+        description =
+            "Showing only the count of number of test cases ")
+    private boolean mDeqpTestsCountOnly = false;
+
 
     protected Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances =
@@ -241,6 +248,7 @@ public class DeqpTestRunner
     protected IRunUtil mRunUtil = RunUtil.getDefault();
     private Set<String> mIncrementalDeqpIncludeTests = new HashSet<>();
     protected long mTimeOfLastRun = 0;
+    private static AtomicInteger totalCountOfDeqpTests = new AtomicInteger(0);
 
     protected IRecovery mDeviceRecovery = new Recovery();
     { mDeviceRecovery.setSleepProvider(new SleepProvider()); }
@@ -2445,6 +2453,11 @@ public class DeqpTestRunner
             }
         }
         CLog.i("Num tests after filtering: %d", mTestInstances.size());
+        if(mDeqpTestsCountOnly)
+        {
+            totalCountOfDeqpTests.getAndAdd(mTestInstances.size());
+            CLog.w("Number of deqp tests cases for this file %s is %d and the total aggregated count is %d",mCaselistFile, mTestInstances.size(), totalCountOfDeqpTests.get());
+        }
     }
 
     /**
@@ -2519,6 +2532,12 @@ public class DeqpTestRunner
         // If sharded, split() will load the tests.
         if (mTestInstances == null) {
             loadTests();
+        }
+
+        if(mDeqpTestsCountOnly)
+        {
+            CLog.d("Only counting the test cases");
+            return ;
         }
 
         mRemainingTests = new HashSet<>();
