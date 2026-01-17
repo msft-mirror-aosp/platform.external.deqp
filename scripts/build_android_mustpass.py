@@ -427,7 +427,7 @@ MAIN_VULKAN_PKG = Package(module = VULKAN_MODULE, configurations = [
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2023-03-01",
-                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt")],
+                      filters = MAIN_VULKAN_FILTERS + [include("vk-main-2023-03-01.txt")],
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2024-03-01",
@@ -440,7 +440,7 @@ MAIN_VULKAN_PKG = Package(module = VULKAN_MODULE, configurations = [
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2026-03-01",
                       # Move LATEST_MAIN_LIST to the newest/latest Configuration.
-                      filters = LATEST_MAIN_LIST + MAIN_VULKAN_FILTERS + [exclude("vk-main-2019-03-01.txt", "vk-main-2020-03-01.txt", "vk-main-2021-03-01.txt", "vk-main-2022-03-01.txt", "vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt", "vk-main-2024-03-01.txt", "vk-main-2025-03-01.txt")],
+                      filters = LATEST_MAIN_LIST + MAIN_VULKAN_FILTERS + [exclude("vk-main-2019-03-01.txt", "vk-main-2020-03-01.txt", "vk-main-2021-03-01.txt", "vk-main-2022-03-01.txt", "vk-main-2023-03-01.txt", "vk-main-2024-03-01.txt", "vk-main-2025-03-01.txt")],
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "incremental-deqp",
