@@ -35,6 +35,7 @@ vk-main-2025-03-01/query-pool.txt
 vk-main-2025-03-01/rasterization.txt
 vk-main-2025-03-01/ray-query.txt
 vk-main-2025-03-01/ray-tracing-pipeline.txt
+vk-main-2025-03-01/renderpasses.txt
 vk-main-2025-03-01/shader-object/binding.txt
 vk-main-2025-03-01/shader-object/link.txt
 vk-main-2025-03-01/shader-object/misc.txt
