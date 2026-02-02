@@ -111,7 +111,7 @@ public class DeqpTestRunner
 
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
-        15 * 60 * 1000; // 10min
+        10 * 60 * 1000; // 10min
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
 
