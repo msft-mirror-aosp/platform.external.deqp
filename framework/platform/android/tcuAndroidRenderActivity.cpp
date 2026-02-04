@@ -135,6 +135,15 @@ void RenderThread::processMessage(const Message &message)
         m_paused = false;
         break;
     case MESSAGE_PAUSE:
+#if defined(ENABLE_MULTI_WINDOW_PARALLEL)
+/**
+ * In standard android env, an activity might be paused if it loses focus. For parallel windows,
+ * we want these windows to continue rendering and executing tests regardless of the system's
+ * focus status.
+ */
+        if (m_activity.isMultiParallelWindow())
+            break;
+#endif
         m_paused = true;
         break;
     case MESSAGE_FINISH:

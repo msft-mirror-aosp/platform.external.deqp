@@ -69,12 +69,18 @@ public:
         return m_activity;
     }
     void finish(void);
-
+#if defined(ENABLE_MULTI_WINDOW_PARALLEL)
+    bool isMultiParallelWindow (void) const {return m_multiParallelWindow;}
+#endif
 private:
     NativeActivity(const NativeActivity &other);
     NativeActivity &operator=(const NativeActivity &other);
 
     ANativeActivity *m_activity;
+#if defined(ENABLE_MULTI_WINDOW_PARALLEL)
+    bool setWindowParams (void);
+    bool m_multiParallelWindow = false;
+#endif
 };
 
 } // namespace Android
