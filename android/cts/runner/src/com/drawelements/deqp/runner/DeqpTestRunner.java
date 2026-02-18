@@ -112,7 +112,7 @@ public class DeqpTestRunner
 
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
-        15 * 60 * 1000; // 10min
+        10 * 60 * 1000; // 10min
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
 
@@ -247,7 +247,6 @@ public class DeqpTestRunner
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
     protected IRunUtil mRunUtil = RunUtil.getDefault();
     private Set<String> mIncrementalDeqpIncludeTests = new HashSet<>();
-    protected long mTimeOfLastRun = 0;
     private static AtomicInteger totalCountOfDeqpTests = new AtomicInteger(0);
 
     protected IRecovery mDeviceRecovery = new Recovery();
@@ -1607,19 +1606,12 @@ public class DeqpTestRunner
         final int numRemainingInstancesBefore = getNumRemainingInstances();
         Throwable interruptingError = null;
 
-        // Fix the requirement of sleep() between batches
-        long duration = System.currentTimeMillis() - mTimeOfLastRun;
-        if (duration < 5000) {
-            CLog.i("Sleeping for %dms", 5000 - duration);
-            mRunUtil.sleep(5000 - duration);
-        }
 
         try {
             executeShellCommandAndReadOutput(runCommand, parser);
         } catch (Throwable ex) {
             interruptingError = ex;
         } finally {
-            mTimeOfLastRun = System.currentTimeMillis();
             parser.flush();
         }
 
