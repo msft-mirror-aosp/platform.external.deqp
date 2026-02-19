@@ -209,6 +209,8 @@ cc_defaults {
         "-Wno-switch",
         "-Wno-unused-parameter",
         "-Wno-unused-variable",
+        // Disabled as part of ongoing development for multi-window parallel execution support.
+        //"-DENABLE_MULTI_WINDOW_PARALLEL",
     ],
 }
 
