@@ -139,6 +139,8 @@ if (NOT DEFINED TCUTIL_PLATFORM_SRCS)
 
 		if (DE_ANDROID_API GREATER 8)
 			# Add NativeActivity code
+			# Disabled as part of ongoing development for multi-window parallel execution support.
+			#add_definitions(-DENABLE_MULTI_WINDOW_PARALLEL=1)
 			set(TCUTIL_PLATFORM_SRCS
 				${TCUTIL_PLATFORM_SRCS}
 				android/tcuAndroidAssets.cpp
