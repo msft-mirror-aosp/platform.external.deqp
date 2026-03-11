@@ -186,6 +186,10 @@ public class DeqpTestRunner
             "Load list of includes from the files given for incremental dEQP.")
     private List<String> mIncrementalDeqpIncludeFiles = new ArrayList<>();
     @Option(
+        name = "enable-deqp-delta-run",
+        description = "enables running dEQP tests only above the device deqp level")
+    private boolean mEnableDeqpDeltaRun = false;
+    @Option(
         name = "collect-tests-only",
         description =
             "Only invoke the instrumentation to collect list of applicable test "
@@ -1895,6 +1899,10 @@ public class DeqpTestRunner
             Pattern.compile("-main-(\\d\\d\\d\\d)-(\\d\\d)-(\\d\\d)\\.txt$");
         final Matcher matcher = caseListFilenamePattern.matcher(mCaselistFile);
         if (!matcher.find()) {
+            if (mEnableDeqpDeltaRun) {
+                CLog.d("dEQP delta run requires a date in the caselist filename, but none found in %s. Not running tests.", mCaselistFile);
+                return false;
+            }
             CLog.d(
                 "No dEQP level date found in caselist. Running unconditionally.");
             return true;
@@ -1951,6 +1959,7 @@ public class DeqpTestRunner
             }
 
             final boolean shouldRunCaselist = forcedDepqLevel >= minimumLevel;
+
             CLog.d("Running caselist? %b", shouldRunCaselist);
             return shouldRunCaselist;
         }
@@ -1971,7 +1980,8 @@ public class DeqpTestRunner
                 CLog.d("Device level is %d", claimedDeqpLevel.get());
 
                 final boolean shouldRunCaselist =
-                    claimedDeqpLevel.get() >= minimumLevel;
+                    (claimedDeqpLevel.get() >= minimumLevel) != mEnableDeqpDeltaRun;
+
                 CLog.d("Running caselist? %b", shouldRunCaselist);
                 return shouldRunCaselist;
             }
@@ -2684,6 +2694,7 @@ public class DeqpTestRunner
         destination.mEnableIncrementalDeqp = source.mEnableIncrementalDeqp;
         destination.mIncrementalDeqpIncludeFiles =
             new ArrayList<>(source.mIncrementalDeqpIncludeFiles);
+        destination.mEnableDeqpDeltaRun = source.mEnableDeqpDeltaRun;
         destination.mForceDeqpLevel = source.mForceDeqpLevel;
     }
 
