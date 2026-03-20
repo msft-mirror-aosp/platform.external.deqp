@@ -1903,6 +1903,11 @@ public class DeqpTestRunner
                 CLog.d("dEQP delta run requires a date in the caselist filename, but none found in %s. Not running tests.", mCaselistFile);
                 return false;
             }
+
+            // Enabling the common tests run when baseline is passed in the command as an argument
+            if (!mRunSpecificDeqpLevel.isEmpty() && mRunSpecificDeqpLevel.equals("baseline"))
+                return true;
+            
             CLog.d(
                 "No dEQP level date found in caselist. Running unconditionally.");
             return true;
@@ -1934,6 +1939,11 @@ public class DeqpTestRunner
 
         if (!mRunSpecificDeqpLevel.isEmpty()) {
             CLog.d("The specific year chosen for run is %s",mRunSpecificDeqpLevel);
+
+            // Disabling yearly test runs when baseline is passed in the command as an argument
+            if(mRunSpecificDeqpLevel.equals("baseline"))
+                return false;
+
             int forcedDepqLevel;
             try {
                 forcedDepqLevel = Integer.parseInt(mRunSpecificDeqpLevel);
