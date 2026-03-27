@@ -2913,4 +2913,352 @@ public class DeqpTestRunnerTest extends TestCase {
         deqpTest.addIncludeFilter("dEQP-GLES3.pick_me.yes");
         testFiltering(deqpTest, expectedTrie, activeTests);
     }
+
+    /**
+     * Tests that a handheld device with a dEQP level of 2023 or higher will unconditionally run tests
+     * from a future caselist.
+     * <p>
+     * This verifies the Google Requirements Freeze (GRF) override policy. Devices claiming a dEQP level
+     * of {@link DeqpTestRunner#DEQP_LEVEL_U_2023} or higher should execute the test cases even if the
+     * provided caselist date (e.g., 2025) is newer than the device's claimed level, provided the device
+     * is considered "handheld" (has a touchscreen).
+     *
+     * @throws Exception if an error occurs during mock setup or test execution
+     */
+    public void testRun_deqpLevel2023Unconditional_handheld() throws Exception {
+        // Define the target test and the caselist file containing it.
+        // We use a future caselist date (2025) to test the GRF override.
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        final String testPath = "dEQP-GLES3.info.version";
+        final String testTrie = "{dEQP-GLES3{info{version}}}";
+        final String caselistFile = "dEQP-GLES3-main-2025-03-01.txt";
+
+        // Expected output from the simulated instrumentation run, indicating a successful pass.
+        final String expectedInstrumentationOutput =
+                "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=2014.x\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseId\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=0xcafebabe\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=targetName\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=android\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginSession\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=" + testPath + "\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=EndSession\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_CODE: 0\r\n";
+
+        // Initialize mocks for the testing environment.
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+
+        // Write the test case into the caselist file in our temporary tests directory.
+        String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
+        FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
+
+        // Configure the DeqpTestRunner with the necessary options to process our caselist.
+        DeqpTestRunner deqpTest = new DeqpTestRunner();
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-package", "dEQP-GLES3");
+        setter.setOptionValue("deqp-gl-config-name", "rgba8888d24s8");
+        setter.setOptionValue("deqp-caselist-file", caselistFile);
+        deqpTest.setAbi(ABI);
+        deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
+
+        // Mock the device's OpenGL ES version to ensure it passes basic requirements.
+        int version = 3 << 16;
+        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
+                .andReturn(Integer.toString(version))
+                .atLeastOnce();
+
+        // Simulate a handheld device with a dEQP level of 2023.
+        // This is the critical part: it should trigger the GRF override
+        // despite the caselist being from 2025 because it is handheld.
+        final int deqpLevel2023 = 132580097; // Corresponds to DEQP_LEVEL_2023
+        String featureString = "feature:" + DeqpTestRunner.FEATURE_TOUCHSCREEN + "\n"
+                + "feature:" + DeqpTestRunner.FEATURE_OPENGLES_DEQP_LEVEL + "=" + deqpLevel2023;
+        EasyMock.expect(mockDevice.executeShellCommand("pm list features")).andReturn(featureString);
+
+        // Setup mock expectations for environment preparation and cleanup.
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_values")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_values")))
+                .andReturn("")
+                .once();
+
+        // Mock the renderability query to indicate the configuration is supported.
+        expectRenderConfigQuery(mockDevice, 3, 0);
+
+        // Define the exact command line expected to be executed on the device.
+        String commandLine = String.format(
+                "--deqp-caselist-file=%s --deqp-gl-config-name=rgba8888d24s8 "
+                        + "--deqp-screen-rotation=unspecified "
+                        + "--deqp-surface-type=window "
+                        + "--deqp-log-images=disable "
+                        + "--deqp-watchdog=enable",
+                APP_DIR + CASE_LIST_FILE_NAME);
+
+        // Mock the actual test execution to return our predefined success output.
+        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, expectedInstrumentationOutput);
+
+        // Set up the expected listener callbacks, indicating a normal execution flow.
+        mockListener.testRunStarted(getTestId(deqpTest), 1);
+        EasyMock.expectLastCall().once();
+
+        mockListener.testStarted(EasyMock.eq(testId));
+        EasyMock.expectLastCall().once();
+
+        mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        // Switch mocks to replay mode to start verification.
+        EasyMock.replay(mockDevice, mockIDevice, mockListener);
+
+        // Execute the test runner.
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+
+        // Verify all expected mock calls were made.
+        EasyMock.verify(mockListener, mockDevice, mockIDevice);
+    }
+
+    /**
+     * Tests that a non-handheld device with a dEQP level of 2023 or higher will unconditionally run tests
+     * from a future caselist when the {@code enable-deqp-non-handheld} option is enabled.
+     * <p>
+     * This verifies that the GRF override policy (normally restricted to handheld devices) can be forced
+     * to apply to non-handheld devices (devices without a touchscreen) by setting the runner option
+     * {@code enable-deqp-non-handheld} to true.
+     *
+     * @throws Exception if an error occurs during mock setup or test execution
+     */
+    public void testRun_deqpLevel2023Unconditional_nonHandheld() throws Exception {
+        // Define the target test and a future caselist date (2025).
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        final String testPath = "dEQP-GLES3.info.version";
+        final String testTrie = "{dEQP-GLES3{info{version}}}";
+        final String caselistFile = "dEQP-GLES3-main-2025-03-01.txt";
+
+        // Expected output from the simulated instrumentation run, indicating a successful pass.
+        final String expectedInstrumentationOutput =
+                "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=2014.x\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseId\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=0xcafebabe\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=targetName\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=android\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginSession\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=" + testPath + "\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=EndSession\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_CODE: 0\r\n";
+
+        // Initialize mocks.
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+
+        // Write the test case into the caselist file.
+        String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
+        FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
+
+        // Configure the DeqpTestRunner.
+        DeqpTestRunner deqpTest = new DeqpTestRunner();
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-package", "dEQP-GLES3");
+        setter.setOptionValue("deqp-gl-config-name", "rgba8888d24s8");
+        setter.setOptionValue("deqp-caselist-file", caselistFile);
+        setter.setOptionValue("enable-deqp-outside-grf-non-handheld", "true"); // Enable non-handheld run
+        deqpTest.setAbi(ABI);
+        deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
+
+        // Mock basic OpenGL ES version requirement.
+        int version = 3 << 16;
+        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
+                .andReturn(Integer.toString(version))
+                .atLeastOnce();
+
+        // Simulate a non-handheld device (NO touchscreen feature) with a dEQP level of 2023.
+        // Because the `--enable-deqp-non-handheld` flag was set to true above,
+        // the GRF override should still apply despite it being a non-handheld device.
+        final int deqpLevel2023 = 132580097; // Corresponds to DEQP_LEVEL_2023
+        String featureString = "feature:" + DeqpTestRunner.FEATURE_OPENGLES_DEQP_LEVEL + "=" + deqpLevel2023;
+        EasyMock.expect(mockDevice.executeShellCommand("pm list features")).andReturn(featureString);
+
+        // Setup mock expectations for environment preparation and cleanup.
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_values")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(
+                        mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_values")))
+                .andReturn("")
+                .once();
+
+        // Mock the renderability query.
+        expectRenderConfigQuery(mockDevice, 3, 0);
+
+        // Define the exact command line expected to be executed on the device.
+        String commandLine = String.format(
+                "--deqp-caselist-file=%s --deqp-gl-config-name=rgba8888d24s8 "
+                        + "--deqp-screen-rotation=unspecified "
+                        + "--deqp-surface-type=window "
+                        + "--deqp-log-images=disable "
+                        + "--deqp-watchdog=enable",
+                APP_DIR + CASE_LIST_FILE_NAME);
+
+        // Mock the actual test execution to return our predefined success output.
+        // If the non-handheld logic failed to trigger the unconditional run,
+        // it would never attempt to run this command, failing the test verification.
+        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, expectedInstrumentationOutput);
+
+        // Set up the expected listener callbacks, indicating a normal execution flow.
+        mockListener.testRunStarted(getTestId(deqpTest), 1);
+        EasyMock.expectLastCall().once();
+
+        mockListener.testStarted(EasyMock.eq(testId));
+        EasyMock.expectLastCall().once();
+
+        mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        // Switch mocks to replay mode.
+        EasyMock.replay(mockDevice, mockIDevice, mockListener);
+
+        // Execute the test runner.
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+
+        // Verify all expected mock calls were made.
+        EasyMock.verify(mockListener, mockDevice, mockIDevice);
+    }
+
+    /**
+     * Tests that a device with a dEQP level of 2022 or below correctly skips tests from a future caselist.
+     * <p>
+     * This verifies that the GRF override policy is *not* triggered for older devices. If a device claims
+     * a dEQP level (e.g., 2022) that is older than the requirement for the provided caselist date (e.g., 2025),
+     * and the device does not meet the 2023 GRF threshold, the tests should be bypassed and reported as ignored
+     * rather than being executed.
+     *
+     * @throws Exception if an error occurs during mock setup or test execution
+     */
+    public void testRun_deqpLevel2022_futureCaselistIgnored() throws Exception {
+        // Define the target test and a future caselist file date (2025).
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        final String caselistFile = "dEQP-GLES3-main-2025-03-01.txt";
+
+        // Initialize mocks.
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        // Write the test case into the caselist file.
+        String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
+        FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
+
+        // Configure the DeqpTestRunner.
+        DeqpTestRunner deqpTest = new DeqpTestRunner();
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-package", "dEQP-GLES3");
+        setter.setOptionValue("deqp-caselist-file", caselistFile);
+        deqpTest.setAbi(ABI);
+        deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
+
+        // Mock basic OpenGL ES version requirement.
+        int version = 3 << 16;
+        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
+                .andReturn(Integer.toString(version))
+                .atLeastOnce();
+
+        // Simulate an older handheld device with a dEQP level of 2022.
+        // Because 2022 < 2023, the GRF override will not apply.
+        // And because 2022 < 2025 (the caselist date), the tests should be skipped.
+        final int deqpLevel2022 = 132514561; // Corresponds to DEQP_LEVEL_2022
+        String featureString = "feature:" + DeqpTestRunner.FEATURE_TOUCHSCREEN + "\n"
+                + "feature:" + DeqpTestRunner.FEATURE_OPENGLES_DEQP_LEVEL + "=" + deqpLevel2022;
+        EasyMock.expect(mockDevice.executeShellCommand("pm list features")).andReturn(featureString);
+
+        // Expect the listener to record the test run, but crucially, mark the test as ignored
+        // instead of executed, because the device level is too old for the caselist.
+        mockListener.testRunStarted(getTestId(deqpTest), 1);
+        mockListener.testStarted(EasyMock.eq(testId));
+        mockListener.testIgnored(EasyMock.eq(testId));
+        mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+
+        // Switch mocks to replay mode.
+        EasyMock.replay(mockDevice, mockListener);
+
+        // Execute the test runner.
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+
+        // Verify that the test was indeed marked as ignored.
+        EasyMock.verify(mockListener, mockDevice);
+    }
+
 }
