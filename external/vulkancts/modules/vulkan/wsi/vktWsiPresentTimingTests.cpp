@@ -311,6 +311,17 @@ vk::VkSwapchainCreateInfoKHR getBasicSwapchainParameters(vk::wsi::Type wsiType, 
     vk::VkSurfaceCapabilitiesKHR capabilities{};
     getSurfacePresentTimingCapabilities(vki, physicalDevice, surface, &capabilities);
 
+    if (presentMode == VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR ||
+            presentMode == VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR) {
+        // Can only ever be 1, per spec.
+        desiredImageCount = 1;
+    } else {
+        // otherwise clamp to the range the driver says is acceptable.
+        desiredImageCount = de::clamp(desiredImageCount, capabilities.minImageCount,
+                  capabilities.maxImageCount > 0 ? capabilities.maxImageCount :
+                                                   capabilities.minImageCount + desiredImageCount);
+    }
+
     const std::vector<vk::VkSurfaceFormatKHR> formats =
         vk::wsi::getPhysicalDeviceSurfaceFormats(vki, physicalDevice, surface);
     const vk::wsi::PlatformProperties &platformProperties = vk::wsi::getPlatformProperties(wsiType);
@@ -331,7 +342,7 @@ vk::VkSwapchainCreateInfoKHR getBasicSwapchainParameters(vk::wsi::Type wsiType, 
         0u,
         nullptr,
         VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
-        VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
+        VK_COMPOSITE_ALPHA_INHERIT_BIT_KHR,
         presentMode,
         VK_FALSE,
         VK_NULL_HANDLE,
@@ -1164,6 +1175,8 @@ tcu::TestStatus timingQueueTest(Context &context, vk::wsi::Type wsiType)
     if (resultsCount != remainingResults + 1)
         TCU_FAIL("Failed to retrieve remaining results");
 
+    vkd.queueWaitIdle(devHelper.queue);
+
     return tcu::TestStatus::pass("Tests ran successfully");
 }
 
@@ -1258,6 +1271,8 @@ tcu::TestStatus timingTest(Context &context, PresentTimingTestConfig config)
 
     pth.sortResults();
     pth.verifyPresentIds(initialPresentId, presentIdStep, frameCount, config.presentStageQueries);
+
+    vkd.queueWaitIdle(devHelper.queue);
 
     return tcu::TestStatus::pass("All tests ran successfully");
 }
@@ -1357,6 +1372,8 @@ tcu::TestStatus largeQueueSizeTest(Context &context, vk::wsi::Type wsiType)
 
     pth.sortResults();
     pth.verifyPresentIds(initialPresentId, presentIdStep, frameCount, kAllPresentStages);
+
+    vkd.queueWaitIdle(devHelper.queue);
 
     return tcu::TestStatus::pass("All tests ran successfully");
 }
@@ -1556,6 +1573,8 @@ tcu::TestStatus timingTestWithBackgroundQueryThreads(Context &context, Type wsiT
     pth.sortResults();
     pth.verifyPresentIds(initialPresentId, presentIdStep, frameCount, surfaceCaps.presentStageQueries);
 
+    vkd.queueWaitIdle(devHelper.queue);
+
     return tcu::TestStatus::pass("All tests ran successfully");
 }
 
@@ -1653,6 +1672,8 @@ tcu::TestStatus retiredSwapchainTest(Context &context, vk::wsi::Type wsiType)
         // Explicitly trigger the destruction of the swapchain
         swapchains[swapchainIdx].m_swapchain = {};
     }
+
+    vkd.queueWaitIdle(devHelper.queue);
 
     return tcu::TestStatus::pass("Tests ran successfully");
 }
@@ -1905,6 +1926,8 @@ tcu::TestStatus presentAtTest(Context &context, PresentTimingTestConfig config)
         }
     }
 
+    vkd.queueWaitIdle(devHelper.queue);
+
     return tcu::TestStatus::pass("Tests ran successfully");
 }
 
@@ -2039,6 +2062,8 @@ tcu::TestStatus timeDomainPropertiesTest(Context &context, Type wsiType)
     const uint32_t pendingResults = maxQueuedFrames - handledResults;
     if (drainPresentationTimingResults(vkd, device, *swapchain, pth, pendingResults) != pendingResults)
         TCU_FAIL("Failed to retrieve all remaining timing results");
+
+    vkd.queueWaitIdle(devHelper.queue);
 
     return tcu::TestStatus::pass("Tests ran successfully");
 }
@@ -2310,6 +2335,12 @@ void populateQueryGroup(tcu::TestCaseGroup *testGroup, vk::wsi::Type wsiType)
 {
     for (auto presentMode : presentModes)
     {
+
+        // skip shared present modes as these tests violate many assumptions of them.
+        if (presentMode.mode == VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR ||
+                presentMode.mode == VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR)
+            continue;
+
         de::MovePtr<tcu::TestCaseGroup> presentModeGroup(
             new tcu::TestCaseGroup(testGroup->getTestContext(), presentMode.name));
 
