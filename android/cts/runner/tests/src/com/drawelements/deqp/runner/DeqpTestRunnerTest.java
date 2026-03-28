@@ -3117,7 +3117,7 @@ public class DeqpTestRunnerTest extends TestCase {
         setter.setOptionValue("deqp-package", "dEQP-GLES3");
         setter.setOptionValue("deqp-gl-config-name", "rgba8888d24s8");
         setter.setOptionValue("deqp-caselist-file", caselistFile);
-        setter.setOptionValue("enable-deqp-non-handheld", "true"); // Enable non-handheld run
+        setter.setOptionValue("enable-deqp-outside-grf-non-handheld", "true"); // Enable non-handheld run
         deqpTest.setAbi(ABI);
         deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
 
