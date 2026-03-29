@@ -248,6 +248,7 @@ cc_test {
     defaults: ["libdeqp_defaults"],
 
     cflags: [
+        "-DDEQP_ANDROID_EXE_LOGCAT",
         "-DDEQP_GLES3_RUNTIME_LOAD=1",
     ],
 
