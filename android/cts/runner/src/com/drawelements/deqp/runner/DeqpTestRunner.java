@@ -2756,6 +2756,8 @@ public class DeqpTestRunner
             new ArrayList<>(source.mIncrementalDeqpIncludeFiles);
         destination.mEnableDeqpDeltaRun = source.mEnableDeqpDeltaRun;
         destination.mForceDeqpLevel = source.mForceDeqpLevel;
+        destination.mRunSpecificDeqpLevel = source.mRunSpecificDeqpLevel;
+        destination.mDeqpTestsCountOnly = source.mDeqpTestsCountOnly;
         destination.mHasTouchscreen = source.mHasTouchscreen;
         destination.mIsTV = source.mIsTV;
         destination.mIsWatch = source.mIsWatch;

@@ -3261,4 +3261,276 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.verify(mockListener, mockDevice);
     }
 
+    /**
+     * Tests that custom configuration options are correctly copied to new runner shards
+     * when a {@link DeqpTestRunner} is split for parallel execution.
+     * <p>
+     * This ensures that any command-line arguments (like specific dEQP levels or count-only flags)
+     * passed to the original runner are preserved in the individual shard runners.
+     *
+     * @throws Exception if an error occurs during runner setup, reflection, or test execution
+     */
+    public void testCopyOptions() throws Exception {
+        // Create a minimal set of dummy tests to allow the runner to be initialized
+        final TestDescription[] testIds = {
+            new TestDescription("dEQP-GLES3.info", "version")
+        };
+
+        Collection<TestDescription> tests = new ArrayList<TestDescription>();
+        for (TestDescription id : testIds) {
+            tests.add(id);
+        }
+
+        // Initialize the main DeqpTestRunner and set our custom command-line options
+        DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
+        OptionSetter setter = new OptionSetter(runner);
+        setter.setOptionValue("run-specific-deqp-level", "2020");
+        setter.setOptionValue("deqp-tests-count-only", "true");
+
+        // Trigger the sharding process, which creates new runner instances based on the original
+        ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>)runner.split();
+        assertNotNull(shards);
+        assertEquals(1, shards.size());
+
+        DeqpTestRunner shard = (DeqpTestRunner)shards.get(0);
+
+        // Use reflection to verify that the private mRunSpecificDeqpLevel field was copied over
+        java.lang.reflect.Field runSpecificDeqpLevelField = DeqpTestRunner.class.getDeclaredField("mRunSpecificDeqpLevel");
+        runSpecificDeqpLevelField.setAccessible(true);
+        assertEquals("2020", runSpecificDeqpLevelField.get(shard));
+
+        // Use reflection to verify that the private mDeqpTestsCountOnly field was copied over
+        java.lang.reflect.Field deqpTestsCountOnlyField = DeqpTestRunner.class.getDeclaredField("mDeqpTestsCountOnly");
+        deqpTestsCountOnlyField.setAccessible(true);
+        assertTrue((boolean) deqpTestsCountOnlyField.get(shard));
+    }
+
+    /**
+     * Verifies that setting the 'deqp-tests-count-only' flag successfully prevents the
+     * actual execution of dEQP tests.
+     * <p>
+     * When this flag is true, the test runner is expected to parse the test list and count
+     * the tests, but completely abort before communicating with the device instrumentation
+     * or sending any execution events to the test listener.
+     *
+     * @throws Exception if an error occurs during mock setup or test execution
+     */
+    public void testRun_deqpTestsCountOnly() throws Exception {
+        // Define a dummy test case and caselist file
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        final String caselistFile = "dEQP-GLES3-main-2025-03-01.txt";
+
+        // Initialize strict mocks to ensure unexpected methods aren't called
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        // Write the dummy test to the temporary caselist file
+        String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
+        FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
+
+        // Configure the DeqpTestRunner and apply the 'deqp-tests-count-only' option
+        DeqpTestRunner deqpTest = new DeqpTestRunner();
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-package", "dEQP-GLES3");
+        setter.setOptionValue("deqp-caselist-file", caselistFile);
+        setter.setOptionValue("deqp-tests-count-only", "true");
+        deqpTest.setAbi(ABI);
+        deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
+
+        // Put the mocks into replay mode. We intentionally don't expect any calls to the mockListener
+        // because the runner should exit early when 'deqp-tests-count-only' is true.
+        EasyMock.replay(mockDevice, mockListener);
+
+        // Run the test runner
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+
+        // Verify that no listener methods were invoked, confirming the tests didn't run
+        EasyMock.verify(mockListener, mockDevice);
+    }
+
+    /**
+     * Verifies that the test runner executes the dEQP caselist normally when the user forces
+     * execution for a specific year and that year matches the year embedded in the caselist filename.
+     * <p>
+     * This tests the 'run-specific-deqp-level' flag. In this scenario, we enforce the level to 2025
+     * and use a caselist file named for 2025. This should bypass standard device capability checks
+     * and directly run the tests.
+     *
+     * @throws Exception if an error occurs during mock setup or test execution
+     */
+    public void testRun_runSpecificDeqpLevel_match() throws Exception {
+        // Define a dummy test case and a caselist file dated for the year 2025
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        final String caselistFile = "dEQP-GLES3-main-2025-03-01.txt";
+        final String testPath = "dEQP-GLES3.info.version";
+        final String testTrie = "{dEQP-GLES3{info{version}}}";
+
+        // Predefine the expected successful output from the on-device instrumentation
+        final String expectedInstrumentationOutput =
+                "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=2014.x\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseId\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=0xcafebabe\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=targetName\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=android\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginSession\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=" + testPath + "\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_STATUS: dEQP-EventType=EndSession\r\n"
+                        + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+                        + "INSTRUMENTATION_CODE: 0\r\n";
+
+        // Initialize mocks for the device and test listener
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+
+        // Write the dummy test to the temporary caselist file
+        String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
+        FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
+
+        // Configure the DeqpTestRunner and enforce the dEQP level to match the caselist year (2025)
+        DeqpTestRunner deqpTest = new DeqpTestRunner();
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-package", "dEQP-GLES3");
+        setter.setOptionValue("deqp-gl-config-name", "rgba8888d24s8");
+        setter.setOptionValue("deqp-caselist-file", caselistFile);
+        setter.setOptionValue("run-specific-deqp-level", "2025");
+        deqpTest.setAbi(ABI);
+        deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
+
+        // Set up the expected device properties
+        int version = 3 << 16;
+        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
+                .andReturn(Integer.toString(version))
+                .atLeastOnce();
+
+        // Set up expectations for test environment setup and teardown
+        EasyMock.expect(mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_values")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_pkgs")))
+                .andReturn("")
+                .once();
+        EasyMock.expect(mockDevice.executeShellCommand(
+                                EasyMock.eq("settings delete global angle_gl_driver_selection_values")))
+                .andReturn("")
+                .once();
+
+        // Expect the runner to query the device to ensure the render configuration is supported
+        expectRenderConfigQuery(mockDevice, 3, 0);
+
+        // Define the exact am instrument command line expected to be executed
+        String commandLine = String.format(
+                "--deqp-caselist-file=%s --deqp-gl-config-name=rgba8888d24s8 "
+                        + "--deqp-screen-rotation=unspecified "
+                        + "--deqp-surface-type=window "
+                        + "--deqp-log-images=disable "
+                        + "--deqp-watchdog=enable",
+                APP_DIR + CASE_LIST_FILE_NAME);
+
+        // Expect the instrumentation command to be executed and return the success string
+        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, expectedInstrumentationOutput);
+
+        // Set up the listener expectations to confirm the test starts, executes, and ends successfully
+        mockListener.testRunStarted(getTestId(deqpTest), 1);
+        EasyMock.expectLastCall().once();
+
+        mockListener.testStarted(EasyMock.eq(testId));
+        EasyMock.expectLastCall().once();
+
+        mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        // Put the mocks into replay mode
+        EasyMock.replay(mockDevice, mockIDevice, mockListener);
+
+        // Execute the test runner
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+
+        // Verify all expected mock calls were made
+        EasyMock.verify(mockListener, mockDevice, mockIDevice);
+    }
+
+    /**
+     * Verifies that the test runner explicitly skips and ignores tests when the user forces
+     * execution for a specific year, but that year does NOT match the year embedded in the
+     * caselist filename.
+     * <p>
+     * This tests the mismatch scenario of the 'run-specific-deqp-level' flag. In this case,
+     * we force the level to 2024, but provide a caselist for 2025. The runner is expected
+     * to safely bypass the execution and report the tests as ignored.
+     *
+     * @throws Exception if an error occurs during mock setup or test execution
+     */
+    public void testRun_runSpecificDeqpLevel_mismatch() throws Exception {
+        // Define a dummy test case and a caselist file dated for the year 2025
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        final String caselistFile = "dEQP-GLES3-main-2025-03-01.txt";
+
+        // Initialize strict mocks for the device and test listener
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        // Write the dummy test to the temporary caselist file
+        String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
+        FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
+
+        // Configure the DeqpTestRunner and enforce a mismatched dEQP level (2024 instead of 2025)
+        DeqpTestRunner deqpTest = new DeqpTestRunner();
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-package", "dEQP-GLES3");
+        setter.setOptionValue("deqp-caselist-file", caselistFile);
+        setter.setOptionValue("run-specific-deqp-level", "2024");
+        deqpTest.setAbi(ABI);
+        deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
+
+        // Set up the expected device properties
+        int version = 3 << 16;
+        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
+                .andReturn(Integer.toString(version))
+                .atLeastOnce();
+
+        // Set up the listener expectations to confirm the test run is started but immediately ignored
+        mockListener.testRunStarted(getTestId(deqpTest), 1);
+        mockListener.testStarted(EasyMock.eq(testId));
+        mockListener.testIgnored(EasyMock.eq(testId));
+        mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+
+        // Put the mocks into replay mode
+        EasyMock.replay(mockDevice, mockListener);
+
+        // Execute the test runner
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+
+        // Verify that the tests were properly marked as ignored
+        EasyMock.verify(mockListener, mockDevice);
+    }
 }
