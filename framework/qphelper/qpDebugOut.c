@@ -115,6 +115,10 @@ static android_LogPriority getLogPriority(MessageType type)
     }
 }
 
+#endif
+
+#if (DE_OS == DE_OS_ANDROID) && !defined(DEQP_ANDROID_EXE_LOGCAT)
+
 void printRaw(MessageType type, const char *message)
 {
     if (writeRedirect && !writeRedirect(type, message))
@@ -146,6 +150,10 @@ void printRaw(MessageType type, const char *message)
     if (writeRedirect && !writeRedirect(type, message))
         return;
 
+#if defined(DEQP_ANDROID_EXE_LOGCAT)
+    __android_log_write(getLogPriority(type), "dEQP", message);
+#endif
+
     FILE *out = getOutFile(type);
 
     if (type == MESSAGETYPE_ERROR)
@@ -164,6 +172,13 @@ void printFmt(MessageType type, const char *format, va_list args)
 {
     if (writeFtmRedirect && !writeFtmRedirect(type, format, args))
         return;
+
+#if defined(DEQP_ANDROID_EXE_LOGCAT)
+    va_list args_copy;
+    va_copy(args_copy, args);
+    __android_log_vprint(getLogPriority(type), "dEQP", format, args_copy);
+    va_end(args_copy);
+#endif
 
     FILE *out = getOutFile(type);
 

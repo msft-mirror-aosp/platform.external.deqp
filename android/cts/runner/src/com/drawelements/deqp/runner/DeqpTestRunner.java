@@ -110,11 +110,23 @@ public class DeqpTestRunner
     public static final String FEATURE_OPENGLES_DEQP_LEVEL =
         "android.software.opengles.deqp.level";
 
+    public static final String FEATURE_TOUCHSCREEN =
+        "android.hardware.touchscreen";
+    public static final String FEATURE_LEANBACK =
+        "android.software.leanback";
+    public static final String FEATURE_WATCH =
+        "android.hardware.type.watch";
+    public static final String FEATURE_AUTOMOTIVE =
+        "android.hardware.type.automotive";
+    public static final String FEATURE_PC =
+        "android.hardware.type.pc";
+
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
         10 * 60 * 1000; // 10min
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
+    private static final int DEQP_LEVEL_U_2023 = 132580097;
 
     protected static final String ANGLE_NONE = "none";
     protected static final String ANGLE_VULKAN = "vulkan";
@@ -236,6 +248,18 @@ public class DeqpTestRunner
             "Showing only the count of number of test cases ")
     private boolean mDeqpTestsCountOnly = false;
 
+    @Option(
+        name = "enable-deqp-outside-grf",
+        description =
+            "Feature flag to enable or disable deqp test runs outside of GRF")
+    private boolean mEnableDeqpOutsideGrf = true;
+
+    @Option(
+        name = "enable-deqp-outside-grf-non-handheld",
+        description =
+            "Feature flag to enable or disable deqp test runs outside of GRF for non handheld devices")
+    private boolean mEnableDeqpOutsideGrfNonHandheld = false;
+
 
     protected Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances =
@@ -248,6 +272,11 @@ public class DeqpTestRunner
     protected CompatibilityBuildHelper mBuildHelper;
     protected ITestDevice mDevice;
     private Map<String, Optional<Integer>> mDeviceFeatures;
+    private boolean mIsTV = false;
+    private boolean mIsWatch = false;
+    private boolean mIsAutomotive = false;
+    private boolean mIsPC = false;
+    private boolean mHasTouchscreen = false;
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
     protected IRunUtil mRunUtil = RunUtil.getDefault();
     private Set<String> mIncrementalDeqpIncludeTests = new HashSet<>();
@@ -1992,6 +2021,20 @@ public class DeqpTestRunner
                 final boolean shouldRunCaselist =
                     (claimedDeqpLevel.get() >= minimumLevel) != mEnableDeqpDeltaRun;
 
+                // For plan delta-run, above computed shouldRunCaselist is returned immediately as delta-run and deqp-outside-grf are contradictory.
+                // If mEnableDeqpOutsideGrf is disabled, shouldRunCaselist is returned at the end of the block.
+                if (mEnableDeqpDeltaRun) {  
+                    CLog.d("Running caselist? %b", shouldRunCaselist);                    
+                    return shouldRunCaselist;
+                }
+
+                if (claimedDeqpLevel.get() >= DEQP_LEVEL_U_2023 && mEnableDeqpOutsideGrf) {
+                    if(mEnableDeqpOutsideGrfNonHandheld || isHandheld()) {
+                        CLog.d("Device dEQP level is >= 2023 and outside GRF flag is enabled. Running all test cases");
+                        return true;
+                    }
+                }
+
                 CLog.d("Running caselist? %b", shouldRunCaselist);
                 return shouldRunCaselist;
             }
@@ -2015,6 +2058,12 @@ public class DeqpTestRunner
         CLog.d("Running caselist unconditionally");
 
         return true;
+    }
+
+
+    private boolean isHandheld() {
+        // There is no PM feature for "handheld"
+        return mHasTouchscreen && !mIsTV && !mIsWatch && !mIsAutomotive && !mIsPC;
     }
 
     /**
@@ -2111,6 +2160,7 @@ public class DeqpTestRunner
         throws DeviceNotAvailableException, CapabilityQueryFailureException {
         if (mDeviceFeatures == null) {
             mDeviceFeatures = queryDeviceFeatures(device);
+            detectDeviceTypes();
         }
         return mDeviceFeatures;
     }
@@ -2706,6 +2756,15 @@ public class DeqpTestRunner
             new ArrayList<>(source.mIncrementalDeqpIncludeFiles);
         destination.mEnableDeqpDeltaRun = source.mEnableDeqpDeltaRun;
         destination.mForceDeqpLevel = source.mForceDeqpLevel;
+        destination.mRunSpecificDeqpLevel = source.mRunSpecificDeqpLevel;
+        destination.mDeqpTestsCountOnly = source.mDeqpTestsCountOnly;
+        destination.mHasTouchscreen = source.mHasTouchscreen;
+        destination.mIsTV = source.mIsTV;
+        destination.mIsWatch = source.mIsWatch;
+        destination.mIsAutomotive = source.mIsAutomotive;
+        destination.mIsPC = source.mIsPC;
+        destination.mEnableDeqpOutsideGrf = source.mEnableDeqpOutsideGrf;
+        destination.mEnableDeqpOutsideGrfNonHandheld = source.mEnableDeqpOutsideGrfNonHandheld;
     }
 
     /**
@@ -2784,6 +2843,15 @@ public class DeqpTestRunner
         }
         // Tests normally take something like ~100ms. Some take a
         // second. Let's guess 200ms per test.
-        return 200 * mTestInstances.size();
+        return 200L * mTestInstances.size();
+    }
+
+    // This helper specifically identifies TV, Watch, Automotive, and PC types based on the presence of hardware features.
+    private void detectDeviceTypes() {
+        mHasTouchscreen = mDeviceFeatures.containsKey(FEATURE_TOUCHSCREEN);
+        mIsTV = mDeviceFeatures.containsKey(FEATURE_LEANBACK);
+        mIsWatch = mDeviceFeatures.containsKey(FEATURE_WATCH);
+        mIsAutomotive = mDeviceFeatures.containsKey(FEATURE_AUTOMOTIVE);
+        mIsPC = mDeviceFeatures.containsKey(FEATURE_PC);
     }
 }
