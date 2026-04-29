@@ -23,9 +23,6 @@
 
 #include "tcuAndroidNativeActivity.hpp"
 #include "deMemory.h"
-#if defined(ENABLE_MULTI_WINDOW_PARALLEL)
-#include <android/log.h>
-#endif
 
 DE_BEGIN_EXTERN_C
 
@@ -116,130 +113,7 @@ namespace tcu
 namespace Android
 {
 
-#if defined(ENABLE_MULTI_WINDOW_PARALLEL)
-namespace {
-/**
- * Checks for pending Java exceptions, logs them, and clears the state.
- */
-bool checkAndClearException(JNIEnv* env, const char* context) {
-    if (env->ExceptionCheck()) {
-        __android_log_print(ANDROID_LOG_ERROR, "dEQP", "Java exception during %s", context);
-        env->ExceptionDescribe();
-        env->ExceptionClear();
-        return true;
-    }
-    return false;
-}
-
-/**
- * Centralized Layout Parameter Application.
- * Uses static caching to ensure O(1) performance after the first call.
- */
-void applyLayoutParams(JNIEnv* env, jobject layoutParamsObj, int x, int y, int w, int h) {
-    static jfieldID fidX = nullptr, fidY = nullptr, fidW = nullptr, fidH = nullptr, fidG = nullptr;
-    static bool idsCached = false;
-
-    if (!idsCached) {
-        jclass lpCls = env->GetObjectClass(layoutParamsObj);
-        fidX = env->GetFieldID(lpCls, "x", "I");
-        fidY = env->GetFieldID(lpCls, "y", "I");
-        fidW = env->GetFieldID(lpCls, "width", "I");
-        fidH = env->GetFieldID(lpCls, "height", "I");
-        fidG = env->GetFieldID(lpCls, "gravity", "I");
-        idsCached = true;
-        env->DeleteLocalRef(lpCls);
-    }
-
-    if (fidX) env->SetIntField(layoutParamsObj, fidX, x);
-    if (fidY) env->SetIntField(layoutParamsObj, fidY, y);
-    if (fidW) env->SetIntField(layoutParamsObj, fidW, w);
-    if (fidH) env->SetIntField(layoutParamsObj, fidH, h);
-    if (fidG) env->SetIntField(layoutParamsObj, fidG, 0x33); // TOP | LEFT
-}
-
-/**
- * Helper to get the Window Object.
- */
-jobject getWindowObject(JNIEnv* env, jobject activityObj, jclass activityClass) {
-    jmethodID getWindowMethod = env->GetMethodID(activityClass, "getWindow", "()Landroid/view/Window;");
-    return env->CallObjectMethod(activityObj, getWindowMethod);
-}
-
-/**
- * Helper to extract Intent extras.
- */
-int getIntentIntExtra(JNIEnv* env, jobject intentObj, jclass intentClass, const char* extraKey) {
-    jstring keyString = env->NewStringUTF(extraKey);
-    jmethodID getIntExtraMethod = env->GetMethodID(intentClass, "getIntExtra", "(Ljava/lang/String;I)I");
-    int value = (getIntExtraMethod) ? env->CallIntMethod(intentObj, getIntExtraMethod, keyString, 0) : 0;
-    env->DeleteLocalRef(keyString);
-    return value;
-}
-
-} // anonymous namespace
-
-bool tcu::Android::NativeActivity::setWindowParams(void)
-{
-    JNIEnv* env = m_activity->env;
-    jobject activityObj = m_activity->clazz;
-    jclass activityClass = env->GetObjectClass(activityObj);
-
-    // 1. Get Intent and Extract Extras
-    jmethodID getIntentMethod = env->GetMethodID(activityClass, "getIntent", "()Landroid/content/Intent;");
-    jobject intentObj = env->CallObjectMethod(activityObj, getIntentMethod);
-    if (!intentObj) {
-        env->DeleteLocalRef(activityClass);
-        return false;
-    }
-
-    jclass intentClass = env->GetObjectClass(intentObj);
-    int x = getIntentIntExtra(env, intentObj, intentClass, "windowX");
-    int y = getIntentIntExtra(env, intentObj, intentClass, "windowY");
-    int w = getIntentIntExtra(env, intentObj, intentClass, "windowWidth");
-    int h = getIntentIntExtra(env, intentObj, intentClass, "windowHeight");
-
-    env->DeleteLocalRef(intentClass);
-    env->DeleteLocalRef(intentObj);
-
-    // 2. Validate - if no dimensions are provided, this is Case 1: Standard Run.
-    if (w <= 0 || h <= 0) {
-        env->DeleteLocalRef(activityClass);
-        return false;
-    }
-    x = std::max(0, x);
-    y = std::max(0, y);
-
-    // 3. Access Window and LayoutParams
-    jobject windowObj = getWindowObject(env, activityObj, activityClass);
-    if (windowObj) {
-        jclass windowClass = env->GetObjectClass(windowObj);
-        jmethodID getAttrMethod = env->GetMethodID(windowClass, "getAttributes", "()Landroid/view/WindowManager$LayoutParams;");
-        jobject lpObj = env->CallObjectMethod(windowObj, getAttrMethod);
-
-        if (lpObj) {
-            // 4. Apply parameters via subroutine
-            applyLayoutParams(env, lpObj, x, y, w, h);
-
-            jmethodID setAttrMethod = env->GetMethodID(windowClass, "setAttributes", "(Landroid/view/WindowManager$LayoutParams;)V");
-            env->CallVoidMethod(windowObj, setAttrMethod, lpObj);
-            env->DeleteLocalRef(lpObj);
-        }
-        env->DeleteLocalRef(windowClass);
-        env->DeleteLocalRef(windowObj);
-    }
-
-    env->DeleteLocalRef(activityClass);
-
-    // Final check to ensure no JNI errors are left pending.
-    return !checkAndClearException(env, "setWindowParams");
-}
-#endif
-
-NativeActivity::NativeActivity(ANativeActivity *activity)
-    : m_activity(activity)
-#if defined(ENABLE_MULTI_WINDOW_PARALLEL)
-    , m_multiParallelWindow(false)
-#endif
+NativeActivity::NativeActivity(ANativeActivity *activity) : m_activity(activity)
 {
     if (activity)
     {
@@ -260,9 +134,6 @@ NativeActivity::NativeActivity(ANativeActivity *activity)
         activity->callbacks->onContentRectChanged       = onContentRectChangedCallback;
         activity->callbacks->onConfigurationChanged     = onConfigurationChangedCallback;
         activity->callbacks->onLowMemory                = onLowMemoryCallback;
-#if defined(ENABLE_MULTI_WINDOW_PARALLEL)
-        m_multiParallelWindow = setWindowParams();
-#endif
     }
 }
 
