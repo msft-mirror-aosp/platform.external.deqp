@@ -52,6 +52,7 @@ import com.android.tradefed.util.FileUtil;
 import com.android.tradefed.util.IRunUtil;
 import com.android.tradefed.util.RunInterruptedException;
 import com.android.tradefed.util.RunUtil;
+import com.google.common.annotations.VisibleForTesting;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -107,6 +108,8 @@ public class DeqpTestRunner
         "android.hardware.vulkan.level";
     public static final String FEATURE_VULKAN_DEQP_LEVEL =
         "android.software.vulkan.deqp.level";
+    public static final String FEATURE_VULKAN_HARDWARE_VERSION =
+        "android.hardware.vulkan.version";
     public static final String FEATURE_OPENGLES_DEQP_LEVEL =
         "android.software.opengles.deqp.level";
 
@@ -327,6 +330,19 @@ public class DeqpTestRunner
      * Get the deqp-package option contents.
      */
     public String getPackageName() { return mDeqpPackage; }
+
+
+    /**
+     * Get the run-specific-deqp-level option contents.
+     */
+    @VisibleForTesting
+    String getRunSpecificDeqpLevel() { return mRunSpecificDeqpLevel; }
+
+    /**
+     * Get the deqp-tests-count-only option contents.
+     */
+    @VisibleForTesting
+    boolean getDeqpTestsCountOnly() { return mDeqpTestsCountOnly; }
 
     /**
      * {@inheritDoc}
