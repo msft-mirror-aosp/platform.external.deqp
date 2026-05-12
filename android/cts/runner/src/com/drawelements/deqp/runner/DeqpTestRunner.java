@@ -1526,22 +1526,25 @@ public class DeqpTestRunner
     executeShellCommandAndReadOutput(final String command,
                                      final IShellOutputReceiver receiver)
         throws AdbComLinkOpenError, AdbComLinkKilledError,
-        DeviceNotAvailableException {
+               AdbComLinkUnresponsiveError {
         try {
-            mDevice.executeShellV2CommandNoRecovery(
-                command,
-                receiver,
-                mUnresponsiveCmdTimeoutMs /* maxTimeToShellOutputResponse */,
-                TimeUnit.MILLISECONDS);
+            mDevice.getIDevice().executeShellCommand(command, receiver,
+                                                     mUnresponsiveCmdTimeoutMs,
+                                                     TimeUnit.MILLISECONDS);
         } catch (TimeoutException ex) {
             // Opening connection timed out
             throw new AdbComLinkOpenError("opening connection timed out", ex);
+        } catch (AdbCommandRejectedException ex) {
+            // Command rejected
+            throw new AdbComLinkOpenError("command rejected", ex);
         } catch (IOException ex) {
             // shell command channel killed
             throw new AdbComLinkKilledError("command link killed", ex);
-        } catch (DeviceNotAvailableException ex) {
+        } catch (ShellCommandUnresponsiveException ex) {
             // shell command halted
-            throw ex;
+            throw new AdbComLinkUnresponsiveError(
+                "command link was unresponsive for longer than requested timeout",
+                ex);
         }
     }
 
@@ -1949,7 +1952,7 @@ public class DeqpTestRunner
             // Enabling the common tests run when baseline is passed in the command as an argument
             if (!mRunSpecificDeqpLevel.isEmpty() && mRunSpecificDeqpLevel.equals("baseline"))
                 return true;
-
+            
             CLog.d(
                 "No dEQP level date found in caselist. Running unconditionally.");
             return true;
@@ -2036,8 +2039,8 @@ public class DeqpTestRunner
 
                 // For plan delta-run, above computed shouldRunCaselist is returned immediately as delta-run and deqp-outside-grf are contradictory.
                 // If mEnableDeqpOutsideGrf is disabled, shouldRunCaselist is returned at the end of the block.
-                if (mEnableDeqpDeltaRun) {
-                    CLog.d("Running caselist? %b", shouldRunCaselist);
+                if (mEnableDeqpDeltaRun) {  
+                    CLog.d("Running caselist? %b", shouldRunCaselist);                    
                     return shouldRunCaselist;
                 }
 
