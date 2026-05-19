@@ -2182,8 +2182,7 @@ public class DeqpTestRunnerTest extends TestCase {
             AbiUtils.createAbiFlag(ABI.getName()), APP_DIR + LOG_FILE_NAME, cmd,
             false, INSTRUMENTATION_NAME);
 
-        EasyMock.expect(mockDevice.getIDevice()).andReturn(mockIDevice);
-        mockIDevice.executeShellCommand(
+        mockDevice.executeShellV2CommandNoRecovery(
             EasyMock.eq(command), EasyMock.<IShellOutputReceiver>notNull(),
             EasyMock.anyLong(), EasyMock.isA(TimeUnit.class));
 
