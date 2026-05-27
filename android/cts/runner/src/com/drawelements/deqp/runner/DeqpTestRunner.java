@@ -138,6 +138,9 @@ public class DeqpTestRunner
     protected static final String ANGLE_VULKAN = "vulkan";
     protected static final String ANGLE_OPENGLES = "opengles";
 
+    protected static final String REPORTING_MODE_JAVA_LOG_PARSER = "java-parser";
+    protected static final String REPORTING_MODE_NATIVE_LOG_PARSER = "native-parser";
+
     // !NOTE: There's a static method copyOptions() for copying options during
     // split. If you add state update copyOptions() as appropriate!
 
@@ -272,6 +275,14 @@ public class DeqpTestRunner
             "Feature flag to enable dEQP tests parallel run")
     private boolean mEnableDeqpParallelRun = false;
 
+    @Option(
+        name = "deqp-test-events-reporting-mode",
+        description =
+            "How to report test events ('java-parser', 'native-parser'). "
+            + "'java-parser' and 'native-parser' parse the qpa files. "
+            + "Defaults to 'java-parser' for parallel run and 'native-parser' for standard runs.")
+    private String mEventReportingMode = "";
+
     protected Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances =
         null;
@@ -351,6 +362,12 @@ public class DeqpTestRunner
      */
     @VisibleForTesting
     boolean getDeqpTestsCountOnly() { return mDeqpTestsCountOnly; }
+
+    /**
+     * Get the deqp-test-events-reporting-mode option contents.
+     */
+    @VisibleForTesting
+    String getEventReportingMode() { return mEventReportingMode; }
 
     /**
      * {@inheritDoc}
@@ -1572,6 +1589,8 @@ public class DeqpTestRunner
 
         final boolean isParallel = isParallelMode(batch.getTestBatchTestDescriptionList().size());
         final StringBuilder deqpCmdLine = new StringBuilder();
+        mEventReportingMode = resolveEventReportingMode(mEventReportingMode, isParallel);
+
         if (!isParallel) {
             // In serial mode, pass the single caselist file via command line.
             // In parallel mode, caselists are split into multiple partition files under
@@ -1598,9 +1617,9 @@ public class DeqpTestRunner
 
         final String command = String.format(
             "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\""
-                + " -e deqpLogData \"%s\" %s",
+                + " -e deqpLogData \"%s\" -e deqpEventReportingMode \"%s\" %s",
             AbiUtils.createAbiFlag(mAbi.getName()), deqpLogData,
-            deqpCmdLine.toString(), mLogData, instrumentationName);
+            deqpCmdLine.toString(), mLogData, mEventReportingMode, instrumentationName);
 
         final InstrumentationParser parser =
             new InstrumentationParser(getInstanceListener());
@@ -2655,6 +2674,18 @@ public class DeqpTestRunner
         }
     }
 
+    private String resolveEventReportingMode(String eventReportingMode, boolean isParallel) {
+        if (eventReportingMode == null || eventReportingMode.isEmpty()) {
+            return isParallel ? REPORTING_MODE_JAVA_LOG_PARSER : REPORTING_MODE_NATIVE_LOG_PARSER;
+        }
+
+        if (!REPORTING_MODE_JAVA_LOG_PARSER.equals(eventReportingMode) &&
+            !REPORTING_MODE_NATIVE_LOG_PARSER.equals(eventReportingMode)) {
+            throw new IllegalArgumentException("Unsupported value for deqp-test-events-reporting-mode: " + eventReportingMode);
+        }
+        return eventReportingMode;
+    }
+
     /**
      * {@inheritDoc}
      */
@@ -2819,6 +2850,7 @@ public class DeqpTestRunner
             new ArrayList<>(source.mExcludeFilterFiles);
         destination.mAbi = source.mAbi;
         destination.mLogData = source.mLogData;
+        destination.mEventReportingMode = source.mEventReportingMode;
         destination.mCollectTestsOnly = source.mCollectTestsOnly;
         destination.mAngle = source.mAngle;
         destination.mDisableWatchdog = source.mDisableWatchdog;

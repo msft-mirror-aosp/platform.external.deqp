@@ -2181,9 +2181,9 @@ public class DeqpTestRunnerTest extends TestCase {
     private void expectInstrumentationCommand(ITestDevice mockDevice, String logFilename, String cmd, final String output) throws Exception {
         String command = String.format(
             "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\" "
-                + "-e deqpLogData \"%s\" %s",
+                + "-e deqpLogData \"%s\" -e deqpEventReportingMode \"%s\" %s",
             AbiUtils.createAbiFlag(ABI.getName()), logFilename, cmd,
-            false, INSTRUMENTATION_NAME);
+            false, DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER, INSTRUMENTATION_NAME);
 
         mockDevice.executeShellV2CommandNoRecovery(
             EasyMock.eq(command), EasyMock.<IShellOutputReceiver>notNull(),
@@ -2635,6 +2635,7 @@ public class DeqpTestRunnerTest extends TestCase {
         OptionSetter setter = new OptionSetter(runner);
         setter.setOptionValue("run-specific-deqp-level", "2020");
         setter.setOptionValue("deqp-tests-count-only", "true");
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         // Trigger the sharding process, which creates new runner instances based on the original
         ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>)runner.split();
@@ -2645,6 +2646,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         assertEquals("2020", shard.getRunSpecificDeqpLevel());
         assertTrue(shard.getDeqpTestsCountOnly());
+        assertEquals(DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER, shard.getEventReportingMode());
     }
 
     /**
@@ -2839,6 +2841,8 @@ public class DeqpTestRunnerTest extends TestCase {
         ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
 
         DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         String output = buildTestProcessOutput(tests);
         runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, getCommandLine(), output);
@@ -2864,6 +2868,8 @@ public class DeqpTestRunnerTest extends TestCase {
         ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
 
         DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         String output = buildTestProcessOutput(tests);
         String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-watchdog=enable";
@@ -2889,6 +2895,8 @@ public class DeqpTestRunnerTest extends TestCase {
         ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
 
         DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true, false);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         final int batchSize = 1000;
         for (int i = 0; i < numTests; i += batchSize) {
@@ -2898,6 +2906,39 @@ public class DeqpTestRunnerTest extends TestCase {
         }
 
         runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+    }
+    /**
+     * Test that an invalid test event reporting mode throws an IllegalArgumentException.
+     * <p>
+     * Verifies that if an unsupported reporting mode is explicitly set via options,
+     * the test runner immediately fails during validation.
+     */
+    public void testRun_invalidReportingMode_throwsIllegalArgumentException() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+        deqpTest.setDevice(mockDevice);
+
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", "invalid-parser");
+
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+        mockListener.testRunStarted(EasyMock.anyObject(), EasyMock.eq(1));
+        EasyMock.expectLastCall().once();
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        expectAngleSetup(mockDevice);
+        EasyMock.replay(mockDevice, mockListener);
+
+        try {
+            deqpTest.run(mockListener);
+            fail("Expected IllegalArgumentException");
+        } catch (IllegalArgumentException e) {
+            // Expected
+        }
     }
 
     private void expectListenerTests(ITestInvocationListener mockListener, Collection<TestDescription> tests) {

@@ -38,6 +38,9 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     private static final long NO_ACTIVITY_SLEEP_MS = 100;
     private static final long REMOTE_DEAD_SLEEP_MS = 100;
 
+    public static final String REPORTING_MODE_JAVA_LOG_PARSER = "java-parser";
+    public static final String REPORTING_MODE_NATIVE_LOG_PARSER = "native-parser";
+
     private String m_cmdLine;
     private String m_logFileName;
     private boolean m_logData;
@@ -45,6 +48,7 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     private int m_parallelMaxWorkers;
     private String m_parallelCaselistDir;
     private String m_parallelLogDir;
+    private String m_eventReportingMode;
 
     @Override
     public void onCreate(Bundle arguments) {
@@ -67,6 +71,12 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
                 m_logData = false;
         } else
             m_logData = false;
+
+        if (arguments.getString("deqpEventReportingMode") != null) {
+            m_eventReportingMode = arguments.getString("deqpEventReportingMode");
+        } else {
+            m_eventReportingMode = REPORTING_MODE_NATIVE_LOG_PARSER;
+        }
 
         m_parallel = Boolean.parseBoolean(arguments.getString("deqpEnableParallel"));
 
@@ -146,7 +156,15 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
 
     private void runLegacyMode() {
         final RemoteAPI remoteApi = new RemoteAPI(getTargetContext(), m_logFileName);
-        final LogParser parser = new TestLogParser();
+        final LogParser parser;
+        if (REPORTING_MODE_JAVA_LOG_PARSER.equalsIgnoreCase(m_eventReportingMode)) {
+            parser = new QpaParser();
+        } else if (REPORTING_MODE_NATIVE_LOG_PARSER.equalsIgnoreCase(m_eventReportingMode)) {
+            parser = new TestLogParser();
+        } else {
+            throw new IllegalArgumentException("Unsupported reporting mode: " + m_eventReportingMode);
+        }
+
         try {
             Log.d(LOG_TAG, "Starting legacy execution mode");
             final String testerName = "";
