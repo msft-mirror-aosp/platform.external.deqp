@@ -31,6 +31,9 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.GridLayout;
 
+import java.io.File;
+import java.util.Queue;
+
 /**
  * SurfaceProviderActivity serves as the orchestrator and UI container for the parallel test runner.
  * It dynamically generates a grid layout containing multiple {@link SurfaceView}s,
@@ -46,10 +49,19 @@ import android.widget.GridLayout;
 public class SurfaceProviderActivity extends Activity implements SurfaceLifecycleListener {
     private static final String TAG = "SurfaceProviderActivity";
     static final String EXTRA_MAX_WORKERS = "extra_max_workers";
+    static final String EXTRA_TEST_BATCHES_DIR = "extra_test_batches_dir";
+    static final String DEFAULT_TEST_BATCHES_DIR;
+    static {
+        DEFAULT_TEST_BATCHES_DIR = new File(
+            android.os.Environment.getExternalStorageDirectory(),
+            "deqpparallel/caselists/"
+        ).getAbsolutePath();
+    }
     static final int DEFAULT_MAX_WORKERS = 4;
     static final int MAX_ALLOWED_WORKERS = 12;
 
     private GridLayout surfaceGrid;
+    private final DeqpTestBatchLoader mTestBatchLoader = new DeqpTestBatchLoader();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -73,7 +85,27 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
             maxWorkers = MAX_ALLOWED_WORKERS;
         }
 
-        generateSurfaceViews(maxWorkers);
+        String testBatchesDir = DEFAULT_TEST_BATCHES_DIR;
+        if (getIntent() != null && getIntent().hasExtra(EXTRA_TEST_BATCHES_DIR)) {
+            testBatchesDir = getIntent().getStringExtra(EXTRA_TEST_BATCHES_DIR);
+        }
+
+        final int finalMaxWorkers = maxWorkers;
+        final String finalTestBatchesDir = testBatchesDir;
+
+        new Thread(() -> {
+            mTestBatchLoader.loadFromDirectory(finalTestBatchesDir);
+            runOnUiThread(() -> {
+                generateSurfaceViews(finalMaxWorkers);
+            });
+        }).start();
+    }
+
+    /**
+     * Gets the in-memory queue of loaded pre-split batch file paths.
+     */
+    public Queue<String> getBatchQueue() {
+        return mTestBatchLoader.getBatchQueue();
     }
 
     static class GridSize {
