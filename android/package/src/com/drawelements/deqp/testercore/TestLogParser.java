@@ -27,11 +27,11 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-public class TestLogParser {
+public class TestLogParser implements LogParser {
     static { System.loadLibrary("deqp"); }
 
     private long m_nativePointer;
-    private DeqpInstrumentation m_instrumentation;
+    private TestEventListener m_testEventListener;
     private FileInputStream m_log;
     private String m_logFileName;
     private byte[] m_buffer;
@@ -39,21 +39,19 @@ public class TestLogParser {
 
     public TestLogParser() {
         m_nativePointer = 0;
-        m_instrumentation = null;
+        m_testEventListener = null;
         m_log = null;
         m_logRead = 0;
         m_buffer = null;
     }
 
-    public void init(DeqpInstrumentation instrumentation, String logFileName,
+    public void init(TestEventListener testEventListener, String logFileName,
                      boolean logData) throws FileNotFoundException {
-        assert instrumentation != null;
-        assert m_instrumentation == null;
+        assert testEventListener != null;
         assert m_nativePointer == 0;
-        assert m_log == null;
 
         m_logFileName = logFileName;
-        m_instrumentation = instrumentation;
+        m_testEventListener = testEventListener;
         m_nativePointer = nativeCreate(logData);
         m_buffer = new byte[4 * 1024 * 1024];
         m_log = new FileInputStream(m_logFileName);
@@ -61,8 +59,6 @@ public class TestLogParser {
 
     public void deinit() throws IOException {
         assert m_nativePointer != 0;
-        assert m_instrumentation != null;
-        assert m_log != null;
 
         nativeDestroy(m_nativePointer);
 
@@ -70,15 +66,13 @@ public class TestLogParser {
             m_log.close();
 
         m_nativePointer = 0;
-        m_instrumentation = null;
+        m_testEventListener = null;
         m_log = null;
         m_buffer = null;
     }
 
     public boolean parse() throws IOException {
         assert m_nativePointer != 0;
-        assert m_instrumentation != null;
-        assert m_log != null;
 
         boolean gotData = false;
 
@@ -96,7 +90,7 @@ public class TestLogParser {
             m_logRead += numRead;
 
             gotData = true;
-            nativeParse(m_nativePointer, m_instrumentation, m_buffer, numRead);
+            nativeParse(m_nativePointer, m_testEventListener, m_buffer, numRead);
         }
 
         return gotData;
@@ -105,6 +99,6 @@ public class TestLogParser {
     private static native long nativeCreate(boolean logData);
     private static native void nativeDestroy(long nativePointer);
     private static native void nativeParse(long nativePointer,
-                                           DeqpInstrumentation instrumentation,
+                                           TestEventListener listener,
                                            byte[] buffer, int size);
 }
