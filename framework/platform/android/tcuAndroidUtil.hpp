@@ -30,6 +30,7 @@
 #include <ostream>
 
 #include <android/native_activity.h>
+#include <jni.h>
 
 namespace tcu
 {
@@ -51,8 +52,10 @@ void setRequestedOrientation(ANativeActivity *activity, ScreenOrientation orient
 ScreenOrientation mapScreenRotation(ScreenRotation rotation);
 
 void describePlatform(ANativeActivity *activity, std::ostream &dst);
+void describePlatform(JavaVM *vm, std::ostream &dst);
 
 size_t getTotalAndroidSystemMemory(ANativeActivity *activity);
+size_t getTotalAndroidSystemMemory(JavaVM *vm, jobject context);
 } // namespace Android
 } // namespace tcu
 

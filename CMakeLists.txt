@@ -420,6 +420,7 @@ if (DE_OS_IS_ANDROID)
 		framework/platform/android/tcuAndroidJNI.cpp
 		framework/platform/android/tcuAndroidPlatformCapabilityQueryJNI.cpp
 		framework/platform/android/tcuTestLogParserJNI.cpp
+                framework/platform/android/tcuAndroidSurfaceJNI.cpp
 		${DEQP_MODULE_ENTRY_POINTS}
 		)
 
