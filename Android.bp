@@ -219,7 +219,10 @@ android_test {
         "vts10",
     ],
 
-    srcs: ["android/package/src/**/*.java"],
+    srcs: [
+        "android/package/src/**/*.java",
+        "android/package/src/**/*.aidl",
+    ],
     resource_dirs: ["android/package/res"],
     manifest: "android/package/AndroidManifest-integration.xml",
 

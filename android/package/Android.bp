@@ -24,7 +24,10 @@ package {
 
 android_library {
     name: "com.drawelements.deqp.java",
-    srcs: ["src/**/*.java"],
+    srcs: [
+        "src/**/*.java",
+        "src/**/*.aidl",
+    ],
     resource_dirs: ["res"],
     sdk_version: "test_current",
     min_sdk_version: "31",
