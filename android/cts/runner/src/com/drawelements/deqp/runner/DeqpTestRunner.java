@@ -263,6 +263,11 @@ public class DeqpTestRunner
             "Feature flag to enable or disable deqp test runs outside of GRF for non handheld devices")
     private boolean mEnableDeqpOutsideGrfNonHandheld = false;
 
+    @Option(
+        name = "enable-deqp-parallel-runner",
+        description =
+            "Feature flag to enable dEQP tests parallel runner")
+    private boolean mEnableDeqpParallelRunner = false;
 
     protected Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances =
@@ -2778,6 +2783,7 @@ public class DeqpTestRunner
         destination.mIsPC = source.mIsPC;
         destination.mEnableDeqpOutsideGrf = source.mEnableDeqpOutsideGrf;
         destination.mEnableDeqpOutsideGrfNonHandheld = source.mEnableDeqpOutsideGrfNonHandheld;
+        destination.mEnableDeqpParallelRunner = source.mEnableDeqpParallelRunner;
     }
 
     /**
