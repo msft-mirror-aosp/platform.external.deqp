@@ -23,23 +23,21 @@ package com.drawelements.deqp.parallelrunner;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-
 import android.content.Context;
 import android.content.Intent;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.GridLayout;
-import android.view.SurfaceView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.io.File;
+import java.io.IOException;
+import java.util.Queue;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Queue;
 
 /**
  * Unit tests for {@link SurfaceProviderActivity} using ActivityScenario.
