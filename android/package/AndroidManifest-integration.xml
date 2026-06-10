@@ -33,6 +33,11 @@
 			<meta-data android:name="android.app.func_name"
 					   android:value="createTestActivity" />
 		</activity>
+        <activity android:name="com.drawelements.deqp.parallelrunner.SurfaceProviderActivity"
+                  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+                  android:label="dEQP Parallel Runner"
+                  android:exported="true" >
+        </activity>
 	</application>
 
 	<uses-feature android:glEsVersion="0x00020000"/>

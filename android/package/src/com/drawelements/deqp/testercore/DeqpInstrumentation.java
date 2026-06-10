@@ -28,7 +28,7 @@ import android.os.Bundle;
 import java.io.File;
 import java.lang.Thread;
 
-public class DeqpInstrumentation extends Instrumentation {
+public class DeqpInstrumentation extends Instrumentation implements TestEventListener {
     private static final String LOG_TAG = "dEQP/Instrumentation";
     private static final long LAUNCH_TIMEOUT_MS = 10000;
     private static final long NO_DATA_TIMEOUT_MS = 5000;
@@ -67,10 +67,9 @@ public class DeqpInstrumentation extends Instrumentation {
     @Override
     public void onStart() {
         super.onStart();
-
         final RemoteAPI remoteApi =
             new RemoteAPI(getTargetContext(), m_logFileName);
-        final TestLogParser parser = new TestLogParser();
+        final LogParser parser = new TestLogParser();
 
         try {
             Log.d(LOG_TAG, "onStart");
@@ -152,6 +151,7 @@ public class DeqpInstrumentation extends Instrumentation {
         }
     }
 
+    @Override
     public void testCaseResult(String code, String details) {
         Bundle info = new Bundle();
 
@@ -162,6 +162,7 @@ public class DeqpInstrumentation extends Instrumentation {
         sendStatus(0, info);
     }
 
+    @Override
     public void beginTestCase(String testCase) {
         Bundle info = new Bundle();
 
@@ -171,6 +172,7 @@ public class DeqpInstrumentation extends Instrumentation {
         sendStatus(0, info);
     }
 
+    @Override
     public void endTestCase() {
         Bundle info = new Bundle();
 
@@ -178,6 +180,7 @@ public class DeqpInstrumentation extends Instrumentation {
         sendStatus(0, info);
     }
 
+    @Override
     public void testLogData(String log) throws InterruptedException {
         if (m_logData) {
             final int chunkSize = 4 * 1024;
@@ -206,6 +209,7 @@ public class DeqpInstrumentation extends Instrumentation {
         }
     }
 
+    @Override
     public void beginSession() {
         Bundle info = new Bundle();
 
@@ -213,6 +217,7 @@ public class DeqpInstrumentation extends Instrumentation {
         sendStatus(0, info);
     }
 
+    @Override
     public void endSession() {
         Bundle info = new Bundle();
 
@@ -220,6 +225,7 @@ public class DeqpInstrumentation extends Instrumentation {
         sendStatus(0, info);
     }
 
+    @Override
     public void sessionInfo(String name, String value) {
         Bundle info = new Bundle();
 
@@ -230,6 +236,7 @@ public class DeqpInstrumentation extends Instrumentation {
         sendStatus(0, info);
     }
 
+    @Override
     public void terminateTestCase(String reason) {
         Bundle info = new Bundle();
 
