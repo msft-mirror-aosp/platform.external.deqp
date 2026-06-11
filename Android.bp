@@ -219,7 +219,10 @@ android_test {
         "vts10",
     ],
 
-    srcs: ["android/package/src/**/*.java"],
+    srcs: [
+        "android/package/src/**/*.java",
+        "android/package/src/**/*.aidl",
+    ],
     resource_dirs: ["android/package/res"],
     manifest: "android/package/AndroidManifest-integration.xml",
 
@@ -299,6 +302,7 @@ cc_library_shared {
         "framework/platform/android/tcuAndroidJNI.cpp",
         "framework/platform/android/tcuAndroidPlatformCapabilityQueryJNI.cpp",
         "framework/platform/android/tcuTestLogParserJNI.cpp",
+        "framework/platform/android/tcuAndroidSurfaceJNI.cpp",
         "external/openglcts/modules/runner/glcAndroidMain.cpp",
         "external/openglcts/modules/glcTestPackageEntry.cpp",
         "modules/gles2/tes2TestPackageEntry.cpp",

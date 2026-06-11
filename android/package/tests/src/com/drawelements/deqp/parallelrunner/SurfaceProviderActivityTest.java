@@ -32,8 +32,14 @@ import android.view.SurfaceView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.Queue;
 
 /**
  * Unit tests for {@link SurfaceProviderActivity} using ActivityScenario.
@@ -41,6 +47,9 @@ import org.junit.runner.RunWith;
  */
 @RunWith(AndroidJUnit4.class)
 public class SurfaceProviderActivityTest {
+
+    @Rule
+    public TemporaryFolder tempFolder = new TemporaryFolder();
 
 
     private GridLayout getAndVerifySurfaceGrid(SurfaceProviderActivity activity, int expectedWorkers) {
@@ -198,5 +207,54 @@ public class SurfaceProviderActivityTest {
         SurfaceProviderActivity.GridSize landscapeGrid9 = SurfaceProviderActivity.calculateOptimalGrid(9, 1.777);
         assertEquals(5, landscapeGrid9.columns);
         assertEquals(2, landscapeGrid9.rows);
+    }
+
+    @Test
+    public void testTestBatchesLoadingFromDirectory() throws IOException {
+        Context context = ApplicationProvider.getApplicationContext();
+
+        File tempDir = tempFolder.newFolder("deqp_temp_batches");
+
+        File file10 = new File(tempDir, "batch_10.txt");
+        File file2 = new File(tempDir, "batch_2.txt");
+        File file1 = new File(tempDir, "batch_1.txt");
+
+        file10.createNewFile();
+        file2.createNewFile();
+        file1.createNewFile();
+
+        Intent intent = new Intent(context, SurfaceProviderActivity.class);
+        intent.putExtra(SurfaceProviderActivity.EXTRA_TEST_BATCHES_DIR, tempDir.getAbsolutePath());
+
+        try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
+            // Wait briefly to allow async background thread loading to execute
+            int maxRetries = 40; 
+            while (maxRetries > 0) {
+                final int[] currentSize = new int[1];
+                scenario.onActivity(activity -> {
+                    if (activity.getBatchQueue() != null) {
+                        currentSize[0] = activity.getBatchQueue().size();
+                    }
+                });
+                
+                if (currentSize[0] == 3) {
+                    break;
+                }
+                Thread.sleep(50);
+                maxRetries--;
+            }
+            scenario.onActivity(activity -> {
+                Queue<String> batchQueue = activity.getBatchQueue();
+                assertNotNull(batchQueue);
+                assertEquals(3, batchQueue.size());
+
+                // Verify files are sorted numerically
+                assertEquals(file1.getAbsolutePath(), batchQueue.poll());
+                assertEquals(file2.getAbsolutePath(), batchQueue.poll());
+                assertEquals(file10.getAbsolutePath(), batchQueue.poll());
+            });
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }
