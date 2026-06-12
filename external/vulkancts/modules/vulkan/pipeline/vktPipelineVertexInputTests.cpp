@@ -3104,6 +3104,7 @@ void createVertexInputTests(tcu::TestCaseGroup *vertexInputTests, PipelineConstr
         // Implementations can use as many vertex input attributes as they advertise
         addTestGroup(vertexInputTests, "max_attributes", createMaxAttributeTests, pipelineConstructionType);
     }
+
     // Uses formats that has more components than shader expects (legal for 64-bit)
     addTestGroup(vertexInputTests, "component_mismatch", createComponentMismatchTests, pipelineConstructionType);
 

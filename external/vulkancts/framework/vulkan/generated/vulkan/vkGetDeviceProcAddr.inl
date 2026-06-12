@@ -190,6 +190,18 @@ tcu::TestStatus        testGetDeviceProcAddr        (Context& context)
 		"vkGetImageViewOpaqueCaptureDescriptorDataEXT",
 		"vkGetSamplerOpaqueCaptureDescriptorDataEXT",
 
+		// "VK_EXT_descriptor_heap
+		"vkCmdBindResourceHeapEXT",
+		"vkCmdBindSamplerHeapEXT",
+		"vkCmdPushDataEXT",
+		"vkGetImageOpaqueCaptureDataEXT",
+		"vkGetPhysicalDeviceDescriptorSizeEXT",
+		"vkGetTensorOpaqueCaptureDataARM",
+		"vkRegisterCustomBorderColorEXT",
+		"vkUnregisterCustomBorderColorEXT",
+		"vkWriteResourceDescriptorsEXT",
+		"vkWriteSamplerDescriptorsEXT",
+
 		// "VK_EXT_device_fault
 		"vkGetDeviceFaultInfoEXT",
 
@@ -843,6 +855,7 @@ tcu::TestStatus        testGetDeviceProcAddr        (Context& context)
 		"vkDestroyCuModuleNVX",
 
 		// "VK_NVX_image_view_handle
+		"vkGetDeviceCombinedImageSamplerIndexNVX",
 		"vkGetImageViewAddressNVX",
 		"vkGetImageViewHandle64NVX",
 		"vkGetImageViewHandleNVX",
@@ -857,6 +870,9 @@ tcu::TestStatus        testGetDeviceProcAddr        (Context& context)
 		// "VK_NV_cluster_acceleration_structure
 		"vkCmdBuildClusterAccelerationStructureIndirectNV",
 		"vkGetClusterAccelerationStructureBuildSizesNV",
+
+		// "VK_NV_compute_occupancy_priority
+		"vkCmdSetComputeOccupancyPriorityNV",
 
 		// "VK_NV_cooperative_matrix
 		"vkGetPhysicalDeviceCooperativeMatrixPropertiesNV",
@@ -972,11 +988,6 @@ tcu::TestStatus        testGetDeviceProcAddr        (Context& context)
 		// "VK_OHOS_external_memory
 		"vkGetMemoryNativeBufferOHOS",
 		"vkGetNativeBufferPropertiesOHOS",
-
-		// "VK_OHOS_native_buffer
-		"vkAcquireImageOHOS",
-		"vkGetSwapchainGrallocUsageOHOS",
-		"vkQueueSignalReleaseImageOHOS",
 
 		// "VK_OHOS_surface
 		"vkCreateSurfaceOHOS",
