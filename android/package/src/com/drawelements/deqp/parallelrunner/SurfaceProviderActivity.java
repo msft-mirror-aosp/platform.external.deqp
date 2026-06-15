@@ -31,6 +31,9 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.GridLayout;
 
+import java.io.File;
+import java.util.Queue;
+
 /**
  * SurfaceProviderActivity serves as the orchestrator and UI container for the parallel test runner.
  * It dynamically generates a grid layout containing multiple {@link SurfaceView}s,
@@ -46,34 +49,63 @@ import android.widget.GridLayout;
 public class SurfaceProviderActivity extends Activity implements SurfaceLifecycleListener {
     private static final String TAG = "SurfaceProviderActivity";
     static final String EXTRA_MAX_WORKERS = "extra_max_workers";
+    static final String EXTRA_TEST_BATCHES_DIR = "extra_test_batches_dir";
+    static final String DEFAULT_TEST_BATCHES_DIR;
+    static {
+        DEFAULT_TEST_BATCHES_DIR = new File(
+            android.os.Environment.getExternalStorageDirectory(),
+            "deqpparallel/caselists/"
+        ).getAbsolutePath();
+    }
     static final int DEFAULT_MAX_WORKERS = 4;
     static final int MAX_ALLOWED_WORKERS = 12;
 
-    private GridLayout surfaceGrid;
+    private GridLayout workerGridLayout;
+    private final DeqpTestBatchLoader mTestBatchLoader = new DeqpTestBatchLoader();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        surfaceGrid = new GridLayout(this);
-        setContentView(surfaceGrid);
+        workerGridLayout = new GridLayout(this);
+        setContentView(workerGridLayout);
 
-        int maxWorkers = DEFAULT_MAX_WORKERS;
+        int workerCount = DEFAULT_MAX_WORKERS;
         if (getIntent() != null && getIntent().hasExtra(EXTRA_MAX_WORKERS)) {
-            maxWorkers = getIntent().getIntExtra(EXTRA_MAX_WORKERS, DEFAULT_MAX_WORKERS);
+            workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, DEFAULT_MAX_WORKERS);
         }
 
-        if (maxWorkers <= 0) {
-            Log.w(TAG, "Invalid maxWorkers count: " + maxWorkers + ". Defaulting to 1.");
-            maxWorkers = 1;
+        if (workerCount <= 0) {
+            Log.w(TAG, "Invalid workerCount: " + workerCount + ". Defaulting to 1.");
+            workerCount = 1;
         }
 
-        if (maxWorkers > MAX_ALLOWED_WORKERS) {
-            Log.w(TAG, "maxWorkers count " + maxWorkers + " exceeds maximum allowed. Clamping to " + MAX_ALLOWED_WORKERS + ".");
-            maxWorkers = MAX_ALLOWED_WORKERS;
+        if (workerCount > MAX_ALLOWED_WORKERS) {
+            Log.w(TAG, "workerCount " + workerCount + " exceeds maximum allowed. Clamping to " + MAX_ALLOWED_WORKERS + ".");
+            workerCount = MAX_ALLOWED_WORKERS;
         }
 
-        generateSurfaceViews(maxWorkers);
+        String testBatchesDir = DEFAULT_TEST_BATCHES_DIR;
+        if (getIntent() != null && getIntent().hasExtra(EXTRA_TEST_BATCHES_DIR)) {
+            testBatchesDir = getIntent().getStringExtra(EXTRA_TEST_BATCHES_DIR);
+        }
+
+        final int finalWorkerCount = workerCount;
+        final String finalTestBatchesDir = testBatchesDir;
+
+        new Thread(() -> {
+            mTestBatchLoader.loadFromDirectory(finalTestBatchesDir);
+            runOnUiThread(() -> {
+                generateSurfaceViews(finalWorkerCount);
+            });
+        }).start();
+    }
+
+    /**
+     * Gets the in-memory queue of loaded pre-split batch file paths.
+     */
+    public Queue<String> getBatchQueue() {
+        return mTestBatchLoader.getBatchQueue();
     }
 
     static class GridSize {
@@ -94,24 +126,25 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
      * driving layout selection to minimize aspect deviation from an ideal 1:1 square context, every spawned
      * {@link SurfaceView} achieves maximum rendering precision across arbitrary device form factors.
      *
-     * @param maxWorkers The targeted threshold of independent parallel surface cells to populate.
+     * @param workerCount The targeted threshold of independent parallel surface cells to populate.
      */
-    private void generateSurfaceViews(int maxWorkers) {
+    private void generateSurfaceViews(int workerCount) {
         Rect bounds = getWindowBounds();
         double windowAspectRatio = bounds.height() > 0 ? (double) bounds.width() / bounds.height()
             : 1.0;
-        GridSize grid = calculateOptimalGrid(maxWorkers, windowAspectRatio);
+        GridSize grid = calculateOptimalGrid(workerCount, windowAspectRatio);
 
         Log.i(TAG, String.format("Generated grid: %d columns, %d rows for %d workers. Window aspect: %.2f",
-            grid.columns, grid.rows, maxWorkers, windowAspectRatio));
+            grid.columns, grid.rows, workerCount, windowAspectRatio));
 
-        surfaceGrid.setColumnCount(grid.columns);
-        surfaceGrid.setRowCount(grid.rows);
+        workerGridLayout.setColumnCount(grid.columns);
+        workerGridLayout.setRowCount(grid.rows);
 
-        for (int i = 0; i < maxWorkers; i++) {
+        for (int i = 0; i < workerCount; i++) {
             SurfaceView surfaceView = new SurfaceView(this);
 
-            // Note: Ensure SafeSurfaceCallback holds Context via WeakReference internally
+            // Note: Ensure SafeSurfaceCallback holds SurfaceLifecycleListener via WeakReference
+            // internally to avoid Activity leaks.
             surfaceView.getHolder().addCallback(new SafeSurfaceCallback(i, this));
 
             // Relies on truncating integer division for deterministic row assignment
@@ -122,17 +155,17 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
             params.height = 0;
 
             surfaceView.setLayoutParams(params);
-            surfaceGrid.addView(surfaceView);
+            workerGridLayout.addView(surfaceView);
         }
     }
 
-    static GridSize calculateOptimalGrid(int maxWorkers, double containerAspectRatio) {
+    static GridSize calculateOptimalGrid(int workerCount, double containerAspectRatio) {
         int bestColumns = 1;
-        int bestRows = maxWorkers;
+        int bestRows = workerCount;
         double minAspectDiff = Double.MAX_VALUE;
 
-        for (int c = 1; c <= maxWorkers; c++) {
-            int r = (int) Math.ceil((double) maxWorkers / c);
+        for (int c = 1; c <= workerCount; c++) {
+            int r = (int) Math.ceil((double) workerCount / c);
 
             // Calculate the physical aspect ratio of an individual rendering buffer
             double cellAspectRatio = containerAspectRatio * ((double) r / c);

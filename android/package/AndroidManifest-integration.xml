@@ -33,11 +33,23 @@
 			<meta-data android:name="android.app.func_name"
 					   android:value="createTestActivity" />
 		</activity>
-        <activity android:name="com.drawelements.deqp.parallelrunner.SurfaceProviderActivity"
-                  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
-                  android:label="dEQP Parallel Runner"
-                  android:exported="true" >
-        </activity>
+		<activity android:name="com.drawelements.deqp.parallelrunner.SurfaceProviderActivity"
+				  android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
+				  android:label="dEQP Parallel Runner"
+				  android:exported="true" >
+		</activity>	
+		<service android:name=".parallelrunner.WorkerService$Worker1" android:process=":worker1" />
+		<service android:name=".parallelrunner.WorkerService$Worker2" android:process=":worker2" />
+		<service android:name=".parallelrunner.WorkerService$Worker3" android:process=":worker3" />
+		<service android:name=".parallelrunner.WorkerService$Worker4" android:process=":worker4" />
+		<service android:name=".parallelrunner.WorkerService$Worker5" android:process=":worker5" />
+		<service android:name=".parallelrunner.WorkerService$Worker6" android:process=":worker6" />
+		<service android:name=".parallelrunner.WorkerService$Worker7" android:process=":worker7" />
+		<service android:name=".parallelrunner.WorkerService$Worker8" android:process=":worker8" />
+		<service android:name=".parallelrunner.WorkerService$Worker9" android:process=":worker9" />
+		<service android:name=".parallelrunner.WorkerService$Worker10" android:process=":worker10" />
+		<service android:name=".parallelrunner.WorkerService$Worker11" android:process=":worker11" />
+		<service android:name=".parallelrunner.WorkerService$Worker12" android:process=":worker12" />
 	</application>
 
 	<uses-feature android:glEsVersion="0x00020000"/>

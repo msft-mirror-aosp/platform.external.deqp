@@ -313,17 +313,17 @@ private:
     WindowRegistry &m_windowRegistry;
 };
 
-static size_t getTotalSystemMemory(ANativeActivity *activity)
+static size_t getTotalSystemMemory(JavaVM *vm, jobject context)
 {
     const size_t MiB = (size_t)(1 << 20);
     // Use relatively high fallback size to encourage CDD-compliant behavior
     const size_t fallbackSize = (sizeof(void *) == sizeof(uint64_t)) ? 2048 * MiB : 1024 * MiB;
 
-    if (activity)
+    if (vm && context)
     {
         try
         {
-            const size_t totalMemory = getTotalAndroidSystemMemory(activity);
+            const size_t totalMemory = getTotalAndroidSystemMemory(vm, context);
             print("Device has %.2f MiB of system memory\n",
                   static_cast<double>(totalMemory) / static_cast<double>(MiB));
             return totalMemory;
@@ -340,16 +340,65 @@ static size_t getTotalSystemMemory(ANativeActivity *activity)
 
 // Platform
 
-Platform::Platform(NativeActivity &activity)
-    : m_activity(activity)
-    , m_totalSystemMemory(getTotalSystemMemory(activity.getNativeActivity()))
+Platform::Platform(NativeActivity &activity, ANativeWindow* window)
+    : m_activity(&activity)
+    , m_vm(activity.getNativeActivity() ? activity.getNativeActivity()->vm : nullptr)
+    , m_context(activity.getNativeActivity() ? activity.getNativeActivity()->clazz : nullptr)
+    , m_ownsContext(false)
+    , m_totalSystemMemory(getTotalSystemMemory(m_vm, m_context))
 {
     m_nativeDisplayFactoryRegistry.registerFactory(new NativeDisplayFactory(m_windowRegistry));
     m_contextFactoryRegistry.registerFactory(new eglu::GLContextFactory(m_nativeDisplayFactoryRegistry));
+    if (window)
+        m_windowRegistry.addWindow(window);
+}
+
+Platform::Platform(JavaVM *vm, jobject context, ANativeWindow* window)
+    : m_activity(nullptr)
+    , m_vm(vm)
+    , m_context(nullptr)
+    , m_ownsContext(false)
+    , m_totalSystemMemory(getTotalSystemMemory(vm, context))
+{
+    if (context && vm)
+    {
+        JNIEnv* env = nullptr;
+        bool detach = false;
+        if (vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED)
+        {
+            if (vm->AttachCurrentThread(&env, nullptr) == JNI_OK)
+                detach = true;
+        }
+        if (env)
+        {
+            m_context = env->NewGlobalRef(context);
+            m_ownsContext = true;
+        }
+        if (detach)
+            vm->DetachCurrentThread();
+    }
+    m_nativeDisplayFactoryRegistry.registerFactory(new NativeDisplayFactory(m_windowRegistry));
+    m_contextFactoryRegistry.registerFactory(new eglu::GLContextFactory(m_nativeDisplayFactoryRegistry));
+    if (window)
+        m_windowRegistry.addWindow(window);
 }
 
 Platform::~Platform(void)
 {
+    if (m_ownsContext && m_context && m_vm)
+    {
+        JNIEnv* env = nullptr;
+        bool detach = false;
+        if (m_vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED)
+        {
+            if (m_vm->AttachCurrentThread(&env, nullptr) == JNI_OK)
+                detach = true;
+        }
+        if (env)
+            env->DeleteGlobalRef(m_context);
+        if (detach)
+            m_vm->DetachCurrentThread();
+    }
 }
 
 bool Platform::processEvents(void)
@@ -365,7 +414,10 @@ vk::Library *Platform::createLibrary(const char *libraryPath) const
 
 void Platform::describePlatform(std::ostream &dst) const
 {
-    tcu::Android::describePlatform(m_activity.getNativeActivity(), dst);
+    if (m_vm)
+        tcu::Android::describePlatform(m_vm, dst);
+    else
+        dst << "Android platform: no JVM available\n";
 }
 
 void Platform::getMemoryLimits(tcu::PlatformMemoryLimits &limits) const
@@ -419,3 +471,4 @@ bool Platform::hasDisplay(vk::wsi::Type wsiType) const
 
 } // namespace Android
 } // namespace tcu
+
