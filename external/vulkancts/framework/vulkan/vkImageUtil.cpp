@@ -4756,17 +4756,19 @@ void copyBufferToImageIndirect(const DeviceInterface &vk, const InstanceInterfac
 
     // Create indirect buffer for copy commands
     const VkDeviceSize indirectBufferSize = copyRegions.size() * sizeof(VkCopyMemoryToImageIndirectCommandKHR);
+    const auto indirectBufferUsage =
+        static_cast<VkBufferUsageFlags>(VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT |
+                                        VK_BUFFER_USAGE_INDIRECT_BUFFER_BIT);
 
     const VkBufferCreateInfo indirectBufferCreateInfo = {
         VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO, // VkStructureType sType
         nullptr,                              // const void* pNext
         0u,                                   // VkBufferCreateFlags flags
         indirectBufferSize,                   // VkDeviceSize size
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT |    // VkBufferUsageFlags usage
-            VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-        VK_SHARING_MODE_EXCLUSIVE, // VkSharingMode sharingMode
-        0u,                        // uint32_t queueFamilyIndexCount
-        nullptr                    // const uint32_t* pQueueFamilyIndices
+        indirectBufferUsage,                  // VkBufferUsageFlags usage
+        VK_SHARING_MODE_EXCLUSIVE,            // VkSharingMode sharingMode
+        0u,                                   // uint32_t queueFamilyIndexCount
+        nullptr                               // const uint32_t* pQueueFamilyIndices
     };
 
     Move<VkBuffer> indirectBuffer = createBuffer(vk, device, &indirectBufferCreateInfo);
@@ -5692,7 +5694,7 @@ void allocateAndBindSparseImage(const DeviceInterface &vk, VkDevice device, cons
                                 const InstanceInterface &instance, const VkImageCreateInfo &imageCreateInfo,
                                 const VkSemaphore &signalSemaphore, VkQueue queue, Allocator &allocator,
                                 std::vector<de::SharedPtr<Allocation>> &allocations, tcu::TextureFormat format,
-                                VkImage destImage)
+                                VkImage destImage, VkFence fence)
 {
     const VkImageAspectFlags imageAspectFlags         = getImageAspectFlags(format);
     const VkPhysicalDeviceProperties deviceProperties = getPhysicalDeviceProperties(instance, physicalDevice);
@@ -5929,7 +5931,7 @@ void allocateAndBindSparseImage(const DeviceInterface &vk, VkDevice device, cons
         bindSparseInfo.pImageOpaqueBinds    = &imageMipTailBindInfo;
     }
 
-    VK_CHECK(vk.queueBindSparse(queue, 1u, &bindSparseInfo, VK_NULL_HANDLE));
+    VK_CHECK(vk.queueBindSparse(queue, 1u, &bindSparseInfo, fence));
 }
 
 bool checkSparseImageFormatSupport(const VkPhysicalDevice physicalDevice, const InstanceInterface &instance,
