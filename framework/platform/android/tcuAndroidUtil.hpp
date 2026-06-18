@@ -36,6 +36,30 @@ namespace tcu
 {
 namespace Android
 {
+class ScopedJNIEnv
+{
+public:
+    ScopedJNIEnv(JavaVM *vm);
+    ~ScopedJNIEnv(void);
+
+    JavaVM *getVM(void) const
+    {
+        return m_vm;
+    }
+    JNIEnv *getEnv(void) const
+    {
+        return m_env;
+    }
+
+private:
+    // Avoid copying
+    ScopedJNIEnv(const ScopedJNIEnv &);
+    ScopedJNIEnv &operator=(const ScopedJNIEnv &);
+
+    JavaVM *const m_vm;
+    JNIEnv *m_env;
+    bool m_detach;
+};
 
 enum ScreenOrientation
 {
