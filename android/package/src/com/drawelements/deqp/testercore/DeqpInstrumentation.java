@@ -25,6 +25,7 @@ package com.drawelements.deqp.testercore;
 
 import android.app.Instrumentation;
 import android.os.Bundle;
+import com.drawelements.deqp.testercore.TestEventConstants;
 import java.io.File;
 import java.lang.Thread;
 
@@ -155,9 +156,9 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     public void testCaseResult(String code, String details) {
         Bundle info = new Bundle();
 
-        info.putString("dEQP-EventType", "TestCaseResult");
-        info.putString("dEQP-TestCaseResult-Code", code);
-        info.putString("dEQP-TestCaseResult-Details", details);
+        info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.TEST_CASE_RESULT);
+        info.putString(TestEventConstants.KEY_TEST_CASE_RESULT_CODE, code);
+        info.putString(TestEventConstants.KEY_TEST_CASE_RESULT_DETAILS, details);
 
         sendStatus(0, info);
     }
@@ -166,8 +167,8 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     public void beginTestCase(String testCase) {
         Bundle info = new Bundle();
 
-        info.putString("dEQP-EventType", "BeginTestCase");
-        info.putString("dEQP-BeginTestCase-TestCasePath", testCase);
+        info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.BEGIN_TEST_CASE);
+        info.putString(TestEventConstants.KEY_BEGIN_TEST_CASE_PATH, testCase);
 
         sendStatus(0, info);
     }
@@ -176,7 +177,7 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     public void endTestCase() {
         Bundle info = new Bundle();
 
-        info.putString("dEQP-EventType", "EndTestCase");
+        info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.END_TEST_CASE);
         sendStatus(0, info);
     }
 
@@ -198,8 +199,8 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
 
                 Bundle info = new Bundle();
 
-                info.putString("dEQP-EventType", "TestLogData");
-                info.putString("dEQP-TestLogData-Log", message);
+                info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.TEST_LOG_DATA);
+                info.putString(TestEventConstants.KEY_TEST_LOG_DATA_LOG, message);
                 sendStatus(0, info);
 
                 if (log != null) {
@@ -213,7 +214,7 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     public void beginSession() {
         Bundle info = new Bundle();
 
-        info.putString("dEQP-EventType", "BeginSession");
+        info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.BEGIN_SESSION);
         sendStatus(0, info);
     }
 
@@ -221,7 +222,7 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     public void endSession() {
         Bundle info = new Bundle();
 
-        info.putString("dEQP-EventType", "EndSession");
+        info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.END_SESSION);
         sendStatus(0, info);
     }
 
@@ -229,9 +230,9 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     public void sessionInfo(String name, String value) {
         Bundle info = new Bundle();
 
-        info.putString("dEQP-EventType", "SessionInfo");
-        info.putString("dEQP-SessionInfo-Name", name);
-        info.putString("dEQP-SessionInfo-Value", value);
+        info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.SESSION_INFO);
+        info.putString(TestEventConstants.KEY_SESSION_INFO_NAME, name);
+        info.putString(TestEventConstants.KEY_SESSION_INFO_VALUE, value);
 
         sendStatus(0, info);
     }
@@ -240,8 +241,8 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     public void terminateTestCase(String reason) {
         Bundle info = new Bundle();
 
-        info.putString("dEQP-EventType", "TerminateTestCase");
-        info.putString("dEQP-TerminateTestCase-Reason", reason);
+        info.putString(TestEventConstants.KEY_EVENT_TYPE, TestEventConstants.TERMINATE_TEST_CASE);
+        info.putString(TestEventConstants.KEY_TERMINATE_TEST_CASE_REASON, reason);
 
         sendStatus(0, info);
     }
