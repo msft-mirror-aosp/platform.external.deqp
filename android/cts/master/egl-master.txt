@@ -3719,7 +3719,6 @@ dEQP-EGL.functional.thread_cleanup.multi_context_multi_surface
 dEQP-EGL.functional.mutable_render_buffer.querySurface
 dEQP-EGL.functional.mutable_render_buffer.negativeConfigBit
 dEQP-EGL.functional.mutable_render_buffer.basic
-dEQP-EGL.functional.get_frame_timestamps.rgb565_no_depth_no_stencil
 dEQP-EGL.functional.get_frame_timestamps.rgb565_no_depth_stencil
 dEQP-EGL.functional.get_frame_timestamps.rgb565_depth_no_stencil
 dEQP-EGL.functional.get_frame_timestamps.rgb565_depth_stencil
