@@ -22,9 +22,11 @@ package com.drawelements.deqp.parallelrunner;
 
 import android.app.Service;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.os.IBinder;
-import android.view.Surface;
 import android.util.Log;
+import android.view.Surface;
+import java.util.List;
 
 public class WorkerService extends Service {
     private static final String TAG = "WorkerService";
@@ -37,9 +39,15 @@ public class WorkerService extends Service {
         }
     }
 
+    private native void nativeStartDeqp(Surface surface, String commandLineArgs, AssetManager assetManager);
+
     private final ISurfaceWorker.Stub binder = new ISurfaceWorker.Stub() {
         private volatile boolean isExecuting = false;
         private final Object stateLock = new Object();
+        /**
+         * Executes the test batch on the provided surface.
+         * This call is blocking and will not return until native dEQP execution completes.
+         */
         @Override
         public boolean startTestBatch(final Surface surface, final String commandLineArgs) {
             synchronized (stateLock) {
@@ -49,21 +57,25 @@ public class WorkerService extends Service {
                 }
                 isExecuting = true;
             }
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        Log.i(TAG, "Executing native dEQP engine in background...");
-                        // TODO: Invoke native C++ execution once framework API is available
-                    } finally {
-                        synchronized (stateLock) {
-                            isExecuting = false;
-                        }
-                        Log.i(TAG, "Batch finished. Terminating worker process.");
-                    }
+            try {
+                Log.i(TAG, "Executing native dEQP engine...");
+                if (surface != null) {
+                    AssetManager assets = (getBaseContext() != null) ? getAssets() : null;
+                    nativeStartDeqp(surface, commandLineArgs, assets);
+                    return true;
+                } else {
+                    Log.w(TAG, "Cannot execute test batch: Surface is null.");
+                    return false;
                 }
-            }, "dEQP-Worker-" + WorkerService.this.getClass().getSimpleName()).start();
-            return true;
+            } catch (Exception e) {
+                Log.e(TAG, "Native execution failed.", e);
+                return false;
+            } finally {
+                synchronized (stateLock) {
+                    isExecuting = false;
+                }
+                Log.i(TAG, "Batch finished.");
+            }
         }
     };
 
@@ -72,16 +84,23 @@ public class WorkerService extends Service {
         return binder;
     }
 
+    @Override
+    public void onDestroy() {
+        super.onDestroy();
+        Log.i(TAG, "Service destroyed. Terminating worker process.");
+        System.exit(0);
+    }
+
     /**
      * Returns the collection of all available worker service classes. Use this to
      * programmatically iterate over or select worker processes instead of referencing
      * subclasses directly.
      */
-    private static final Class<?>[] WORKER_CLASSES = {
+    private static final List<Class<? extends WorkerService>> WORKER_CLASSES = List.of(
         Worker1.class, Worker2.class, Worker3.class, Worker4.class,
         Worker5.class, Worker6.class, Worker7.class, Worker8.class,
         Worker9.class, Worker10.class, Worker11.class, Worker12.class
-    };
+    );
 
     /**
      * Returns the worker service class for the specified index.
@@ -89,13 +108,10 @@ public class WorkerService extends Service {
      * @return The Class object for the requested worker.
      */
     public static Class<? extends WorkerService> getServiceClass(int index) {
-        if (index < 0 || index >= WORKER_CLASSES.length) {
+        if (index < 0 || index >= WORKER_CLASSES.size()) {
             throw new IllegalArgumentException("Invalid worker index: " + index);
         }
-        // This cast is safe because WORKER_CLASSES is typed as Class<? extends WorkerService>
-        @SuppressWarnings("unchecked")
-        Class<? extends WorkerService> workerClass = (Class<? extends WorkerService>) WORKER_CLASSES[index];
-        return workerClass;
+        return WORKER_CLASSES.get(index);
     }
 
     /**
