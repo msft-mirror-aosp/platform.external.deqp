@@ -24,6 +24,7 @@
  *//*--------------------------------------------------------------------*/
 
 #include "tcuDefs.hpp"
+#include <cstdint>
 
 namespace glu
 {

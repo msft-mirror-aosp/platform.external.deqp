@@ -229,12 +229,13 @@ class SourceFile (Source):
 		writeBinaryFile(dstPath, data)
 
 class GitRepo (Source):
-	def __init__(self, httpsUrl, sshUrl, revision, baseDir, extractDir = "src", removeTags = []):
+	def __init__(self, httpsUrl, sshUrl, revision, baseDir, extractDir = "src", removeTags = [], patch = None):
 		Source.__init__(self, baseDir, extractDir)
 		self.httpsUrl	= httpsUrl
 		self.sshUrl		= sshUrl
 		self.revision	= revision
 		self.removeTags	= removeTags
+		self.patch = patch
 
 	def detectProtocol(self, cmdProtocol = None):
 		# reuse parent repo protocol
@@ -290,6 +291,10 @@ class GitRepo (Source):
 			force_arg = ['--force'] if force else []
 			execute(["git", "fetch"] + force_arg + ["--tags", url, "+refs/heads/*:refs/remotes/origin/*"])
 			execute(["git", "checkout"] + force_arg + [self.revision])
+			if self.patch is not None:
+				patchFile = os.path.join(EXTERNAL_DIR, self.patch)
+				execute(["git", "reset", "--hard", "HEAD"])
+				execute(["git", "apply", patchFile])
 		finally:
 			popWorkingDir()
 
@@ -339,7 +344,8 @@ PACKAGES = [
 		"https://github.com/google/amber.git",
 		None,
 		"615ab4863f7d2e31d3037d0c6a0f641fd6fc0d07",
-		"amber"),
+		"amber",
+		patch = "amber-cstdint.patch"),
 ]
 
 def parseArgs ():
