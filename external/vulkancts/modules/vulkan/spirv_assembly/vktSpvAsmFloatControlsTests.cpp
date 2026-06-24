@@ -35,6 +35,7 @@
 #include "vkRefUtil.hpp"
 #include <cstring>
 #include <vector>
+#include <cstdint>
 #include <limits>
 #include <fenv.h>
 

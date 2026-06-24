@@ -1,5 +1,7 @@
 # dEQP cmake file
 
+set(CMAKE_POLICY_VERSION_MINIMUM "3.5")
+
 # Module FindGit requires cmake >= 2.8.2
 cmake_minimum_required(VERSION 3.10.2)
 

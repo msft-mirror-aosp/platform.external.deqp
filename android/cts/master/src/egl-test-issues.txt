@@ -33,3 +33,7 @@ dEQP-EGL.functional.image.modify.renderbuffer_rgba4_renderbuffer_clear_color
 # Can be removed in Q.
 dEQP-EGL.functional.wide_color.pbuffer_8888_colorspace_p3
 dEQP-EGL.functional.wide_color.window_8888_colorspace_p3
+
+# b/524066195, b/511897206
+dEQP-EGL.functional.get_frame_timestamps.rgb565_no_depth_no_stencil
+

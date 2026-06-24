@@ -1,0 +1,381 @@
+diff --git a/src/amberscript/parser.h b/src/amberscript/parser.h
+index 83c8c99..34351ec 100644
+--- a/src/amberscript/parser.h
++++ b/src/amberscript/parser.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_AMBERSCRIPT_PARSER_H_
+ #define SRC_AMBERSCRIPT_PARSER_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <utility>
+diff --git a/src/clspv_helper.h b/src/clspv_helper.h
+index 3a06c74..7a37259 100644
+--- a/src/clspv_helper.h
++++ b/src/clspv_helper.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_CLSPV_HELPER_H_
+ #define SRC_CLSPV_HELPER_H_
+ 
++#include <cstdint>
+ #include <string>
+ #include <vector>
+ 
+diff --git a/src/engine.h b/src/engine.h
+index 71c14c8..7f0747d 100644
+--- a/src/engine.h
++++ b/src/engine.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_ENGINE_H_
+ #define SRC_ENGINE_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <utility>
+diff --git a/src/pipeline.h b/src/pipeline.h
+index 3c93d6c..198d04f 100644
+--- a/src/pipeline.h
++++ b/src/pipeline.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_PIPELINE_H_
+ #define SRC_PIPELINE_H_
+ 
++#include <cstdint>
+ #include <map>
+ #include <memory>
+ #include <string>
+diff --git a/src/pipeline_data.h b/src/pipeline_data.h
+index c763f37..80e42ac 100644
+--- a/src/pipeline_data.h
++++ b/src/pipeline_data.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_PIPELINE_DATA_H_
+ #define SRC_PIPELINE_DATA_H_
+ 
++#include <cstdint>
+ #include <limits>
+ 
+ #include "src/command_data.h"
+diff --git a/src/shader_compiler.h b/src/shader_compiler.h
+index 849f731..2604aac 100644
+--- a/src/shader_compiler.h
++++ b/src/shader_compiler.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_SHADER_COMPILER_H_
+ #define SRC_SHADER_COMPILER_H_
+ 
++#include <cstdint>
+ #include <string>
+ #include <utility>
+ #include <vector>
+diff --git a/src/tokenizer.h b/src/tokenizer.h
+index 53efec6..fb52318 100644
+--- a/src/tokenizer.h
++++ b/src/tokenizer.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_TOKENIZER_H_
+ #define SRC_TOKENIZER_H_
+ 
++#include <cstdint>
+ #include <cstdlib>
+ #include <memory>
+ #include <string>
+diff --git a/src/type.h b/src/type.h
+index c63779b..97720f2 100644
+--- a/src/type.h
++++ b/src/type.h
+@@ -16,6 +16,7 @@
+ #define SRC_TYPE_H_
+ 
+ #include <cassert>
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <vector>
+diff --git a/src/type_parser.cc b/src/type_parser.cc
+index 7df8be5..741a6d1 100644
+--- a/src/type_parser.cc
++++ b/src/type_parser.cc
+@@ -16,6 +16,7 @@
+ 
+ #include <cassert>
+ #include <cstdlib>
++#include <cstdint>
+ #include <string>
+ 
+ #include "src/make_unique.h"
+diff --git a/src/type_parser.h b/src/type_parser.h
+index 3c3581d..eb47b35 100644
+--- a/src/type_parser.h
++++ b/src/type_parser.h
+@@ -16,6 +16,7 @@
+ #define SRC_TYPE_PARSER_H_
+ 
+ #include <memory>
++#include <cstdint>
+ #include <string>
+ #include <vector>
+ 
+diff --git a/src/verifier.h b/src/verifier.h
+index 9edf261..a5f414e 100644
+--- a/src/verifier.h
++++ b/src/verifier.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VERIFIER_H_
+ #define SRC_VERIFIER_H_
+ 
++#include <cstdint>
+ #include <vector>
+ 
+ #include "amber/result.h"
+diff --git a/src/vkscript/section_parser.h b/src/vkscript/section_parser.h
+index 9a37cac..293c895 100644
+--- a/src/vkscript/section_parser.h
++++ b/src/vkscript/section_parser.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VKSCRIPT_SECTION_PARSER_H_
+ #define SRC_VKSCRIPT_SECTION_PARSER_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <vector>
+diff --git a/src/vulkan/buffer_backed_descriptor.h b/src/vulkan/buffer_backed_descriptor.h
+index 8a2d0a5..a5cb65d 100644
+--- a/src/vulkan/buffer_backed_descriptor.h
++++ b/src/vulkan/buffer_backed_descriptor.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_BUFFER_BACKED_DESCRIPTOR_H_
+ #define SRC_VULKAN_BUFFER_BACKED_DESCRIPTOR_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <utility>
+ #include <vector>
+diff --git a/src/vulkan/buffer_descriptor.h b/src/vulkan/buffer_descriptor.h
+index 439afa5..4f00e7f 100644
+--- a/src/vulkan/buffer_descriptor.h
++++ b/src/vulkan/buffer_descriptor.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_BUFFER_DESCRIPTOR_H_
+ #define SRC_VULKAN_BUFFER_DESCRIPTOR_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <unordered_map>
+ #include <utility>
+diff --git a/src/vulkan/command_buffer.h b/src/vulkan/command_buffer.h
+index 67bfa11..0319250 100644
+--- a/src/vulkan/command_buffer.h
++++ b/src/vulkan/command_buffer.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_COMMAND_BUFFER_H_
+ #define SRC_VULKAN_COMMAND_BUFFER_H_
+ 
++#include <cstdint>
+ #include "amber/result.h"
+ #include "amber/vulkan_header.h"
+ 
+diff --git a/src/vulkan/compute_pipeline.h b/src/vulkan/compute_pipeline.h
+index 53f2221..81be3ff 100644
+--- a/src/vulkan/compute_pipeline.h
++++ b/src/vulkan/compute_pipeline.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_COMPUTE_PIPELINE_H_
+ #define SRC_VULKAN_COMPUTE_PIPELINE_H_
+ 
++#include <cstdint>
+ #include <vector>
+ 
+ #include "amber/result.h"
+diff --git a/src/vulkan/descriptor.h b/src/vulkan/descriptor.h
+index cc3c7c1..cf94513 100644
+--- a/src/vulkan/descriptor.h
++++ b/src/vulkan/descriptor.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_VULKAN_DESCRIPTOR_H_
+ #define SRC_VULKAN_DESCRIPTOR_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/vulkan/device.h b/src/vulkan/device.h
+index 0ce0529..b912599 100644
+--- a/src/vulkan/device.h
++++ b/src/vulkan/device.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_VULKAN_DEVICE_H_
+ #define SRC_VULKAN_DEVICE_H_
+ 
++#include <cstdint>
+ #include <functional>
+ #include <memory>
+ #include <string>
+diff --git a/src/vulkan/engine_vulkan.h b/src/vulkan/engine_vulkan.h
+index baf5ad7..fd2a111 100644
+--- a/src/vulkan/engine_vulkan.h
++++ b/src/vulkan/engine_vulkan.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_VULKAN_ENGINE_VULKAN_H_
+ #define SRC_VULKAN_ENGINE_VULKAN_H_
+ 
++#include <cstdint>
+ #include <map>
+ #include <memory>
+ #include <string>
+diff --git a/src/vulkan/frame_buffer.h b/src/vulkan/frame_buffer.h
+index 5774289..b54bfd7 100644
+--- a/src/vulkan/frame_buffer.h
++++ b/src/vulkan/frame_buffer.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_FRAME_BUFFER_H_
+ #define SRC_VULKAN_FRAME_BUFFER_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/vulkan/graphics_pipeline.h b/src/vulkan/graphics_pipeline.h
+index c4bb657..6dd8a59 100644
+--- a/src/vulkan/graphics_pipeline.h
++++ b/src/vulkan/graphics_pipeline.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_GRAPHICS_PIPELINE_H_
+ #define SRC_VULKAN_GRAPHICS_PIPELINE_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/vulkan/image_descriptor.h b/src/vulkan/image_descriptor.h
+index 3046436..2bc7a6c 100644
+--- a/src/vulkan/image_descriptor.h
++++ b/src/vulkan/image_descriptor.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_IMAGE_DESCRIPTOR_H_
+ #define SRC_VULKAN_IMAGE_DESCRIPTOR_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <unordered_map>
+ #include <utility>
+diff --git a/src/vulkan/pipeline.h b/src/vulkan/pipeline.h
+index db93c00..e430a5b 100644
+--- a/src/vulkan/pipeline.h
++++ b/src/vulkan/pipeline.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_VULKAN_PIPELINE_H_
+ #define SRC_VULKAN_PIPELINE_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <string>
+ #include <unordered_map>
+diff --git a/src/vulkan/push_constant.h b/src/vulkan/push_constant.h
+index 0ae8b70..526cadc 100644
+--- a/src/vulkan/push_constant.h
++++ b/src/vulkan/push_constant.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_PUSH_CONSTANT_H_
+ #define SRC_VULKAN_PUSH_CONSTANT_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/vulkan/resource.h b/src/vulkan/resource.h
+index 8ae4fec..40e4d25 100644
+--- a/src/vulkan/resource.h
++++ b/src/vulkan/resource.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_VULKAN_RESOURCE_H_
+ #define SRC_VULKAN_RESOURCE_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/vulkan/sampler_descriptor.h b/src/vulkan/sampler_descriptor.h
+index 64d08fa..8b9e934 100644
+--- a/src/vulkan/sampler_descriptor.h
++++ b/src/vulkan/sampler_descriptor.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_SAMPLER_DESCRIPTOR_H_
+ #define SRC_VULKAN_SAMPLER_DESCRIPTOR_H_
+ 
++#include <cstdint>
+ #include <memory>
+ #include <vector>
+ 
+diff --git a/src/vulkan/transfer_buffer.h b/src/vulkan/transfer_buffer.h
+index 8734363..93b14b7 100644
+--- a/src/vulkan/transfer_buffer.h
++++ b/src/vulkan/transfer_buffer.h
+@@ -16,6 +16,7 @@
+ #ifndef SRC_VULKAN_TRANSFER_BUFFER_H_
+ #define SRC_VULKAN_TRANSFER_BUFFER_H_
+ 
++#include <cstdint>
+ #include <vector>
+ 
+ #include "amber/result.h"
+diff --git a/src/vulkan/transfer_image.h b/src/vulkan/transfer_image.h
+index 3af71d2..c6f6814 100644
+--- a/src/vulkan/transfer_image.h
++++ b/src/vulkan/transfer_image.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_TRANSFER_IMAGE_H_
+ #define SRC_VULKAN_TRANSFER_IMAGE_H_
+ 
++#include <cstdint>
+ #include "amber/result.h"
+ #include "amber/vulkan_header.h"
+ #include "src/format.h"
+diff --git a/src/vulkan/vertex_buffer.h b/src/vulkan/vertex_buffer.h
+index 871a9cc..4295218 100644
+--- a/src/vulkan/vertex_buffer.h
++++ b/src/vulkan/vertex_buffer.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_VULKAN_VERTEX_BUFFER_H_
+ #define SRC_VULKAN_VERTEX_BUFFER_H_
+ 
++#include <cstdint>
+ #include <map>
+ #include <memory>
+ #include <vector>
+
+diff --git a/src/descriptor_set_and_binding_parser.h b/src/descriptor_set_and_binding_parser.h
+--- a/src/descriptor_set_and_binding_parser.h
++++ b/src/descriptor_set_and_binding_parser.h
+@@ -15,6 +15,7 @@
+ #ifndef SRC_DESCRIPTOR_SET_AND_BINDING_PARSER_H_
+ #define SRC_DESCRIPTOR_SET_AND_BINDING_PARSER_H_
+ 
++#include <cstdint>
+ #include <string>
+ 
+ #include "amber/result.h"
+ 
+diff --git a/src/recipe.cc b/src/recipe.cc
+--- a/src/recipe.cc
++++ b/src/recipe.cc
+@@ -12,5 +12,6 @@
+ // See the License for the specific language governing permissions and
+ 
++#include <cstdint>
+ #include "amber/recipe.h"
+ 
+ namespace amber {
+diff --git a/include/amber/shader_info.h b/include/amber/shader_info.h
+--- a/include/amber/shader_info.h
++++ b/include/amber/shader_info.h
+@@ -15,5 +15,6 @@
+ #ifndef AMBER_SHADER_INFO_H_
+ #define AMBER_SHADER_INFO_H_
+ 
++#include <cstdint>
+ #include <string>
+ #include <vector>
