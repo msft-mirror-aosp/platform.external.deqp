@@ -57,8 +57,6 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
             "deqpparallel/caselists/"
         ).getAbsolutePath();
     }
-    static final int DEFAULT_MAX_WORKERS = 4;
-    static final int MAX_ALLOWED_WORKERS = 12;
 
     private GridLayout workerGridLayout;
     private final DeqpTestBatchLoader mTestBatchLoader = new DeqpTestBatchLoader();
@@ -70,9 +68,9 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
         workerGridLayout = new GridLayout(this);
         setContentView(workerGridLayout);
 
-        int workerCount = DEFAULT_MAX_WORKERS;
+        int workerCount = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
         if (getIntent() != null && getIntent().hasExtra(EXTRA_MAX_WORKERS)) {
-            workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, DEFAULT_MAX_WORKERS);
+            workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
         }
 
         if (workerCount <= 0) {
@@ -80,9 +78,9 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
             workerCount = 1;
         }
 
-        if (workerCount > MAX_ALLOWED_WORKERS) {
-            Log.w(TAG, "workerCount " + workerCount + " exceeds maximum allowed. Clamping to " + MAX_ALLOWED_WORKERS + ".");
-            workerCount = MAX_ALLOWED_WORKERS;
+        if (workerCount > ParallelRunnerConfig.MAX_ALLOWED_WORKERS) {
+            Log.w(TAG, "workerCount " + workerCount + " exceeds maximum allowed. Clamping to " + ParallelRunnerConfig.MAX_ALLOWED_WORKERS + ".");
+            workerCount = ParallelRunnerConfig.MAX_ALLOWED_WORKERS;
         }
 
         String testBatchesDir = DEFAULT_TEST_BATCHES_DIR;

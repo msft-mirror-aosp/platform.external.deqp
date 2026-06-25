@@ -122,15 +122,15 @@ public class SurfaceProviderActivityTest {
 
     @Test
     public void testDefaultMaxWorkersConstant() {
-        assertEquals(4, SurfaceProviderActivity.DEFAULT_MAX_WORKERS);
+        assertEquals(4, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
     }
 
     @Test
     public void testDefaultWorkersLaunch() {
         try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(SurfaceProviderActivity.class)) {
             scenario.onActivity(activity -> {
-                GridLayout gridLayout = getAndVerifySurfaceGrid(activity, SurfaceProviderActivity.DEFAULT_MAX_WORKERS);
-                assertGridGeometryTiling(gridLayout, SurfaceProviderActivity.DEFAULT_MAX_WORKERS);
+                GridLayout gridLayout = getAndVerifySurfaceGrid(activity, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+                assertGridGeometryTiling(gridLayout, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
             });
         }
     }
