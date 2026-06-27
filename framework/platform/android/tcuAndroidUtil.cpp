@@ -39,50 +39,6 @@ using std::vector;
 namespace
 {
 
-class ScopedJNIEnv
-{
-public:
-    ScopedJNIEnv(JavaVM *vm);
-    ~ScopedJNIEnv(void);
-
-    JavaVM *getVM(void) const
-    {
-        return m_vm;
-    }
-    JNIEnv *getEnv(void) const
-    {
-        return m_env;
-    }
-
-private:
-    JavaVM *const m_vm;
-    JNIEnv *m_env;
-    bool m_detach;
-};
-
-ScopedJNIEnv::ScopedJNIEnv(JavaVM *vm) : m_vm(vm), m_env(nullptr), m_detach(false)
-{
-    const int getEnvRes = m_vm->GetEnv((void **)&m_env, JNI_VERSION_1_6);
-
-    if (getEnvRes == JNI_EDETACHED)
-    {
-        if (m_vm->AttachCurrentThread(&m_env, nullptr) != JNI_OK)
-            throw std::runtime_error("JNI AttachCurrentThread() failed");
-
-        m_detach = true;
-    }
-    else if (getEnvRes != JNI_OK)
-        throw std::runtime_error("JNI GetEnv() failed");
-
-    DE_ASSERT(m_env);
-}
-
-ScopedJNIEnv::~ScopedJNIEnv(void)
-{
-    if (m_detach)
-        m_vm->DetachCurrentThread();
-}
-
 class LocalRef
 {
 public:
@@ -351,6 +307,29 @@ void describePlatform(JNIEnv *env, std::ostream &dst)
 }
 
 } // namespace
+
+ScopedJNIEnv::ScopedJNIEnv(JavaVM *vm) : m_vm(vm), m_env(nullptr), m_detach(false)
+{
+    const int getEnvRes = m_vm->GetEnv((void **)&m_env, JNI_VERSION_1_6);
+
+    if (getEnvRes == JNI_EDETACHED)
+    {
+        if (m_vm->AttachCurrentThread(&m_env, nullptr) != JNI_OK)
+            throw std::runtime_error("JNI AttachCurrentThread() failed");
+
+        m_detach = true;
+    }
+    else if (getEnvRes != JNI_OK)
+        throw std::runtime_error("JNI GetEnv() failed");
+
+    DE_ASSERT(m_env);
+}
+
+ScopedJNIEnv::~ScopedJNIEnv(void)
+{
+    if (m_detach)
+        m_vm->DetachCurrentThread();
+}
 
 ScreenOrientation mapScreenRotation(ScreenRotation rotation)
 {
