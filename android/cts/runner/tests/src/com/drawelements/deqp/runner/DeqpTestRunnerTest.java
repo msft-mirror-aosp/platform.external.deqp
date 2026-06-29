@@ -109,6 +109,7 @@ public class DeqpTestRunnerTest extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         mTestsDir = FileUtil.createTempDir("deqp-test-cases");
+        // TODO: Refactor test cases across this class to initialize common mocks (mockDevice, mockIDevice, mockListener) here in setUp().
     }
 
     /**
@@ -2151,35 +2152,37 @@ public class DeqpTestRunnerTest extends TestCase {
                                         output);
     }
 
-    private void
-    runInstrumentationLineAndAnswer(ITestDevice mockDevice, IDevice mockIDevice,
-                                    final String testTrie, final String cmd,
-                                    final String output) throws Exception {
-        EasyMock
-            .expect(mockDevice.executeShellCommand(
-                EasyMock.eq("rm " + APP_DIR + CASE_LIST_FILE_NAME)))
-            .andReturn("")
-            .once();
+    private void expectRemoveFile(ITestDevice mockDevice, String path) throws Exception {
+        String cmd = "rm " + path;
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(cmd)))
+                .andReturn("")
+                .once();
+    }
 
-        EasyMock
-            .expect(mockDevice.executeShellCommand(
-                EasyMock.eq("rm " + APP_DIR + LOG_FILE_NAME)))
-            .andReturn("")
-            .once();
+    private void expectRemoveFolder(ITestDevice mockDevice, String path) throws Exception {
+        String cmd = "rm -rf " + path;
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(cmd)))
+                .andReturn("")
+                .once();
+    }
 
-        if (testTrie == null) {
-            mockDevice.pushString((String)EasyMock.anyObject(),
-                                  EasyMock.eq(APP_DIR + CASE_LIST_FILE_NAME));
-        } else {
-            mockDevice.pushString(testTrie + "\n",
-                                  APP_DIR + CASE_LIST_FILE_NAME);
-        }
+    private void expectCreateDirectory(ITestDevice mockDevice, String path) throws Exception {
+        String cmd = "mkdir -p " + path;
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(cmd)))
+                .andReturn("")
+                .once();
+    }
+
+    private void expectPushString(ITestDevice mockDevice, String content, String remotePath) throws Exception {
+        mockDevice.pushString(content, remotePath);
         EasyMock.expectLastCall().andReturn(true).once();
+    }
 
+    private void expectInstrumentationCommand(ITestDevice mockDevice, String logFilename, String cmd, final String output) throws Exception {
         String command = String.format(
             "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\" "
                 + "-e deqpLogData \"%s\" %s",
-            AbiUtils.createAbiFlag(ABI.getName()), APP_DIR + LOG_FILE_NAME, cmd,
+            AbiUtils.createAbiFlag(ABI.getName()), logFilename, cmd,
             false, INSTRUMENTATION_NAME);
 
         mockDevice.executeShellV2CommandNoRecovery(
@@ -2198,6 +2201,51 @@ public class DeqpTestRunnerTest extends TestCase {
                 return null;
             }
         });
+    }
+
+    private void
+    runInstrumentationLineAndAnswer(ITestDevice mockDevice, IDevice mockIDevice,
+                                    final String testTrie, final String cmd,
+                                    final String output) throws Exception {
+        expectRemoveFile(mockDevice, APP_DIR + CASE_LIST_FILE_NAME);
+        expectRemoveFile(mockDevice, APP_DIR + LOG_FILE_NAME);
+
+        String remotePath = APP_DIR + CASE_LIST_FILE_NAME;
+        if (testTrie != null) {
+            expectPushString(mockDevice, testTrie + "\n", remotePath);
+        } else {
+            expectPushString(mockDevice, (String)EasyMock.anyObject(), EasyMock.eq(remotePath));
+        }
+
+        String logFilename = APP_DIR + LOG_FILE_NAME;
+        expectInstrumentationCommand(mockDevice, logFilename, cmd, output);
+    }
+
+    private void
+    runInstrumentationLineAndAnswerParallel(ITestDevice mockDevice,
+                                            final List<TestDescription> tests, final String cmd,
+                                            final String output, int expectedParallelBatches) throws Exception {
+        expectRemoveFolder(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
+        expectRemoveFolder(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
+        expectCreateDirectory(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
+        expectCreateDirectory(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
+
+        final int batchSize = 1000;
+        for (int i = 0; i < expectedParallelBatches; i++) {
+            String remotePath = DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part" + (i + 1) + ".txt";
+            if (tests != null) {
+                List<TestDescription> subList = tests.subList(i * batchSize, Math.min((i + 1) * batchSize, tests.size()));
+                String expectedTrie = DeqpTestRunner.generateTestCaseTrie(subList);
+                expectPushString(mockDevice, EasyMock.eq(expectedTrie + "\n"),
+                                 EasyMock.eq(remotePath));
+            } else {
+                expectPushString(mockDevice, (String)EasyMock.anyObject(),
+                                 EasyMock.eq(remotePath));
+            }
+        }
+
+        String logFilename = DeqpTestRunner.APP_DIR_PARALLEL_LOGS;
+        expectInstrumentationCommand(mockDevice, logFilename, cmd, output);
     }
 
     static private void writeStringsToFile(File target, Set<String> strings)
@@ -2697,5 +2745,136 @@ public class DeqpTestRunnerTest extends TestCase {
         deqpTest.run(mockListener);
 
         EasyMock.verify(mockListener, mockDevice, mockIDevice);
+    }
+
+    private DeqpTestRunner setupTestRunner(ITestDevice mockDevice, List<TestDescription> tests, boolean enableParallelRun) throws Exception {
+        DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
+
+        if (enableParallelRun) {
+            OptionSetter setter = new OptionSetter(deqpTest);
+            setter.setOptionValue("enable-deqp-parallel-run", "true");
+        }
+
+        expectGlVersion(mockDevice, 3, 0);
+        expectRenderConfigQuery(mockDevice, 3, 0);
+
+        return deqpTest;
+    }
+
+    private void runTestAndVerify(DeqpTestRunner deqpTest, Collection<TestDescription> tests,
+                                  ITestDevice mockDevice, IDevice mockIDevice,
+                                  ITestInvocationListener mockListener) throws Exception {
+        mockListener.testRunStarted(getTestId(deqpTest), tests.size());
+        EasyMock.expectLastCall().once();
+        expectAngleSetupAndTeardown(mockDevice);
+
+        expectListenerTests(mockListener, tests);
+
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+
+        EasyMock.replay(mockDevice, mockIDevice, mockListener);
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+        EasyMock.verify(mockListener, mockDevice, mockIDevice);
+    }
+
+    /**
+     * Test running in sequential mode when the parallel execution option is disabled.
+     * <p>
+     * Verifies that even with a large test count (5000 tests), the runner falls back
+     * to executing the tests sequentially in multiple batches (5 batches of 1000 tests each)
+     * using the default single-batch instrumentation and caselist path.
+     *
+     * @throws Exception if an error occurs during mock setup or execution
+     */
+    public void testRun_multipleBatches() throws Exception {
+        final int numTests = 5000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, false);
+
+        // Mock 5 batch executions sequentially
+        final int batchSize = 1000;
+        for (int i = 0; i < numTests; i += batchSize) {
+            List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, getCommandLine(), subOutput);
+        }
+
+        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+    }
+
+    /**
+     * Test running in parallel mode when the test count is below the parallel execution threshold.
+     * <p>
+     * Verifies that when the parallel run option is enabled, but the input test size (1 test)
+     * is below the threshold (5000 tests), the runner transparently falls back to sequential
+     * execution to avoid setup overhead.
+     *
+     * @throws Exception if an error occurs during mock setup or execution
+     */
+    public void testRun_parallelModeEnabled_testCountBelowThreshold() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+
+        String output = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, getCommandLine(), output);
+
+        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+    }
+
+    /**
+     * Test running in parallel mode when the test count is at or above the parallel execution threshold.
+     * <p>
+     * Verifies that when the parallel run option is enabled and the test count is large enough
+     * (5000 tests), the runner successfully slices and pushes all batches to the device at once,
+     * executing them in parallel and using the parallel logs directory.
+     *
+     * @throws Exception if an error occurs during mock setup or execution
+     */
+    public void testRun_parallelModeEnabled_testCountAboveThreshold() throws Exception {
+        final int numTests = 5000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+
+        String output = buildTestProcessOutput(tests);
+        String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-watchdog=enable";
+
+        runInstrumentationLineAndAnswerParallel(mockDevice, tests, parallelCmd, output, 5);
+
+        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+    }
+
+    private void expectListenerTests(ITestInvocationListener mockListener, Collection<TestDescription> tests) {
+        for (TestDescription testId : tests) {
+            mockListener.testStarted(EasyMock.eq(testId));
+            EasyMock.expectLastCall().once();
+            mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
+            EasyMock.expectLastCall().once();
+        }
+    }
+
+    private List<TestDescription> generateTestList(int numTests) {
+        List<TestDescription> tests = new ArrayList<>();
+        for (int i = 0; i < numTests; i++) {
+            tests.add(new TestDescription("dEQP-GLES3.info", "test" + i));
+        }
+        return tests;
     }
 }
