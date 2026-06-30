@@ -100,8 +100,6 @@ public class DeqpTestRunner
     protected static final String APP_DIR = "/sdcard/";
     protected static final String CASE_LIST_FILE_NAME = "dEQP-TestCaseList.txt";
     protected static final String LOG_FILE_NAME = "TestLog.qpa";
-    protected static final String APP_DIR_PARALLEL_CASELISTS = APP_DIR + "deqpparallel/caselists/";
-    protected static final String APP_DIR_PARALLEL_LOGS = APP_DIR + "deqpparallel/logs/";
     public static final String FEATURE_LANDSCAPE =
         "android.hardware.screen.landscape";
     public static final String FEATURE_PORTRAIT =
@@ -129,7 +127,6 @@ public class DeqpTestRunner
     private static final int TESTCASE_BATCH_LIMIT = 1000;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
         10 * 60 * 1000; // 10min
-    private static final int DEQP_PARALLEL_EXECUTION_THRESHOLD = 5000;
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
     private static final int DEQP_LEVEL_U_2023 = 132580097;
@@ -267,10 +264,10 @@ public class DeqpTestRunner
     private boolean mEnableDeqpOutsideGrfNonHandheld = false;
 
     @Option(
-        name = "enable-deqp-parallel-run",
+        name = "enable-deqp-parallel-runner",
         description =
-            "Feature flag to enable dEQP tests parallel run")
-    private boolean mEnableDeqpParallelRun = false;
+            "Feature flag to enable dEQP tests parallel runner")
+    private boolean mEnableDeqpParallelRunner = false;
 
     protected Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances =
@@ -1381,11 +1378,8 @@ public class DeqpTestRunner
             }
             if (runBatchTests.size() >=
                 getBatchSizeLimitForInstability(leadingInstability)) {
-                // For parallel mode, batching limit check is pushed from here to executeTestRunBatchRun
-                if (!isParallelMode(pool.size())) {
-                    // batch size is limited.
-                    break;
-                }
+                // batch size is limited.
+                break;
             }
             runBatchTests.add(test);
         }
@@ -1421,15 +1415,9 @@ public class DeqpTestRunner
         }
     }
 
-    protected void recordTestInstability(TestDescription testId, boolean isParallelMode) {
-        if (isParallelMode) {
-            // TODO : We have to take into account instability of the test and hence we can reduce
-            // the parallel batch size based on instability score instead of aborting the test.
-            getInstanceListener().abortTest(testId, "Test removed due to instability");
-        } else {
-            mTestInstabilityRatings.put(testId,
-                    getTestInstabilityRating(testId) + 1);
-        }
+    protected void recordTestInstability(TestDescription testId) {
+        mTestInstabilityRatings.put(testId,
+                                    getTestInstabilityRating(testId) + 1);
     }
 
     protected void clearTestInstability(TestDescription testId) {
@@ -1570,16 +1558,10 @@ public class DeqpTestRunner
         final String instrumentationName =
             "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
 
-        final boolean isParallel = isParallelMode(batch.getTestBatchTestDescriptionList().size());
         final StringBuilder deqpCmdLine = new StringBuilder();
-        if (!isParallel) {
-            // In serial mode, pass the single caselist file via command line.
-            // In parallel mode, caselists are split into multiple partition files under
-            // APP_DIR_PARALLEL_CASELISTS, which are automatically discovered and handled by the app.
-            deqpCmdLine.append("--deqp-caselist-file=");
-            deqpCmdLine.append(APP_DIR + CASE_LIST_FILE_NAME);
-            deqpCmdLine.append(" ");
-        }
+        deqpCmdLine.append("--deqp-caselist-file=");
+        deqpCmdLine.append(APP_DIR + CASE_LIST_FILE_NAME);
+        deqpCmdLine.append(" ");
         deqpCmdLine.append(getRunConfigDisplayCmdLine(batch.getTestBatchConfig()));
 
         // If we are not logging data, do not bother outputting the images from
@@ -1591,15 +1573,11 @@ public class DeqpTestRunner
         if (!mDisableWatchdog) {
             deqpCmdLine.append(" --deqp-watchdog=enable");
         }
-        String deqpLogData = APP_DIR + LOG_FILE_NAME;
-        if (isParallel) {
-            deqpLogData = APP_DIR_PARALLEL_LOGS;
-        }
 
         final String command = String.format(
             "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\""
                 + " -e deqpLogData \"%s\" %s",
-            AbiUtils.createAbiFlag(mAbi.getName()), deqpLogData,
+            AbiUtils.createAbiFlag(mAbi.getName()), APP_DIR + LOG_FILE_NAME,
             deqpCmdLine.toString(), mLogData, instrumentationName);
 
         final InstrumentationParser parser =
@@ -1667,40 +1645,15 @@ public class DeqpTestRunner
 
         checkInterrupted(); // throws if interrupted
 
-        final boolean isParallel = isParallelMode(batch.getTestBatchTestDescriptionList().size());
-
-        // Clean up old files from both serial and parallel modes to avoid interference
-        mDevice.executeShellCommand("rm -f " + APP_DIR + CASE_LIST_FILE_NAME);
-        mDevice.executeShellCommand("rm -f " + APP_DIR + LOG_FILE_NAME);
-        mDevice.executeShellCommand("rm -rf " + APP_DIR_PARALLEL_CASELISTS);
-        mDevice.executeShellCommand("rm -rf " + APP_DIR_PARALLEL_LOGS);
-
-        if (isParallel) {
-            final List<TestDescription> testList = batch.getTestBatchTestDescriptionList();
-            final String remoteCaselistsDir = APP_DIR_PARALLEL_CASELISTS;
-            mDevice.executeShellCommand("mkdir -p " + remoteCaselistsDir);
-            final String remoteLogsDir = APP_DIR_PARALLEL_LOGS;
-            mDevice.executeShellCommand("mkdir -p " + remoteLogsDir);
-
-            // TODO: Currently we are taking instability score of 0 for the parallel mode
-            //       In future we have to take into account of instability score of the tests.
-            final int batchSize = getBatchSizeLimitForInstability(0);
-            for (int i = 0; i < testList.size(); i += batchSize) {
-                List<TestDescription> subList = testList.subList(i, Math.min(i + batchSize, testList.size()));
-                String testCases = generateTestCaseTrie(subList);
-                String remoteFileName = remoteCaselistsDir + "dEQP-part" + (i / batchSize + 1) + ".txt";
-                if (!mDevice.pushString(testCases + "\n", remoteFileName)) {
-                    throw new RuntimeException("Failed to write test cases to " + remoteFileName);
-                }
-            }
-        } else {
-            final String testCases = generateTestCaseTrie(batch.getTestBatchTestDescriptionList());
-            final String testCaseFilename = APP_DIR + CASE_LIST_FILE_NAME;
-            if (!mDevice.pushString(testCases + "\n", testCaseFilename)) {
-                throw new RuntimeException("Failed to write test cases to " +
-                                           testCaseFilename);
-            }
+        final String testCases = generateTestCaseTrie(batch.getTestBatchTestDescriptionList());
+        final String testCaseFilename = APP_DIR + CASE_LIST_FILE_NAME;
+        mDevice.executeShellCommand("rm " + testCaseFilename);
+        mDevice.executeShellCommand("rm " + APP_DIR + LOG_FILE_NAME);
+        if (!mDevice.pushString(testCases + "\n", testCaseFilename)) {
+            throw new RuntimeException("Failed to write test cases to " +
+                                       testCaseFilename);
         }
+
         final int numRemainingInstancesBefore = getNumRemainingInstances();
         Throwable interruptingError = null;
 
@@ -1762,7 +1715,7 @@ public class DeqpTestRunner
             // two observations until bailing.
             if (!wasTestExecuted &&
                 (!wasLinkFailure || getTestInstabilityRating(onlyTest) > 0)) {
-                recordTestInstability(onlyTest, isParallel);
+                recordTestInstability(onlyTest);
                 // If we cannot finish the test, mark the case as a crash.
                 //
                 // If we couldn't even start the test, fail the test instance as
@@ -1790,13 +1743,13 @@ public class DeqpTestRunner
                 for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
                     if (getInstanceListener().isPendingTestInstance(
                             test, batch.getTestBatchConfig())) {
-                        recordTestInstability(test, isParallel);
+                        recordTestInstability(test);
                     } else {
                         clearTestInstability(test);
                     }
                 }
             } else {
-                recordTestInstability(getInstanceListener().getCurrentTestId(), isParallel);
+                recordTestInstability(getInstanceListener().getCurrentTestId());
                 for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
                     // \note: isPendingTestInstance is false for
                     // getCurrentTestId. Current ID is considered 'running' and
@@ -2830,7 +2783,7 @@ public class DeqpTestRunner
         destination.mIsPC = source.mIsPC;
         destination.mEnableDeqpOutsideGrf = source.mEnableDeqpOutsideGrf;
         destination.mEnableDeqpOutsideGrfNonHandheld = source.mEnableDeqpOutsideGrfNonHandheld;
-        destination.mEnableDeqpParallelRun = source.mEnableDeqpParallelRun;
+        destination.mEnableDeqpParallelRunner = source.mEnableDeqpParallelRunner;
     }
 
     /**
@@ -2920,9 +2873,4 @@ public class DeqpTestRunner
         mIsAutomotive = mDeviceFeatures.containsKey(FEATURE_AUTOMOTIVE);
         mIsPC = mDeviceFeatures.containsKey(FEATURE_PC);
     }
-
-    private boolean isParallelMode(int testCount) {
-        return mEnableDeqpParallelRun && testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD;
-    }
-
 }
