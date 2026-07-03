@@ -44,6 +44,7 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -74,21 +75,32 @@ public class DeqpTestRunnerTest extends TestCase {
     private static final String ALL_FEATURES =
         ONLY_LANDSCAPE_FEATURES +
         "\nfeature:" + DeqpTestRunner.FEATURE_PORTRAIT;
-    private static List<Map<String, String>> DEFAULT_INSTANCE_ARGS;
 
     private static String ASSUMPTION_FAILURE_MESSAGE = "Assumption Failure";
     private static String PASS_MESSAGE = "Pass";
 
-    static {
-        DEFAULT_INSTANCE_ARGS = new ArrayList<>(1);
-        DEFAULT_INSTANCE_ARGS.add(new HashMap<String, String>());
-        DEFAULT_INSTANCE_ARGS.iterator().next().put("glconfig",
-                                                    "rgba8888d24s8");
-        DEFAULT_INSTANCE_ARGS.iterator().next().put("rotation", "unspecified");
-        DEFAULT_INSTANCE_ARGS.iterator().next().put("surfacetype", "window");
-    }
+    private static final TestDescription[] SAMPLE_TEST_IDS = {
+        new TestDescription("dEQP-GLES3.missing", "no"),
+        new TestDescription("dEQP-GLES3.missing", "nope"),
+        new TestDescription("dEQP-GLES3.missing", "donotwant"),
+        new TestDescription("dEQP-GLES3.pick_me", "yes"),
+        new TestDescription("dEQP-GLES3.pick_me", "ok"),
+        new TestDescription("dEQP-GLES3.pick_me", "accepted"),
+    };
+
+    private static final TestDescription[] GLES3_INFO_TEST_IDS = {
+        new TestDescription("dEQP-GLES3.info", "vendor"),
+        new TestDescription("dEQP-GLES3.info", "renderer"),
+        new TestDescription("dEQP-GLES3.info", "version"),
+        new TestDescription("dEQP-GLES3.info", "shading_language_version"),
+        new TestDescription("dEQP-GLES3.info", "extensions"),
+        new TestDescription("dEQP-GLES3.info", "render_target"),
+    };
 
     private File mTestsDir = null;
+    private ITestDevice mockDevice;
+    private IDevice mockIDevice;
+    private ITestInvocationListener mockListener;
 
     public static class BuildHelperMock extends CompatibilityBuildHelper {
         private File mTestsDir = null;
@@ -109,7 +121,9 @@ public class DeqpTestRunnerTest extends TestCase {
     protected void setUp() throws Exception {
         super.setUp();
         mTestsDir = FileUtil.createTempDir("deqp-test-cases");
-        // TODO: Refactor test cases across this class to initialize common mocks (mockDevice, mockIDevice, mockListener) here in setUp().
+        mockDevice = EasyMock.createMock(ITestDevice.class);
+        mockIDevice = EasyMock.createMock(IDevice.class);
+        mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
     }
 
     /**
@@ -210,42 +224,6 @@ public class DeqpTestRunnerTest extends TestCase {
         return getCommandLine("unspecified");
     }
 
-    private void expectAngleSetup(ITestDevice mockDevice) throws Exception {
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(
-                "settings delete global angle_gl_driver_selection_pkgs")))
-            .andReturn("")
-            .once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(
-                "settings delete global angle_gl_driver_selection_values")))
-            .andReturn("")
-            .once();
-    }
-
-    private void expectAngleSetupAndTeardown(ITestDevice mockDevice) throws Exception {
-        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
-        expectAngleSetup(mockDevice);
-        expectAngleSetup(mockDevice);
-    }
-
-    private void expectGlVersion(ITestDevice mockDevice, int majorVersion, int minorVersion) throws Exception {
-        int version = (majorVersion << 16) | minorVersion;
-        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
-            .andReturn(Integer.toString(version))
-            .atLeastOnce();
-    }
-
-    private void expectVulkanVersion(ITestDevice mockDevice,  int deqpLevel, int vulkanHardwareVersion) throws Exception {
-        int majorVersion = (vulkanHardwareVersion >> 22) & 0x7F;
-        assertEquals("Only Vulkan version 1.0 is supported in this mock", 1, majorVersion);
-
-        String featureString = "feature:" + DeqpTestRunner.FEATURE_VULKAN_LEVEL + "=" + majorVersion + "\n"
-                + "feature:" + DeqpTestRunner.FEATURE_VULKAN_DEQP_LEVEL + "=" + deqpLevel + "\n"
-                + "feature:" + DeqpTestRunner.FEATURE_VULKAN_HARDWARE_VERSION  + "=" + vulkanHardwareVersion;
-        EasyMock.expect(mockDevice.executeShellCommand("pm list features"))
-            .andReturn(featureString)
-            .atLeastOnce();
-    }
-
     /**
      * Test version of OpenGL ES.
      */
@@ -258,10 +236,6 @@ public class DeqpTestRunnerTest extends TestCase {
                 Integer.toString(requiredMinorVersion) + ".info",
             "version");
 
-        final String testPath =
-            "dEQP-GLES" + Integer.toString(requiredMajorVersion) +
-            Integer.toString(requiredMinorVersion) + ".info.version";
-
         final String testTrie =
             "{dEQP-GLES" + Integer.toString(requiredMajorVersion) +
             Integer.toString(requiredMinorVersion) + "{info{version}}}";
@@ -272,10 +246,6 @@ public class DeqpTestRunnerTest extends TestCase {
                 DeqpTestRunner.ASSUMPTION_FAILURE_DEQP_LEVEL_LOG_MESSAGE;
         }
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
 
@@ -283,25 +253,24 @@ public class DeqpTestRunnerTest extends TestCase {
         DeqpTestRunner deqpTest = buildGlesTestRunner(
             requiredMajorVersion, requiredMinorVersion, tests, mTestsDir);
 
-        expectGlVersion(mockDevice, majorVersion, minorVersion);
+        expectGlVersion(majorVersion, minorVersion);
 
         if (majorVersion > requiredMajorVersion ||
             (majorVersion == requiredMajorVersion &&
              minorVersion >= requiredMinorVersion)) {
 
-            expectAngleSetupAndTeardown(mockDevice);
+            expectAngleSetupAndTeardown();
 
-            expectRenderConfigQuery(mockDevice, requiredMajorVersion,
+            expectRenderConfigQuery(requiredMajorVersion,
                                     requiredMinorVersion);
 
             String commandLine = getCommandLine();
 
-            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+            runInstrumentationLineAndAnswer(testTrie,
                                             commandLine, output);
         }
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 1);
 
         mockListener.testStarted(EasyMock.eq(testId));
         EasyMock.expectLastCall().once();
@@ -318,68 +287,12 @@ public class DeqpTestRunnerTest extends TestCase {
                                EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectTestRunEnded();
 
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        runAndVerifyTest(deqpTest);
     }
 
-    private void expectRenderConfigQuery(ITestDevice mockDevice,
-                                         int majorVersion, int minorVersion)
-        throws Exception {
-        expectRenderConfigQuery(
-            mockDevice,
-            String.format("--deqp-gl-config-name=rgba8888d24s8 "
-                              + "--deqp-screen-rotation=unspecified "
-                              + "--deqp-surface-type=window "
-                              + "--deqp-gl-major-version=%d "
-                              + "--deqp-gl-minor-version=%d",
-                          majorVersion, minorVersion));
-    }
 
-    private void expectRenderConfigQuery(ITestDevice mockDevice,
-                                         String commandLine) throws Exception {
-        expectRenderConfigQueryAndReturn(mockDevice, commandLine, "Yes");
-    }
-
-    private void expectRenderConfigQueryAndReturn(ITestDevice mockDevice,
-                                                  String commandLine,
-                                                  String output)
-        throws Exception {
-        final String queryOutput =
-            "INSTRUMENTATION_RESULT: Supported=" + output + "\r\n"
-            + "INSTRUMENTATION_CODE: 0\r\n";
-        final String command = String.format(
-            "am instrument %s -w -e deqpQueryType renderConfigSupported -e deqpCmdLine "
-                + "\"%s\" %s",
-            AbiUtils.createAbiFlag(ABI.getName()), commandLine,
-            QUERY_INSTRUMENTATION_NAME);
-
-        mockDevice.executeShellCommand(
-            EasyMock.eq(command), EasyMock.<IShellOutputReceiver>notNull());
-
-        EasyMock.expectLastCall().andAnswer(new IAnswer<Object>() {
-            @Override
-            public Object answer() {
-                IShellOutputReceiver receiver =
-                    (IShellOutputReceiver)EasyMock.getCurrentArguments()[1];
-
-                receiver.addOutput(queryOutput.getBytes(), 0,
-                                   queryOutput.length());
-                receiver.flush();
-
-                return null;
-            }
-        });
-    }
 
     /**
      * Test that result code produces correctly pass or fail.
@@ -388,13 +301,8 @@ public class DeqpTestRunnerTest extends TestCase {
         throws Exception {
         final TestDescription testId =
             new TestDescription("dEQP-GLES3.info", "version");
-        final String testPath = "dEQP-GLES3.info.version";
         final String testTrie = "{dEQP-GLES3{info{version}}}";
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
 
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
@@ -403,19 +311,18 @@ public class DeqpTestRunnerTest extends TestCase {
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
-        expectRenderConfigQuery(mockDevice, 3, 0);
+        expectRenderConfigQuery(3, 0);
 
         String commandLine = getCommandLine();
 
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+        runInstrumentationLineAndAnswer(testTrie,
                                         commandLine, output);
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 1);
 
-        expectAngleSetupAndTeardown(mockDevice);
+        expectAngleSetupAndTeardown();
 
         mockListener.testStarted(EasyMock.eq(testId));
         EasyMock.expectLastCall().once();
@@ -433,18 +340,9 @@ public class DeqpTestRunnerTest extends TestCase {
                                EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectTestRunEnded();
 
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        runAndVerifyTest(deqpTest);
     }
 
     /**
@@ -452,152 +350,24 @@ public class DeqpTestRunnerTest extends TestCase {
      */
     public void testRun_multipleTests() throws Exception {
         /* MultiLineReceiver expects "\r\n" line ending. */
-        final String output =
-            "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=2014.x\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseId\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=0xcafebabe\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=targetName\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=android\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginSession\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.info.vendor\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.info.renderer\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.info.version\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.info.shading_language_version\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.info.extensions\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n"
-            +
-            "INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=dEQP-GLES3.info.render_target\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Code=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-TestCaseResult-Details=Pass\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=TestCaseResult\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndTestCase\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_STATUS: dEQP-EventType=EndSession\r\n"
-            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
-            + "INSTRUMENTATION_CODE: 0\r\n";
-
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.info", "vendor"),
-            new TestDescription("dEQP-GLES3.info", "renderer"),
-            new TestDescription("dEQP-GLES3.info", "version"),
-            new TestDescription("dEQP-GLES3.info", "shading_language_version"),
-            new TestDescription("dEQP-GLES3.info", "extensions"),
-            new TestDescription("dEQP-GLES3.info", "render_target")};
-
-        final String[] testPaths = {"dEQP-GLES3.info.vendor",
-                                    "dEQP-GLES3.info.renderer",
-                                    "dEQP-GLES3.info.version",
-                                    "dEQP-GLES3.info.shading_language_version",
-                                    "dEQP-GLES3.info.extensions",
-                                    "dEQP-GLES3.info.render_target"};
+        List<TestDescription> tests = Arrays.asList(GLES3_INFO_TEST_IDS);
+        final String output = buildTestProcessOutput(tests);
 
         final String testTrie =
             "{dEQP-GLES3{info{vendor,renderer,version,shading_language_version,extensions,render_target}}}";
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-
-        Collection<TestDescription> tests = new ArrayList<TestDescription>();
-
-        for (TestDescription id : testIds) {
-            tests.add(id);
-        }
-
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
-        expectRenderConfigQuery(mockDevice, 3, 0);
+        expectRenderConfigQuery(3, 0);
 
         String commandLine = getCommandLine();
 
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+        runInstrumentationLineAndAnswer(testTrie,
                                         commandLine, output);
 
-        mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
-        EasyMock.expectLastCall().once();
-
-        expectAngleSetupAndTeardown(mockDevice);
-
-        for (int i = 0; i < testPaths.length; i++) {
-            mockListener.testStarted(EasyMock.eq(testIds[i]));
-            EasyMock.expectLastCall().once();
-
-            mockListener.testEnded(EasyMock.eq(testIds[i]),
-                                   EasyMock.<HashMap<String, Metric>>notNull());
-
-            EasyMock.expectLastCall().once();
-        }
-
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        expectRunAndVerifyTest(deqpTest, tests);
     }
 
     static private String buildTestProcessOutput(Collection<TestDescription> tests) {
@@ -657,70 +427,23 @@ public class DeqpTestRunnerTest extends TestCase {
     private void testFiltering(DeqpTestRunner deqpTest, String expectedTrie,
                                List<TestDescription> expectedTests)
         throws Exception {
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         boolean thereAreTests = !expectedTests.isEmpty();
 
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        mockListener.testRunStarted(getTestId(deqpTest), expectedTests.size());
-        EasyMock.expectLastCall().once();
-
-        expectAngleSetupAndTeardown(mockDevice);
-
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
         if (thereAreTests) {
-            expectRenderConfigQuery(mockDevice, 3, 0);
-
+            expectRenderConfigQuery(3, 0);
             String testOut = buildTestProcessOutput(expectedTests);
-            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testOut);
-
-            for (int i = 0; i < expectedTests.size(); i++) {
-                mockListener.testStarted(EasyMock.eq(expectedTests.get(i)));
-                EasyMock.expectLastCall().once();
-
-                mockListener.testEnded(
-                    EasyMock.eq(expectedTests.get(i)),
-                    EasyMock.<HashMap<String, Metric>>notNull());
-
-                EasyMock.expectLastCall().once();
-            }
+            runInstrumentationLineAndAnswer(testOut);
         }
 
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        expectRunAndVerifyTest(deqpTest, expectedTests);
     }
 
     public void testRun_trivialIncludeFilter() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.missing", "no"),
-            new TestDescription("dEQP-GLES3.missing", "nope"),
-            new TestDescription("dEQP-GLES3.missing", "donotwant"),
-            new TestDescription("dEQP-GLES3.pick_me", "yes"),
-            new TestDescription("dEQP-GLES3.pick_me", "ok"),
-            new TestDescription("dEQP-GLES3.pick_me", "accepted"),
-        };
-
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
-
-        List<TestDescription> activeTests = new ArrayList<TestDescription>();
-        activeTests.add(testIds[3]);
-        activeTests.add(testIds[4]);
-        activeTests.add(testIds[5]);
+        List<TestDescription> allTests = Arrays.asList(SAMPLE_TEST_IDS);
+        List<TestDescription> activeTests = Arrays.asList(
+            SAMPLE_TEST_IDS[3], SAMPLE_TEST_IDS[4], SAMPLE_TEST_IDS[5]);
 
         String expectedTrie = "{dEQP-GLES3{pick_me{yes,ok,accepted}}}";
 
@@ -731,24 +454,9 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     public void testRun_trivialExcludeFilter() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.missing", "no"),
-            new TestDescription("dEQP-GLES3.missing", "nope"),
-            new TestDescription("dEQP-GLES3.missing", "donotwant"),
-            new TestDescription("dEQP-GLES3.pick_me", "yes"),
-            new TestDescription("dEQP-GLES3.pick_me", "ok"),
-            new TestDescription("dEQP-GLES3.pick_me", "accepted"),
-        };
-
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
-
-        List<TestDescription> activeTests = new ArrayList<TestDescription>();
-        activeTests.add(testIds[3]);
-        activeTests.add(testIds[4]);
-        activeTests.add(testIds[5]);
+        List<TestDescription> allTests = Arrays.asList(SAMPLE_TEST_IDS);
+        List<TestDescription> activeTests = Arrays.asList(
+            SAMPLE_TEST_IDS[3], SAMPLE_TEST_IDS[4], SAMPLE_TEST_IDS[5]);
 
         String expectedTrie = "{dEQP-GLES3{pick_me{yes,ok,accepted}}}";
 
@@ -768,10 +476,7 @@ public class DeqpTestRunnerTest extends TestCase {
             new TestDescription("dEQP-GLES3.group2", "thoushallnotpass"),
         };
 
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
+        List<TestDescription> allTests = Arrays.asList(testIds);
 
         List<TestDescription> activeTests = new ArrayList<TestDescription>();
         activeTests.add(testIds[4]);
@@ -802,10 +507,7 @@ public class DeqpTestRunnerTest extends TestCase {
             new TestDescription("dEQP-GLES3.group2", "granted"),
         };
 
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
+        List<TestDescription> allTests = Arrays.asList(testIds);
 
         String expectedTrie =
             "{dEQP-GLES3{group1{mememe,yeah,takeitall},group2{jeba,yes,granted}}}";
@@ -826,25 +528,15 @@ public class DeqpTestRunnerTest extends TestCase {
             new TestDescription("dEQP-GLES3.group2", "-2"),
         };
 
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
+        List<TestDescription> allTests = Arrays.asList(testIds);
 
         DeqpTestRunner deqpTest =
             buildGlesTestRunner(3, 0, allTests, mTestsDir);
         deqpTest.addExcludeFilter("*");
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        mockListener.testRunStarted(getTestId(deqpTest), 0);
-        EasyMock.expectLastCall().once();
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 0);
+        expectTestRunEnded();
 
-        EasyMock.replay(mockListener);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener);
+        runAndVerifyTest(deqpTest);
     }
 
     public void testRun_incrementalDeqpAttributeSet() throws Exception {
@@ -857,10 +549,7 @@ public class DeqpTestRunnerTest extends TestCase {
             new TestDescription("dEQP-GLES3.group2", "-2"),
         };
 
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
+        List<TestDescription> allTests = Arrays.asList(testIds);
 
         DeqpTestRunner deqpTest =
             buildGlesTestRunner(3, 0, allTests, mTestsDir);
@@ -878,17 +567,10 @@ public class DeqpTestRunnerTest extends TestCase {
         deqpTest.setBuildHelper(helper);
         EasyMock.replay(mockBuildInfo);
 
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        mockListener.testRunStarted(getTestId(deqpTest), 0);
-        EasyMock.expectLastCall().once();
-        mockListener.testRunEnded(EasyMock.anyLong(),
-            EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 0);
+        expectTestRunEnded();
 
-        EasyMock.replay(mockListener);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener);
+        runAndVerifyTest(deqpTest);
     }
 
     public void testRun_incrementalDeqpEnabled() throws Exception {
@@ -919,46 +601,16 @@ public class DeqpTestRunnerTest extends TestCase {
         String testTrie =
             "{dEQP-GLES3{incremental-deqp{should-run-1,should-run-2,should-run-3}}}";
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
-        expectRenderConfigQuery(mockDevice, 3, 0);
+        expectRenderConfigQuery(3, 0);
 
         String commandLine = getCommandLine();
 
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+        runInstrumentationLineAndAnswer(testTrie,
             commandLine, output);
 
-        mockListener.testRunStarted(getTestId(deqpTest), incrementalTests.size());
-        EasyMock.expectLastCall().once();
-
-        expectAngleSetupAndTeardown(mockDevice);
-
-        for (TestDescription incrementalTest : incrementalTests) {
-            mockListener.testStarted(EasyMock.eq(incrementalTest));
-            EasyMock.expectLastCall().once();
-
-            mockListener.testEnded(EasyMock.eq(incrementalTest),
-                EasyMock.<HashMap<String, Metric>>notNull());
-
-            EasyMock.expectLastCall().once();
-        }
-
-        mockListener.testRunEnded(EasyMock.anyLong(),
-            EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        expectRunAndVerifyTest(deqpTest, incrementalTests);
     }
 
     /**
@@ -979,48 +631,39 @@ public class DeqpTestRunnerTest extends TestCase {
             "dEQP-GLES3.missing.donotwant",
         };
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
 
-        Collection<TestDescription> tests = new ArrayList<TestDescription>();
-
-        for (TestDescription id : testIds) {
-            tests.add(id);
-        }
+        List<TestDescription> tests = Arrays.asList(testIds);
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
-        expectRenderConfigQuery(mockDevice, 3, 0);
+        expectRenderConfigQuery(3, 0);
 
         String commandLine = getCommandLine();
 
         // first try
         runInstrumentationLineAndAnswer(
-            mockDevice, mockIDevice, "{dEQP-GLES3{missing{no,nope,donotwant}}}",
+            "{dEQP-GLES3{missing{no,nope,donotwant}}}",
             commandLine, instrumentationAnswerNoExecs);
 
         // splitting begins
         runInstrumentationLineAndAnswer(
-            mockDevice, mockIDevice, "{dEQP-GLES3{missing{no}}}", commandLine,
+            "{dEQP-GLES3{missing{no}}}", commandLine,
             instrumentationAnswerNoExecs);
         runInstrumentationLineAndAnswer(
-            mockDevice, mockIDevice, "{dEQP-GLES3{missing{nope,donotwant}}}",
+            "{dEQP-GLES3{missing{nope,donotwant}}}",
             commandLine, instrumentationAnswerNoExecs);
         runInstrumentationLineAndAnswer(
-            mockDevice, mockIDevice, "{dEQP-GLES3{missing{nope}}}", commandLine,
+            "{dEQP-GLES3{missing{nope}}}", commandLine,
             instrumentationAnswerNoExecs);
         runInstrumentationLineAndAnswer(
-            mockDevice, mockIDevice, "{dEQP-GLES3{missing{donotwant}}}",
+            "{dEQP-GLES3{missing{donotwant}}}",
             commandLine, instrumentationAnswerNoExecs);
 
-        mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, testPaths.length);
 
-        expectAngleSetupAndTeardown(mockDevice);
+        expectAngleSetupAndTeardown();
 
         for (int i = 0; i < testPaths.length; i++) {
             mockListener.testStarted(EasyMock.eq(testIds[i]));
@@ -1038,18 +681,9 @@ public class DeqpTestRunnerTest extends TestCase {
             EasyMock.expectLastCall().once();
         }
 
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectTestRunEnded();
 
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        runAndVerifyTest(deqpTest);
     }
 
     /**
@@ -1059,9 +693,6 @@ public class DeqpTestRunnerTest extends TestCase {
         final TestDescription testId =
             new TestDescription("dEQP-GLES3.orientation", "test");
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
 
@@ -1071,26 +702,17 @@ public class DeqpTestRunnerTest extends TestCase {
         // queried at all
         setter.setOptionValue("deqp-screen-rotation", "90");
 
-        deqpTest.setDevice(mockDevice);
-
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         EasyMock.expect(mockDevice.executeShellCommand("pm list features"))
             .andReturn("not a valid format");
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
-        expectAngleSetup(mockDevice);
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetup();
 
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectTestRunEnded();
 
-        EasyMock.replay(mockDevice);
-        EasyMock.replay(mockListener);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice);
+        runAndVerifyTest(deqpTest);
     }
 
     /**
@@ -1100,21 +722,15 @@ public class DeqpTestRunnerTest extends TestCase {
         final TestDescription testId =
             new TestDescription("dEQP-GLES3.orientation", "test");
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
 
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
-        deqpTest.setDevice(mockDevice);
-
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         expectRenderConfigQueryAndReturn(
-            mockDevice,
             "--deqp-gl-config-name=rgba8888d24s8 "
                 + "--deqp-screen-rotation=unspecified "
                 + "--deqp-surface-type=window "
@@ -1122,19 +738,12 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "--deqp-gl-minor-version=0",
             "Maybe?");
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 1);
 
-        expectAngleSetup(mockDevice);
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectAngleSetup();
+        expectTestRunEnded();
 
-        EasyMock.replay(mockDevice);
-        EasyMock.replay(mockListener);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice);
+        runAndVerifyTest(deqpTest);
     }
 
     /**
@@ -1144,13 +753,8 @@ public class DeqpTestRunnerTest extends TestCase {
                                  final String featureString) throws Exception {
         final TestDescription testId =
             new TestDescription("dEQP-GLES3.orientation", "test");
-        final String testPath = "dEQP-GLES3.orientation.test";
         final String testTrie = "{dEQP-GLES3{orientation{test}}}";
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
 
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
@@ -1160,9 +764,7 @@ public class DeqpTestRunnerTest extends TestCase {
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-screen-rotation", rotation);
 
-        deqpTest.setDevice(mockDevice);
-
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         if (!rotation.equals(BatchRunConfiguration.ROTATION_UNSPECIFIED)) {
             EasyMock.expect(mockDevice.executeShellCommand("pm list features"))
@@ -1184,7 +786,6 @@ public class DeqpTestRunnerTest extends TestCase {
 
         if (executable) {
             expectRenderConfigQuery(
-                mockDevice,
                 String.format(
                     "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=%s "
                         +
@@ -1194,31 +795,11 @@ public class DeqpTestRunnerTest extends TestCase {
 
             String commandLine = getCommandLine(rotation);
 
-            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+            runInstrumentationLineAndAnswer(testTrie,
                                             commandLine, output);
         }
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
-
-        expectAngleSetupAndTeardown(mockDevice);
-
-        mockListener.testStarted(EasyMock.eq(testId));
-        EasyMock.expectLastCall().once();
-
-        mockListener.testEnded(EasyMock.eq(testId),
-                               EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        expectRunAndVerifyTest(deqpTest, Collections.singletonList(testId));
     }
 
     /**
@@ -1390,9 +971,6 @@ public class DeqpTestRunnerTest extends TestCase {
         final TestDescription testId =
             new TestDescription("dEQP-GLES3.pixelformat", "test");
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
 
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
@@ -1401,12 +979,9 @@ public class DeqpTestRunnerTest extends TestCase {
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-gl-config-name", pixelFormat);
 
-        deqpTest.setDevice(mockDevice);
-
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         expectRenderConfigQueryAndReturn(
-            mockDevice,
             String.format(
                 "--deqp-gl-config-name=%s --deqp-screen-rotation=unspecified "
                     + "--deqp-surface-type=window "
@@ -1415,27 +990,7 @@ public class DeqpTestRunnerTest extends TestCase {
                 pixelFormat),
             "No");
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
-
-        expectAngleSetupAndTeardown(mockDevice);
-
-        mockListener.testStarted(EasyMock.eq(testId));
-        EasyMock.expectLastCall().once();
-
-        mockListener.testEnded(EasyMock.eq(testId),
-                               EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice);
-        EasyMock.replay(mockListener);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice);
+        expectRunAndVerifyTest(deqpTest, Collections.singletonList(testId));
     }
 
     /**
@@ -1475,49 +1030,39 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private void setRecoveryExpectationKillProcess(
-        RecoverableTestDevice mockDevice,
         DeqpTestRunner.ISleepProvider mockSleepProvider)
         throws DeviceNotAvailableException {
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains("ps")))
-            .andReturn("root 1234 com.drawelement.deqp")
-            .once();
-
-        EasyMock
-            .expect(mockDevice.executeShellCommand(EasyMock.eq("kill -9 1234")))
-            .andReturn("")
-            .once();
+        expectShellCommandContains("ps", "root 1234 com.drawelement.deqp");
+        expectShellCommand("kill -9 1234", "");
 
         // Recovery checks if kill failed
         mockSleepProvider.sleep(EasyMock.gt(0));
         EasyMock.expectLastCall().once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains("ps")))
-            .andReturn("")
-            .once();
+        expectShellCommandContains("ps", "");
     }
 
     private void
-    setRecoveryExpectationRecovery(RecoverableTestDevice mockDevice)
+    setRecoveryExpectationRecovery()
         throws DeviceNotAvailableException {
-        EasyMock.expect(mockDevice.recoverDevice()).andReturn(true).once();
+        EasyMock.expect(((RecoverableTestDevice) mockDevice).recoverDevice()).andReturn(true).once();
     }
 
-    private void setRecoveryExpectationReboot(RecoverableTestDevice mockDevice)
+    private void setRecoveryExpectationReboot()
         throws DeviceNotAvailableException {
         mockDevice.reboot();
         EasyMock.expectLastCall().once();
     }
 
     private int setRecoveryExpectationOfAConnFailure(
-        RecoverableTestDevice mockDevice,
         DeqpTestRunner.ISleepProvider mockSleepProvider,
         int numConsecutiveErrors) throws DeviceNotAvailableException {
         switch (numConsecutiveErrors) {
         case 0:
         case 1:
-            setRecoveryExpectationRecovery(mockDevice);
+            setRecoveryExpectationRecovery();
             return 2;
         case 2:
-            setRecoveryExpectationReboot(mockDevice);
+            setRecoveryExpectationReboot();
             return 3;
         default:
             return 4;
@@ -1525,20 +1070,19 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private int setRecoveryExpectationOfAComKilled(
-        RecoverableTestDevice mockDevice,
         DeqpTestRunner.ISleepProvider mockSleepProvider,
         int numConsecutiveErrors) throws DeviceNotAvailableException {
         switch (numConsecutiveErrors) {
         case 0:
             setRecoveryExpectationWait(mockSleepProvider);
-            setRecoveryExpectationKillProcess(mockDevice, mockSleepProvider);
+            setRecoveryExpectationKillProcess(mockSleepProvider);
             return 1;
         case 1:
-            setRecoveryExpectationRecovery(mockDevice);
-            setRecoveryExpectationKillProcess(mockDevice, mockSleepProvider);
+            setRecoveryExpectationRecovery();
+            setRecoveryExpectationKillProcess(mockSleepProvider);
             return 2;
         case 2:
-            setRecoveryExpectationReboot(mockDevice);
+            setRecoveryExpectationReboot();
             return 3;
         default:
             return 4;
@@ -1546,7 +1090,6 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private void setRecoveryExpectationsOfAPattern(
-        RecoverableTestDevice mockDevice,
         DeqpTestRunner.ISleepProvider mockSleepProvider, RecoveryEvent[] events)
         throws DeviceNotAvailableException {
         int numConsecutiveErrors = 0;
@@ -1557,11 +1100,11 @@ public class DeqpTestRunnerTest extends TestCase {
                 break;
             case FAIL_CONNECTION_REFUSED:
                 numConsecutiveErrors = setRecoveryExpectationOfAConnFailure(
-                    mockDevice, mockSleepProvider, numConsecutiveErrors);
+                    mockSleepProvider, numConsecutiveErrors);
                 break;
             case FAIL_LINK_KILLED:
                 numConsecutiveErrors = setRecoveryExpectationOfAComKilled(
-                    mockDevice, mockSleepProvider, numConsecutiveErrors);
+                    mockSleepProvider, numConsecutiveErrors);
                 break;
             }
         }
@@ -1575,13 +1118,12 @@ public class DeqpTestRunnerTest extends TestCase {
         throws Exception {
         DeqpTestRunner.Recovery recovery = new DeqpTestRunner.Recovery();
         IMocksControl orderedControl = EasyMock.createStrictControl();
-        RecoverableTestDevice mockDevice =
-            orderedControl.createMock(RecoverableTestDevice.class);
+        mockDevice = orderedControl.createMock(RecoverableTestDevice.class);
         EasyMock.expect(mockDevice.getSerialNumber()).andStubReturn("SERIAL");
         DeqpTestRunner.ISleepProvider mockSleepProvider =
             orderedControl.createMock(DeqpTestRunner.ISleepProvider.class);
 
-        setRecoveryExpectationsOfAPattern(mockDevice, mockSleepProvider,
+        setRecoveryExpectationsOfAPattern(mockSleepProvider,
                                           pattern);
 
         orderedControl.replay();
@@ -1728,46 +1270,31 @@ public class DeqpTestRunnerTest extends TestCase {
     public void testRecovery_unkillableProcess() throws Exception {
         DeqpTestRunner.Recovery recovery = new DeqpTestRunner.Recovery();
         IMocksControl orderedControl = EasyMock.createStrictControl();
-        RecoverableTestDevice mockDevice =
-            orderedControl.createMock(RecoverableTestDevice.class);
+        mockDevice = orderedControl.createMock(RecoverableTestDevice.class);
         DeqpTestRunner.ISleepProvider mockSleepProvider =
             orderedControl.createMock(DeqpTestRunner.ISleepProvider.class);
 
         // recovery attempts to kill the process after a timeout
         mockSleepProvider.sleep(EasyMock.gt(0));
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains("ps")))
-            .andReturn("root 1234 com.drawelement.deqp")
-            .once();
-        EasyMock
-            .expect(mockDevice.executeShellCommand(EasyMock.eq("kill -9 1234")))
-            .andReturn("")
-            .once();
+        expectShellCommandContains("ps", "root 1234 com.drawelement.deqp");
+        expectShellCommand("kill -9 1234", "");
 
         // Recovery checks if kill failed
         mockSleepProvider.sleep(EasyMock.gt(0));
         EasyMock.expectLastCall().once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains("ps")))
-            .andReturn("root 1234 com.drawelement.deqp")
-            .once();
+        expectShellCommandContains("ps", "root 1234 com.drawelement.deqp");
 
         // Recovery resets the connection
-        EasyMock.expect(mockDevice.recoverDevice()).andReturn(true);
+        EasyMock.expect(((RecoverableTestDevice) mockDevice).recoverDevice()).andReturn(true);
 
         // and attempts to kill the process again
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains("ps")))
-            .andReturn("root 1234 com.drawelement.deqp")
-            .once();
-        EasyMock
-            .expect(mockDevice.executeShellCommand(EasyMock.eq("kill -9 1234")))
-            .andReturn("")
-            .once();
+        expectShellCommandContains("ps", "root 1234 com.drawelement.deqp");
+        expectShellCommand("kill -9 1234", "");
 
         // Recovery checks if kill failed
         mockSleepProvider.sleep(EasyMock.gt(0));
         EasyMock.expectLastCall().once();
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains("ps")))
-            .andReturn("root 1234 com.drawelement.deqp")
-            .once();
+        expectShellCommandContains("ps", "root 1234 com.drawelement.deqp");
 
         // recovery reboots the device
         mockDevice.reboot();
@@ -1790,10 +1317,6 @@ public class DeqpTestRunnerTest extends TestCase {
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
 
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
         IRunUtil mockRunUtil = EasyMock.createMock(IRunUtil.class);
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
@@ -1801,10 +1324,9 @@ public class DeqpTestRunnerTest extends TestCase {
         deqpTest.setDevice(mockDevice);
         deqpTest.setRunUtil(mockRunUtil);
 
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         expectRenderConfigQuery(
-            mockDevice,
             "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified "
                 + "--deqp-surface-type=window --deqp-gl-major-version=3 "
                 + "--deqp-gl-minor-version=0");
@@ -1813,105 +1335,46 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.expectLastCall().andThrow(new RunInterruptedException(
             "message", InfraErrorIdentifier.TRADEFED_SHUTTING_DOWN));
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
-        expectAngleSetup(mockDevice);
-        mockListener.testRunEnded(
-            EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>anyObject());
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetup();
+        expectTestRunEnded();
 
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-        EasyMock.replay(mockRunUtil);
-        try {
-            deqpTest.run(mockListener);
-            fail("expected RunInterruptedException");
-        } catch (RunInterruptedException ex) {
-            // expected
-        }
-        EasyMock.verify(mockRunUtil);
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        runAndVerifyTestInterrupted(deqpTest, mockRunUtil);
     }
 
     private void
     runShardedTest(TestDescription[] testIds,
                    ArrayList<ArrayList<TestDescription>> testsForShard)
         throws Exception {
-        Collection<TestDescription> tests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds)
-            tests.add(id);
-
+        List<TestDescription> tests = Arrays.asList(testIds);
         DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
         ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>)runner.split();
 
         for (int shardIndex = 0; shardIndex < shards.size(); shardIndex++) {
+            EasyMock.reset(mockDevice, mockIDevice, mockListener);
             DeqpTestRunner shard = (DeqpTestRunner)shards.get(shardIndex);
             shard.setBuildHelper(getMockBuildHelper(mTestsDir));
 
             ArrayList<TestDescription> shardTests =
                 testsForShard.get(shardIndex);
 
-            ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-            ITestInvocationListener mockListener =
-                EasyMock.createStrictMock(ITestInvocationListener.class);
-            IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-            expectGlVersion(mockDevice, 3, 0);
-
-            mockListener.testRunStarted(getTestId(shard), shardTests.size());
-            EasyMock.expectLastCall().once();
-
-            expectAngleSetupAndTeardown(mockDevice);
-
-            expectRenderConfigQuery(mockDevice, 3, 0);
+            expectGlVersion(3, 0);
+            expectRenderConfigQuery(3, 0);
 
             String testOut = buildTestProcessOutput(shardTests);
             // NOTE: This assumes that there won't be multiple batches per
             // shard!
-            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testOut);
+            runInstrumentationLineAndAnswer(testOut);
 
-            for (int i = 0; i < shardTests.size(); i++) {
-                mockListener.testStarted(EasyMock.eq(shardTests.get(i)));
-                EasyMock.expectLastCall().once();
-
-                mockListener.testEnded(
-                    EasyMock.eq(shardTests.get(i)),
-                    EasyMock.<HashMap<String, Metric>>notNull());
-
-                EasyMock.expectLastCall().once();
-            }
-
-            mockListener.testRunEnded(
-                EasyMock.anyLong(),
-                EasyMock.<HashMap<String, Metric>>notNull());
-            EasyMock.expectLastCall().once();
-
-            EasyMock.replay(mockDevice, mockIDevice);
-            EasyMock.replay(mockListener);
-
-            shard.setDevice(mockDevice);
-            shard.run(mockListener);
-
-            EasyMock.verify(mockListener);
-            EasyMock.verify(mockDevice, mockIDevice);
+            expectRunAndVerifyTest(shard, shardTests);
         }
     }
 
     public void testSharding_smallTrivial() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.info", "vendor"),
-            new TestDescription("dEQP-GLES3.info", "renderer"),
-            new TestDescription("dEQP-GLES3.info", "version"),
-            new TestDescription("dEQP-GLES3.info", "shading_language_version"),
-            new TestDescription("dEQP-GLES3.info", "extensions"),
-            new TestDescription("dEQP-GLES3.info", "render_target")};
         ArrayList<ArrayList<TestDescription>> shardedTests = new ArrayList<>();
-        ArrayList<TestDescription> shardOne = new ArrayList<>();
-        for (int i = 0; i < testIds.length; i++) {
-            shardOne.add(testIds[i]);
-        }
+        ArrayList<TestDescription> shardOne = new ArrayList<>(Arrays.asList(GLES3_INFO_TEST_IDS));
         shardedTests.add(shardOne);
-        runShardedTest(testIds, shardedTests);
+        runShardedTest(GLES3_INFO_TEST_IDS, shardedTests);
     }
 
     public void testSharding_twoShards() throws Exception {
@@ -1952,7 +1415,6 @@ public class DeqpTestRunnerTest extends TestCase {
     public void testInterrupt_killReportTestFailed() throws Exception {
         final TestDescription testId =
             new TestDescription("dEQP-GLES3.interrupt", "test");
-        final String testPath = "dEQP-GLES3.interrupt.test";
         final String testTrie = "{dEQP-GLES3{interrupt{test}}}";
 
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
@@ -1960,10 +1422,6 @@ public class DeqpTestRunnerTest extends TestCase {
 
         final String output = buildTestProcessOutput(tests, "Fail", "Fail");
 
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
         IRunUtil mockRunUtil = EasyMock.createMock(IRunUtil.class);
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
@@ -1971,10 +1429,9 @@ public class DeqpTestRunnerTest extends TestCase {
         deqpTest.setDevice(mockDevice);
         deqpTest.setRunUtil(mockRunUtil);
 
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         expectRenderConfigQuery(
-            mockDevice,
             "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified "
                 + "--deqp-surface-type=window --deqp-gl-major-version=3 "
                 + "--deqp-gl-minor-version=0");
@@ -1984,13 +1441,12 @@ public class DeqpTestRunnerTest extends TestCase {
 
         String commandLine = getCommandLine();
 
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+        runInstrumentationLineAndAnswer(testTrie,
                                         commandLine, output);
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 1);
 
-        expectAngleSetup(mockDevice);
+        expectAngleSetup();
 
         mockListener.testStarted(EasyMock.eq(testId));
         EasyMock.expectLastCall().once();
@@ -2000,52 +1456,15 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.expectLastCall().andThrow(new RunInterruptedException(
             "message", InfraErrorIdentifier.TRADEFED_SHUTTING_DOWN));
 
-        mockListener.testRunEnded(
-            EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>anyObject());
-        EasyMock.expectLastCall().once();
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-        EasyMock.replay(mockRunUtil);
-        try {
-            deqpTest.run(mockListener);
-            fail("expected RunInterruptedException");
-        } catch (RunInterruptedException ex) {
-            // expected
-        }
-        EasyMock.verify(mockRunUtil);
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        expectTestRunEnded();
+        runAndVerifyTestInterrupted(deqpTest, mockRunUtil);
     }
 
     public void testRuntimeHint_optionSet() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.info", "vendor"),
-            new TestDescription("dEQP-GLES3.info", "renderer"),
-            new TestDescription("dEQP-GLES3.info", "version"),
-            new TestDescription("dEQP-GLES3.info", "shading_language_version"),
-            new TestDescription("dEQP-GLES3.info", "extensions"),
-            new TestDescription("dEQP-GLES3.info", "render_target")};
-
-        final String[] testPaths = {"dEQP-GLES3.info.vendor",
-                                    "dEQP-GLES3.info.renderer",
-                                    "dEQP-GLES3.info.version",
-                                    "dEQP-GLES3.info.shading_language_version",
-                                    "dEQP-GLES3.info.extensions",
-                                    "dEQP-GLES3.info.render_target"};
-
         final String testTrie =
             "{dEQP-GLES3{info{vendor,renderer,version,shading_language_version,extensions,render_target}}}";
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener =
-            EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-
-        Collection<TestDescription> tests = new ArrayList<TestDescription>();
-
-        for (TestDescription id : testIds) {
-            tests.add(id);
-        }
+        List<TestDescription> tests = Arrays.asList(GLES3_INFO_TEST_IDS);
 
         final String output = buildTestProcessOutput(tests);
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
@@ -2058,42 +1477,16 @@ public class DeqpTestRunnerTest extends TestCase {
         // Try running the tests as well. The unit tests do not set the hint be
         // default, so that case is covered.
 
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
-        expectRenderConfigQuery(mockDevice, 3, 0);
+        expectRenderConfigQuery(3, 0);
 
         String commandLine = getCommandLine();
 
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie,
+        runInstrumentationLineAndAnswer(testTrie,
                                         commandLine, output);
 
-        mockListener.testRunStarted(getTestId(deqpTest), testPaths.length);
-        EasyMock.expectLastCall().once();
-
-        expectAngleSetupAndTeardown(mockDevice);
-
-        for (int i = 0; i < testPaths.length; i++) {
-            mockListener.testStarted(EasyMock.eq(testIds[i]));
-            EasyMock.expectLastCall().once();
-
-            mockListener.testEnded(EasyMock.eq(testIds[i]),
-                                   EasyMock.<HashMap<String, Metric>>notNull());
-
-            EasyMock.expectLastCall().once();
-        }
-
-        mockListener.testRunEnded(EasyMock.anyLong(),
-                                  EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice);
-        EasyMock.replay(mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener);
-        EasyMock.verify(mockDevice, mockIDevice);
+        expectRunAndVerifyTest(deqpTest, tests);
     }
 
     public void testRuntimeHint_optionSetSharded() throws Exception {
@@ -2122,18 +1515,7 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     public void testRuntimeHint_optionNotSet() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.info", "vendor"),
-            new TestDescription("dEQP-GLES3.info", "renderer"),
-            new TestDescription("dEQP-GLES3.info", "version"),
-            new TestDescription("dEQP-GLES3.info", "shading_language_version"),
-            new TestDescription("dEQP-GLES3.info", "extensions"),
-            new TestDescription("dEQP-GLES3.info", "render_target")};
-        Collection<TestDescription> tests = new ArrayList<TestDescription>();
-
-        for (TestDescription id : testIds) {
-            tests.add(id);
-        }
+        List<TestDescription> tests = Arrays.asList(GLES3_INFO_TEST_IDS);
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
@@ -2143,92 +1525,38 @@ public class DeqpTestRunnerTest extends TestCase {
                    runtime < (1000 * 10)); // Must be done in 10s
     }
 
-    private void runInstrumentationLineAndAnswer(ITestDevice mockDevice,
-                                                 IDevice mockIDevice,
-                                                 final String output)
+    private void runInstrumentationLineAndAnswer(final String output)
         throws Exception {
         String cmd = getCommandLine();
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, cmd,
-                                        output);
+        runInstrumentationLineAndAnswer(null, cmd, output);
     }
 
-    private void expectRemoveFile(ITestDevice mockDevice, String path) throws Exception {
-        String cmd = "rm " + path;
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(cmd)))
-                .andReturn("")
-                .once();
-    }
 
-    private void expectRemoveFolder(ITestDevice mockDevice, String path) throws Exception {
-        String cmd = "rm -rf " + path;
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(cmd)))
-                .andReturn("")
-                .once();
-    }
-
-    private void expectCreateDirectory(ITestDevice mockDevice, String path) throws Exception {
-        String cmd = "mkdir -p " + path;
-        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(cmd)))
-                .andReturn("")
-                .once();
-    }
-
-    private void expectPushString(ITestDevice mockDevice, String content, String remotePath) throws Exception {
-        mockDevice.pushString(content, remotePath);
-        EasyMock.expectLastCall().andReturn(true).once();
-    }
-
-    private void expectInstrumentationCommand(ITestDevice mockDevice, String logFilename, String cmd, final String output) throws Exception {
-        String command = String.format(
-            "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\" "
-                + "-e deqpLogData \"%s\" -e deqpEventReportingMode \"%s\" %s",
-            AbiUtils.createAbiFlag(ABI.getName()), logFilename, cmd,
-            false, DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER, INSTRUMENTATION_NAME);
-
-        mockDevice.executeShellV2CommandNoRecovery(
-            EasyMock.eq(command), EasyMock.<IShellOutputReceiver>notNull(),
-            EasyMock.anyLong(), EasyMock.isA(TimeUnit.class));
-
-        EasyMock.expectLastCall().andAnswer(new IAnswer<Object>() {
-            @Override
-            public Object answer() {
-                IShellOutputReceiver receiver =
-                    (IShellOutputReceiver)EasyMock.getCurrentArguments()[1];
-
-                receiver.addOutput(output.getBytes(), 0, output.length());
-                receiver.flush();
-
-                return null;
-            }
-        });
-    }
 
     private void
-    runInstrumentationLineAndAnswer(ITestDevice mockDevice, IDevice mockIDevice,
-                                    final String testTrie, final String cmd,
+    runInstrumentationLineAndAnswer(final String testTrie, final String cmd,
                                     final String output) throws Exception {
-        expectRemoveFile(mockDevice, APP_DIR + CASE_LIST_FILE_NAME);
-        expectRemoveFile(mockDevice, APP_DIR + LOG_FILE_NAME);
+        expectRemoveFile(APP_DIR + CASE_LIST_FILE_NAME);
+        expectRemoveFile(APP_DIR + LOG_FILE_NAME);
 
         String remotePath = APP_DIR + CASE_LIST_FILE_NAME;
         if (testTrie != null) {
-            expectPushString(mockDevice, testTrie + "\n", remotePath);
+            expectPushString(testTrie + "\n", remotePath);
         } else {
-            expectPushString(mockDevice, (String)EasyMock.anyObject(), EasyMock.eq(remotePath));
+            expectPushString((String)EasyMock.anyObject(), EasyMock.eq(remotePath));
         }
 
         String logFilename = APP_DIR + LOG_FILE_NAME;
-        expectInstrumentationCommand(mockDevice, logFilename, cmd, output);
+        expectInstrumentationCommand(logFilename, cmd, output);
     }
 
     private void
-    runInstrumentationLineAndAnswerParallel(ITestDevice mockDevice,
-                                            final List<TestDescription> tests, final String cmd,
+    runInstrumentationLineAndAnswerParallel(final List<TestDescription> tests, final String cmd,
                                             final String output, int expectedParallelBatches) throws Exception {
-        expectRemoveFolder(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
-        expectRemoveFolder(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
-        expectCreateDirectory(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
-        expectCreateDirectory(mockDevice, DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
+        expectRemoveFolder(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
+        expectRemoveFolder(DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
+        expectCreateDirectory(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
+        expectCreateDirectory(DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
 
         final int batchSize = 1000;
         for (int i = 0; i < expectedParallelBatches; i++) {
@@ -2236,16 +1564,16 @@ public class DeqpTestRunnerTest extends TestCase {
             if (tests != null) {
                 List<TestDescription> subList = tests.subList(i * batchSize, Math.min((i + 1) * batchSize, tests.size()));
                 String expectedTrie = DeqpTestRunner.generateTestCaseTrie(subList);
-                expectPushString(mockDevice, EasyMock.eq(expectedTrie + "\n"),
+                expectPushString(EasyMock.eq(expectedTrie + "\n"),
                                  EasyMock.eq(remotePath));
             } else {
-                expectPushString(mockDevice, (String)EasyMock.anyObject(),
+                expectPushString((String)EasyMock.anyObject(),
                                  EasyMock.eq(remotePath));
             }
         }
 
         String logFilename = DeqpTestRunner.APP_DIR_PARALLEL_LOGS;
-        expectInstrumentationCommand(mockDevice, logFilename, cmd, output);
+        expectInstrumentationCommand(logFilename, cmd, output);
     }
 
     static private void writeStringsToFile(File target, Set<String> strings)
@@ -2266,24 +1594,9 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     public void testIncludeFilterFile() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.missing", "no"),
-            new TestDescription("dEQP-GLES3.missing", "nope"),
-            new TestDescription("dEQP-GLES3.missing", "donotwant"),
-            new TestDescription("dEQP-GLES3.pick_me", "yes"),
-            new TestDescription("dEQP-GLES3.pick_me", "ok"),
-            new TestDescription("dEQP-GLES3.pick_me", "accepted"),
-        };
-
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
-
-        List<TestDescription> activeTests = new ArrayList<TestDescription>();
-        activeTests.add(testIds[3]);
-        activeTests.add(testIds[4]);
-        activeTests.add(testIds[5]);
+        List<TestDescription> allTests = Arrays.asList(SAMPLE_TEST_IDS);
+        List<TestDescription> activeTests = Arrays.asList(
+            SAMPLE_TEST_IDS[3], SAMPLE_TEST_IDS[4], SAMPLE_TEST_IDS[5]);
 
         String expectedTrie = "{dEQP-GLES3{pick_me{yes,ok,accepted}}}";
 
@@ -2296,16 +1609,8 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     public void testMissingIncludeFilterFile() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.pick_me", "yes"),
-            new TestDescription("dEQP-GLES3.pick_me", "ok"),
-            new TestDescription("dEQP-GLES3.pick_me", "accepted"),
-        };
-
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
+        List<TestDescription> allTests = Arrays.asList(
+            SAMPLE_TEST_IDS[3], SAMPLE_TEST_IDS[4], SAMPLE_TEST_IDS[5]);
 
         String expectedTrie = "{dEQP-GLES3{pick_me{yes,ok,accepted}}}";
 
@@ -2321,24 +1626,9 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     public void testExcludeFilterFile() throws Exception {
-        final TestDescription[] testIds = {
-            new TestDescription("dEQP-GLES3.missing", "no"),
-            new TestDescription("dEQP-GLES3.missing", "nope"),
-            new TestDescription("dEQP-GLES3.missing", "donotwant"),
-            new TestDescription("dEQP-GLES3.pick_me", "yes"),
-            new TestDescription("dEQP-GLES3.pick_me", "ok"),
-            new TestDescription("dEQP-GLES3.pick_me", "accepted"),
-        };
-
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
-
-        List<TestDescription> activeTests = new ArrayList<TestDescription>();
-        activeTests.add(testIds[3]);
-        activeTests.add(testIds[4]);
-        activeTests.add(testIds[5]);
+        List<TestDescription> allTests = Arrays.asList(SAMPLE_TEST_IDS);
+        List<TestDescription> activeTests = Arrays.asList(
+            SAMPLE_TEST_IDS[3], SAMPLE_TEST_IDS[4], SAMPLE_TEST_IDS[5]);
 
         String expectedTrie = "{dEQP-GLES3{pick_me{yes,ok,accepted}}}";
 
@@ -2361,10 +1651,7 @@ public class DeqpTestRunnerTest extends TestCase {
             new TestDescription("dEQP-GLES3.group2", "thoushallnotpass"),
         };
 
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
+        List<TestDescription> allTests = Arrays.asList(testIds);
 
         List<TestDescription> activeTests = new ArrayList<TestDescription>();
         activeTests.add(testIds[0]);
@@ -2400,10 +1687,7 @@ public class DeqpTestRunnerTest extends TestCase {
             new TestDescription("dEQP-GLES3.pick_me", "donotwant"),
             new TestDescription("dEQP-GLES3.pick_me", "yes")};
 
-        List<TestDescription> allTests = new ArrayList<TestDescription>();
-        for (TestDescription id : testIds) {
-            allTests.add(id);
-        }
+        List<TestDescription> allTests = Arrays.asList(testIds);
 
         List<TestDescription> activeTests = new ArrayList<TestDescription>();
         activeTests.add(testIds[2]);
@@ -2433,10 +1717,6 @@ public class DeqpTestRunnerTest extends TestCase {
         // Expected output from the simulated instrumentation run, indicating a successful pass.
         final String expectedInstrumentationOutput = buildTestProcessOutput(Collections.singletonList(testId));
 
-        // Initialize mocks.
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
 
         // Write the test case into the caselist file.
         String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
@@ -2455,7 +1735,7 @@ public class DeqpTestRunnerTest extends TestCase {
         deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
 
         // Mock basic OpenGL ES version requirement.
-        expectGlVersion(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
 
         String featureString = "feature:" + DeqpTestRunner.FEATURE_OPENGLES_DEQP_LEVEL + "=" + deqpLevel;
         if (isHandheld) {
@@ -2465,19 +1745,18 @@ public class DeqpTestRunnerTest extends TestCase {
 
         if (expectSuccess) {
             // Setup mock expectations for environment preparation and cleanup.
-            expectAngleSetupAndTeardown(mockDevice);
+            expectAngleSetupAndTeardown();
 
             // Mock the renderability query.
-            expectRenderConfigQuery(mockDevice, 3, 0);
+            expectRenderConfigQuery(3, 0);
 
             // Define the exact command line expected to be executed on the device.
             String commandLine = getCommandLine();
 
-            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, expectedInstrumentationOutput);
+            runInstrumentationLineAndAnswer(testTrie, commandLine, expectedInstrumentationOutput);
         }
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
+        expectTestRunStarted(deqpTest, 1);
         mockListener.testStarted(EasyMock.eq(testId));
         EasyMock.expectLastCall().once();
 
@@ -2488,17 +1767,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
         mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
+        expectTestRunEnded();
 
-        EasyMock.replay(mockDevice, mockIDevice, mockListener);
-
-        // Execute the test runner.
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        // Verify all expected mock calls were made.
-        EasyMock.verify(mockListener, mockDevice, mockIDevice);
+        runAndVerifyTest(deqpTest);
     }
 
     /**
@@ -2553,9 +1824,6 @@ public class DeqpTestRunnerTest extends TestCase {
         final String testTrie = "{dEQP-GLES3{info{version}}}";
 
         final String expectedInstrumentationOutput = buildTestProcessOutput(Collections.singletonList(testId));
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
 
         String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
         FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
@@ -2575,20 +1843,19 @@ public class DeqpTestRunnerTest extends TestCase {
         deqpTest.setBuildHelper(getMockBuildHelper(mTestsDir));
 
         if (!countOnly) {
-            expectGlVersion(mockDevice, 3, 0);
+            expectGlVersion(3, 0);
 
             if (expectMatch) {
-                expectAngleSetupAndTeardown(mockDevice);
+                expectAngleSetupAndTeardown();
 
-                expectRenderConfigQuery(mockDevice, 3, 0);
+                expectRenderConfigQuery(3, 0);
 
                 String commandLine = getCommandLine();
 
-                runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, expectedInstrumentationOutput);
+                runInstrumentationLineAndAnswer(testTrie, commandLine, expectedInstrumentationOutput);
             }
 
-            mockListener.testRunStarted(getTestId(deqpTest), 1);
-            EasyMock.expectLastCall().once();
+            expectTestRunStarted(deqpTest, 1);
             mockListener.testStarted(EasyMock.eq(testId));
             EasyMock.expectLastCall().once();
 
@@ -2599,20 +1866,10 @@ public class DeqpTestRunnerTest extends TestCase {
 
             mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
             EasyMock.expectLastCall().once();
-            mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
-            EasyMock.expectLastCall().once();
+            expectTestRunEnded();
         }
 
-        EasyMock.replay(mockDevice, mockIDevice, mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        if (countOnly || !expectMatch) {
-            EasyMock.verify(mockListener, mockDevice);
-        } else {
-            EasyMock.verify(mockListener, mockDevice, mockIDevice);
-        }
+        runAndVerifyTest(deqpTest);
     }
 
     /**
@@ -2702,9 +1959,6 @@ public class DeqpTestRunnerTest extends TestCase {
 
         final String expectedInstrumentationOutput = buildTestProcessOutput(Collections.singletonList(testId));
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
 
         String testlist = testId.getClassName() + "." + testId.getTestName() + "\n";
         FileUtil.writeToFile(testlist, new File(mTestsDir, caselistFile));
@@ -2719,9 +1973,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         final int deqpLevel2025 = calculateDeqpLevel(2025, 3, 1);
         final int vulkanHardwareVersion = calculateVulkanVersion(0, 1, 4, 0);
-        expectVulkanVersion(mockDevice, deqpLevel2025, vulkanHardwareVersion);
-
-        expectAngleSetupAndTeardown(mockDevice);
+        expectVulkanVersion(deqpLevel2025, vulkanHardwareVersion);
 
         String commandLine = String.format(
             "--deqp-caselist-file=%s --deqp-screen-rotation=unspecified "
@@ -2729,31 +1981,16 @@ public class DeqpTestRunnerTest extends TestCase {
                 + "--deqp-watchdog=enable",
             APP_DIR + CASE_LIST_FILE_NAME);
 
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, testTrie, commandLine, expectedInstrumentationOutput);
+        runInstrumentationLineAndAnswer(testTrie, commandLine, expectedInstrumentationOutput);
 
-        mockListener.testRunStarted(getTestId(deqpTest), 1);
-        EasyMock.expectLastCall().once();
-        mockListener.testStarted(EasyMock.eq(testId));
-        EasyMock.expectLastCall().once();
-
-        mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice, mockListener);
-
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-
-        EasyMock.verify(mockListener, mockDevice, mockIDevice);
+        expectRunAndVerifyTest(deqpTest, Collections.singletonList(testId));
     }
 
-    private DeqpTestRunner setupTestRunner(ITestDevice mockDevice, List<TestDescription> tests, boolean enableParallelRun) throws Exception {
-        return setupTestRunner(mockDevice, tests, enableParallelRun, true);
+    private DeqpTestRunner setupTestRunner(List<TestDescription> tests, boolean enableParallelRun) throws Exception {
+        return setupTestRunner(tests, enableParallelRun, true);
     }
 
-    private DeqpTestRunner setupTestRunner(ITestDevice mockDevice, List<TestDescription> tests, boolean enableParallelRun, boolean isHandheld) throws Exception {
+    private DeqpTestRunner setupTestRunner(List<TestDescription> tests, boolean enableParallelRun, boolean isHandheld) throws Exception {
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
         if (enableParallelRun) {
@@ -2761,8 +1998,8 @@ public class DeqpTestRunnerTest extends TestCase {
             setter.setOptionValue("enable-deqp-parallel-run", "true");
         }
 
-        expectGlVersion(mockDevice, 3, 0);
-        expectRenderConfigQuery(mockDevice, 3, 0);
+        expectGlVersion(3, 0);
+        expectRenderConfigQuery(3, 0);
 
         String featureString = "feature:" + DeqpTestRunner.FEATURE_OPENGLES_DEQP_LEVEL + "=132580097";
         if (isHandheld) {
@@ -2773,24 +2010,6 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.expect(mockDevice.executeShellCommand("pm list features")).andReturn(featureString).anyTimes();
 
         return deqpTest;
-    }
-
-    private void runTestAndVerify(DeqpTestRunner deqpTest, Collection<TestDescription> tests,
-                                  ITestDevice mockDevice, IDevice mockIDevice,
-                                  ITestInvocationListener mockListener) throws Exception {
-        mockListener.testRunStarted(getTestId(deqpTest), tests.size());
-        EasyMock.expectLastCall().once();
-        expectAngleSetupAndTeardown(mockDevice);
-
-        expectListenerTests(mockListener, tests);
-
-        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
-        EasyMock.expectLastCall().once();
-
-        EasyMock.replay(mockDevice, mockIDevice, mockListener);
-        deqpTest.setDevice(mockDevice);
-        deqpTest.run(mockListener);
-        EasyMock.verify(mockListener, mockDevice, mockIDevice);
     }
 
     /**
@@ -2806,21 +2025,17 @@ public class DeqpTestRunnerTest extends TestCase {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
-
-        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, false);
+        DeqpTestRunner deqpTest = setupTestRunner(tests, false);
 
         // Mock 5 batch executions sequentially
         final int batchSize = 1000;
         for (int i = 0; i < numTests; i += batchSize) {
             List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
             String subOutput = buildTestProcessOutput(subList);
-            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, getCommandLine(), subOutput);
+            runInstrumentationLineAndAnswer(null, getCommandLine(), subOutput);
         }
 
-        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+        expectRunAndVerifyTest(deqpTest, tests);
     }
 
     /**
@@ -2836,18 +2051,14 @@ public class DeqpTestRunnerTest extends TestCase {
         final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
         List<TestDescription> tests = Collections.singletonList(testId);
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
-
-        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         String output = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, getCommandLine(), output);
+        runInstrumentationLineAndAnswer(null, getCommandLine(), output);
 
-        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+        expectRunAndVerifyTest(deqpTest, tests);
     }
 
     /**
@@ -2863,20 +2074,16 @@ public class DeqpTestRunnerTest extends TestCase {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
-
-        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         String output = buildTestProcessOutput(tests);
         String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-watchdog=enable";
 
-        runInstrumentationLineAndAnswerParallel(mockDevice, tests, parallelCmd, output, 5);
+        runInstrumentationLineAndAnswerParallel(tests, parallelCmd, output, 5);
 
-        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+        expectRunAndVerifyTest(deqpTest, tests);
     }
 
     /**
@@ -2890,11 +2097,7 @@ public class DeqpTestRunnerTest extends TestCase {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
-
-        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true, false);
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true, false);
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
@@ -2902,11 +2105,12 @@ public class DeqpTestRunnerTest extends TestCase {
         for (int i = 0; i < numTests; i += batchSize) {
             List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
             String subOutput = buildTestProcessOutput(subList);
-            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, getCommandLine(), subOutput);
+            runInstrumentationLineAndAnswer(null, getCommandLine(), subOutput);
         }
 
-        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+        expectRunAndVerifyTest(deqpTest, tests);
     }
+
     /**
      * Test that an invalid test event reporting mode throws an IllegalArgumentException.
      * <p>
@@ -2917,20 +2121,18 @@ public class DeqpTestRunnerTest extends TestCase {
         final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
         List<TestDescription> tests = Collections.singletonList(testId);
 
-        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
-        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true);
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
         deqpTest.setDevice(mockDevice);
 
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", "invalid-parser");
 
-        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
         mockListener.testRunStarted(EasyMock.anyObject(), EasyMock.eq(1));
         EasyMock.expectLastCall().once();
         mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
         EasyMock.expectLastCall().once();
 
-        expectAngleSetup(mockDevice);
+        expectAngleSetup();
         EasyMock.replay(mockDevice, mockListener);
 
         try {
@@ -2941,13 +2143,24 @@ public class DeqpTestRunnerTest extends TestCase {
         }
     }
 
-    private void expectListenerTests(ITestInvocationListener mockListener, Collection<TestDescription> tests) {
-        for (TestDescription testId : tests) {
-            mockListener.testStarted(EasyMock.eq(testId));
-            EasyMock.expectLastCall().once();
-            mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
-            EasyMock.expectLastCall().once();
+    private void runAndVerifyTest(DeqpTestRunner deqpTest) throws Exception {
+        EasyMock.replay(mockDevice, mockIDevice, mockListener);
+        deqpTest.setDevice(mockDevice);
+        deqpTest.run(mockListener);
+        EasyMock.verify(mockListener, mockDevice, mockIDevice);
+    }
+
+    private void runAndVerifyTestInterrupted(DeqpTestRunner deqpTest, IRunUtil mockRunUtil)
+        throws Exception {
+        EasyMock.replay(mockDevice, mockIDevice, mockListener);
+        EasyMock.replay(mockRunUtil);
+        try {
+            deqpTest.run(mockListener);
+            fail("expected RunInterruptedException");
+        } catch (RunInterruptedException ex) {
+            // expected
         }
+        EasyMock.verify(mockRunUtil, mockListener, mockDevice, mockIDevice);
     }
 
     private List<TestDescription> generateTestList(int numTests) {
@@ -2956,5 +2169,160 @@ public class DeqpTestRunnerTest extends TestCase {
             tests.add(new TestDescription("dEQP-GLES3.info", "test" + i));
         }
         return tests;
+    }
+
+    private void expectShellCommand(String command, String output) throws DeviceNotAvailableException {
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.eq(command)))
+            .andReturn(output)
+            .once();
+    }
+
+    private void expectShellCommandContains(String substring, String output) throws DeviceNotAvailableException {
+        EasyMock.expect(mockDevice.executeShellCommand(EasyMock.contains(substring)))
+            .andReturn(output)
+            .once();
+    }
+
+    private void expectAngleSetup() throws Exception {
+        expectShellCommand("settings delete global angle_gl_driver_selection_pkgs", "");
+        expectShellCommand("settings delete global angle_gl_driver_selection_values", "");
+    }
+
+    private void expectAngleSetupAndTeardown() throws Exception {
+        // Expect the calls twice: setupTestEnvironment() and teardownTestEnvironment()
+        expectAngleSetup();
+        expectAngleSetup();
+    }
+
+    private void expectGlVersion(int majorVersion, int minorVersion) throws Exception {
+        int version = (majorVersion << 16) | minorVersion;
+        EasyMock.expect(mockDevice.getProperty("ro.opengles.version"))
+            .andReturn(Integer.toString(version))
+            .atLeastOnce();
+    }
+
+    private void expectVulkanVersion(int deqpLevel, int vulkanHardwareVersion) throws Exception {
+        int majorVersion = (vulkanHardwareVersion >> 22) & 0x7F;
+        assertEquals("Only Vulkan version 1.0 is supported in this mock", 1, majorVersion);
+
+        String featureString = "feature:" + DeqpTestRunner.FEATURE_VULKAN_LEVEL + "=" + majorVersion + "\n"
+                + "feature:" + DeqpTestRunner.FEATURE_VULKAN_DEQP_LEVEL + "=" + deqpLevel + "\n"
+                + "feature:" + DeqpTestRunner.FEATURE_VULKAN_HARDWARE_VERSION  + "=" + vulkanHardwareVersion;
+        EasyMock.expect(mockDevice.executeShellCommand("pm list features"))
+            .andReturn(featureString)
+            .atLeastOnce();
+    }
+
+    private void expectRenderConfigQuery(int majorVersion, int minorVersion)
+        throws Exception {
+        expectRenderConfigQuery(
+            String.format("--deqp-gl-config-name=rgba8888d24s8 "
+                              + "--deqp-screen-rotation=unspecified "
+                              + "--deqp-surface-type=window "
+                              + "--deqp-gl-major-version=%d "
+                              + "--deqp-gl-minor-version=%d",
+                          majorVersion, minorVersion));
+    }
+
+    private void expectRenderConfigQuery(String commandLine) throws Exception {
+        expectRenderConfigQueryAndReturn(commandLine, "Yes");
+    }
+
+    private void expectRenderConfigQueryAndReturn(String commandLine, String output)
+        throws Exception {
+        final String queryOutput =
+            "INSTRUMENTATION_RESULT: Supported=" + output + "\r\n"
+            + "INSTRUMENTATION_CODE: 0\r\n";
+        final String command = String.format(
+            "am instrument %s -w -e deqpQueryType renderConfigSupported -e deqpCmdLine "
+                + "\"%s\" %s",
+            AbiUtils.createAbiFlag(ABI.getName()), commandLine,
+            QUERY_INSTRUMENTATION_NAME);
+
+        mockDevice.executeShellCommand(
+            EasyMock.eq(command), EasyMock.<IShellOutputReceiver>notNull());
+
+        EasyMock.expectLastCall().andAnswer(new IAnswer<Object>() {
+            @Override
+            public Object answer() {
+                IShellOutputReceiver receiver =
+                    (IShellOutputReceiver)EasyMock.getCurrentArguments()[1];
+
+                receiver.addOutput(queryOutput.getBytes(), 0,
+                                   queryOutput.length());
+                receiver.flush();
+
+                return null;
+            }
+        });
+    }
+
+    private void expectRemoveFile(String path) throws Exception {
+        expectShellCommand("rm " + path, "");
+    }
+
+    private void expectRemoveFolder(String path) throws Exception {
+        expectShellCommand("rm -rf " + path, "");
+    }
+
+    private void expectCreateDirectory(String path) throws Exception {
+        expectShellCommand("mkdir -p " + path, "");
+    }
+
+    private void expectPushString(String content, String remotePath) throws Exception {
+        mockDevice.pushString(content, remotePath);
+        EasyMock.expectLastCall().andReturn(true).once();
+    }
+
+    private void expectInstrumentationCommand(String logFilename, String cmd, final String output) throws Exception {
+        String command = String.format(
+            "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\" "
+                + "-e deqpLogData \"%s\" -e deqpEventReportingMode \"%s\" %s",
+            AbiUtils.createAbiFlag(ABI.getName()), logFilename, cmd,
+            false, DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER, INSTRUMENTATION_NAME);
+
+        mockDevice.executeShellV2CommandNoRecovery(
+            EasyMock.eq(command), EasyMock.<IShellOutputReceiver>notNull(),
+            EasyMock.anyLong(), EasyMock.isA(TimeUnit.class));
+
+        EasyMock.expectLastCall().andAnswer(new IAnswer<Object>() {
+            @Override
+            public Object answer() {
+                IShellOutputReceiver receiver =
+                    (IShellOutputReceiver)EasyMock.getCurrentArguments()[1];
+
+                receiver.addOutput(output.getBytes(), 0, output.length());
+                receiver.flush();
+
+                return null;
+            }
+        });
+    }
+
+    private void expectTestRunStarted(DeqpTestRunner deqpTest, int testCount) {
+        mockListener.testRunStarted(getTestId(deqpTest), testCount);
+        EasyMock.expectLastCall().once();
+    }
+
+    private void expectTestRunEnded() {
+        mockListener.testRunEnded(EasyMock.anyLong(), EasyMock.<HashMap<String, Metric>>notNull());
+        EasyMock.expectLastCall().once();
+    }
+
+    private void expectListenerTests(Collection<TestDescription> tests) {
+        for (TestDescription testId : tests) {
+            mockListener.testStarted(EasyMock.eq(testId));
+            EasyMock.expectLastCall().once();
+            mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
+            EasyMock.expectLastCall().once();
+        }
+    }
+
+    private void expectRunAndVerifyTest(DeqpTestRunner deqpTest, Collection<TestDescription> tests) throws Exception {
+        expectTestRunStarted(deqpTest, tests.size());
+        expectAngleSetupAndTeardown();
+        expectListenerTests(tests);
+        expectTestRunEnded();
+        runAndVerifyTest(deqpTest);
     }
 }
