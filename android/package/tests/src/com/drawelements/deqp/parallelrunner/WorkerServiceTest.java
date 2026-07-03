@@ -21,6 +21,7 @@
 package com.drawelements.deqp.parallelrunner;
 
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -47,10 +48,22 @@ public class WorkerServiceTest {
         workerService = new WorkerService();
     }
 
+    private ISurfaceWorker getBoundWorker(WorkerService service) {
+        IBinder binder = service.onBind(new Intent());
+        assertNotNull("onBind should return a non-null IBinder", binder);
+        return ISurfaceWorker.Stub.asInterface(binder);
+    }
+
+    @Test
+    public void testGetServiceClass() {
+        assertEquals(WorkerService.Worker1.class, WorkerService.getServiceClass(0));
+        assertEquals(WorkerService.Worker2.class, WorkerService.getServiceClass(1));
+        assertEquals(WorkerService.Worker12.class, WorkerService.getServiceClass(11));
+    }
+
     @Test
     public void testOnBindReturnsValidStub() {
-        Intent intent = new Intent();
-        IBinder binder = workerService.onBind(intent);
+        IBinder binder = workerService.onBind(new Intent());
 
         assertNotNull("onBind should return a non-null IBinder", binder);
         assertTrue("Returned binder should implement ISurfaceWorker", binder instanceof ISurfaceWorker.Stub);
@@ -58,25 +71,8 @@ public class WorkerServiceTest {
 
     @Test
     public void testSubclassesInstantiateCorrectly() {
-        // Assert that targeted worker implementations instantiate successfully for manifest resolution
         assertNotNull(new WorkerService.Worker1());
         assertNotNull(new WorkerService.Worker12());
-    }
-
-    @Test
-    public void testStartTestBatchAsynchronousInvocation() throws android.os.RemoteException {
-        Intent intent = new Intent();
-        IBinder binder = workerService.onBind(intent);
-        assertNotNull(binder);
-        ISurfaceWorker worker = ISurfaceWorker.Stub.asInterface(binder);
-        assertNotNull(worker);
-
-        // Verify calling startTestBatch does not crash, even with null surface/args
-        boolean accepted = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info");
-        assertTrue("Worker should accept the first test batch", accepted);
-
-        boolean rejected = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info");
-        assertFalse("Worker should reject the second test batch", rejected);
     }
 
     @Test
@@ -91,5 +87,17 @@ public class WorkerServiceTest {
             assertTrue(workerClass.getSimpleName() + " binder should implement ISurfaceWorker",
                 binder instanceof ISurfaceWorker.Stub);
         }
+    }
+
+    @Test
+    public void testStartTestBatch_withNullSurface_rejectsExecution() throws RemoteException {
+        ISurfaceWorker worker = getBoundWorker(workerService);
+
+        // Verify calling startTestBatch rejects null surface safely without crashing
+        boolean accepted = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info");
+        assertFalse("Worker should reject test batch when surface is null", accepted);
+
+        boolean acceptedSecond = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info");
+        assertFalse("Worker should reject second test batch sequentially when surface is null", acceptedSecond);
     }
 }

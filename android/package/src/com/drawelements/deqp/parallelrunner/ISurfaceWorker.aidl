@@ -23,6 +23,10 @@ package com.drawelements.deqp.parallelrunner;
 import android.view.Surface;
 
 interface ISurfaceWorker {
-    // Pass the UI surface and the specific test batch arguments
+    /**
+     * Executes the given test batch on the provided Surface.
+     * Note: This is a synchronous, blocking call. It will not return
+     * until the dEQP test execution finishes.
+     */
     boolean startTestBatch(in Surface surface, String commandLineArgs);
 }
