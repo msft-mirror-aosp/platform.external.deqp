@@ -32,6 +32,7 @@ def initBuildDir (config, generator):
 
     # Build base configuration args
     cfgArgs += config.getArgs()
+    cfgArgs.append("-DCMAKE_POLICY_VERSION_MINIMUM=3.5")
 
     # Generator args
     cfgArgs += generator.getGenerateArgs(config.getBuildType())

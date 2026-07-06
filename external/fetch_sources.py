@@ -341,7 +341,8 @@ PACKAGES = [
         None,
         "77417d5c9e0a5d4c79ddd0285d530b45f7259f0d",
         "glslang",
-        removeTags = ["master-tot"]),
+        removeTags = ["master-tot"],
+        patch = "glslang-cstdint.patch"),
     GitRepo(
         "https://github.com/KhronosGroup/SPIRV-Headers.git",
         "git@github.com:KhronosGroup/SPIRV-Headers.git",
@@ -356,7 +357,8 @@ PACKAGES = [
         "https://github.com/google/amber.git",
         None,
         "933ecb4d6288675a92eb1650e0f52b1d7afe8273",
-        "amber"),
+        "amber",
+        patch = "amber-cstdint.patch"),
     GitRepo(
         "https://github.com/open-source-parsers/jsoncpp.git",
         "git@github.com:open-source-parsers/jsoncpp.git",
