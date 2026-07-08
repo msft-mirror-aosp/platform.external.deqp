@@ -2126,6 +2126,14 @@ public class DeqpTestRunner
 
     private boolean isHandheld() {
         // There is no PM feature for "handheld"
+        if (mDevice != null) {
+            try {
+                getDeviceFeatures(mDevice);
+            } catch (DeviceNotAvailableException | CapabilityQueryFailureException e) {
+                CLog.e("Failed to query device features in isHandheld: " + e.getMessage());
+                return false;
+            }
+        }
         return mHasTouchscreen && !mIsTV && !mIsWatch && !mIsAutomotive && !mIsPC;
     }
 
@@ -2920,7 +2928,7 @@ public class DeqpTestRunner
     }
 
     private boolean isParallelMode(int testCount) {
-        return mEnableDeqpParallelRun && testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD;
+        return mEnableDeqpParallelRun && testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD && isHandheld();
     }
 
 }

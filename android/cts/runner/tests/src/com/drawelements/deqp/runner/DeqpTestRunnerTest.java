@@ -2748,6 +2748,10 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private DeqpTestRunner setupTestRunner(ITestDevice mockDevice, List<TestDescription> tests, boolean enableParallelRun) throws Exception {
+        return setupTestRunner(mockDevice, tests, enableParallelRun, true);
+    }
+
+    private DeqpTestRunner setupTestRunner(ITestDevice mockDevice, List<TestDescription> tests, boolean enableParallelRun, boolean isHandheld) throws Exception {
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
         if (enableParallelRun) {
@@ -2757,6 +2761,14 @@ public class DeqpTestRunnerTest extends TestCase {
 
         expectGlVersion(mockDevice, 3, 0);
         expectRenderConfigQuery(mockDevice, 3, 0);
+
+        String featureString = "feature:" + DeqpTestRunner.FEATURE_OPENGLES_DEQP_LEVEL + "=132580097";
+        if (isHandheld) {
+            featureString = "feature:" + DeqpTestRunner.FEATURE_TOUCHSCREEN + "\n" + featureString;
+        } else {
+            featureString = "feature:" + DeqpTestRunner.FEATURE_LEANBACK + "\n" + featureString;
+        }
+        EasyMock.expect(mockDevice.executeShellCommand("pm list features")).andReturn(featureString).anyTimes();
 
         return deqpTest;
     }
@@ -2857,6 +2869,33 @@ public class DeqpTestRunnerTest extends TestCase {
         String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-watchdog=enable";
 
         runInstrumentationLineAndAnswerParallel(mockDevice, tests, parallelCmd, output, 5);
+
+        runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
+    }
+
+    /**
+     * Test running when parallel mode is enabled and test count is above threshold,
+     * but the target device is non-handheld (e.g. TV).
+     * <p>
+     * Verifies that when running on a non-handheld device, the runner transparently falls back to
+     * sequential execution even if parallel run is enabled and test count is above threshold.
+     */
+    public void testRun_parallelModeEnabled_nonHandheldDevice_fallsBackToSequential() throws Exception {
+        final int numTests = 5000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        ITestDevice mockDevice = EasyMock.createMock(ITestDevice.class);
+        IDevice mockIDevice = EasyMock.createMock(IDevice.class);
+        ITestInvocationListener mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        DeqpTestRunner deqpTest = setupTestRunner(mockDevice, tests, true, false);
+
+        final int batchSize = 1000;
+        for (int i = 0; i < numTests; i += batchSize) {
+            List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(mockDevice, mockIDevice, null, getCommandLine(), subOutput);
+        }
 
         runTestAndVerify(deqpTest, tests, mockDevice, mockIDevice, mockListener);
     }
