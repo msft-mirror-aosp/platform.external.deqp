@@ -20,10 +20,10 @@
 #include "tcuAndroidPlatform.hpp"
 #include "tcuAndroidWindow.hpp"
 #include "tcuAndroidUtil.hpp"
-#include "tcuAndroidAssets.hpp" // <-- ADDED: Needed for AssetArchive
+#include "tcuAndroidAssets.hpp"
 
-//Java_com_drawelements_deqp_DeqpWorkerService_nativeStartDeqp
-extern "C" JNIEXPORT void JNICALL Java_com_drawelements_deqp_parallelrunner_DeqpWorkerService_nativeStartDeqp(
+//Java_com_drawelements_deqp_parallelrunner_WorkerService_nativeStartDeqp
+extern "C" JNIEXPORT void JNICALL Java_com_drawelements_deqp_parallelrunner_WorkerService_nativeStartDeqp(
         JNIEnv* env, jobject thiz, jobject jSurface, jstring jArgs, jobject jAssetManager) {
 
     __android_log_print(ANDROID_LOG_ERROR, "dEQP", "nativeStartDeqp called for service:%p, surface:%p", thiz, jSurface);
