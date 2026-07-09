@@ -20,13 +20,10 @@
 
 package com.drawelements.deqp.parallelrunner;
 
-import android.view.Surface;
-
-interface ISurfaceWorker {
-    /**
-     * Executes the given test batch on the provided Surface.
-     * Note: This is a synchronous, blocking call. It will not return
-     * until the dEQP test execution finishes.
-     */
-    boolean startTestBatch(in Surface surface, String commandLineArgs);
+/**
+ * Common configuration constants for the parallel runner.
+ */
+public class ParallelRunnerConfig {
+    public static final int DEFAULT_MAX_WORKERS = 4;
+    public static final int MAX_ALLOWED_WORKERS = 12;
 }

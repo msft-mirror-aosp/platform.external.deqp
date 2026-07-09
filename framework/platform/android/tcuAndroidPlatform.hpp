@@ -80,6 +80,7 @@ private:
     bool            m_ownsContext;
     WindowRegistry  m_windowRegistry;
     const size_t    m_totalSystemMemory;
+    void            initialize(ANativeWindow* window);
 };
 
 } // namespace Android
