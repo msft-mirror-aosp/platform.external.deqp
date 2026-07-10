@@ -2425,10 +2425,10 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private void runDeqpLevelTest(int deqpLevel, boolean isHandheld, boolean enableNonHandheld, boolean expectSuccess) throws Exception {
-        // Define the target test and a future caselist file date (2025).
+        // Define the target test and a future caselist file date (2026).
         final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
         final String testTrie = "{dEQP-GLES3{info{version}}}";
-        final String caselistFile = "dEQP-GLES3-main-2025-03-01.txt";
+        final String caselistFile = "dEQP-GLES3-main-2026-03-01.txt";
 
         // Expected output from the simulated instrumentation run, indicating a successful pass.
         final String expectedInstrumentationOutput = buildTestProcessOutput(Collections.singletonList(testId));
@@ -2502,23 +2502,23 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     /**
-     * Tests that a handheld device with a dEQP level of 2023 or higher will unconditionally run tests
+     * Tests that a handheld device with a dEQP level of 2025 or higher will unconditionally run tests
      * from a future caselist.
      * <p>
      * This verifies the Google Requirements Freeze (GRF) override policy. Devices claiming a dEQP level
-     * of {@link DeqpTestRunner#DEQP_LEVEL_U_2023} or higher should execute the test cases even if the
-     * provided caselist date (e.g., 2025) is newer than the device's claimed level, provided the device
+     * of 2025 or higher should execute the test cases even if the
+     * provided caselist date (e.g., 2026) is newer than the device's claimed level, provided the device
      * is considered "handheld" (has a touchscreen).
      *
      * @throws Exception if an error occurs during mock setup or test execution
      */
-    public void testRun_deqpLevel2023UnconditionalHandheld() throws Exception {
-        final int deqpLevel2023 = calculateDeqpLevel(2023, 3, 1);
-        runDeqpLevelTest(deqpLevel2023, true /* handheld */, false /* enableNonHandheld */, true /* expectSuccess */);
+    public void testRun_deqpLevel2025UnconditionalHandheld() throws Exception {
+        final int deqpLevel2025 = calculateDeqpLevel(2025, 3, 1);
+        runDeqpLevelTest(deqpLevel2025, true /* handheld */, false /* enableNonHandheld */, true /* expectSuccess */);
     }
 
     /**
-     * Tests that a non-handheld device with a dEQP level of 2023 or higher will unconditionally run tests
+     * Tests that a non-handheld device with a dEQP level of 2025 or higher will unconditionally run tests
      * from a future caselist when the {@code enable-deqp-non-handheld} option is enabled.
      * <p>
      * This verifies that the GRF override policy (normally restricted to handheld devices) can be forced
@@ -2527,24 +2527,24 @@ public class DeqpTestRunnerTest extends TestCase {
      *
      * @throws Exception if an error occurs during mock setup or test execution
      */
-    public void testRun_deqpLevel2023UnconditionalNonHandheld() throws Exception {
-        final int deqpLevel2023 = calculateDeqpLevel(2023, 3, 1);
-        runDeqpLevelTest(deqpLevel2023, false /* handheld */, true /* enableNonHandheld */, true /* expectSuccess */);
+    public void testRun_deqpLevel2025UnconditionalNonHandheld() throws Exception {
+        final int deqpLevel2025 = calculateDeqpLevel(2025, 3, 1);
+        runDeqpLevelTest(deqpLevel2025, false /* handheld */, true /* enableNonHandheld */, true /* expectSuccess */);
     }
 
     /**
-     * Tests that a device with a dEQP level of 2022 or below correctly skips tests from a future caselist.
+     * Tests that a device with a dEQP level of 2024 or below correctly skips tests from a future caselist.
      * <p>
      * This verifies that the GRF override policy is *not* triggered for older devices. If a device claims
-     * a dEQP level (e.g., 2022) that is older than the requirement for the provided caselist date (e.g., 2025),
-     * and the device does not meet the 2023 GRF threshold, the tests should be bypassed and reported as ignored
+     * a dEQP level (e.g., 2024) that is older than the requirement for the provided caselist date (e.g., 2025),
+     * and the device does not meet the 2025 GRF threshold, the tests should be bypassed and reported as ignored
      * rather than being executed.
      *
      * @throws Exception if an error occurs during mock setup or test execution
      */
-    public void testRun_deqpLevel2022FutureCaselistIgnored() throws Exception {
-        final int deqpLevel2022 = calculateDeqpLevel(2022, 3, 1);
-        runDeqpLevelTest(deqpLevel2022, true /* handheld */, false /* enableNonHandheld */, false /* expectSuccess */);
+    public void testRun_deqpLevel2024FutureCaselistIgnored() throws Exception {
+        final int deqpLevel2024 = calculateDeqpLevel(2024, 3, 1);
+        runDeqpLevelTest(deqpLevel2024, true /* handheld */, false /* enableNonHandheld */, false /* expectSuccess */);
     }
 
     private void runSpecificOptionsTest(String specificLevel, boolean countOnly, boolean expectMatch) throws Exception {
