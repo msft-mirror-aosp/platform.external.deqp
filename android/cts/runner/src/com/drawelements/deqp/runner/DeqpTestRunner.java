@@ -129,7 +129,7 @@ public class DeqpTestRunner
         10 * 60 * 1000; // 10min
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
-    private static final int DEQP_LEVEL_U_2023 = 132580097;
+    private static final int DEQP_LEVEL_B_2025 = 132711169;
 
     protected static final String ANGLE_NONE = "none";
     protected static final String ANGLE_VULKAN = "vulkan";
@@ -1973,7 +1973,7 @@ public class DeqpTestRunner
         CLog.d("    2022-03-01 -> 132514561");
         CLog.d("    2023-03-01 -> 132580097");
         CLog.d("    2024-03-01 -> 132645633");
-	    CLog.d("    2025-03-01 -> 132711169");
+        CLog.d("    2025-03-01 -> 132711169");
         CLog.d("    2026-03-01 -> 132776705");
 
         CLog.d("Minimum level required to run this caselist is %d",
@@ -2041,9 +2041,9 @@ public class DeqpTestRunner
                     return shouldRunCaselist;
                 }
 
-                if (claimedDeqpLevel.get() >= DEQP_LEVEL_U_2023 && mEnableDeqpOutsideGrf) {
+                if (claimedDeqpLevel.get() >= DEQP_LEVEL_B_2025 && mEnableDeqpOutsideGrf) {
                     if(mEnableDeqpOutsideGrfNonHandheld || isHandheld()) {
-                        CLog.d("Device dEQP level is >= 2023 and outside GRF flag is enabled. Running all test cases");
+                        CLog.d("Device dEQP level is >= 2025 and outside GRF flag is enabled. Running all test cases");
                         return true;
                     }
                 }
