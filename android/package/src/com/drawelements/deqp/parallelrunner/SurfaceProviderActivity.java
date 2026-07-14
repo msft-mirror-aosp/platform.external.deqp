@@ -21,6 +21,7 @@
 package com.drawelements.deqp.parallelrunner;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Build;
@@ -40,12 +41,22 @@ import java.util.Queue;
  */
 public class SurfaceProviderActivity extends Activity {
     private static final String TAG = "SurfaceProviderActivity";
-    static final String EXTRA_MAX_WORKERS = "extra_max_workers";
-    static final String EXTRA_TEST_BATCHES_DIR = "extra_test_batches_dir";
-    static final String DEFAULT_TEST_BATCHES_DIR;
+    private static final String EXTRA_MAX_WORKERS = "extra_max_workers";
+    private static final String EXTRA_CASELIST_DIR = "extra_caselist_dir";
+
+    public static Intent createIntent(Context context, int maxWorkers, String caselistDir) {
+        Intent intent = new Intent(context, SurfaceProviderActivity.class);
+        intent.putExtra(EXTRA_MAX_WORKERS, maxWorkers);
+        if (caselistDir != null) {
+            intent.putExtra(EXTRA_CASELIST_DIR, caselistDir);
+        }
+        return intent;
+    }
+
+    static final String DEFAULT_CASELIST_DIR;
 
     static {
-        DEFAULT_TEST_BATCHES_DIR = new File(
+        DEFAULT_CASELIST_DIR = new File(
             android.os.Environment.getExternalStorageDirectory(),
             "deqpparallel/caselists/"
         ).getAbsolutePath();
@@ -68,27 +79,19 @@ public class SurfaceProviderActivity extends Activity {
             workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
         }
 
-        if (workerCount <= 0) {
-            Log.w(TAG, "Invalid workerCount: " + workerCount + ". Defaulting to 1.");
-            workerCount = 1;
+        String caselistDir = DEFAULT_CASELIST_DIR;
+        if (getIntent() != null && getIntent().hasExtra(EXTRA_CASELIST_DIR)) {
+            caselistDir = getIntent().getStringExtra(EXTRA_CASELIST_DIR);
         }
 
-        if (workerCount > ParallelRunnerConfig.MAX_ALLOWED_WORKERS) {
-            Log.w(TAG, "workerCount " + workerCount + " exceeds maximum allowed. Clamping to " + ParallelRunnerConfig.MAX_ALLOWED_WORKERS + ".");
-            workerCount = ParallelRunnerConfig.MAX_ALLOWED_WORKERS;
-        }
-
-        String testBatchesDir = DEFAULT_TEST_BATCHES_DIR;
-        if (getIntent() != null && getIntent().hasExtra(EXTRA_TEST_BATCHES_DIR)) {
-            testBatchesDir = getIntent().getStringExtra(EXTRA_TEST_BATCHES_DIR);
-        }
+        Log.i(TAG, "onCreate: workerCount=" + workerCount + ", caselistDir=" + caselistDir);
 
         final int finalWorkerCount = workerCount;
-        final String finalTestBatchesDir = testBatchesDir;
+        final String finalCaselistDir = caselistDir;
 
         // Maintain reference to loader thread for proper cleanup in onDestroy()
         loaderThread = new Thread(() -> {
-            mTestBatchLoader.loadFromDirectory(finalTestBatchesDir);
+            mTestBatchLoader.loadFromDirectory(finalCaselistDir);
 
             runOnUiThread(() -> {
                 if (isDestroyed() || isFinishing()) {
@@ -205,6 +208,14 @@ public class SurfaceProviderActivity extends Activity {
         }
     }
 
+    public interface LifeCycleListener {
+        void onDestroyed();
+    }
+    private static volatile LifeCycleListener sLifeCycleListener;
+    public static void setLifeCycleListener(LifeCycleListener listener) {
+        sLifeCycleListener = listener;
+    }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -216,6 +227,11 @@ public class SurfaceProviderActivity extends Activity {
         if (scheduler != null) {
             scheduler.shutdown();
             scheduler = null;
+        }
+
+        if (sLifeCycleListener != null) {
+            sLifeCycleListener.onDestroyed();
+            sLifeCycleListener = null;
         }
     }
 }
