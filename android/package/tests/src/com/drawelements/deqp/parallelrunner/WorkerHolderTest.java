@@ -138,6 +138,9 @@ public class WorkerHolderTest {
         return mockHolder;
     }
 
+    private static final String TEST_LOG_DIR = "/sdcard/deqpparallel/logs/";
+    private static final String TEST_CMD_LINE = "--deqp-gl-config-name=rgba8888d24s8";
+
     @After
     public void tearDown() {
         WorkerHolder.setConnectionFactory(WorkerServiceConnection::new);
@@ -146,7 +149,7 @@ public class WorkerHolderTest {
     @Test
     public void testSurfaceCreatedTriggersBind() {
         TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, directExecutor, stateLock, mockSchedulerCallback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, mockSchedulerCallback);
 
         SurfaceHolder mockHolder = createMockSurfaceHolder(new TestSurface());
 
@@ -163,7 +166,7 @@ public class WorkerHolderTest {
         TestSurface testSurface = new TestSurface();
         TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, directExecutor, stateLock, mockSchedulerCallback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, mockSchedulerCallback);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
@@ -193,7 +196,7 @@ public class WorkerHolderTest {
         TestSurface testSurface = new TestSurface();
         TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, directExecutor, stateLock, mockSchedulerCallback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, mockSchedulerCallback);
 
         // Set valid surface
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
@@ -214,10 +217,62 @@ public class WorkerHolderTest {
     }
 
     @Test
+    public void testOnConnectedDispatchesBatchWithCmdLineAndLogDir() throws Exception {
+        setupBatchLoaderWithFiles("batch_1.txt");
+        ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
+        TestSurface testSurface = new TestSurface();
+        TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
+
+        String baseCmdLine = "--deqp-watchdog=enable --deqp-gl-config-name=rgba8888d24s8";
+        String logDir = "/sdcard/deqplogs";
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, logDir, baseCmdLine, directExecutor, stateLock, mockSchedulerCallback);
+
+        SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
+        holder.surfaceCreated(mockHolder);
+
+        expect(mockWorker.startTestBatch(eq(testSurface), contains(baseCmdLine + " --deqp-log-filename=/sdcard/deqplogs/TestLog_worker_0.qpa --deqp-caselist-file="))).andReturn(true).once();
+        mockSchedulerCallback.checkAllWorkersFinished();
+        expectLastCall().once();
+
+        replay(mockWorker, mockSchedulerCallback);
+
+        capturedConnection[0].workerVal = mockWorker;
+        holder.onConnected(mockWorker);
+
+        verify(mockWorker, mockSchedulerCallback);
+        assertTrue(capturedConnection[0].unbindCalled);
+    }
+
+    @Test
+    public void testOnConnectedDispatchesBatchWithNullCmdLineAndLogDir() throws Exception {
+        setupBatchLoaderWithFiles("batch_1.txt");
+        ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
+        TestSurface testSurface = new TestSurface();
+        TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
+
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, null, null, directExecutor, stateLock, mockSchedulerCallback);
+
+        SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
+        holder.surfaceCreated(mockHolder);
+
+        expect(mockWorker.startTestBatch(eq(testSurface), matches("^--deqp-caselist-file=.*batch_1.txt$"))).andReturn(true).once();
+        mockSchedulerCallback.checkAllWorkersFinished();
+        expectLastCall().once();
+
+        replay(mockWorker, mockSchedulerCallback);
+
+        capturedConnection[0].workerVal = mockWorker;
+        holder.onConnected(mockWorker);
+
+        verify(mockWorker, mockSchedulerCallback);
+        assertTrue(capturedConnection[0].unbindCalled);
+    }
+
+    @Test
     public void testQueueExhaustionCallsCheckAllWorkersFinished() throws Exception {
         // No files loaded, batch queue is empty
         TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, directExecutor, stateLock, mockSchedulerCallback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, mockSchedulerCallback);
 
         SurfaceHolder mockHolder = createMockSurfaceHolder(new TestSurface());
         holder.surfaceCreated(mockHolder);
@@ -241,7 +296,7 @@ public class WorkerHolderTest {
         TestSurface testSurface = new TestSurface();
         TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, directExecutor, stateLock, mockSchedulerCallback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, mockSchedulerCallback);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
@@ -275,7 +330,7 @@ public class WorkerHolderTest {
         TestSurface testSurface = new TestSurface();
         TestWorkerServiceConnection[] capturedConnection = registerMockConnectionFactory();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, directExecutor, stateLock, mockSchedulerCallback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, mockSchedulerCallback);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 

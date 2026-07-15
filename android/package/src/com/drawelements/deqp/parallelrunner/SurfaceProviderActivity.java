@@ -26,6 +26,7 @@ import android.content.Intent;
 import android.graphics.Rect;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
 import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.SurfaceHolder;
@@ -43,22 +44,35 @@ public class SurfaceProviderActivity extends Activity {
     private static final String TAG = "SurfaceProviderActivity";
     private static final String EXTRA_MAX_WORKERS = "extra_max_workers";
     private static final String EXTRA_CASELIST_DIR = "extra_caselist_dir";
+    private static final String EXTRA_LOG_DIR = "extra_log_dir";
+    private static final String EXTRA_CMDLINE = "extra_cmdline";
 
-    public static Intent createIntent(Context context, int maxWorkers, String caselistDir) {
+    public static Intent createIntent(Context context, int maxWorkers, String caselistDir, String logDir, String cmdLine) {
         Intent intent = new Intent(context, SurfaceProviderActivity.class);
         intent.putExtra(EXTRA_MAX_WORKERS, maxWorkers);
         if (caselistDir != null) {
             intent.putExtra(EXTRA_CASELIST_DIR, caselistDir);
         }
+        if (logDir != null) {
+            intent.putExtra(EXTRA_LOG_DIR, logDir);
+        }
+        if (cmdLine != null) {
+            intent.putExtra(EXTRA_CMDLINE, cmdLine);
+        }
         return intent;
     }
 
     static final String DEFAULT_CASELIST_DIR;
+    static final String DEFAULT_LOG_DIR;
 
     static {
         DEFAULT_CASELIST_DIR = new File(
-            android.os.Environment.getExternalStorageDirectory(),
+            Environment.getExternalStorageDirectory(),
             "deqpparallel/caselists/"
+        ).getAbsolutePath();
+        DEFAULT_LOG_DIR = new File(
+            Environment.getExternalStorageDirectory(),
+            "deqpparallel/logs/"
         ).getAbsolutePath();
     }
 
@@ -78,16 +92,32 @@ public class SurfaceProviderActivity extends Activity {
         if (getIntent() != null && getIntent().hasExtra(EXTRA_MAX_WORKERS)) {
             workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
         }
+        if (workerCount <= 0) {
+            Log.w(TAG, "Invalid workerCount=" + workerCount + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+            workerCount = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
+        }
 
         String caselistDir = DEFAULT_CASELIST_DIR;
         if (getIntent() != null && getIntent().hasExtra(EXTRA_CASELIST_DIR)) {
             caselistDir = getIntent().getStringExtra(EXTRA_CASELIST_DIR);
         }
 
-        Log.i(TAG, "onCreate: workerCount=" + workerCount + ", caselistDir=" + caselistDir);
+        String logDir = DEFAULT_LOG_DIR;
+        if (getIntent() != null && getIntent().hasExtra(EXTRA_LOG_DIR)) {
+            logDir = getIntent().getStringExtra(EXTRA_LOG_DIR);
+        }
+
+        String cmdLine = "";
+        if (getIntent() != null && getIntent().hasExtra(EXTRA_CMDLINE)) {
+            cmdLine = getIntent().getStringExtra(EXTRA_CMDLINE);
+        }
+
+        Log.i(TAG, "onCreate: workerCount=" + workerCount + ", caselistDir=" + caselistDir + ", logDir=" + logDir + ", cmdLine=" + cmdLine);
 
         final int finalWorkerCount = workerCount;
         final String finalCaselistDir = caselistDir;
+        final String finalLogDir = logDir;
+        final String finalCmdLine = cmdLine;
 
         // Maintain reference to loader thread for proper cleanup in onDestroy()
         loaderThread = new Thread(() -> {
@@ -99,7 +129,7 @@ public class SurfaceProviderActivity extends Activity {
                 }
 
                 // Initialize the scheduler safely AFTER batches are loaded
-                scheduler = new ParallelTestsScheduler(this, finalWorkerCount, mTestBatchLoader, new ParallelTestsScheduler.Callback() {
+                scheduler = new ParallelTestsScheduler(this, finalWorkerCount, mTestBatchLoader, finalLogDir, finalCmdLine, new ParallelTestsScheduler.Callback() {
                     @Override
                     public void onAllTestsCompleted() {
                         Log.i(TAG, "All rendering workers finished execution. Completing activity.");

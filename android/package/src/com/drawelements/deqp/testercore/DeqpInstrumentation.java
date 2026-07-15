@@ -42,8 +42,9 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     private String m_logFileName;
     private boolean m_logData;
     private boolean m_parallel;
-    private int m_maxWorkers;
-    private String m_caselistDir;
+    private int m_parallelMaxWorkers;
+    private String m_parallelCaselistDir;
+    private String m_parallelLogDir;
 
     @Override
     public void onCreate(Bundle arguments) {
@@ -70,9 +71,10 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
         m_parallel = Boolean.parseBoolean(arguments.getString("deqpEnableParallel"));
 
         if (m_parallel) {
-            m_caselistDir = arguments.getString("deqpCaselistDir");
+            m_parallelCaselistDir = arguments.getString("deqpCaselistDir");
+            m_parallelLogDir = arguments.getString("deqpLogDir");
 
-            m_maxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
+            m_parallelMaxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
             String maxWorkersStr = arguments.getString("deqpMaxWorkers");
             if (maxWorkersStr != null) {
                 try {
@@ -80,19 +82,19 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
                     if (val <= 0) {
                         Log.w(LOG_TAG, "Invalid deqpMaxWorkers=" + val
                                 + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
-                        m_maxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
+                        m_parallelMaxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
                     } else if (val > ParallelRunnerConfig.MAX_ALLOWED_WORKERS) {
                         Log.w(LOG_TAG, "deqpMaxWorkers=" + val
                                 + "> max allowed=" + ParallelRunnerConfig.MAX_ALLOWED_WORKERS
                                 + ". Defaulting to max allowed.");
-                        m_maxWorkers = ParallelRunnerConfig.MAX_ALLOWED_WORKERS;
+                        m_parallelMaxWorkers = ParallelRunnerConfig.MAX_ALLOWED_WORKERS;
                     } else {
-                        m_maxWorkers = val;
+                        m_parallelMaxWorkers = val;
                     }
                 } catch (NumberFormatException e) {
                     Log.e(LOG_TAG, "Failed to parse deqpMaxWorkers=" + maxWorkersStr
                             + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
-                    m_maxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
+                    m_parallelMaxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
                 }
             }
         }
@@ -121,7 +123,7 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
                 }
             });
 
-            Intent testIntent = SurfaceProviderActivity.createIntent(getTargetContext(), m_maxWorkers, m_caselistDir);
+            Intent testIntent = SurfaceProviderActivity.createIntent(getTargetContext(), m_parallelMaxWorkers, m_parallelCaselistDir, m_parallelLogDir, m_cmdLine);
             testIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
 
             if (getTargetContext().getPackageManager().resolveActivity(testIntent, 0) == null) {
