@@ -20,13 +20,25 @@
 
 package com.drawelements.deqp.parallelrunner;
 
-import android.view.Surface;
+import static org.junit.Assert.assertEquals;
 
-interface ISurfaceWorker {
-    /**
-     * Executes the given test batch on the provided Surface.
-     * Note: This is a synchronous, blocking call. It will not return
-     * until the dEQP test execution finishes.
-     */
-    boolean startTestBatch(in Surface surface, String commandLineArgs);
+import androidx.test.ext.junit.runners.AndroidJUnit4;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+
+/**
+ * Unit tests for {@link ParallelRunnerConfig}.
+ */
+@RunWith(AndroidJUnit4.class)
+public class ParallelRunnerConfigTest {
+
+    @Test
+    public void testDefaultMaxWorkersConstant() {
+        assertEquals(4, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+    }
+
+    @Test
+    public void testMaxAllowedWorkersConstant() {
+        assertEquals(12, ParallelRunnerConfig.MAX_ALLOWED_WORKERS);
+    }
 }

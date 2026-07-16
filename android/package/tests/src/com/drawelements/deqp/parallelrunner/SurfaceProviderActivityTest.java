@@ -23,23 +23,21 @@ package com.drawelements.deqp.parallelrunner;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-
 import android.content.Context;
 import android.content.Intent;
+import android.view.SurfaceView;
 import android.view.View;
 import android.widget.GridLayout;
-import android.view.SurfaceView;
 import androidx.test.core.app.ActivityScenario;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import java.io.File;
+import java.io.IOException;
+import java.util.Queue;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.Queue;
 
 /**
  * Unit tests for {@link SurfaceProviderActivity} using ActivityScenario.
@@ -121,16 +119,11 @@ public class SurfaceProviderActivityTest {
     }
 
     @Test
-    public void testDefaultMaxWorkersConstant() {
-        assertEquals(4, SurfaceProviderActivity.DEFAULT_MAX_WORKERS);
-    }
-
-    @Test
     public void testDefaultWorkersLaunch() {
         try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(SurfaceProviderActivity.class)) {
             scenario.onActivity(activity -> {
-                GridLayout gridLayout = getAndVerifySurfaceGrid(activity, SurfaceProviderActivity.DEFAULT_MAX_WORKERS);
-                assertGridGeometryTiling(gridLayout, SurfaceProviderActivity.DEFAULT_MAX_WORKERS);
+                GridLayout gridLayout = getAndVerifySurfaceGrid(activity, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+                assertGridGeometryTiling(gridLayout, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
             });
         }
     }
@@ -141,8 +134,7 @@ public class SurfaceProviderActivityTest {
         int[] countsToTest = {4, 6, 7, 9};
 
         for (int workers : countsToTest) {
-            Intent intent = new Intent(context, SurfaceProviderActivity.class);
-            intent.putExtra(SurfaceProviderActivity.EXTRA_MAX_WORKERS, workers);
+            Intent intent = SurfaceProviderActivity.createIntent(context, workers, null);
 
             try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
                 scenario.onActivity(activity -> {
@@ -150,20 +142,6 @@ public class SurfaceProviderActivityTest {
                     assertGridGeometryTiling(gridLayout, workers);
                 });
             }
-        }
-    }
-
-    @Test
-    public void testInvalidWorkersGrid() {
-        Context context = ApplicationProvider.getApplicationContext();
-        Intent intent = new Intent(context, SurfaceProviderActivity.class);
-        intent.putExtra(SurfaceProviderActivity.EXTRA_MAX_WORKERS, 0); // Invalid count
-
-        try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
-            scenario.onActivity(activity -> {
-                GridLayout gridLayout = getAndVerifySurfaceGrid(activity, 1);
-                assertGridGeometryTiling(gridLayout, 1);
-            });
         }
     }
 
@@ -210,21 +188,20 @@ public class SurfaceProviderActivityTest {
     }
 
     @Test
-    public void testTestBatchesLoadingFromDirectory() throws IOException {
+    public void testCaselistLoadingFromDirectory() throws IOException {
         Context context = ApplicationProvider.getApplicationContext();
 
-        File tempDir = tempFolder.newFolder("deqp_temp_batches");
+        File tempDir = tempFolder.newFolder("deqp_temp_caselists");
 
-        File file10 = new File(tempDir, "batch_10.txt");
-        File file2 = new File(tempDir, "batch_2.txt");
-        File file1 = new File(tempDir, "batch_1.txt");
+        File file10 = new File(tempDir, "caselist_10.txt");
+        File file2 = new File(tempDir, "caselist_2.txt");
+        File file1 = new File(tempDir, "caselist_1.txt");
 
         file10.createNewFile();
         file2.createNewFile();
         file1.createNewFile();
 
-        Intent intent = new Intent(context, SurfaceProviderActivity.class);
-        intent.putExtra(SurfaceProviderActivity.EXTRA_TEST_BATCHES_DIR, tempDir.getAbsolutePath());
+        Intent intent = SurfaceProviderActivity.createIntent(context, 0, tempDir.getAbsolutePath());
 
         try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
             // Wait briefly to allow async background thread loading to execute

@@ -347,10 +347,7 @@ Platform::Platform(NativeActivity &activity, ANativeWindow* window)
     , m_ownsContext(false)
     , m_totalSystemMemory(getTotalSystemMemory(m_vm, m_context))
 {
-    m_nativeDisplayFactoryRegistry.registerFactory(new NativeDisplayFactory(m_windowRegistry));
-    m_contextFactoryRegistry.registerFactory(new eglu::GLContextFactory(m_nativeDisplayFactoryRegistry));
-    if (window)
-        m_windowRegistry.addWindow(window);
+    initialize(window);
 }
 
 Platform::Platform(JavaVM *vm, jobject context, ANativeWindow* window)
@@ -362,21 +359,18 @@ Platform::Platform(JavaVM *vm, jobject context, ANativeWindow* window)
 {
     if (context && vm)
     {
-        JNIEnv* env = nullptr;
-        bool detach = false;
-        if (vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED)
+        const ScopedJNIEnv env(vm);
+        if (env.getEnv())
         {
-            if (vm->AttachCurrentThread(&env, nullptr) == JNI_OK)
-                detach = true;
-        }
-        if (env)
-        {
-            m_context = env->NewGlobalRef(context);
+            m_context = env.getEnv()->NewGlobalRef(context);
             m_ownsContext = true;
         }
-        if (detach)
-            vm->DetachCurrentThread();
     }
+    initialize(window);
+}
+
+void Platform::initialize(ANativeWindow* window)
+{
     m_nativeDisplayFactoryRegistry.registerFactory(new NativeDisplayFactory(m_windowRegistry));
     m_contextFactoryRegistry.registerFactory(new eglu::GLContextFactory(m_nativeDisplayFactoryRegistry));
     if (window)
@@ -387,17 +381,16 @@ Platform::~Platform(void)
 {
     if (m_ownsContext && m_context && m_vm)
     {
-        JNIEnv* env = nullptr;
-        bool detach = false;
-        if (m_vm->GetEnv((void**)&env, JNI_VERSION_1_6) == JNI_EDETACHED)
+        try
         {
-            if (m_vm->AttachCurrentThread(&env, nullptr) == JNI_OK)
-                detach = true;
+            const ScopedJNIEnv env(m_vm);
+            if (env.getEnv())
+                env.getEnv()->DeleteGlobalRef(m_context);
         }
-        if (env)
-            env->DeleteGlobalRef(m_context);
-        if (detach)
-            m_vm->DetachCurrentThread();
+        catch (const std::exception &)
+        {
+            // Destructors should not throw.
+        }
     }
 }
 
