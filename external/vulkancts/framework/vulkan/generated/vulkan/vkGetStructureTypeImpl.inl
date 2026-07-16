@@ -3723,3 +3723,13 @@ template<> VkStructureType getStructureType<VkPhysicalDeviceMultiviewPerViewView
 	return VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MULTIVIEW_PER_VIEW_VIEWPORTS_FEATURES_QCOM;
 }
 
+template<> VkStructureType getStructureType<VkPipelineCreateFlags2CreateInfoKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_PIPELINE_CREATE_FLAGS_2_CREATE_INFO_KHR;
+}
+
+template<> VkStructureType getStructureType<VkBufferUsageFlags2CreateInfoKHR> (void)
+{
+	return VK_STRUCTURE_TYPE_BUFFER_USAGE_FLAGS_2_CREATE_INFO_KHR;
+}
+
