@@ -36,4 +36,24 @@ dEQP-EGL.functional.wide_color.window_8888_colorspace_p3
 
 # b/524066195, b/511897206
 dEQP-EGL.functional.get_frame_timestamps.rgb565_no_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgb565_no_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgb565_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgb565_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgb888_no_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgb888_no_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgb888_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgb888_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba4444_no_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba4444_no_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba4444_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba4444_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba5551_no_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba5551_no_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba5551_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba5551_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba8888_no_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba8888_no_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba8888_depth_no_stencil
+dEQP-EGL.functional.get_frame_timestamps.rgba8888_depth_stencil
+dEQP-EGL.functional.get_frame_timestamps.other
 
