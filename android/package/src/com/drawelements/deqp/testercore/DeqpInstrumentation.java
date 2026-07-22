@@ -24,10 +24,12 @@
 package com.drawelements.deqp.testercore;
 
 import android.app.Instrumentation;
+import android.content.Intent;
 import android.os.Bundle;
-import com.drawelements.deqp.testercore.TestEventConstants;
+import com.drawelements.deqp.parallelrunner.ParallelRunnerConfig;
+import com.drawelements.deqp.parallelrunner.SurfaceProviderActivity;
 import java.io.File;
-import java.lang.Thread;
+import java.util.concurrent.CountDownLatch;
 
 public class DeqpInstrumentation extends Instrumentation implements TestEventListener {
     private static final String LOG_TAG = "dEQP/Instrumentation";
@@ -39,6 +41,9 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
     private String m_cmdLine;
     private String m_logFileName;
     private boolean m_logData;
+    private boolean m_parallel;
+    private int m_maxWorkers;
+    private String m_caselistDir;
 
     @Override
     public void onCreate(Bundle arguments) {
@@ -62,19 +67,86 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
         } else
             m_logData = false;
 
+        m_parallel = Boolean.parseBoolean(arguments.getString("deqpEnableParallel"));
+
+        if (m_parallel) {
+            m_caselistDir = arguments.getString("deqpCaselistDir");
+
+            m_maxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
+            String maxWorkersStr = arguments.getString("deqpMaxWorkers");
+            if (maxWorkersStr != null) {
+                try {
+                    int val = Integer.parseInt(maxWorkersStr);
+                    if (val <= 0) {
+                        Log.w(LOG_TAG, "Invalid deqpMaxWorkers=" + val
+                                + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+                        m_maxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
+                    } else if (val > ParallelRunnerConfig.MAX_ALLOWED_WORKERS) {
+                        Log.w(LOG_TAG, "deqpMaxWorkers=" + val
+                                + "> max allowed=" + ParallelRunnerConfig.MAX_ALLOWED_WORKERS
+                                + ". Defaulting to max allowed.");
+                        m_maxWorkers = ParallelRunnerConfig.MAX_ALLOWED_WORKERS;
+                    } else {
+                        m_maxWorkers = val;
+                    }
+                } catch (NumberFormatException e) {
+                    Log.e(LOG_TAG, "Failed to parse deqpMaxWorkers=" + maxWorkersStr
+                            + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+                    m_maxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
+                }
+            }
+        }
+
         start();
     }
 
     @Override
     public void onStart() {
         super.onStart();
-        final RemoteAPI remoteApi =
-            new RemoteAPI(getTargetContext(), m_logFileName);
-        final LogParser parser = new TestLogParser();
 
+        if (m_parallel) {
+            runParallelMode();
+        } else {
+            runLegacyMode();
+        }
+    }
+
+    private void runParallelMode() {
         try {
-            Log.d(LOG_TAG, "onStart");
+            final CountDownLatch latch = new CountDownLatch(1);
+            SurfaceProviderActivity.setLifeCycleListener(new SurfaceProviderActivity.LifeCycleListener() {
+                @Override
+                public void onDestroyed() {
+                    latch.countDown();
+                }
+            });
 
+            Intent testIntent = SurfaceProviderActivity.createIntent(getTargetContext(), m_maxWorkers, m_caselistDir);
+            testIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+
+            if (getTargetContext().getPackageManager().resolveActivity(testIntent, 0) == null) {
+                throw new Exception("Can't resolve parallel runner activity: com.drawelements.deqp.parallelrunner.SurfaceProviderActivity");
+            }
+
+            Log.d(LOG_TAG, "Starting parallel execution mode");
+            getTargetContext().startActivity(testIntent);
+            latch.await();
+            finish(0, new Bundle());
+        } catch (Exception e) {
+            Log.e(LOG_TAG, "Exception in parallel execution", e);
+            Bundle info = new Bundle();
+            info.putString("Exception", e.getMessage());
+            finish(1, info);
+        } finally {
+            SurfaceProviderActivity.setLifeCycleListener(null);
+        }
+    }
+
+    private void runLegacyMode() {
+        final RemoteAPI remoteApi = new RemoteAPI(getTargetContext(), m_logFileName);
+        final LogParser parser = new TestLogParser();
+        try {
+            Log.d(LOG_TAG, "Starting legacy execution mode");
             final String testerName = "";
             final File logFile = new File(m_logFileName);
 
@@ -249,7 +321,6 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
 
     @Override
     public void onDestroy() {
-        Log.e(LOG_TAG, "onDestroy");
         super.onDestroy();
         Log.e(LOG_TAG, "onDestroy");
     }

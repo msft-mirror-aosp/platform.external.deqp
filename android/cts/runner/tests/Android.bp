@@ -34,4 +34,7 @@ java_test_host {
         "CtsDeqpTestCases",
     ],
     static_libs: ["easymock"],
+    test_options: {
+        unit_test: true,
+    },
 }
