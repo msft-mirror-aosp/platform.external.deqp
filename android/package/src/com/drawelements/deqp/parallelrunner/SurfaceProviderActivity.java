@@ -30,38 +30,31 @@ import android.util.Log;
 import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.widget.GridLayout;
-
 import java.io.File;
 import java.util.Queue;
 
 /**
  * SurfaceProviderActivity serves as the orchestrator and UI container for the parallel test runner.
  * It dynamically generates a grid layout containing multiple {@link SurfaceView}s,
- * each corresponding to an independent rendering worker.
- *
- * It implements {@link SurfaceLifecycleListener} to monitor when the raw surfaces
- * are created, changed, or destroyed, allowing it to dispatch these events
- * to background rendering threads.
- *
- * The number of parallel workers can be configured dynamically via Intent extras
- * using {@code "extra_max_workers"}.
+ * each corresponding to an independent rendering worker managed by {@link ParallelTestsScheduler}.
  */
-public class SurfaceProviderActivity extends Activity implements SurfaceLifecycleListener {
+public class SurfaceProviderActivity extends Activity {
     private static final String TAG = "SurfaceProviderActivity";
     static final String EXTRA_MAX_WORKERS = "extra_max_workers";
     static final String EXTRA_TEST_BATCHES_DIR = "extra_test_batches_dir";
     static final String DEFAULT_TEST_BATCHES_DIR;
+
     static {
         DEFAULT_TEST_BATCHES_DIR = new File(
             android.os.Environment.getExternalStorageDirectory(),
             "deqpparallel/caselists/"
         ).getAbsolutePath();
     }
-    static final int DEFAULT_MAX_WORKERS = 4;
-    static final int MAX_ALLOWED_WORKERS = 12;
 
     private GridLayout workerGridLayout;
     private final DeqpTestBatchLoader mTestBatchLoader = new DeqpTestBatchLoader();
+    private ParallelTestsScheduler scheduler;
+    private Thread loaderThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,9 +63,9 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
         workerGridLayout = new GridLayout(this);
         setContentView(workerGridLayout);
 
-        int workerCount = DEFAULT_MAX_WORKERS;
+        int workerCount = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
         if (getIntent() != null && getIntent().hasExtra(EXTRA_MAX_WORKERS)) {
-            workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, DEFAULT_MAX_WORKERS);
+            workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
         }
 
         if (workerCount <= 0) {
@@ -80,9 +73,9 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
             workerCount = 1;
         }
 
-        if (workerCount > MAX_ALLOWED_WORKERS) {
-            Log.w(TAG, "workerCount " + workerCount + " exceeds maximum allowed. Clamping to " + MAX_ALLOWED_WORKERS + ".");
-            workerCount = MAX_ALLOWED_WORKERS;
+        if (workerCount > ParallelRunnerConfig.MAX_ALLOWED_WORKERS) {
+            Log.w(TAG, "workerCount " + workerCount + " exceeds maximum allowed. Clamping to " + ParallelRunnerConfig.MAX_ALLOWED_WORKERS + ".");
+            workerCount = ParallelRunnerConfig.MAX_ALLOWED_WORKERS;
         }
 
         String testBatchesDir = DEFAULT_TEST_BATCHES_DIR;
@@ -93,12 +86,34 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
         final int finalWorkerCount = workerCount;
         final String finalTestBatchesDir = testBatchesDir;
 
-        new Thread(() -> {
+        // Maintain reference to loader thread for proper cleanup in onDestroy()
+        loaderThread = new Thread(() -> {
             mTestBatchLoader.loadFromDirectory(finalTestBatchesDir);
+
             runOnUiThread(() -> {
+                if (isDestroyed() || isFinishing()) {
+                    return;
+                }
+
+                // Initialize the scheduler safely AFTER batches are loaded
+                scheduler = new ParallelTestsScheduler(this, finalWorkerCount, mTestBatchLoader, new ParallelTestsScheduler.Callback() {
+                    @Override
+                    public void onAllTestsCompleted() {
+                        Log.i(TAG, "All rendering workers finished execution. Completing activity.");
+                        runOnUiThread(() -> {
+                            if (!isDestroyed() && !isFinishing()) {
+                                SurfaceProviderActivity.this.finish();
+                            }
+                        });
+                    }
+                });
+
+                // Generate views only when scheduler is ready to receive callbacks
                 generateSurfaceViews(finalWorkerCount);
             });
-        }).start();
+        });
+
+        loaderThread.start();
     }
 
     /**
@@ -130,8 +145,7 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
      */
     private void generateSurfaceViews(int workerCount) {
         Rect bounds = getWindowBounds();
-        double windowAspectRatio = bounds.height() > 0 ? (double) bounds.width() / bounds.height()
-            : 1.0;
+        double windowAspectRatio = bounds.height() > 0 ? (double) bounds.width() / bounds.height() : 1.0;
         GridSize grid = calculateOptimalGrid(workerCount, windowAspectRatio);
 
         Log.i(TAG, String.format("Generated grid: %d columns, %d rows for %d workers. Window aspect: %.2f",
@@ -143,9 +157,8 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
         for (int i = 0; i < workerCount; i++) {
             SurfaceView surfaceView = new SurfaceView(this);
 
-            // Note: Ensure SafeSurfaceCallback holds SurfaceLifecycleListener via WeakReference
-            // internally to avoid Activity leaks.
-            surfaceView.getHolder().addCallback(new SafeSurfaceCallback(i, this));
+            // Let the scheduler register its callback to the surface view holder
+            scheduler.registerSurface(i, surfaceView.getHolder());
 
             // Relies on truncating integer division for deterministic row assignment
             GridLayout.Spec rowSpec = GridLayout.spec(i / grid.columns, GridLayout.FILL, 1.0f);
@@ -193,19 +206,16 @@ public class SurfaceProviderActivity extends Activity implements SurfaceLifecycl
     }
 
     @Override
-    public void onSurfaceCreated(int workerId, SurfaceHolder holder) {
-        Log.i(TAG, "onSurfaceCreated: Raw Surface READY for worker " + workerId);
-        // TODO: Dispatch surface to background rendering thread
-    }
+    protected void onDestroy() {
+        super.onDestroy();
+        if (loaderThread != null && loaderThread.isAlive()) {
+            loaderThread.interrupt();
+            loaderThread = null;
+        }
 
-    @Override
-    public void onSurfaceChanged(int workerId, SurfaceHolder holder, int format, int width, int height) {
-        Log.i(TAG, String.format("onSurfaceChanged: Worker %d surface dimensions: [w: %d, h: %d]", workerId, width, height));
-    }
-
-    @Override
-    public void onSurfaceDestroyed(int workerId) {
-        Log.i(TAG, "onSurfaceDestroyed: Raw Surface DESTROYED for worker " + workerId);
-        // TODO: Safely stop and join background worker thread before returning!
+        if (scheduler != null) {
+            scheduler.shutdown();
+            scheduler = null;
+        }
     }
 }
