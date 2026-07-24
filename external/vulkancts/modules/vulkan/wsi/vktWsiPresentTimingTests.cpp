@@ -312,14 +312,17 @@ vk::VkSwapchainCreateInfoKHR getBasicSwapchainParameters(vk::wsi::Type wsiType, 
     getSurfacePresentTimingCapabilities(vki, physicalDevice, surface, &capabilities);
 
     if (presentMode == VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR ||
-            presentMode == VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR) {
+        presentMode == VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR)
+    {
         // Can only ever be 1, per spec.
         desiredImageCount = 1;
-    } else {
+    }
+    else
+    {
         // otherwise clamp to the range the driver says is acceptable.
         desiredImageCount = de::clamp(desiredImageCount, capabilities.minImageCount,
-                  capabilities.maxImageCount > 0 ? capabilities.maxImageCount :
-                                                   capabilities.minImageCount + desiredImageCount);
+                                      capabilities.maxImageCount > 0 ? capabilities.maxImageCount :
+                                                                       capabilities.minImageCount + desiredImageCount);
     }
 
     const std::vector<vk::VkSurfaceFormatKHR> formats =
@@ -1532,7 +1535,6 @@ tcu::TestStatus timingTestWithBackgroundQueryThreads(Context &context, Type wsiT
             de::ScopedLock lock(sharedState.m_swapchainMutex);
             VK_CHECK_WSI(presentWithTimingInfo(vkd, devHelper.queue, **renderSemaphores[frame.imageIndex], *swapchain,
                                                frame.imageIndex, timingInfo, currentPresentId));
-            sharedState.m_swapchainMutex.unlock();
 
             currentPresentId += presentIdStep;
         }
@@ -2156,6 +2158,7 @@ tcu::TestStatus timeDomainCalibrationTest(Context &context, CalibrationTestConfi
         (config.timeDomain == VK_TIME_DOMAIN_PRESENT_STAGE_LOCAL_EXT) ?
             kAllPresentStages :
             static_cast<VkPresentStageFlagsEXT>(VK_PRESENT_STAGE_QUEUE_OPERATIONS_END_BIT_EXT);
+    const VkPresentStageFlagsEXT verifyPresentStages = calibrationStageQueryMask;
     std::vector<VkSwapchainCalibratedTimestampInfoEXT> swapchainCalibratedTimesInfos{};
     do
     {
@@ -2214,7 +2217,7 @@ tcu::TestStatus timeDomainCalibrationTest(Context &context, CalibrationTestConfi
     for (uint32_t i = 0; i < frameCount; i++)
     {
         // Check that each presented timestamp falls between the before/after calibrated timestamp
-        VkPresentStageFlagsEXT presentStages = kAllPresentStages;
+        VkPresentStageFlagsEXT presentStages = verifyPresentStages;
         do
         {
             const VkPresentStageFlagsEXT presentStage = presentStages & -static_cast<int32_t>(presentStages);
@@ -2338,7 +2341,7 @@ void populateQueryGroup(tcu::TestCaseGroup *testGroup, vk::wsi::Type wsiType)
 
         // skip shared present modes as these tests violate many assumptions of them.
         if (presentMode.mode == VK_PRESENT_MODE_SHARED_DEMAND_REFRESH_KHR ||
-                presentMode.mode == VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR)
+            presentMode.mode == VK_PRESENT_MODE_SHARED_CONTINUOUS_REFRESH_KHR)
             continue;
 
         de::MovePtr<tcu::TestCaseGroup> presentModeGroup(
