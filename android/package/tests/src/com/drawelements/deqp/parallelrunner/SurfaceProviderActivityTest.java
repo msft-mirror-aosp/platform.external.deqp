@@ -201,7 +201,7 @@ public class SurfaceProviderActivityTest {
         file2.createNewFile();
         file1.createNewFile();
 
-        Intent intent = SurfaceProviderActivity.createIntent(context, 0, tempDir.getAbsolutePath());
+        Intent intent = SurfaceProviderActivity.createIntent(context, ParallelRunnerConfig.DEFAULT_MAX_WORKERS, tempDir.getAbsolutePath());
 
         try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
             // Wait briefly to allow async background thread loading to execute
