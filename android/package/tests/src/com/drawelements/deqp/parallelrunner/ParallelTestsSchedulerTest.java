@@ -36,6 +36,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import static org.easymock.EasyMock.*;
+import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -131,8 +132,8 @@ public class ParallelTestsSchedulerTest {
 
     private TestWorkerServiceConnection[] registerMockConnectionFactory() {
         final TestWorkerServiceConnection[] capturedConnection = new TestWorkerServiceConnection[1];
-        WorkerHolder.setConnectionFactory((ctx, id, cb) -> {
-            capturedConnection[0] = new TestWorkerServiceConnection(ctx, id, cb);
+        WorkerHolder.setConnectionFactory((context, workerId, callback) -> {
+            capturedConnection[0] = new TestWorkerServiceConnection(context, workerId, callback);
             return capturedConnection[0];
         });
         return capturedConnection;
@@ -249,10 +250,12 @@ public class ParallelTestsSchedulerTest {
     @Test
     public void testShutdownCallsOnShutdownOnWorkers() {
         final TestWorkerHolder[] capturedHolder = new TestWorkerHolder[1];
-        ParallelTestsScheduler.setWorkerHolderFactory((ctx, id, loader, logDir, cmdLine, exec, lock, cb) -> {
-            capturedHolder[0] = new TestWorkerHolder(ctx, id, loader, logDir, cmdLine, exec, lock, cb);
-            return capturedHolder[0];
-        });
+        ParallelTestsScheduler.setWorkerHolderFactory(
+                (context, workerId, loader, logDir, cmdLine, executor, lock, callback) -> {
+                    capturedHolder[0] = new TestWorkerHolder(
+                            context, workerId, loader, logDir, cmdLine, executor, lock, callback);
+                    return capturedHolder[0];
+                });
 
         ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, mockSchedulerCallback);
         scheduler.shutdown();
@@ -264,18 +267,39 @@ public class ParallelTestsSchedulerTest {
     @Test
     public void testCmdLineAndLogDirPropagationToWorkers() {
         final TestWorkerHolder[] capturedHolder = new TestWorkerHolder[1];
-        ParallelTestsScheduler.setWorkerHolderFactory((ctx, id, loader, logDir, cmdLine, exec, lock, cb) -> {
-            capturedHolder[0] = new TestWorkerHolder(ctx, id, loader, logDir, cmdLine, exec, lock, cb);
-            return capturedHolder[0];
-        });
+        ParallelTestsScheduler.setWorkerHolderFactory(
+                (context, workerId, loader, logDir, cmdLine, executor, lock, callback) -> {
+                    capturedHolder[0] = new TestWorkerHolder(
+                            context, workerId, loader, logDir, cmdLine, executor, lock, callback);
+                    return capturedHolder[0];
+                });
 
         String testCmdLine = "--deqp-watchdog=enable --deqp-gl-config-name=rgba8888d24s8";
         String testLogDir = "/tmp/log";
         ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, testLogDir, testCmdLine, mockSchedulerCallback);
 
         assertNotNull(capturedHolder[0]);
-        org.junit.Assert.assertEquals(testLogDir, capturedHolder[0].capturedLogDir);
-        org.junit.Assert.assertEquals(testCmdLine, capturedHolder[0].capturedCmdLine);
+        assertEquals(testLogDir, capturedHolder[0].capturedLogDir);
+        assertEquals(testCmdLine, capturedHolder[0].capturedCmdLine);
+        scheduler.shutdown();
+    }
+
+    @Test
+    public void testAcquireAndReleaseServiceIdPool() {
+        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, mockSchedulerCallback);
+        Integer id1 = scheduler.acquireServiceId();
+        Integer id2 = scheduler.acquireServiceId();
+
+        assertEquals(0, (int) id1);
+        assertEquals(1, (int) id2);
+
+        scheduler.releaseServiceId(id1);
+
+        for (int i = 2; i < ParallelRunnerConfig.MAX_ALLOWED_WORKERS; i++) {
+            assertEquals(i, (int) scheduler.acquireServiceId());
+        }
+
+        assertEquals(0, (int) scheduler.acquireServiceId());
         scheduler.shutdown();
     }
 }

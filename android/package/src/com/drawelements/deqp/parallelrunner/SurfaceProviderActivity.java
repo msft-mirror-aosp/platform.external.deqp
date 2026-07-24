@@ -92,10 +92,7 @@ public class SurfaceProviderActivity extends Activity {
         if (getIntent() != null && getIntent().hasExtra(EXTRA_MAX_WORKERS)) {
             workerCount = getIntent().getIntExtra(EXTRA_MAX_WORKERS, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
         }
-        if (workerCount <= 0) {
-            Log.w(TAG, "Invalid workerCount=" + workerCount + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
-            workerCount = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
-        }
+        workerCount = ParallelRunnerConfig.clampWorkerCount(workerCount, TAG);
 
         String caselistDir = DEFAULT_CASELIST_DIR;
         if (getIntent() != null && getIntent().hasExtra(EXTRA_CASELIST_DIR)) {
