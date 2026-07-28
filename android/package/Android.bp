@@ -53,6 +53,12 @@ android_robolectric_test {
     ],
     associates: ["com.drawelements.deqp.java"],
     instrumentation_for: "com.drawelements.deqp.shell",
-    test_suites: ["general-tests"],
+    test_suites: [
+        "general-tests",
+        "robolectric-tests",
+    ],
     upstream: true,
+    test_options: {
+        unit_test: true,
+    },
 }

@@ -27,13 +27,13 @@ java_test_host {
     // Only compile source java files in this lib.
     srcs: ["src/**/*.java"],
 
-    libs: [
+    static_libs: [
+        "CtsDeqpTestCases",
+        "easymock",
         "cts-tradefed",
         "compatibility-host-util",
         "tradefed",
-        "CtsDeqpTestCases",
     ],
-    static_libs: ["easymock"],
     test_options: {
         unit_test: true,
     },

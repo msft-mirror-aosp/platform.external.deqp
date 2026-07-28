@@ -1,0 +1,7 @@
+{
+  "desktop-presubmit-robolectric": [
+    {
+      "name": "DeqpAppTests"
+    }
+  ]
+}
