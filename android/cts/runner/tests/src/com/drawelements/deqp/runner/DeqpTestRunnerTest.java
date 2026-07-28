@@ -424,6 +424,52 @@ public class DeqpTestRunnerTest extends TestCase {
         return output.toString();
     }
 
+    /**
+     * Builds mock instrumentation process output representing an incomplete or crashed test.
+     * <p>
+     * Emits a {@code BeginTestCase} event for the specified test case but terminates the session
+     * without emitting {@code TestCaseResult} or {@code EndTestCase}. This simulates a process crash
+     * while running the test, causing {@code getCurrentTestId()} to remain
+     * non-null and marking the test as crashed in the test runner.
+     *
+     * @param test the test description that starts execution before the process terminates
+     * @return raw instrumentation output string
+     */
+    static private String buildIncompleteTestProcessOutput(TestDescription test) {
+        final String outputHeader =
+            "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseName\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=2014.x\r\n"
+            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=releaseId\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=0xcafebabe\r\n"
+            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Name=targetName\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-EventType=SessionInfo\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-SessionInfo-Value=android\r\n"
+            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+            + "INSTRUMENTATION_STATUS: dEQP-EventType=BeginSession\r\n"
+            + "INSTRUMENTATION_STATUS_CODE: 0\r\n";
+
+        final String outputEnd =
+            "INSTRUMENTATION_STATUS: dEQP-EventType=EndSession\r\n"
+            + "INSTRUMENTATION_STATUS_CODE: 0\r\n"
+            + "INSTRUMENTATION_CODE: 0\r\n";
+
+        StringWriter output = new StringWriter();
+        output.write(outputHeader);
+        output.write("INSTRUMENTATION_STATUS: dEQP-EventType=BeginTestCase\r\n");
+        output.write("INSTRUMENTATION_STATUS: dEQP-BeginTestCase-TestCasePath=");
+        output.write(test.getClassName());
+        output.write(".");
+        output.write(test.getTestName());
+        output.write("\r\n");
+        output.write("INSTRUMENTATION_STATUS_CODE: 0\r\n");
+        output.write(outputEnd);
+        return output.toString();
+    }
+
     private void testFiltering(DeqpTestRunner deqpTest, String expectedTrie,
                                List<TestDescription> expectedTests)
         throws Exception {
@@ -1551,13 +1597,7 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private void
-    runInstrumentationLineAndAnswerParallel(final List<TestDescription> tests, final String cmd,
-                                            final String output, int expectedParallelBatches) throws Exception {
-        runInstrumentationLineAndAnswerParallel(tests, cmd, output, expectedParallelBatches, 4);
-    }
-
-    private void
-    runInstrumentationLineAndAnswerParallel(final List<TestDescription> tests, final String cmd,
+    runInstrumentationLineAndAnswerParallel(final List<TestDescription> tests,
                                             final String output, int expectedParallelBatches, int maxWorkers) throws Exception {
         expectRemoveFolder(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
         expectRemoveFolder(DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
@@ -1579,7 +1619,11 @@ public class DeqpTestRunnerTest extends TestCase {
         }
 
         String logFilename = DeqpTestRunner.APP_DIR_PARALLEL_LOGS;
-        expectInstrumentationCommand(logFilename, cmd, output, maxWorkers);
+        String parallelCmd =
+            "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified "
+            + "--deqp-surface-type=window --deqp-log-images=disable --deqp-log-shader-sources=disable "
+            + "--deqp-watchdog=enable";
+        expectInstrumentationCommand(logFilename, parallelCmd, output, maxWorkers);
     }
 
     static private void writeStringsToFile(File target, Set<String> strings)
@@ -2047,22 +2091,22 @@ public class DeqpTestRunnerTest extends TestCase {
     /**
      * Test running in parallel mode when the test count is below the parallel execution threshold.
      * <p>
-     * Verifies that when the parallel run option is enabled, but the input test size (1 test)
-     * is below the threshold (5000 tests), the runner transparently falls back to sequential
-     * execution to avoid setup overhead.
+     * Verifies that when the parallel run option is enabled, but the test count is below
+     * the threshold (e.g. 1000 tests < 5000), the runner executes in parallel mode with
+     * maxWorkers set to 1.
      *
      * @throws Exception if an error occurs during mock setup or execution
      */
-    public void testRun_parallelModeEnabled_testCountBelowThreshold() throws Exception {
-        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
-        List<TestDescription> tests = Collections.singletonList(testId);
+    public void testRun_parallelModeEnabled_testCountBelowThreshold_maxWorkersOne() throws Exception {
+        final int numTests = 1000;
+        List<TestDescription> tests = generateTestList(numTests);
 
         DeqpTestRunner deqpTest = setupTestRunner(tests, true);
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         String output = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswer(null, getCommandLine(), output);
+        runInstrumentationLineAndAnswerParallel(tests, output, 1, 1);
 
         expectRunAndVerifyTest(deqpTest, tests);
     }
@@ -2071,12 +2115,12 @@ public class DeqpTestRunnerTest extends TestCase {
      * Test running in parallel mode when the test count is at or above the parallel execution threshold.
      * <p>
      * Verifies that when the parallel run option is enabled and the test count is large enough
-     * (5000 tests), the runner successfully slices and pushes all batches to the device at once,
-     * executing them in parallel and using the parallel logs directory.
+     * (5000 tests >= threshold), the runner slices and pushes all batches to the device at once,
+     * executing them in parallel with maxWorkers set to 4.
      *
      * @throws Exception if an error occurs during mock setup or execution
      */
-    public void testRun_parallelModeEnabled_testCountAboveThreshold() throws Exception {
+    public void testRun_parallelModeEnabled_testCountAboveThreshold_maxWorkersFour() throws Exception {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
@@ -2085,9 +2129,7 @@ public class DeqpTestRunnerTest extends TestCase {
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         String output = buildTestProcessOutput(tests);
-        String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-log-shader-sources=disable --deqp-watchdog=enable";
-
-        runInstrumentationLineAndAnswerParallel(tests, parallelCmd, output, 5);
+        runInstrumentationLineAndAnswerParallel(tests, output, 5, 4);
 
         expectRunAndVerifyTest(deqpTest, tests);
     }
@@ -2131,12 +2173,92 @@ public class DeqpTestRunnerTest extends TestCase {
         setter.setOptionValue("deqp-max-workers", "8");
 
         String output = buildTestProcessOutput(tests);
-        String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-log-shader-sources=disable --deqp-watchdog=enable";
-
-        runInstrumentationLineAndAnswerParallel(tests, parallelCmd, output, 5, 8);
+        runInstrumentationLineAndAnswerParallel(tests, output, 5, 8);
 
         expectRunAndVerifyTest(deqpTest, tests);
     }
+
+    /**
+     * Test that when a single-test batch cannot be executed in parallel mode, the test fails.
+     */
+    public void testRun_parallelMode_singleTestBatchUnexecuted() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // Empty output contains no BeginTestCase event, leaving getCurrentTestId() null to mark it as unexecuted.
+        String output = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output, 1, 1);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetupAndTeardown();
+        expectTestWithResult(tests, false);
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when a single-test batch crashes in parallel mode, the test fails.
+     * <p>
+     * An incomplete output produces a BeginTestCase event without a corresponding EndTestCase before
+     * the session ends. Because the test started, getCurrentTestId() is non-null, which marks the test
+     * as aborted on the listener.
+     */
+    public void testRun_parallelMode_singleTestBatchCrashed() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        String output = buildIncompleteTestProcessOutput(testId);
+        runInstrumentationLineAndAnswerParallel(tests, output, 1, 1);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetupAndTeardown();
+        expectTestWithResult(tests, false);
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when a multi-test batch crashes in parallel mode, the remaining test(s) in the batch
+     * are recovered and executed in a subsequent sub-batch.
+     */
+    public void testRun_parallelMode_multiTestBatchCrashed_retriesRemainingTests() throws Exception {
+        final TestDescription test1 = new TestDescription("dEQP-GLES3.info", "test1");
+        final TestDescription test2 = new TestDescription("dEQP-GLES3.info", "test2");
+        List<TestDescription> tests = Arrays.asList(test1, test2);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st batch run with both tests: test1 starts and then process crashes abruptly
+        String crashOutput = buildIncompleteTestProcessOutput(test1);
+        runInstrumentationLineAndAnswerParallel(tests, crashOutput, 1, 1);
+
+        // 2nd sub-batch run: test1 is excluded (unstable), test2 is selected and passes
+        String passOutput = buildTestProcessOutput(Collections.singletonList(test2));
+        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), passOutput, 1, 1);
+
+        expectTestRunStarted(deqpTest, 2);
+        expectAngleSetupAndTeardown();
+
+        // test2 is started and passes in 2nd sub-batch
+        expectTestWithResult(Collections.singletonList(test2), true);
+
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
 
     /**
      * Test that an invalid test event reporting mode throws an IllegalArgumentException.
@@ -2350,10 +2472,14 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.expectLastCall().once();
     }
 
-    private void expectListenerTests(Collection<TestDescription> tests) {
+    private void expectTestWithResult(Collection<TestDescription> tests, boolean passed) {
         for (TestDescription testId : tests) {
             mockListener.testStarted(EasyMock.eq(testId));
             EasyMock.expectLastCall().once();
+            if (!passed) {
+                mockListener.testFailed(EasyMock.eq(testId), (String)EasyMock.anyObject());
+                EasyMock.expectLastCall().once();
+            }
             mockListener.testEnded(EasyMock.eq(testId), EasyMock.<HashMap<String, Metric>>notNull());
             EasyMock.expectLastCall().once();
         }
@@ -2362,7 +2488,7 @@ public class DeqpTestRunnerTest extends TestCase {
     private void expectRunAndVerifyTest(DeqpTestRunner deqpTest, Collection<TestDescription> tests) throws Exception {
         expectTestRunStarted(deqpTest, tests.size());
         expectAngleSetupAndTeardown();
-        expectListenerTests(tests);
+        expectTestWithResult(tests, true);
         expectTestRunEnded();
         runAndVerifyTest(deqpTest);
     }
