@@ -88,6 +88,8 @@ public class DeqpTestRunner
                IShardableTest, ITestCollector, IRuntimeHintProvider {
     private static final String DEQP_ONDEVICE_APK = "com.drawelements.deqp.apk";
     private static final String DEQP_ONDEVICE_PKG = "com.drawelements.deqp";
+    protected static final String APK_INSTRUMENTATION_NAME =
+        DEQP_ONDEVICE_PKG + "/com.drawelements.deqp.testercore.DeqpInstrumentation";
     protected static final String INCOMPLETE_LOG_MESSAGE =
         "Crash: Incomplete test log";
     protected static final String TIMEOUT_LOG_MESSAGE = "Timeout: Test timeout";
@@ -276,6 +278,12 @@ public class DeqpTestRunner
     private boolean mEnableDeqpParallelRun = false;
 
     @Option(
+        name = "deqp-max-workers",
+        description =
+            "Maximum number of parallel workers for parallel run. Default is 4.")
+    private int mDeqpMaxWorkers = 4;
+
+    @Option(
         name = "deqp-test-events-reporting-mode",
         description =
             "How to report test events ('java-parser', 'native-parser'). "
@@ -368,6 +376,12 @@ public class DeqpTestRunner
      */
     @VisibleForTesting
     String getEventReportingMode() { return mEventReportingMode; }
+
+    /**
+     * Get the deqp-max-workers option contents.
+     */
+    @VisibleForTesting
+    int getDeqpMaxWorkers() { return mDeqpMaxWorkers; }
 
     /**
      * {@inheritDoc}
@@ -1580,51 +1594,85 @@ public class DeqpTestRunner
     }
 
     /**
-     * Executes given test batch on a device
+     * Builds the dEQP command line flags for a batch run.
      */
-    protected void executeTestRunBatch(TestBatch batch)
-        throws DeviceNotAvailableException {
-        final String instrumentationName =
-            "com.drawelements.deqp/com.drawelements.deqp.testercore.DeqpInstrumentation";
-
-        final boolean isParallel = isParallelMode(batch.getTestBatchTestDescriptionList().size());
+    private String buildDeqpCmdLine(
+            BatchRunConfiguration runConfig, boolean isParallel, boolean shouldLogData) {
         final StringBuilder deqpCmdLine = new StringBuilder();
-        mEventReportingMode = resolveEventReportingMode(mEventReportingMode, isParallel);
-
         if (!isParallel) {
             // In serial mode, pass the single caselist file via command line.
             // In parallel mode, caselists are split into multiple partition files under
             // APP_DIR_PARALLEL_CASELISTS, which are automatically discovered and handled by the app.
-            deqpCmdLine.append("--deqp-caselist-file=");
-            deqpCmdLine.append(APP_DIR + CASE_LIST_FILE_NAME);
-            deqpCmdLine.append(" ");
+            deqpCmdLine.append("--deqp-caselist-file=")
+                       .append(APP_DIR).append(CASE_LIST_FILE_NAME)
+                       .append(" ");
         }
-        deqpCmdLine.append(getRunConfigDisplayCmdLine(batch.getTestBatchConfig()));
+        deqpCmdLine.append(getRunConfigDisplayCmdLine(runConfig));
 
-        // If we are not logging data, do not bother outputting the images from
-        // the test exe.
-        if (!mLogData) {
+        // If logging data is disabled or running in parallel mode, disable image output to avoid
+        // disk I/O bottlenecks across multiple concurrent worker processes.
+        if (!shouldLogData) {
             deqpCmdLine.append(" --deqp-log-images=disable");
+        }
+
+        // In parallel mode, disable shader source logging to prevent massive log inflation and
+        // disk write contention during multi-worker execution.
+        if (isParallel) {
+            deqpCmdLine.append(" --deqp-log-shader-sources=disable");
         }
 
         if (!mDisableWatchdog) {
             deqpCmdLine.append(" --deqp-watchdog=enable");
         }
-        String deqpLogData = APP_DIR + LOG_FILE_NAME;
+        return deqpCmdLine.toString();
+    }
+
+    /**
+     * Builds the 'am instrument' command line string.
+     */
+    private String buildInstrumentationCommand(
+            BatchRunConfiguration runConfig, boolean isParallel) {
+        final String deqpLogPath = isParallel ? APP_DIR_PARALLEL_LOGS : APP_DIR + LOG_FILE_NAME;
+        // In parallel mode, log data streaming through instrumentation output is disabled
+        // because worker processes write test logs directly to partition files under APP_DIR_PARALLEL_LOGS,
+        // which are parsed asynchronously by parallel log parsers.
+        final boolean shouldLogData = !isParallel && mLogData;
+        final String deqpCmdLine = buildDeqpCmdLine(runConfig, isParallel, shouldLogData);
+
+        final StringBuilder command = new StringBuilder("am instrument ");
+        command.append(AbiUtils.createAbiFlag(mAbi.getName()))
+               .append(" -w -e deqpLogFilename \"").append(deqpLogPath).append("\"")
+               .append(" -e deqpCmdLine \"").append(deqpCmdLine).append("\"")
+               .append(" -e deqpLogData \"").append(shouldLogData).append("\"")
+               .append(" -e deqpEventReportingMode \"").append(mEventReportingMode).append("\"");
+
         if (isParallel) {
-            deqpLogData = APP_DIR_PARALLEL_LOGS;
+            // Pass parallel execution configuration options to DeqpInstrumentation on the device.
+            command.append(" -e deqpEnableParallel \"true\"")
+                   .append(" -e deqpCaselistDir \"").append(APP_DIR_PARALLEL_CASELISTS).append("\"")
+                   .append(" -e deqpLogDir \"").append(APP_DIR_PARALLEL_LOGS).append("\"")
+                   .append(" -e deqpMaxWorkers \"").append(mDeqpMaxWorkers).append("\"");
         }
 
-        final String command = String.format(
-            "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\""
-                + " -e deqpLogData \"%s\" -e deqpEventReportingMode \"%s\" %s",
-            AbiUtils.createAbiFlag(mAbi.getName()), deqpLogData,
-            deqpCmdLine.toString(), mLogData, mEventReportingMode, instrumentationName);
+        command.append(" ").append(APK_INSTRUMENTATION_NAME);
+        return command.toString();
+    }
+
+    /**
+     * Executes given test batch on a device
+     */
+    protected void executeTestRunBatch(TestBatch batch)
+        throws DeviceNotAvailableException {
+        final boolean isParallel = isParallelMode(batch.getTestBatchTestDescriptionList().size());
+        mEventReportingMode = resolveEventReportingMode(mEventReportingMode, isParallel);
+
+        final String command =
+            buildInstrumentationCommand(batch.getTestBatchConfig(), isParallel);
 
         final InstrumentationParser parser =
             new InstrumentationParser(getInstanceListener());
         // attempt full run once
-        executeTestRunBatchRun(batch, instrumentationName, command, parser);
+        executeTestRunBatchRun(batch, APK_INSTRUMENTATION_NAME, command, parser);
 
         // split remaining tests to two sub batches and execute both. This will
         // terminate since executeTestRunBatchRun will always progress for a
@@ -2869,6 +2917,7 @@ public class DeqpTestRunner
         destination.mEnableDeqpOutsideGrf = source.mEnableDeqpOutsideGrf;
         destination.mEnableDeqpOutsideGrfNonHandheld = source.mEnableDeqpOutsideGrfNonHandheld;
         destination.mEnableDeqpParallelRun = source.mEnableDeqpParallelRun;
+        destination.mDeqpMaxWorkers = source.mDeqpMaxWorkers;
     }
 
     /**
