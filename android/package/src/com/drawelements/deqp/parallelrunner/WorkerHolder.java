@@ -24,6 +24,7 @@ import android.content.Context;
 import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
+import java.io.File;
 import java.util.concurrent.ExecutorService;
 
 /**
@@ -49,6 +50,8 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
     private final int id;
     private final WorkerServiceConnection connection;
     private final DeqpTestBatchLoader testBatchLoader;
+    private final String logDir;
+    private final String cmdLine;
     private final ExecutorService dispatchExecutor;
     private final Object stateLock;
     private final SchedulerCallback schedulerCallback;
@@ -58,9 +61,11 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
     private String currentBatch;
 
     WorkerHolder(Context context, int id, DeqpTestBatchLoader testBatchLoader,
-                 ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback) {
+                 String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback) {
         this.id = id;
         this.testBatchLoader = testBatchLoader;
+        this.logDir = logDir;
+        this.cmdLine = cmdLine;
         this.dispatchExecutor = dispatchExecutor;
         this.stateLock = stateLock;
         this.schedulerCallback = schedulerCallback;
@@ -182,10 +187,19 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
         final Surface finalSurface = activeSurface;
         final ISurfaceWorker finalWorker = activeWorker;
         final String finalBatch = batchFile;
+        String logArg = "";
+        if (logDir != null && !logDir.trim().isEmpty()) {
+            File logFile = new File(logDir, "TestLog_worker_" + id + ".qpa");
+            logArg = "--deqp-log-filename=" + logFile.getAbsolutePath() + " ";
+        }
+        final String caseListArg = "--deqp-caselist-file=" + finalBatch;
+        final String fullCmdLine = (cmdLine != null && !cmdLine.trim().isEmpty())
+                ? cmdLine.trim() + " " + logArg + caseListArg
+                : logArg + caseListArg;
         dispatchExecutor.execute(() -> {
             boolean success = false;
             try {
-                success = finalWorker.startTestBatch(finalSurface, "--deqp-caselist-file=" + finalBatch);
+                success = finalWorker.startTestBatch(finalSurface, fullCmdLine);
             } catch (Exception e) {
                 Log.e(TAG, "Execution failure on worker " + id, e);
             }
