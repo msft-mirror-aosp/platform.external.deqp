@@ -1626,6 +1626,7 @@ public class DeqpTestRunnerTest extends TestCase {
         expectInstrumentationCommand(logFilename, parallelCmd, output, maxWorkers);
     }
 
+
     static private void writeStringsToFile(File target, Set<String> strings)
         throws IOException {
         try (PrintWriter out = new PrintWriter(new FileWriter(target))) {
@@ -2130,6 +2131,52 @@ public class DeqpTestRunnerTest extends TestCase {
 
         String output = buildTestProcessOutput(tests);
         runInstrumentationLineAndAnswerParallel(tests, output, 5, 4);
+
+        expectRunAndVerifyTest(deqpTest, tests);
+    }
+
+    /**
+     * Test running in parallel mode when the test count exceeds the chunk size limit (50,000 tests).
+     * <p>
+     * Verifies that when the test list exceeds the chunk size limit (e.g. 55,000 tests), the runner divides
+     * the tests into bounded chunks, pushing up to 50,000 tests per chunk and cleaning up remote directories
+     * between chunk executions.
+     */
+    public void testRun_parallelModeEnabled_multipleChunks() throws Exception {
+        final int numTests = 55000; // 55 batches: 50,000 tests in first chunk, 5,000 tests in second chunk
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        List<TestDescription> chunk1Tests = tests.subList(0, 50000);
+        List<TestDescription> chunk2Tests = tests.subList(50000, 55000);
+
+        String chunk1Output = buildTestProcessOutput(chunk1Tests);
+        runInstrumentationLineAndAnswerParallel(chunk1Tests, chunk1Output, 50, 4);
+
+        String chunk2Output = buildTestProcessOutput(chunk2Tests);
+        runInstrumentationLineAndAnswerParallel(chunk2Tests, chunk2Output, 5, 4);
+
+        expectRunAndVerifyTest(deqpTest, tests);
+    }
+
+    /**
+     * Test running in parallel mode when the test count is exactly at the chunk size limit (50,000 tests).
+     * <p>
+     * Verifies that 50,000 tests are pushed and executed in a single chunk containing exactly 50 batch partitions.
+     */
+    public void testRun_parallelModeEnabled_singleChunk() throws Exception {
+        final int numTests = 50000; // Exactly 50,000 tests in 1 chunk
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        String output = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, output, 50, 4);
 
         expectRunAndVerifyTest(deqpTest, tests);
     }

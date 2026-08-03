@@ -129,6 +129,9 @@ public class DeqpTestRunner
         "android.hardware.type.pc";
 
     private static final int TESTCASE_BATCH_LIMIT = 1000;
+    private static final int DEQP_PARALLEL_MAX_BATCHES_PER_CHUNK = 50;
+    private static final int DEQP_PARALLEL_CHUNK_SIZE =
+        DEQP_PARALLEL_MAX_BATCHES_PER_CHUNK * TESTCASE_BATCH_LIMIT;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
         10 * 60 * 1000; // 10min
     private static final int DEQP_PARALLEL_EXECUTION_THRESHOLD = 5000;
@@ -1420,13 +1423,13 @@ public class DeqpTestRunner
                 // stability rating.
                 continue;
             }
-            if (runBatchTests.size() >=
-                getBatchSizeLimitForInstability(leadingInstability)) {
-                // For parallel mode, batching limit check is pushed from here to executeTestRunBatchRun
-                if (!isParallelMode()) {
-                    // batch size is limited.
-                    break;
-                }
+            final int batchLimit = isParallelMode()
+                    ? DEQP_PARALLEL_CHUNK_SIZE
+                    : getBatchSizeLimitForInstability(leadingInstability);
+            if (runBatchTests.size() >= batchLimit) {
+                // Batch size is limited to DEQP_PARALLEL_CHUNK_SIZE in parallel mode,
+                // or the instability-based limit in serial mode.
+                break;
             }
             runBatchTests.add(test);
         }
