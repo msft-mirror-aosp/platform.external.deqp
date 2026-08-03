@@ -279,3 +279,8 @@ dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler2d_vec4
 dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler3d_bias_fragment
 dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler3d_fragment
 dEQP-VK.glsl.texture_functions.textureprojoffset.mirrored_repeat.usampler3d_vertex
+
+# Issue: b/527096827
+dEQP-VK.memory.allocation.basic.size_1KiB.mixed.count_1000
+dEQP-VK.memory.allocation.basic.size_4KiB.mixed.count_1000
+dEQP-VK.memory.allocation.basic.size_8KiB.mixed.count_1000
