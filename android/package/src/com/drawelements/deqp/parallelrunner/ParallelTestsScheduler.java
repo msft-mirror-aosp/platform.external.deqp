@@ -42,7 +42,7 @@ public class ParallelTestsScheduler implements WorkerHolder.SchedulerCallback {
 
     interface WorkerHolderFactory {
         WorkerHolder create(Context context, int id, DeqpTestBatchLoader testBatchLoader,
-                            ExecutorService dispatchExecutor, Object stateLock, WorkerHolder.SchedulerCallback schedulerCallback);
+                            String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, WorkerHolder.SchedulerCallback schedulerCallback);
     }
 
     private static WorkerHolderFactory workerHolderFactory = WorkerHolder::new;
@@ -65,6 +65,8 @@ public class ParallelTestsScheduler implements WorkerHolder.SchedulerCallback {
     }
     private final Context context;
     private final DeqpTestBatchLoader testBatchLoader;
+    private final String logDir;
+    private final String cmdLine;
     private final Callback completionCallback;
     private final ExecutorService dispatchExecutor;
     private final List<WorkerHolder> workers = new ArrayList<>();
@@ -72,14 +74,16 @@ public class ParallelTestsScheduler implements WorkerHolder.SchedulerCallback {
     private boolean callbackFired = false;
 
 
-    public ParallelTestsScheduler(Context context, int workerCount, DeqpTestBatchLoader testBatchLoader, Callback callback) {
+    public ParallelTestsScheduler(Context context, int workerCount, DeqpTestBatchLoader testBatchLoader, String logDir, String cmdLine, Callback callback) {
         this.context = context.getApplicationContext();
         this.testBatchLoader = testBatchLoader;
+        this.logDir = logDir;
+        this.cmdLine = cmdLine;
         this.completionCallback = callback;
         this.dispatchExecutor = Executors.newFixedThreadPool(workerCount);
 
         for (int i = 0; i < workerCount; i++) {
-            workers.add(workerHolderFactory.create(this.context, i, testBatchLoader, dispatchExecutor, stateLock, this));
+            workers.add(workerHolderFactory.create(this.context, i, testBatchLoader, this.logDir, this.cmdLine, dispatchExecutor, stateLock, this));
         }
     }
 

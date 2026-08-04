@@ -50,6 +50,10 @@ public class SurfaceProviderActivityTest {
     public TemporaryFolder tempFolder = new TemporaryFolder();
 
 
+    private static final String TEST_CASELIST_DIR = "/sdcard/deqpparallel/caselists/";
+    private static final String TEST_LOG_DIR = "/sdcard/deqpparallel/logs/";
+    private static final String TEST_CMD_LINE = "--deqp-gl-config-name=rgba8888d24s8 --deqp-watchdog=enable";
+
     private GridLayout getAndVerifySurfaceGrid(SurfaceProviderActivity activity, int expectedWorkers) {
         View contentView = activity.findViewById(android.R.id.content);
         assertNotNull(contentView);
@@ -134,7 +138,7 @@ public class SurfaceProviderActivityTest {
         int[] countsToTest = {4, 6, 7, 9};
 
         for (int workers : countsToTest) {
-            Intent intent = SurfaceProviderActivity.createIntent(context, workers, null);
+            Intent intent = SurfaceProviderActivity.createIntent(context, workers, TEST_CASELIST_DIR, TEST_LOG_DIR, TEST_CMD_LINE);
 
             try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
                 scenario.onActivity(activity -> {
@@ -142,6 +146,19 @@ public class SurfaceProviderActivityTest {
                     assertGridGeometryTiling(gridLayout, workers);
                 });
             }
+        }
+    }
+
+    @Test
+    public void testInvalidWorkerCountFallback() {
+        Context context = ApplicationProvider.getApplicationContext();
+        Intent intent = SurfaceProviderActivity.createIntent(context, -1, TEST_CASELIST_DIR, TEST_LOG_DIR, TEST_CMD_LINE);
+
+        try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
+            scenario.onActivity(activity -> {
+                GridLayout gridLayout = getAndVerifySurfaceGrid(activity, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+                assertGridGeometryTiling(gridLayout, ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
+            });
         }
     }
 
@@ -201,7 +218,8 @@ public class SurfaceProviderActivityTest {
         file2.createNewFile();
         file1.createNewFile();
 
-        Intent intent = SurfaceProviderActivity.createIntent(context, ParallelRunnerConfig.DEFAULT_MAX_WORKERS, tempDir.getAbsolutePath());
+        Intent intent = SurfaceProviderActivity.createIntent(context, ParallelRunnerConfig.DEFAULT_MAX_WORKERS,
+            tempDir.getAbsolutePath(), TEST_LOG_DIR, TEST_CMD_LINE);
 
         try (ActivityScenario<SurfaceProviderActivity> scenario = ActivityScenario.launch(intent)) {
             // Wait briefly to allow async background thread loading to execute

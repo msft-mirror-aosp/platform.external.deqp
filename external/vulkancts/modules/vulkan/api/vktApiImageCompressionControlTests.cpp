@@ -468,6 +468,11 @@ CustomInstance createInstanceWithWsi(Context &context, Type wsiType, const vecto
 
     extensions.push_back("VK_KHR_surface");
     extensions.push_back(getExtensionName(wsiType));
+    if (isDisplaySurface(wsiType))
+    {
+        extensions.push_back("VK_KHR_display");
+        extensions.push_back("VK_EXT_direct_mode_display");
+    }
     extensions.push_back("VK_KHR_get_surface_capabilities2");
 
     vector<string> instanceExtensions;
@@ -600,7 +605,6 @@ static tcu::TestStatus swapchainCreateTest(Context &context, TestParams testPara
     const wsi::NativeObjects native(context, instHelper.supportedExtensions, testParams.wsiType);
     const bool is_fixed_rate_ex = testParams.control.flags == VK_IMAGE_COMPRESSION_FIXED_RATE_EXPLICIT_EXT;
 
-    VkExtent2D extent2d = {16, 16};
     VkImageCompressionFixedRateFlagsEXT planeFlags[3]{};
 
     for (unsigned i{}; i < (is_fixed_rate_ex ? 24u : 1u); i++)
@@ -674,6 +678,9 @@ static tcu::TestStatus swapchainCreateTest(Context &context, TestParams testPara
                 testParams.control.pFixedRateFlags[0] =
                     testParams.control.pFixedRateFlags[0] & supportedCompressionRate;
             }
+
+            VkExtent2D extent2d =
+                (isDisplaySurface(testParams.wsiType) ? caps.surfaceCapabilities.currentExtent : VkExtent2D{16, 16});
 
             VkSwapchainCreateInfoKHR swapchainInfo = initVulkanStructure();
             swapchainInfo.surface                  = surface.get();

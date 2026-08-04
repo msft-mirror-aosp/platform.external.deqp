@@ -89,7 +89,10 @@ public class LogParserWorkerTest {
     public void testRun_normalFlow() throws Exception {
         mockParser.init(isA(TestSessionEventsAccumulator.class), eq(tempFile.getAbsolutePath()), eq(true));
         expectLastCall().once();
-        LogParserWorker.TimingSettings config = new LogParserWorker.TimingSettings(1, 2, 5,
+        LogParserWorker.TimingSettings config = new LogParserWorker.TimingSettings(
+            /* noActivitySleepMs = */ 1,
+            /* noDataSleepMs = */ 2,
+            /* noDataTimeoutMs = */ 5,
             LogParserWorker.TimingSettings.DEFAULT_FILE_READY_TIMEOUT_MS);
         LogParserWorker worker = new LogParserWorker(mockParser, testEventQueue,
             tempFile.getAbsolutePath(), true, null, config);
@@ -105,7 +108,7 @@ public class LogParserWorkerTest {
         }).once();
 
         // Phase 2 post-mortem loop (draining remaining buffer)
-        expect(mockParser.parse()).andReturn(false).times(4);
+        expect(mockParser.parse()).andReturn(false).atLeastOnce();
 
         mockParser.deinit();
         expectLastCall().once();

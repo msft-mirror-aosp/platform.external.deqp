@@ -98,10 +98,14 @@ public class ParallelTestsSchedulerTest {
 
     private static class TestWorkerHolder extends WorkerHolder {
         boolean onShutdownCalled = false;
+        final String capturedLogDir;
+        final String capturedCmdLine;
 
         TestWorkerHolder(Context context, int id, DeqpTestBatchLoader testBatchLoader,
-                         ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback) {
-            super(context, id, testBatchLoader, dispatchExecutor, stateLock, schedulerCallback);
+                         String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback) {
+            super(context, id, testBatchLoader, logDir, cmdLine, dispatchExecutor, stateLock, schedulerCallback);
+            this.capturedLogDir = logDir;
+            this.capturedCmdLine = cmdLine;
         }
 
         @Override
@@ -142,6 +146,9 @@ public class ParallelTestsSchedulerTest {
     }
 
 
+    private static final String TEST_LOG_DIR = "/sdcard/deqpparallel/logs/";
+    private static final String TEST_CMD_LINE = "--deqp-gl-config-name=rgba8888d24s8";
+
     @After
     public void tearDown() {
         WorkerHolder.setConnectionFactory(WorkerServiceConnection::new);
@@ -167,7 +174,7 @@ public class ParallelTestsSchedulerTest {
 
         replay(mockWorker, mockSchedulerCallback);
 
-        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, mockSchedulerCallback);
+        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, mockSchedulerCallback);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         
         // 1. Surface created -> Triggers mockConn.bind()
@@ -207,7 +214,7 @@ public class ParallelTestsSchedulerTest {
 
         replay(mockWorker, mockSchedulerCallback);
 
-        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, mockSchedulerCallback);
+        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, mockSchedulerCallback);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
 
         scheduler.getWorkerCallback(0).surfaceCreated(mockHolder);
@@ -227,29 +234,48 @@ public class ParallelTestsSchedulerTest {
 
     @Test
     public void testRegisterSurfaceAppendsCallback() {
-        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, mockSchedulerCallback);
+        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, mockSchedulerCallback);
         SurfaceHolder mockHolder = createMock(SurfaceHolder.class);
-        
+
         mockHolder.addCallback(scheduler.getWorkerCallback(0));
         expectLastCall().once();
-        
+
         replay(mockHolder);
         scheduler.registerSurface(0, mockHolder);
         verify(mockHolder);
+        scheduler.shutdown();
     }
 
     @Test
     public void testShutdownCallsOnShutdownOnWorkers() {
         final TestWorkerHolder[] capturedHolder = new TestWorkerHolder[1];
-        ParallelTestsScheduler.setWorkerHolderFactory((ctx, id, loader, exec, lock, cb) -> {
-            capturedHolder[0] = new TestWorkerHolder(ctx, id, loader, exec, lock, cb);
+        ParallelTestsScheduler.setWorkerHolderFactory((ctx, id, loader, logDir, cmdLine, exec, lock, cb) -> {
+            capturedHolder[0] = new TestWorkerHolder(ctx, id, loader, logDir, cmdLine, exec, lock, cb);
             return capturedHolder[0];
         });
 
-        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, mockSchedulerCallback);
+        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, mockSchedulerCallback);
         scheduler.shutdown();
 
         assertNotNull(capturedHolder[0]);
         assertTrue(capturedHolder[0].onShutdownCalled);
+    }
+
+    @Test
+    public void testCmdLineAndLogDirPropagationToWorkers() {
+        final TestWorkerHolder[] capturedHolder = new TestWorkerHolder[1];
+        ParallelTestsScheduler.setWorkerHolderFactory((ctx, id, loader, logDir, cmdLine, exec, lock, cb) -> {
+            capturedHolder[0] = new TestWorkerHolder(ctx, id, loader, logDir, cmdLine, exec, lock, cb);
+            return capturedHolder[0];
+        });
+
+        String testCmdLine = "--deqp-watchdog=enable --deqp-gl-config-name=rgba8888d24s8";
+        String testLogDir = "/tmp/log";
+        ParallelTestsScheduler scheduler = new ParallelTestsScheduler(context, 1, batchLoader, testLogDir, testCmdLine, mockSchedulerCallback);
+
+        assertNotNull(capturedHolder[0]);
+        org.junit.Assert.assertEquals(testLogDir, capturedHolder[0].capturedLogDir);
+        org.junit.Assert.assertEquals(testCmdLine, capturedHolder[0].capturedCmdLine);
+        scheduler.shutdown();
     }
 }
