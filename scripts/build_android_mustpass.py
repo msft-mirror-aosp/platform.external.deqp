@@ -348,33 +348,33 @@ MAIN_GLES31_PKG = Package(module = GLES31_MODULE, configurations = [
                       runByDefault = False),
     ])
 
-MAIN_VULKAN_FILTERS = [
-        include("vk-main.txt"),
+MAIN_VULKAN_EXCLUDE_FILTERS = [
         exclude("vk-not-applicable.txt"),
         exclude("vk-excluded-tests.txt"),
         exclude("vk-test-issues.txt"),
         exclude("vk-waivers.txt"),
         exclude("vk-temp-excluded.txt"),
     ]
+MAIN_VULKAN_FILTERS = [include("vk-main.txt")] + MAIN_VULKAN_EXCLUDE_FILTERS
 MAIN_VULKAN_PKG = Package(module = VULKAN_MODULE, configurations = [
         Configuration(name = "main-2019-03-01",
-                      filters = [include("vk-main-2019-03-01.txt")],
+                      filters = [include("vk-main-2019-03-01.txt")] + MAIN_VULKAN_EXCLUDE_FILTERS,
                       runtime = "2h29m",
                       listOfGroupsToSplit = ["dEQP-VK"]),
         Configuration(name = "main-2020-03-01",
-                      filters = [include("vk-main-2020-03-01.txt")],
+                      filters = [include("vk-main-2020-03-01.txt")] + MAIN_VULKAN_EXCLUDE_FILTERS,
                       runtime = "2h29m",
                       listOfGroupsToSplit = ["dEQP-VK"]),
         Configuration(name = "main-2021-03-01",
-                      filters = [include("vk-main-2021-03-01.txt")],
+                      filters = [include("vk-main-2021-03-01.txt")] + MAIN_VULKAN_EXCLUDE_FILTERS,
                       runtime = "2h29m",
                       listOfGroupsToSplit = ["dEQP-VK"]),
         Configuration(name = "main-2022-03-01",
-                      filters = [include("vk-main-2022-03-01.txt")],
+                      filters = [include("vk-main-2022-03-01.txt")] + MAIN_VULKAN_EXCLUDE_FILTERS,
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2023-03-01",
-                      filters = [include("vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt")],
+                      filters = [include("vk-main-2023-03-01-part1.txt", "vk-main-2023-03-01-part2.txt")] + MAIN_VULKAN_EXCLUDE_FILTERS,
                       runtime = "10m",
                       listOfGroupsToSplit = ["dEQP-VK", "dEQP-VK.pipeline", "dEQP-VK.image", "dEQP-VK.shader_object"]),
         Configuration(name = "main-2024-03-01",

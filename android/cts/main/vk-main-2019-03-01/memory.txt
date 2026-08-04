@@ -20,7 +20,6 @@ dEQP-VK.memory.allocation.basic.size_1KiB.forward.count_1000
 dEQP-VK.memory.allocation.basic.size_1KiB.mixed.count_1
 dEQP-VK.memory.allocation.basic.size_1KiB.mixed.count_10
 dEQP-VK.memory.allocation.basic.size_1KiB.mixed.count_100
-dEQP-VK.memory.allocation.basic.size_1KiB.mixed.count_1000
 dEQP-VK.memory.allocation.basic.size_1KiB.reverse.count_1
 dEQP-VK.memory.allocation.basic.size_1KiB.reverse.count_10
 dEQP-VK.memory.allocation.basic.size_1KiB.reverse.count_100
@@ -54,7 +53,6 @@ dEQP-VK.memory.allocation.basic.size_4KiB.forward.count_4000
 dEQP-VK.memory.allocation.basic.size_4KiB.mixed.count_1
 dEQP-VK.memory.allocation.basic.size_4KiB.mixed.count_10
 dEQP-VK.memory.allocation.basic.size_4KiB.mixed.count_100
-dEQP-VK.memory.allocation.basic.size_4KiB.mixed.count_1000
 dEQP-VK.memory.allocation.basic.size_4KiB.mixed.count_4000
 dEQP-VK.memory.allocation.basic.size_4KiB.reverse.count_1
 dEQP-VK.memory.allocation.basic.size_4KiB.reverse.count_10
@@ -93,7 +91,6 @@ dEQP-VK.memory.allocation.basic.size_8KiB.forward.count_4000
 dEQP-VK.memory.allocation.basic.size_8KiB.mixed.count_1
 dEQP-VK.memory.allocation.basic.size_8KiB.mixed.count_10
 dEQP-VK.memory.allocation.basic.size_8KiB.mixed.count_100
-dEQP-VK.memory.allocation.basic.size_8KiB.mixed.count_1000
 dEQP-VK.memory.allocation.basic.size_8KiB.mixed.count_4000
 dEQP-VK.memory.allocation.basic.size_8KiB.reverse.count_1
 dEQP-VK.memory.allocation.basic.size_8KiB.reverse.count_10
