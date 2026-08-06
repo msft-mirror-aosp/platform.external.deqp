@@ -1451,8 +1451,9 @@ public class DeqpTestRunnerTest extends TestCase {
         DeqpTestRunner runner = buildGlesTestRunner(
             3, 0, new ArrayList<TestDescription>(), mTestsDir);
         ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>)runner.split();
-        // Returns null when cannot be sharded.
-        assertNull(shards);
+        // Returns empty list when there are no tests to run to omit empty caselists.
+        assertNotNull(shards);
+        assertTrue(shards.isEmpty());
     }
 
     /**
@@ -2898,5 +2899,85 @@ public class DeqpTestRunnerTest extends TestCase {
         expectTestWithResult(tests, true);
         expectTestRunEnded();
         runAndVerifyTest(deqpTest);
+    }
+
+    public void testSplit_parallelDisabled_usesLegacyBatchLimit() throws Exception {
+        List<TestDescription> tests = new ArrayList<>();
+        for (int i = 0; i < 2500; i++) {
+            tests.add(new TestDescription("dEQP-GLES3.test", "test_" + i));
+        }
+        DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
+        OptionSetter setter = new OptionSetter(runner);
+        setter.setOptionValue("enable-deqp-parallel-run", "false");
+
+        ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>) runner.split();
+        assertEquals(3, shards.size());
+        assertEquals(1000, ((DeqpTestRunner) shards.get(0)).getTestInstance().size());
+        assertEquals(1000, ((DeqpTestRunner) shards.get(1)).getTestInstance().size());
+        assertEquals(500, ((DeqpTestRunner) shards.get(2)).getTestInstance().size());
+    }
+
+    public void testSplit_parallelEnabled_smallCaselist_dividesEvenly() throws Exception {
+        List<TestDescription> tests = new ArrayList<>();
+        for (int i = 0; i < 10000; i++) {
+            tests.add(new TestDescription("dEQP-GLES3.test", "test_" + i));
+        }
+        DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
+        OptionSetter setter = new OptionSetter(runner);
+        setter.setOptionValue("enable-deqp-parallel-run", "true");
+        setter.setOptionValue("deqp-max-workers", "4");
+
+        // ITestSuite rejects a shard count hint of 1 or less, and ModuleSplitter then doubles the
+        // hint for dynamic modules before clamping it to MAX_MODULE_LOCAL_SHARDING (8). A module
+        // therefore never sees a hint below 4 in a suite run, so testing against 2 would exercise
+        // a code path that cannot occur in production.
+        ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>) runner.split(4);
+        assertEquals(2, shards.size());
+        assertEquals(5000, ((DeqpTestRunner) shards.get(0)).getTestInstance().size());
+        assertEquals(5000, ((DeqpTestRunner) shards.get(1)).getTestInstance().size());
+
+        int totalShardedTests = 0;
+        for (IRemoteTest shard : shards) {
+            totalShardedTests += ((DeqpTestRunner) shard).getTestInstance().size();
+        }
+        assertEquals(10000, totalShardedTests);
+    }
+
+    /**
+     * Pins the exact shard plan produced by progressive batch sizing.
+     *
+     * <p>With 100,000 tests, a shard count hint of 4 and 4 workers:
+     * {@code baseDivisor = (4 * 4) / 2 = 8}, so {@code baseChunk = 100000 / 8 = 12500} and
+     * {@code minChunk = max(4000, 4 * 1000) = 4000}. Shards stay flat at 12,500 while more than
+     * 30% of the tests remain, then shrink linearly towards {@code minChunk}.
+     *
+     * <p>The trailing shard of 282 is what is left once the taper runs out. It is below the
+     * parallel execution threshold, so it runs single-threaded on device. That is accepted
+     * behaviour, not a bug, and this test records it so a future change to the taper is visible
+     * in the diff rather than silent.
+     */
+    public void testSplit_parallelEnabled_largeCaselist_usesProgressiveTapering() throws Exception {
+        List<TestDescription> tests = new ArrayList<>();
+        for (int i = 0; i < 100000; i++) {
+            tests.add(new TestDescription("dEQP-GLES3.test", "test_" + i));
+        }
+        DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
+        OptionSetter setter = new OptionSetter(runner);
+        setter.setOptionValue("enable-deqp-parallel-run", "true");
+        setter.setOptionValue("deqp-max-workers", "4");
+
+        // 4 is the smallest hint reachable in production (see the note on the test above).
+        ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>) runner.split(4);
+
+        final int[] expected = {12500, 12500, 12500, 12500, 12500, 12500, 11083, 7943, 5692, 282};
+        assertEquals("Unexpected shard count", expected.length, shards.size());
+
+        int totalShardedTests = 0;
+        for (int i = 0; i < expected.length; i++) {
+            int actual = ((DeqpTestRunner) shards.get(i)).getTestInstance().size();
+            assertEquals("Shard " + i + " has the wrong size", expected[i], actual);
+            totalShardedTests += actual;
+        }
+        assertEquals("Sharding lost or duplicated tests", 100000, totalShardedTests);
     }
 }
