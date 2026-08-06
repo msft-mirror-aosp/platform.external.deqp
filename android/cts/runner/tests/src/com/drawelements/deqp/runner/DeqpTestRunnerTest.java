@@ -1553,6 +1553,12 @@ public class DeqpTestRunnerTest extends TestCase {
     private void
     runInstrumentationLineAndAnswerParallel(final List<TestDescription> tests, final String cmd,
                                             final String output, int expectedParallelBatches) throws Exception {
+        runInstrumentationLineAndAnswerParallel(tests, cmd, output, expectedParallelBatches, 4);
+    }
+
+    private void
+    runInstrumentationLineAndAnswerParallel(final List<TestDescription> tests, final String cmd,
+                                            final String output, int expectedParallelBatches, int maxWorkers) throws Exception {
         expectRemoveFolder(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
         expectRemoveFolder(DeqpTestRunner.APP_DIR_PARALLEL_LOGS);
         expectCreateDirectory(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS);
@@ -1573,7 +1579,7 @@ public class DeqpTestRunnerTest extends TestCase {
         }
 
         String logFilename = DeqpTestRunner.APP_DIR_PARALLEL_LOGS;
-        expectInstrumentationCommand(logFilename, cmd, output);
+        expectInstrumentationCommand(logFilename, cmd, output, maxWorkers);
     }
 
     static private void writeStringsToFile(File target, Set<String> strings)
@@ -2079,7 +2085,7 @@ public class DeqpTestRunnerTest extends TestCase {
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         String output = buildTestProcessOutput(tests);
-        String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-watchdog=enable";
+        String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-log-shader-sources=disable --deqp-watchdog=enable";
 
         runInstrumentationLineAndAnswerParallel(tests, parallelCmd, output, 5);
 
@@ -2107,6 +2113,27 @@ public class DeqpTestRunnerTest extends TestCase {
             String subOutput = buildTestProcessOutput(subList);
             runInstrumentationLineAndAnswer(null, getCommandLine(), subOutput);
         }
+
+        expectRunAndVerifyTest(deqpTest, tests);
+    }
+
+
+    /**
+     * Test running in parallel mode with a custom deqp-max-workers option value.
+     */
+    public void testRun_parallelModeEnabled_customMaxWorkers() throws Exception {
+        final int numTests = 5000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+        setter.setOptionValue("deqp-max-workers", "8");
+
+        String output = buildTestProcessOutput(tests);
+        String parallelCmd = "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified --deqp-surface-type=window --deqp-log-images=disable --deqp-log-shader-sources=disable --deqp-watchdog=enable";
+
+        runInstrumentationLineAndAnswerParallel(tests, parallelCmd, output, 5, 8);
 
         expectRunAndVerifyTest(deqpTest, tests);
     }
@@ -2275,11 +2302,25 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private void expectInstrumentationCommand(String logFilename, String cmd, final String output) throws Exception {
-        String command = String.format(
+        expectInstrumentationCommand(logFilename, cmd, output, 4);
+    }
+
+    private void expectInstrumentationCommand(String logFilename, String cmd, final String output, int maxWorkers) throws Exception {
+        final StringBuilder commandBuilder = new StringBuilder();
+        commandBuilder.append(String.format(
             "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\" "
-                + "-e deqpLogData \"%s\" -e deqpEventReportingMode \"%s\" %s",
+                + "-e deqpLogData \"%s\" -e deqpEventReportingMode \"%s\"",
             AbiUtils.createAbiFlag(ABI.getName()), logFilename, cmd,
-            false, DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER, INSTRUMENTATION_NAME);
+            false, DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER));
+
+        if (DeqpTestRunner.APP_DIR_PARALLEL_LOGS.equals(logFilename)) {
+            commandBuilder.append(String.format(
+                " -e deqpEnableParallel \"true\" -e deqpCaselistDir \"%s\" -e deqpLogDir \"%s\" -e deqpMaxWorkers \"%d\"",
+                DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS, DeqpTestRunner.APP_DIR_PARALLEL_LOGS, maxWorkers));
+        }
+
+        commandBuilder.append(String.format(" %s", INSTRUMENTATION_NAME));
+        String command = commandBuilder.toString();
 
         mockDevice.executeShellV2CommandNoRecovery(
             EasyMock.eq(command), EasyMock.<IShellOutputReceiver>notNull(),

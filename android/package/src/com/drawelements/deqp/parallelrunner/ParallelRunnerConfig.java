@@ -20,10 +20,31 @@
 
 package com.drawelements.deqp.parallelrunner;
 
+import android.util.Log;
+
 /**
  * Common configuration constants for the parallel runner.
  */
 public class ParallelRunnerConfig {
     public static final int DEFAULT_MAX_WORKERS = 4;
     public static final int MAX_ALLOWED_WORKERS = 12;
+
+    /**
+     * Validates and clamps the requested worker count to a valid range [1, MAX_ALLOWED_WORKERS].
+     *
+     * @param count  The requested worker count.
+     * @param logTag The tag to use for logging warnings if the count is out of bounds.
+     * @return A valid worker count within allowed limits.
+     */
+    public static int clampWorkerCount(int count, String logTag) {
+        if (count <= 0) {
+            Log.w(logTag, "Invalid workerCount=" + count + ". Defaulting to " + DEFAULT_MAX_WORKERS);
+            return DEFAULT_MAX_WORKERS;
+        } else if (count > MAX_ALLOWED_WORKERS) {
+            Log.w(logTag, "workerCount=" + count + " > max allowed=" + MAX_ALLOWED_WORKERS
+                    + ". Defaulting to max allowed (" + MAX_ALLOWED_WORKERS + ").");
+            return MAX_ALLOWED_WORKERS;
+        }
+        return count;
+    }
 }

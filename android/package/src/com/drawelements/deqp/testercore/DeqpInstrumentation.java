@@ -89,18 +89,7 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
             if (maxWorkersStr != null) {
                 try {
                     int val = Integer.parseInt(maxWorkersStr);
-                    if (val <= 0) {
-                        Log.w(LOG_TAG, "Invalid deqpMaxWorkers=" + val
-                                + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);
-                        m_parallelMaxWorkers = ParallelRunnerConfig.DEFAULT_MAX_WORKERS;
-                    } else if (val > ParallelRunnerConfig.MAX_ALLOWED_WORKERS) {
-                        Log.w(LOG_TAG, "deqpMaxWorkers=" + val
-                                + "> max allowed=" + ParallelRunnerConfig.MAX_ALLOWED_WORKERS
-                                + ". Defaulting to max allowed.");
-                        m_parallelMaxWorkers = ParallelRunnerConfig.MAX_ALLOWED_WORKERS;
-                    } else {
-                        m_parallelMaxWorkers = val;
-                    }
+                    m_parallelMaxWorkers = ParallelRunnerConfig.clampWorkerCount(val, LOG_TAG);
                 } catch (NumberFormatException e) {
                     Log.e(LOG_TAG, "Failed to parse deqpMaxWorkers=" + maxWorkersStr
                             + ". Defaulting to " + ParallelRunnerConfig.DEFAULT_MAX_WORKERS);

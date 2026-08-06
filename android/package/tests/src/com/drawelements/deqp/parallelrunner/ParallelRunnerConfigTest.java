@@ -41,4 +41,28 @@ public class ParallelRunnerConfigTest {
     public void testMaxAllowedWorkersConstant() {
         assertEquals(12, ParallelRunnerConfig.MAX_ALLOWED_WORKERS);
     }
+
+    @Test
+    public void testClampWorkerCount_belowOrZeroDefaultsToDefault() {
+        assertEquals(ParallelRunnerConfig.DEFAULT_MAX_WORKERS,
+                ParallelRunnerConfig.clampWorkerCount(0, "TestTag"));
+        assertEquals(ParallelRunnerConfig.DEFAULT_MAX_WORKERS,
+                ParallelRunnerConfig.clampWorkerCount(-5, "TestTag"));
+    }
+
+    @Test
+    public void testClampWorkerCount_exceedingMaxDefaultsToMaxAllowed() {
+        assertEquals(ParallelRunnerConfig.MAX_ALLOWED_WORKERS,
+                ParallelRunnerConfig.clampWorkerCount(100, "TestTag"));
+        assertEquals(ParallelRunnerConfig.MAX_ALLOWED_WORKERS,
+                ParallelRunnerConfig.clampWorkerCount(ParallelRunnerConfig.MAX_ALLOWED_WORKERS + 1, "TestTag"));
+    }
+
+    @Test
+    public void testClampWorkerCount_validCountUnchanged() {
+        assertEquals(1, ParallelRunnerConfig.clampWorkerCount(1, "TestTag"));
+        assertEquals(8, ParallelRunnerConfig.clampWorkerCount(8, "TestTag"));
+        assertEquals(ParallelRunnerConfig.MAX_ALLOWED_WORKERS,
+                ParallelRunnerConfig.clampWorkerCount(ParallelRunnerConfig.MAX_ALLOWED_WORKERS, "TestTag"));
+    }
 }

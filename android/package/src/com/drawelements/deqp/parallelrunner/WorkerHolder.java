@@ -35,6 +35,11 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
 
     interface SchedulerCallback {
         void checkAllWorkersFinished();
+        /**
+         * Acquires an available service ID from the pool, or {@code null} if none is available.
+         */
+        Integer acquireServiceId();
+        void releaseServiceId(int id);
     }
 
     interface ConnectionFactory {
@@ -47,8 +52,8 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
         connectionFactory = factory;
     }
 
+    private final Context applicationContext;
     private final int id;
-    private final WorkerServiceConnection connection;
     private final DeqpTestBatchLoader testBatchLoader;
     private final String logDir;
     private final String cmdLine;
@@ -56,12 +61,15 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
     private final Object stateLock;
     private final SchedulerCallback schedulerCallback;
 
+    private int activeServiceId = -1;
     private Surface surface;
+    private WorkerServiceConnection connection;
     private boolean isBusy = false;
     private String currentBatch;
 
     WorkerHolder(Context context, int id, DeqpTestBatchLoader testBatchLoader,
                  String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback) {
+        this.applicationContext = context.getApplicationContext();
         this.id = id;
         this.testBatchLoader = testBatchLoader;
         this.logDir = logDir;
@@ -69,7 +77,6 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
         this.dispatchExecutor = dispatchExecutor;
         this.stateLock = stateLock;
         this.schedulerCallback = schedulerCallback;
-        this.connection = connectionFactory.create(context, id, this);
     }
 
     @Override
@@ -98,28 +105,42 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
 
     @Override
     public void onConnected(ISurfaceWorker worker) {
-        Log.i(TAG, "Worker " + id + " connected.");
+        final int serviceId;
+        synchronized (stateLock) {
+            serviceId = activeServiceId;
+        }
+        Log.i(TAG, "Worker " + id + " connected (service ID " + serviceId + ").");
         tryDispatch();
     }
 
     @Override
     public void onDisconnected() {
-        Log.i(TAG, "Worker " + id + " disconnected.");
+        final int serviceId;
+        synchronized (stateLock) {
+            serviceId = activeServiceId;
+        }
+        Log.i(TAG, "Worker " + id + " disconnected (service ID " + serviceId + ").");
         handleWorkerDisconnected();
     }
 
     private void safeBind() {
-        boolean shouldBind = false;
         synchronized (stateLock) {
             if (surface != null && surface.isValid()) {
-                shouldBind = true;
+                if (connection == null) {
+                    Integer serviceId = schedulerCallback.acquireServiceId();
+                    if (serviceId == null) {
+                        Log.w(TAG, "Worker " + id + " cannot bind: no available service ID in pool (max allowed: "
+                                + ParallelRunnerConfig.MAX_ALLOWED_WORKERS + ")");
+                        return;
+                    }
+                    activeServiceId = serviceId;
+                    connection = connectionFactory.create(applicationContext, activeServiceId, this);
+                }
+                connection.bind();
             } else {
                 Log.w(TAG, "Worker " + id + " cannot bind: surface is " +
                       (surface == null ? "null" : "invalid"));
             }
-        }
-        if (shouldBind) {
-            connection.bind();
         }
     }
 
@@ -127,8 +148,15 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
         synchronized (stateLock) {
             isBusy = false;
             currentBatch = null;
+            if (connection != null) {
+                connection.unbind();
+                connection = null;
+            }
+            if (activeServiceId != -1) {
+                schedulerCallback.releaseServiceId(activeServiceId);
+                activeServiceId = -1;
+            }
         }
-        connection.unbind();
     }
 
     void onShutdown() {
@@ -145,7 +173,9 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
     }
 
     boolean isBound() {
-        return connection.isBound();
+        synchronized (stateLock) {
+            return connection != null && connection.isBound();
+        }
     }
 
     private void tryDispatch() {
@@ -161,6 +191,10 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
             if (surface == null || !surface.isValid()) {
                 Log.w(TAG, "Worker " + id + " tryDispatch failed: surface is " +
                       (surface == null ? "null" : "invalid"));
+                return;
+            }
+            if (connection == null) {
+                Log.e(TAG, "Worker " + id + " tryDispatch failed: connection is null");
                 return;
             }
             activeWorker = connection.getWorker();
