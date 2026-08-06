@@ -26,8 +26,14 @@ package com.drawelements.deqp.testercore;
 import android.app.Instrumentation;
 import android.content.Intent;
 import android.os.Bundle;
+import com.drawelements.deqp.parallelrunner.AsyncLogParsersCoordinator;
+import com.drawelements.deqp.parallelrunner.LogParserFactory;
+import com.drawelements.deqp.parallelrunner.LogParserFactoryImpl;
+import com.drawelements.deqp.parallelrunner.LogParsersCoordinator;
 import com.drawelements.deqp.parallelrunner.ParallelRunnerConfig;
 import com.drawelements.deqp.parallelrunner.SurfaceProviderActivity;
+import com.drawelements.deqp.parallelrunner.TestEvent;
+import com.drawelements.deqp.parallelrunner.TestEventSubscriber;
 import java.io.File;
 import java.util.concurrent.CountDownLatch;
 
@@ -72,13 +78,13 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
         } else
             m_logData = false;
 
+        m_parallel = Boolean.parseBoolean(arguments.getString("deqpEnableParallel"));
+
         if (arguments.getString("deqpEventReportingMode") != null) {
             m_eventReportingMode = arguments.getString("deqpEventReportingMode");
         } else {
-            m_eventReportingMode = REPORTING_MODE_NATIVE_LOG_PARSER;
+            m_eventReportingMode = m_parallel ? REPORTING_MODE_JAVA_LOG_PARSER : REPORTING_MODE_NATIVE_LOG_PARSER;
         }
-
-        m_parallel = Boolean.parseBoolean(arguments.getString("deqpEnableParallel"));
 
         if (m_parallel) {
             m_parallelCaselistDir = arguments.getString("deqpCaselistDir");
@@ -129,9 +135,30 @@ public class DeqpInstrumentation extends Instrumentation implements TestEventLis
                 throw new Exception("Can't resolve parallel runner activity: com.drawelements.deqp.parallelrunner.SurfaceProviderActivity");
             }
 
-            Log.d(LOG_TAG, "Starting parallel execution mode");
-            getTargetContext().startActivity(testIntent);
-            latch.await();
+            AsyncLogParsersCoordinator.initialize(
+                    m_parallelMaxWorkers, m_logData, m_eventReportingMode, new LogParserFactoryImpl());
+            final LogParsersCoordinator coordinator = AsyncLogParsersCoordinator.getInstance();
+
+            final TestEventSubscriber subscriber = new TestEventSubscriber() {
+                @Override
+                public void onTestEventReceived(TestEvent event) {
+                    for (Bundle bundle : event.getBundles()) {
+                        sendStatus(0, bundle);
+                    }
+                }
+            };
+
+            coordinator.subscribe(subscriber);
+
+            try {
+                Log.d(LOG_TAG, "Starting parallel execution mode");
+                getTargetContext().startActivity(testIntent);
+                latch.await();
+            } finally {
+                // Some events may be sent during deinitialization of coordinator
+                coordinator.deinit();
+            }
+
             finish(0, new Bundle());
         } catch (Exception e) {
             Log.e(LOG_TAG, "Exception in parallel execution", e);

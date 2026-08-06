@@ -45,7 +45,7 @@ public class ParallelTestsScheduler implements WorkerHolder.SchedulerCallback {
 
     interface WorkerHolderFactory {
         WorkerHolder create(Context context, int id, DeqpTestBatchLoader testBatchLoader,
-                            String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, WorkerHolder.SchedulerCallback schedulerCallback);
+                            String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, WorkerHolder.SchedulerCallback schedulerCallback, LogParsersCoordinator logParsersCoordinator);
     }
 
     private static WorkerHolderFactory workerHolderFactory = WorkerHolder::new;
@@ -91,7 +91,7 @@ public class ParallelTestsScheduler implements WorkerHolder.SchedulerCallback {
         }
 
         for (int i = 0; i < workerCount; i++) {
-            workers.add(workerHolderFactory.create(this.context, i, testBatchLoader, this.logDir, this.cmdLine, dispatchExecutor, stateLock, this));
+            workers.add(workerHolderFactory.create(this.context, i, testBatchLoader, this.logDir, this.cmdLine, dispatchExecutor, stateLock, this, AsyncLogParsersCoordinator.getInstance()));
         }
     }
 
