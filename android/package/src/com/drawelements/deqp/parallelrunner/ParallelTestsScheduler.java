@@ -25,7 +25,10 @@ import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -72,6 +75,7 @@ public class ParallelTestsScheduler implements WorkerHolder.SchedulerCallback {
     private final List<WorkerHolder> workers = new ArrayList<>();
     private final Object stateLock = new Object();
     private boolean callbackFired = false;
+    private final Set<Integer> availableServiceIds = new LinkedHashSet<>();
 
 
     public ParallelTestsScheduler(Context context, int workerCount, DeqpTestBatchLoader testBatchLoader, String logDir, String cmdLine, Callback callback) {
@@ -82,8 +86,37 @@ public class ParallelTestsScheduler implements WorkerHolder.SchedulerCallback {
         this.completionCallback = callback;
         this.dispatchExecutor = Executors.newFixedThreadPool(workerCount);
 
+        for (int i = 0; i < ParallelRunnerConfig.MAX_ALLOWED_WORKERS; i++) {
+            availableServiceIds.add(i);
+        }
+
         for (int i = 0; i < workerCount; i++) {
             workers.add(workerHolderFactory.create(this.context, i, testBatchLoader, this.logDir, this.cmdLine, dispatchExecutor, stateLock, this));
+        }
+    }
+
+    /**
+     * Acquires an available service ID from the pool, or {@code null} if none is available.
+     */
+    @Override
+    public Integer acquireServiceId() {
+        synchronized (stateLock) {
+            Iterator<Integer> it = availableServiceIds.iterator();
+            if (!it.hasNext()) {
+                return null;
+            }
+            Integer id = it.next();
+            it.remove();
+            return id;
+        }
+    }
+
+    @Override
+    public void releaseServiceId(int id) {
+        synchronized (stateLock) {
+            if (id >= 0 && id < ParallelRunnerConfig.MAX_ALLOWED_WORKERS) {
+                availableServiceIds.add(id);
+            }
         }
     }
 
