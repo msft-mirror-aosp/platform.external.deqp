@@ -25,6 +25,8 @@ import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
+import com.drawelements.deqp.testercore.DeqpInstrumentation;
+import com.drawelements.deqp.testercore.QpaParser;
 
 import java.io.File;
 import java.io.IOException;
@@ -33,23 +35,26 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import static org.easymock.EasyMock.*;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+
 @RunWith(RobolectricTestRunner.class)
-public class LogParsersCoordinatorTest {
+public class AsyncLogParsersCoordinatorTest {
 
     private LogParsersCoordinator coordinator;
 
     @Before
-    public void setUp() {
-        coordinator = new LogParsersCoordinator();
+    public void setUp() throws Exception {
+        AsyncLogParsersCoordinator.initialize(4, true, DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, new LogParserFactoryImpl());
+        coordinator = AsyncLogParsersCoordinator.getInstance();
     }
 
     @After
     public void tearDown() {
-        coordinator.deinit();
+        AsyncLogParsersCoordinator.reset();
     }
 
     private File createDummyQpaFile() throws IOException {
@@ -81,7 +86,7 @@ public class LogParsersCoordinatorTest {
         coordinator.subscribe(subscriber);
 
         File dummyQpa = createDummyQpaFile();
-        coordinator.parse(dummyQpa.getAbsolutePath(), true);
+        coordinator.parse(dummyQpa.getAbsolutePath());
 
         boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
         assertTrue("Timeout waiting for 3 events", receivedAll);
@@ -113,7 +118,7 @@ public class LogParsersCoordinatorTest {
         coordinator.subscribe(helperSubscriber);
 
         File dummyQpa = createDummyQpaFile();
-        coordinator.parse(dummyQpa.getAbsolutePath(), true);
+        coordinator.parse(dummyQpa.getAbsolutePath());
 
         boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
         assertTrue("Timeout waiting for 3 events in helper subscriber", receivedAll);
@@ -152,7 +157,7 @@ public class LogParsersCoordinatorTest {
         coordinator.subscribe(sub2);
 
         File dummyQpa = createDummyQpaFile();
-        coordinator.parse(dummyQpa.getAbsolutePath(), true);
+        coordinator.parse(dummyQpa.getAbsolutePath());
 
         boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
         assertTrue("Timeout waiting for 6 events across subscribers", receivedAll);
@@ -180,8 +185,8 @@ public class LogParsersCoordinatorTest {
         File dummyQpa1 = createDummyQpaFile();
         File dummyQpa2 = createDummyQpaFile();
 
-        coordinator.parse(dummyQpa1.getAbsolutePath(), true);
-        coordinator.parse(dummyQpa2.getAbsolutePath(), true);
+        coordinator.parse(dummyQpa1.getAbsolutePath());
+        coordinator.parse(dummyQpa2.getAbsolutePath());
 
         // wait till we receive 6 values with timeout
         boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
@@ -209,7 +214,7 @@ public class LogParsersCoordinatorTest {
         dummyQpa.deleteOnExit();
 
         // Start parsing while the file is still being written to
-        coordinator.parse(dummyQpa.getAbsolutePath(), true);
+        coordinator.parse(dummyQpa.getAbsolutePath());
 
         // We use PrintWriter with auto-flush so lines are written immediately
         try (java.io.PrintWriter out = new java.io.PrintWriter(
@@ -251,11 +256,45 @@ public class LogParsersCoordinatorTest {
         }
     }
 
-
     @Test
     public void testOnTestProcessFinished_unknownFile() {
         // Should not throw exception
         coordinator.onTestProcessFinished("nonexistent.qpa");
     }
 
+    @Test
+    public void testReset() {
+        AsyncLogParsersCoordinator.reset();
+
+        boolean exceptionThrown = false;
+        try {
+            AsyncLogParsersCoordinator.getInstance();
+        } catch (IllegalStateException e) {
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
+    }
+
+    @Test
+    public void testLogParserFactoryCalledWithReportingMode() throws Exception {
+        AsyncLogParsersCoordinator.reset();
+
+        LogParserFactory mockFactory = createMock(LogParserFactory.class);
+        expect(mockFactory.create(DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER))
+                .andReturn(new QpaParser());
+        replay(mockFactory);
+
+        AsyncLogParsersCoordinator.initialize(
+                4, true, DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, mockFactory);
+        LogParsersCoordinator customCoordinator = AsyncLogParsersCoordinator.getInstance();
+
+        try {
+            File dummyQpa = createDummyQpaFile();
+            customCoordinator.parse(dummyQpa.getAbsolutePath());
+
+            verify(mockFactory);
+        } finally {
+            AsyncLogParsersCoordinator.reset();
+        }
+    }
 }

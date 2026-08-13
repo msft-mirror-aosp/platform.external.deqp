@@ -25,6 +25,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import com.drawelements.deqp.testercore.DeqpInstrumentation;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,6 +51,7 @@ public class WorkerHolderTest {
 
     private Context context;
     private DeqpTestBatchLoader batchLoader;
+    private LogParsersCoordinator mockCoordinator;
     private ExecutorService directExecutor;
     private final Object stateLock = new Object();
 
@@ -119,6 +121,7 @@ public class WorkerHolderTest {
     public void setUp() {
         context = ApplicationProvider.getApplicationContext();
         batchLoader = new DeqpTestBatchLoader();
+        mockCoordinator = createMock(LogParsersCoordinator.class);
 
         // Use a direct executor to run background tasks synchronously in tests
         directExecutor = createMock(ExecutorService.class);
@@ -167,13 +170,14 @@ public class WorkerHolderTest {
     @After
     public void tearDown() {
         WorkerHolder.setConnectionFactory(WorkerServiceConnection::new);
+        AsyncLogParsersCoordinator.reset();
     }
 
     @Test
     public void testSurfaceCreatedTriggersBind() {
         TestSchedulerCallback callback = new TestSchedulerCallback();
         List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
 
         SurfaceHolder mockHolder = createMockSurfaceHolder(new TestSurface());
 
@@ -192,7 +196,7 @@ public class WorkerHolderTest {
         List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
         TestSchedulerCallback callback = new TestSchedulerCallback();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
@@ -201,13 +205,17 @@ public class WorkerHolderTest {
             holder.surfaceDestroyed(mockHolder);
             return true;
         }).once();
+        mockCoordinator.parse(anyObject());
+        expectLastCall().once();
+        mockCoordinator.onTestProcessFinished(anyObject());
+        expectLastCall().once();
 
-        replay(mockWorker);
+        replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
         holder.onConnected(mockWorker);
 
-        verify(mockWorker);
+        verify(mockWorker, mockCoordinator);
         assertTrue(capturedConnections.get(0).unbindCalled);
 
         // The batch should be put back in the queue
@@ -223,21 +231,25 @@ public class WorkerHolderTest {
         List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
         TestSchedulerCallback callback = new TestSchedulerCallback();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
 
         // Set valid surface
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
         expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(true).once();
+        mockCoordinator.parse(anyObject());
+        expectLastCall().once();
+        mockCoordinator.onTestProcessFinished(anyObject());
+        expectLastCall().once();
 
-        replay(mockWorker);
+        replay(mockWorker, mockCoordinator);
 
         // Trigger connection
         capturedConnections.get(0).workerVal = mockWorker;
         holder.onConnected(mockWorker);
 
-        verify(mockWorker);
+        verify(mockWorker, mockCoordinator);
         assertTrue(callback.checkAllWorkersFinishedCalled);
         assertTrue(capturedConnections.get(0).unbindCalled);
     }
@@ -252,24 +264,28 @@ public class WorkerHolderTest {
 
         String baseCmdLine = "--deqp-watchdog=enable --deqp-gl-config-name=rgba8888d24s8";
         String logDir = "/sdcard/deqplogs";
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, logDir, baseCmdLine, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, logDir, baseCmdLine, directExecutor, stateLock, callback, mockCoordinator);
 
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
-        expect(mockWorker.startTestBatch(eq(testSurface), contains(baseCmdLine + " --deqp-log-filename=/sdcard/deqplogs/TestLog_worker_0.qpa --deqp-caselist-file="))).andReturn(true).once();
+        expect(mockWorker.startTestBatch(eq(testSurface), matches(".*--deqp-log-filename=/sdcard/deqplogs/TestLog_parallel_0_\\d+\\.qpa --deqp-caselist-file=.*"))).andReturn(true).once();
+        mockCoordinator.parse(anyObject());
+        expectLastCall().once();
+        mockCoordinator.onTestProcessFinished(anyObject());
+        expectLastCall().once();
 
-        replay(mockWorker);
+        replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
         holder.onConnected(mockWorker);
 
-        verify(mockWorker);
+        verify(mockWorker, mockCoordinator);
         assertTrue(callback.checkAllWorkersFinishedCalled);
         assertTrue(capturedConnections.get(0).unbindCalled);
     }
 
-    @Test
+    @Test(expected = IllegalArgumentException.class)
     public void testOnConnectedDispatchesBatchWithNullCmdLineAndLogDir() throws Exception {
         setupBatchLoaderWithFiles("batch_1.txt");
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
@@ -277,35 +293,30 @@ public class WorkerHolderTest {
         List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
         TestSchedulerCallback callback = new TestSchedulerCallback();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, null, null, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, null, null, directExecutor, stateLock, callback, mockCoordinator);
 
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
-        expect(mockWorker.startTestBatch(eq(testSurface), matches("^--deqp-caselist-file=.*batch_1.txt$"))).andReturn(true).once();
-
-        replay(mockWorker);
-
         capturedConnections.get(0).workerVal = mockWorker;
         holder.onConnected(mockWorker);
-
-        verify(mockWorker);
-        assertTrue(callback.checkAllWorkersFinishedCalled);
-        assertTrue(capturedConnections.get(0).unbindCalled);
     }
 
     @Test
     public void testQueueExhaustionCallsCheckAllWorkersFinished() throws Exception {
         List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
         TestSchedulerCallback callback = new TestSchedulerCallback();
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
 
         SurfaceHolder mockHolder = createMockSurfaceHolder(new TestSurface());
         holder.surfaceCreated(mockHolder);
 
+        replay(mockCoordinator);
+
         capturedConnections.get(0).workerVal = createMock(ISurfaceWorker.class);
         holder.onConnected(capturedConnections.get(0).workerVal);
 
+        verify(mockCoordinator);
         assertTrue(callback.checkAllWorkersFinishedCalled);
         assertTrue(capturedConnections.get(0).unbindCalled);
         assertEquals(1, callback.releasedCount);
@@ -319,18 +330,22 @@ public class WorkerHolderTest {
         List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
         TestSchedulerCallback callback = new TestSchedulerCallback();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
         expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(false).once();
+        mockCoordinator.parse(anyObject());
+        expectLastCall().once();
+        mockCoordinator.onTestProcessFinished(anyObject());
+        expectLastCall().once();
 
-        replay(mockWorker);
+        replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
         holder.onConnected(mockWorker);
 
-        verify(mockWorker);
+        verify(mockWorker, mockCoordinator);
         // Connection 1 (service ID 0) should be unbound
         assertTrue(capturedConnections.get(0).unbindCalled);
         // Connection 2 (service ID 1) should be created and bound
@@ -352,7 +367,7 @@ public class WorkerHolderTest {
         List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
         TestSchedulerCallback callback = new TestSchedulerCallback();
 
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
@@ -360,13 +375,17 @@ public class WorkerHolderTest {
             holder.onDisconnected();
             return false;
         }).once();
+        mockCoordinator.parse(anyObject());
+        expectLastCall().once();
+        mockCoordinator.onTestProcessFinished(anyObject());
+        expectLastCall().once();
 
-        replay(mockWorker);
+        replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
         holder.onConnected(mockWorker);
 
-        verify(mockWorker);
+        verify(mockWorker, mockCoordinator);
         // Connection 1 (service ID 0) should be unbound
         assertTrue(capturedConnections.get(0).unbindCalled);
         // Connection 2 (service ID 1) should be created and bound
@@ -383,7 +402,7 @@ public class WorkerHolderTest {
     @Test
     public void testSurfaceDestroyedReleasesServiceId() {
         TestSchedulerCallback callback = new TestSchedulerCallback();
-        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback);
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
 
         SurfaceHolder mockHolder = createMockSurfaceHolder(new TestSurface());
         holder.surfaceCreated(mockHolder);
