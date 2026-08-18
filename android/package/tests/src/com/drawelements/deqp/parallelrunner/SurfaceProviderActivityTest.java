@@ -39,12 +39,30 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 
+import com.drawelements.deqp.testercore.DeqpInstrumentation;
+import org.junit.After;
+import org.junit.Before;
+
 /**
  * Unit tests for {@link SurfaceProviderActivity} using ActivityScenario.
  * These tests verify the dynamic UI generation logic of the SurfaceProviderActivity.
  */
 @RunWith(AndroidJUnit4.class)
 public class SurfaceProviderActivityTest {
+
+    @Before
+    public void setUp() {
+        AsyncLogParsersCoordinator.initialize(
+            ParallelRunnerConfig.DEFAULT_MAX_WORKERS, false,
+            DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER,
+            new LogParserFactoryImpl()
+        );
+    }
+
+    @After
+    public void tearDown() {
+        AsyncLogParsersCoordinator.reset();
+    }
 
     @Rule
     public TemporaryFolder tempFolder = new TemporaryFolder();

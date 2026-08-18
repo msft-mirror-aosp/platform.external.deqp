@@ -60,6 +60,7 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
     private final ExecutorService dispatchExecutor;
     private final Object stateLock;
     private final SchedulerCallback schedulerCallback;
+    private final LogParsersCoordinator logParsersCoordinator;
 
     private int activeServiceId = -1;
     private Surface surface;
@@ -68,7 +69,7 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
     private String currentBatch;
 
     WorkerHolder(Context context, int id, DeqpTestBatchLoader testBatchLoader,
-                 String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback) {
+                 String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback, LogParsersCoordinator logParsersCoordinator) {
         this.applicationContext = context.getApplicationContext();
         this.id = id;
         this.testBatchLoader = testBatchLoader;
@@ -77,6 +78,7 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
         this.dispatchExecutor = dispatchExecutor;
         this.stateLock = stateLock;
         this.schedulerCallback = schedulerCallback;
+        this.logParsersCoordinator = logParsersCoordinator;
     }
 
     @Override
@@ -221,22 +223,24 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
         final Surface finalSurface = activeSurface;
         final ISurfaceWorker finalWorker = activeWorker;
         final String finalBatch = batchFile;
-        String logArg = "";
-        if (logDir != null && !logDir.trim().isEmpty()) {
-            File logFile = new File(logDir, "TestLog_worker_" + id + ".qpa");
-            logArg = "--deqp-log-filename=" + logFile.getAbsolutePath() + " ";
-        }
+        final String logFilePath = generateLogFilePath();
+        final String logArg = "--deqp-log-filename=" + logFilePath + " ";
         final String caseListArg = "--deqp-caselist-file=" + finalBatch;
         final String fullCmdLine = (cmdLine != null && !cmdLine.trim().isEmpty())
                 ? cmdLine.trim() + " " + logArg + caseListArg
                 : logArg + caseListArg;
         dispatchExecutor.execute(() -> {
             boolean success = false;
+
+            logParsersCoordinator.parse(logFilePath);
+
             try {
                 success = finalWorker.startTestBatch(finalSurface, fullCmdLine);
             } catch (Exception e) {
                 Log.e(TAG, "Execution failure on worker " + id, e);
             }
+
+            logParsersCoordinator.onTestProcessFinished(logFilePath);
 
             if (!success) {
                 handleExecutionFailure(finalBatch);
@@ -244,6 +248,15 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
                 resetAndScheduleNext(false, null);
             }
         });
+    }
+
+    private String generateLogFilePath() {
+        if (logDir != null && !logDir.trim().isEmpty()) {
+            File logFile = new File(logDir, "TestLog_parallel_" + id + "_" + System.currentTimeMillis() + ".qpa");
+            return logFile.getAbsolutePath();
+        } else {
+            throw new IllegalArgumentException("logDir must not be null or empty");
+        }
     }
 
     private void handleExecutionFailure(String failedBatch) {

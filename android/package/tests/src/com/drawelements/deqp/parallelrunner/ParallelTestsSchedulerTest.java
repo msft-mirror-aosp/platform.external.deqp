@@ -25,6 +25,7 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import com.drawelements.deqp.testercore.DeqpInstrumentation;
 import java.io.File;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -103,8 +104,8 @@ public class ParallelTestsSchedulerTest {
         final String capturedCmdLine;
 
         TestWorkerHolder(Context context, int id, DeqpTestBatchLoader testBatchLoader,
-                         String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback) {
-            super(context, id, testBatchLoader, logDir, cmdLine, dispatchExecutor, stateLock, schedulerCallback);
+                         String logDir, String cmdLine, ExecutorService dispatchExecutor, Object stateLock, SchedulerCallback schedulerCallback, LogParsersCoordinator coordinator) {
+            super(context, id, testBatchLoader, logDir, cmdLine, dispatchExecutor, stateLock, schedulerCallback, coordinator);
             this.capturedLogDir = logDir;
             this.capturedCmdLine = cmdLine;
         }
@@ -120,6 +121,7 @@ public class ParallelTestsSchedulerTest {
         context = ApplicationProvider.getApplicationContext();
         batchLoader = new DeqpTestBatchLoader();
         mockSchedulerCallback = createMock(ParallelTestsScheduler.Callback.class);
+        AsyncLogParsersCoordinator.initialize(1, false, DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, new LogParserFactoryImpl());
     }
 
     private void setupBatchLoaderWithFiles(String... filenames) throws Exception {
@@ -154,6 +156,7 @@ public class ParallelTestsSchedulerTest {
     public void tearDown() {
         WorkerHolder.setConnectionFactory(WorkerServiceConnection::new);
         ParallelTestsScheduler.setWorkerHolderFactory(WorkerHolder::new);
+        AsyncLogParsersCoordinator.reset();
     }
 
     @Test
@@ -251,9 +254,9 @@ public class ParallelTestsSchedulerTest {
     public void testShutdownCallsOnShutdownOnWorkers() {
         final TestWorkerHolder[] capturedHolder = new TestWorkerHolder[1];
         ParallelTestsScheduler.setWorkerHolderFactory(
-                (context, workerId, loader, logDir, cmdLine, executor, lock, callback) -> {
+                (context, workerId, loader, logDir, cmdLine, executor, lock, callback, coordinator) -> {
                     capturedHolder[0] = new TestWorkerHolder(
-                            context, workerId, loader, logDir, cmdLine, executor, lock, callback);
+                            context, workerId, loader, logDir, cmdLine, executor, lock, callback, coordinator);
                     return capturedHolder[0];
                 });
 
@@ -268,9 +271,9 @@ public class ParallelTestsSchedulerTest {
     public void testCmdLineAndLogDirPropagationToWorkers() {
         final TestWorkerHolder[] capturedHolder = new TestWorkerHolder[1];
         ParallelTestsScheduler.setWorkerHolderFactory(
-                (context, workerId, loader, logDir, cmdLine, executor, lock, callback) -> {
+                (context, workerId, loader, logDir, cmdLine, executor, lock, callback, coordinator) -> {
                     capturedHolder[0] = new TestWorkerHolder(
-                            context, workerId, loader, logDir, cmdLine, executor, lock, callback);
+                            context, workerId, loader, logDir, cmdLine, executor, lock, callback, coordinator);
                     return capturedHolder[0];
                 });
 

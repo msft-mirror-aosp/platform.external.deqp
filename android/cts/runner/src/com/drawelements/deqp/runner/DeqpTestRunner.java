@@ -129,6 +129,9 @@ public class DeqpTestRunner
         "android.hardware.type.pc";
 
     private static final int TESTCASE_BATCH_LIMIT = 1000;
+    private static final int DEQP_PARALLEL_MAX_BATCHES_PER_CHUNK = 50;
+    private static final int DEQP_PARALLEL_CHUNK_SIZE =
+        DEQP_PARALLEL_MAX_BATCHES_PER_CHUNK * TESTCASE_BATCH_LIMIT;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
         10 * 60 * 1000; // 10min
     private static final int DEQP_PARALLEL_EXECUTION_THRESHOLD = 5000;
@@ -294,10 +297,13 @@ public class DeqpTestRunner
     protected Set<TestDescription> mRemainingTests = null;
     private Map<TestDescription, Set<BatchRunConfiguration>> mTestInstances =
         null;
-    private final TestInstanceResultListener mInstanceListerner =
+    private final TestInstanceResultListener mInstanceListener =
         new TestInstanceResultListener();
     private final Map<TestDescription, Integer> mTestInstabilityRatings =
         new HashMap<>();
+    private final Set<TestDescription> mUnstableTests = new LinkedHashSet<>();
+    private final Set<TestDescription> mErrantTests = new LinkedHashSet<>();
+
     protected IAbi mAbi;
     protected CompatibilityBuildHelper mBuildHelper;
     protected ITestDevice mDevice;
@@ -418,10 +424,10 @@ public class DeqpTestRunner
     private static final class CapabilityQueryFailureException
         extends Exception {}
 
-    protected TestInstanceResultListener getInstanceListener() {return mInstanceListerner;}
+    protected TestInstanceResultListener getInstanceListener() {return mInstanceListener;}
 
     /**
-     * dEQP test instance listerer and invocation result forwarded
+     * dEQP test instance listener and invocation result forwarded
      */
     protected class TestInstanceResultListener {
         private BatchRunConfiguration mRunConfig;
@@ -484,6 +490,9 @@ public class DeqpTestRunner
 
                 // Error message
                 if (!result.allInstancesPassed) {
+                    if (isParallelMode()) {
+                        mErrantTests.add(testId);
+                    }
                     final StringBuilder errorLog = new StringBuilder();
 
                     for (Map.Entry<BatchRunConfiguration, String> entry :
@@ -1337,6 +1346,10 @@ public class DeqpTestRunner
         public void setTestBatchTestDescriptionList(List<TestDescription> tests) {mTests = tests;}
     }
 
+    private boolean isFlaggedForParallelRetry(TestDescription test) {
+        return mUnstableTests.contains(test) || mErrantTests.contains(test);
+    }
+
     /**
      * Creates a TestBatch from the given tests or null if not tests remaining.
      *
@@ -1350,7 +1363,7 @@ public class DeqpTestRunner
         // pack along as many other compatible instances as possible.
         TestDescription leadingTest = null;
         for (TestDescription test : pool) {
-            if (!mRemainingTests.contains(test)) {
+            if (!mRemainingTests.contains(test) || isFlaggedForParallelRetry(test)) {
                 continue;
             }
             if (requiredConfig != null &&
@@ -1394,8 +1407,8 @@ public class DeqpTestRunner
         runBatchTests.add(leadingTest);
 
         for (TestDescription test : pool) {
-            if (test == leadingTest) {
-                // do not re-select the leading tests
+            if (test == leadingTest || isFlaggedForParallelRetry(test)) {
+                // do not re-select the leading tests or unstable tests or errant tests
                 continue;
             }
             if (!getInstanceListener().isPendingTestInstance(test,
@@ -1410,13 +1423,13 @@ public class DeqpTestRunner
                 // stability rating.
                 continue;
             }
-            if (runBatchTests.size() >=
-                getBatchSizeLimitForInstability(leadingInstability)) {
-                // For parallel mode, batching limit check is pushed from here to executeTestRunBatchRun
-                if (!isParallelMode(pool.size())) {
-                    // batch size is limited.
-                    break;
-                }
+            final int batchLimit = isParallelMode()
+                    ? DEQP_PARALLEL_CHUNK_SIZE
+                    : getBatchSizeLimitForInstability(leadingInstability);
+            if (runBatchTests.size() >= batchLimit) {
+                // Batch size is limited to DEQP_PARALLEL_CHUNK_SIZE in parallel mode,
+                // or the instability-based limit in serial mode.
+                break;
             }
             runBatchTests.add(test);
         }
@@ -1432,7 +1445,8 @@ public class DeqpTestRunner
     protected int getBatchNumPendingCases(TestBatch batch) {
         int numPending = 0;
         for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
-            if (getInstanceListener().isPendingTestInstance(test, batch.getTestBatchConfig())) {
+            if (getInstanceListener().isPendingTestInstance(test, batch.getTestBatchConfig()) &&
+                !mUnstableTests.contains(test)) {
                 ++numPending;
             }
         }
@@ -1453,10 +1467,11 @@ public class DeqpTestRunner
     }
 
     protected void recordTestInstability(TestDescription testId, boolean isParallelMode) {
+        // We are not aborting the tests now in the parallel mode
+        // TODO : We have to take into account instability of the test and hence we can
+        // reduce the parallel batch size based on instability score instead of aborting the test.
         if (isParallelMode) {
-            // TODO : We have to take into account instability of the test and hence we can reduce
-            // the parallel batch size based on instability score instead of aborting the test.
-            getInstanceListener().abortTest(testId, "Test removed due to instability");
+            mUnstableTests.add(testId);
         } else {
             mTestInstabilityRatings.put(testId,
                     getTestInstabilityRating(testId) + 1);
@@ -1631,7 +1646,7 @@ public class DeqpTestRunner
      * Builds the 'am instrument' command line string.
      */
     private String buildInstrumentationCommand(
-            BatchRunConfiguration runConfig, boolean isParallel) {
+            BatchRunConfiguration runConfig, boolean isParallel, int testCount) {
         final String deqpLogPath = isParallel ? APP_DIR_PARALLEL_LOGS : APP_DIR + LOG_FILE_NAME;
         // In parallel mode, log data streaming through instrumentation output is disabled
         // because worker processes write test logs directly to partition files under APP_DIR_PARALLEL_LOGS,
@@ -1647,11 +1662,15 @@ public class DeqpTestRunner
                .append(" -e deqpEventReportingMode \"").append(mEventReportingMode).append("\"");
 
         if (isParallel) {
+            final int maxWorkers = (testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD) ? mDeqpMaxWorkers : 1;
+            CLog.d("Executing batch with test count: %d, max workers: %d, in Parallel mode", testCount, maxWorkers);
             // Pass parallel execution configuration options to DeqpInstrumentation on the device.
             command.append(" -e deqpEnableParallel \"true\"")
                    .append(" -e deqpCaselistDir \"").append(APP_DIR_PARALLEL_CASELISTS).append("\"")
                    .append(" -e deqpLogDir \"").append(APP_DIR_PARALLEL_LOGS).append("\"")
-                   .append(" -e deqpMaxWorkers \"").append(mDeqpMaxWorkers).append("\"");
+                   .append(" -e deqpMaxWorkers \"").append(maxWorkers).append("\"");
+        } else {
+            CLog.d("Executing batch with test count: %d in Serial mode", testCount);
         }
 
         command.append(" ").append(APK_INSTRUMENTATION_NAME);
@@ -1663,11 +1682,12 @@ public class DeqpTestRunner
      */
     protected void executeTestRunBatch(TestBatch batch)
         throws DeviceNotAvailableException {
-        final boolean isParallel = isParallelMode(batch.getTestBatchTestDescriptionList().size());
+        final int testCount = batch.getTestBatchTestDescriptionList().size();
+        final boolean isParallel = isParallelMode();
         mEventReportingMode = resolveEventReportingMode(mEventReportingMode, isParallel);
 
         final String command =
-            buildInstrumentationCommand(batch.getTestBatchConfig(), isParallel);
+            buildInstrumentationCommand(batch.getTestBatchConfig(), isParallel, testCount);
 
         final InstrumentationParser parser =
             new InstrumentationParser(getInstanceListener());
@@ -1685,32 +1705,47 @@ public class DeqpTestRunner
             }
         }
 
-        final int divisorNdx = pendingTests.size() / 2;
-        final List<TestDescription> headList =
-            pendingTests.subList(0, divisorNdx);
-        final List<TestDescription> tailList =
-            pendingTests.subList(divisorNdx, pendingTests.size());
+        if (isParallel) {
+            // In parallel mode, re-select and execute remaining pending tests in sub-batches.
+            // Any test that is unstable or errant is excluded by selectRunBatch, allowing the
+            // remaining tests in the batch to be executed in subsequent passes.
+            for (;;) {
+                TestBatch subBatch = selectRunBatch(pendingTests, batch.getTestBatchConfig());
 
-        // head
-        for (;;) {
-            TestBatch subBatch = selectRunBatch(headList, batch.getTestBatchConfig());
+                if (subBatch == null) {
+                    break;
+                }
 
-            if (subBatch == null) {
-                break;
+                executeTestRunBatch(subBatch);
+            }
+        } else {
+            final int divisorNdx = pendingTests.size() / 2;
+            final List<TestDescription> headList =
+                pendingTests.subList(0, divisorNdx);
+            final List<TestDescription> tailList =
+                pendingTests.subList(divisorNdx, pendingTests.size());
+
+            // head
+            for (;;) {
+                TestBatch subBatch = selectRunBatch(headList, batch.getTestBatchConfig());
+
+                if (subBatch == null) {
+                    break;
+                }
+
+                executeTestRunBatch(subBatch);
             }
 
-            executeTestRunBatch(subBatch);
-        }
+            // tail
+            for (;;) {
+                TestBatch subBatch = selectRunBatch(tailList, batch.getTestBatchConfig());
 
-        // tail
-        for (;;) {
-            TestBatch subBatch = selectRunBatch(tailList, batch.getTestBatchConfig());
+                if (subBatch == null) {
+                    break;
+                }
 
-            if (subBatch == null) {
-                break;
+                executeTestRunBatch(subBatch);
             }
-
-            executeTestRunBatch(subBatch);
         }
 
         if (getBatchNumPendingCases(batch) != 0) {
@@ -1734,7 +1769,7 @@ public class DeqpTestRunner
 
         checkInterrupted(); // throws if interrupted
 
-        final boolean isParallel = isParallelMode(batch.getTestBatchTestDescriptionList().size());
+        final boolean isParallel = isParallelMode();
 
         if (isParallel) {
             final List<TestDescription> testList = batch.getTestBatchTestDescriptionList();
@@ -1861,12 +1896,13 @@ public class DeqpTestRunner
                     }
                 }
             } else {
-                recordTestInstability(getInstanceListener().getCurrentTestId(), isParallel);
+                final TestDescription currentTest = getInstanceListener().getCurrentTestId();
+                recordTestInstability(currentTest, isParallel);
                 for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
                     // \note: isPendingTestInstance is false for
                     // getCurrentTestId. Current ID is considered 'running' and
                     // will be restored to 'pending' in endBatch().
-                    if (!test.equals(getInstanceListener().getCurrentTestId()) &&
+                    if (!test.equals(currentTest) &&
                         !getInstanceListener().isPendingTestInstance(
                             test, batch.getTestBatchConfig())) {
                         clearTestInstability(test);
@@ -1905,6 +1941,9 @@ public class DeqpTestRunner
     protected int getNumRemainingInstances() {
         int retVal = 0;
         for (TestDescription testId : mRemainingTests) {
+            if (mUnstableTests.contains(testId)) {
+                continue;
+            }
             // If case is in current working set, sum only not yet executed
             // instances. If case is not in current working set, sum all
             // instances (since they are not yet executed).
@@ -3008,8 +3047,8 @@ public class DeqpTestRunner
         mIsPC = mDeviceFeatures.containsKey(FEATURE_PC);
     }
 
-    private boolean isParallelMode(int testCount) {
-        return mEnableDeqpParallelRun && testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD && isHandheld();
+    private boolean isParallelMode() {
+        return mEnableDeqpParallelRun && isHandheld();
     }
 
 }
