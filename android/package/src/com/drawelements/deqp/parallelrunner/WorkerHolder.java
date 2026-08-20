@@ -98,17 +98,18 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
         Log.i(TAG, "Surface destroyed for worker " + id);
         synchronized (stateLock) {
             this.surface = null;
-            if (this.currentBatch != null) {
-                testBatchLoader.getBatchQueue().add(this.currentBatch);
-            }
         }
         reset();
     }
 
     @Override
-    public void onConnected(ISurfaceWorker worker) {
+    public void onConnected(WorkerServiceConnection connection, ISurfaceWorker worker) {
         final int serviceId;
         synchronized (stateLock) {
+            if (this.connection != connection) {
+                Log.w(TAG, "onConnected ignored: connection instance mismatch for worker " + id);
+                return;
+            }
             serviceId = activeServiceId;
         }
         Log.i(TAG, "Worker " + id + " connected (service ID " + serviceId + ").");
@@ -116,13 +117,17 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
     }
 
     @Override
-    public void onDisconnected() {
+    public void onDisconnected(WorkerServiceConnection connection) {
         final int serviceId;
         synchronized (stateLock) {
+            if (this.connection != connection) {
+                // Stale disconnect from an old connection that was already reset/unbound. Ignore!
+                return;
+            }
             serviceId = activeServiceId;
         }
         Log.i(TAG, "Worker " + id + " disconnected (service ID " + serviceId + ").");
-        handleWorkerDisconnected();
+        resetAndScheduleNext(null);
     }
 
     private void safeBind() {
@@ -193,24 +198,25 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
             if (surface == null || !surface.isValid()) {
                 Log.w(TAG, "Worker " + id + " tryDispatch failed: surface is " +
                       (surface == null ? "null" : "invalid"));
-                return;
-            }
-            if (connection == null) {
+                shouldUnbind = true;
+            } else if (connection == null) {
                 Log.e(TAG, "Worker " + id + " tryDispatch failed: connection is null");
-                return;
-            }
-            activeWorker = connection.getWorker();
-            if (activeWorker == null) {
-                Log.e(TAG, "Worker " + id + " tryDispatch failed: ISurfaceWorker is null");
-                return;
-            }
-            batchFile = testBatchLoader.getBatchQueue().poll();
-            if (batchFile == null) {
                 shouldUnbind = true;
             } else {
-                isBusy = true;
-                currentBatch = batchFile;
-                activeSurface = surface;
+                activeWorker = connection.getWorker();
+                if (activeWorker == null) {
+                    Log.e(TAG, "Worker " + id + " tryDispatch failed: ISurfaceWorker is null");
+                    shouldUnbind = true;
+                } else {
+                    batchFile = testBatchLoader.getBatchQueue().poll();
+                    if (batchFile == null) {
+                        shouldUnbind = true;
+                    } else {
+                        isBusy = true;
+                        currentBatch = batchFile;
+                        activeSurface = surface;
+                    }
+                }
             }
         }
 
@@ -245,7 +251,7 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
             if (!success) {
                 handleExecutionFailure(finalBatch);
             } else {
-                resetAndScheduleNext(false, null);
+                resetAndScheduleNext(null);
             }
         });
     }
@@ -265,19 +271,10 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
                 return;
             }
         }
-        resetAndScheduleNext(true, "Worker " + id + " execution failed. Scheduling next batch.");
+        resetAndScheduleNext("Worker " + id + " execution failed. Scheduling next batch.");
     }
 
-    private void handleWorkerDisconnected() {
-        resetAndScheduleNext(true, null);
-    }
-
-    private void resetAndScheduleNext(boolean putBatchBack, String failureMessage) {
-        synchronized (stateLock) {
-            if (putBatchBack && currentBatch != null) {
-                testBatchLoader.getBatchQueue().add(currentBatch);
-            }
-        }
+    private void resetAndScheduleNext(String failureMessage) {
         reset();
         boolean shouldBind = false;
         synchronized (stateLock) {

@@ -188,7 +188,7 @@ public class ParallelTestsSchedulerTest {
 
         // 2. Connect worker -> Dispatches batch_1
         capturedConnection[0].workerVal = mockWorker;
-        capturedConnection[0].callback.onConnected(mockWorker);
+        capturedConnection[0].callback.onConnected(capturedConnection[0], mockWorker);
 
         // Wait for completion
         assertTrue(completionLatch.await(2, TimeUnit.SECONDS));
@@ -224,7 +224,7 @@ public class ParallelTestsSchedulerTest {
         scheduler.getWorkerCallback(0).surfaceCreated(mockHolder);
         capturedConnection[0].workerVal = mockWorker;
         capturedConnection[0].isBoundVal = true;
-        capturedConnection[0].callback.onConnected(mockWorker);
+        capturedConnection[0].callback.onConnected(capturedConnection[0], mockWorker);
 
         // Wait for the completion callback to fire automatically
         assertTrue(completionLatch.await(2, TimeUnit.SECONDS));
