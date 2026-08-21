@@ -34,10 +34,12 @@
 namespace tcu
 {
 
+class TestSessionListener;
+
 class TestSessionExecutor
 {
 public:
-    TestSessionExecutor(TestPackageRoot &root, TestContext &testCtx);
+    TestSessionExecutor(TestPackageRoot &root, TestContext &testCtx, TestSessionListener *listener = nullptr);
     ~TestSessionExecutor(void);
 
     bool iterate(void);
@@ -84,6 +86,7 @@ private:
     uint64_t m_testStartTime;
     uint64_t m_packageStartTime;
     std::map<std::string, uint64_t> m_groupsDurationTime;
+    TestSessionListener *m_listener;
 };
 
 } // namespace tcu

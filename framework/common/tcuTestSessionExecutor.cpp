@@ -23,10 +23,13 @@
 
 #include "tcuTestSessionExecutor.hpp"
 #include "qpTestLog.h"
+#include "qpInfo.h"
 #include "tcuCommandLine.hpp"
 #include "tcuTestLog.hpp"
+#include "tcuTestSessionListener.hpp"
 
 #include "deClock.h"
+#include <cstdio>
 
 namespace tcu
 {
@@ -51,7 +54,7 @@ static qpTestCaseType nodeTypeToTestCaseType(TestNodeType nodeType)
     }
 }
 
-TestSessionExecutor::TestSessionExecutor(TestPackageRoot &root, TestContext &testCtx)
+TestSessionExecutor::TestSessionExecutor(TestPackageRoot &root, TestContext &testCtx, TestSessionListener *listener)
     : m_testCtx(testCtx)
     , m_inflater(testCtx)
     , m_caseListFilter(testCtx.getCommandLine().createCaseListFilter(testCtx.getArchive()))
@@ -61,11 +64,28 @@ TestSessionExecutor::TestSessionExecutor(TestPackageRoot &root, TestContext &tes
     , m_isInTestCase(false)
     , m_testStartTime(0)
     , m_packageStartTime(0)
+    , m_listener(listener)
 {
+    if (m_listener)
+    {
+        m_listener->beginSession();
+        m_listener->sessionInfo("releaseName", qpGetReleaseName());
+
+        char releaseIdHex[32];
+        snprintf(releaseIdHex, sizeof(releaseIdHex), "0x%08x", qpGetReleaseId());
+        m_listener->sessionInfo("releaseId", releaseIdHex);
+
+        m_listener->sessionInfo("targetName", qpGetTargetName());
+        m_listener->sessionInfo("commandLineParameters", m_testCtx.getCommandLine().getInitialCmdLine().c_str());
+    }
 }
 
 TestSessionExecutor::~TestSessionExecutor(void)
 {
+    if (m_listener)
+    {
+        m_listener->endSession();
+    }
 }
 
 bool TestSessionExecutor::iterate(void)
@@ -228,6 +248,11 @@ bool TestSessionExecutor::enterTestCase(TestCase *testCase, const std::string &c
 
     m_testCtx.setTestResult(QP_TEST_RESULT_LAST, "");
     m_testCtx.setTerminateAfter(false);
+
+    if (m_listener)
+    {
+        m_listener->beginTestCase(casePath.c_str());
+    }
     log.startCase(casePath.c_str(), caseType, caseSource);
 
     m_isInTestCase  = true;
@@ -301,6 +326,12 @@ void TestSessionExecutor::leaveTestCase(TestCase *testCase)
         DE_ASSERT(testResult != QP_TEST_RESULT_LAST);
 
         m_isInTestCase = false;
+
+        if (m_listener)
+        {
+            m_listener->testCaseResult(qpGetTestResultName(testResult), testResultDesc);
+            m_listener->endTestCase();
+        }
         m_testCtx.getLog().endCase(testResult, testResultDesc);
 
         // Update statistics.
