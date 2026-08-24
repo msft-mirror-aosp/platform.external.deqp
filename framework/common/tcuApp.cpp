@@ -28,6 +28,7 @@
 #include "tcuTestHierarchyUtil.hpp"
 #include "tcuCommandLine.hpp"
 #include "tcuTestLog.hpp"
+#include "tcuTestSessionListener.hpp"
 
 #include "qpInfo.h"
 #include "qpDebugOut.h"
@@ -125,7 +126,7 @@ static void verifyAmberCapabilityCoherency(TestPackageRoot &root, TestContext &t
  *
  * \param platform Reference to platform implementation.
  *//*--------------------------------------------------------------------*/
-App::App(Platform &platform, Archive &archive, TestLog &log, const CommandLine &cmdLine)
+App::App(Platform &platform, Archive &archive, TestLog &log, const CommandLine &cmdLine, TestSessionListener *listener)
     : m_platform(platform)
     , m_watchDog(nullptr)
     , m_crashHandler(nullptr)
@@ -133,6 +134,7 @@ App::App(Platform &platform, Archive &archive, TestLog &log, const CommandLine &
     , m_testCtx(nullptr)
     , m_testRoot(nullptr)
     , m_testExecutor(nullptr)
+    , m_listener(listener)
 {
     if (!cmdLine.isSubProcess())
     {
@@ -164,7 +166,7 @@ App::App(Platform &platform, Archive &archive, TestLog &log, const CommandLine &
 
         // \note No executor is created if runmode is not EXECUTE
         if (runMode == RUNMODE_EXECUTE)
-            m_testExecutor = new TestSessionExecutor(*m_testRoot, *m_testCtx);
+            m_testExecutor = new TestSessionExecutor(*m_testRoot, *m_testCtx, m_listener);
         else if (runMode == RUNMODE_DUMP_STDOUT_CASELIST)
             writeCaselistsToStdout(*m_testRoot, *m_testCtx);
         else if (runMode == RUNMODE_DUMP_XML_CASELIST)
@@ -304,6 +306,8 @@ void App::onWatchdogTimeout(qpTimeoutReason reason)
 
     m_crashed = true;
 
+    if (m_listener)
+        m_listener->terminateTestCase(qpGetTestResultName(QP_TEST_RESULT_TIMEOUT));
     m_testCtx->getLog().terminateCase(QP_TEST_RESULT_TIMEOUT);
     die("Watchdog timer timeout for %s",
         (reason == QP_TIMEOUT_REASON_INTERVAL_LIMIT ? "touch interval" : "total time"));
@@ -337,6 +341,8 @@ void App::onCrash(void)
     if (isInCase)
     {
         qpCrashHandler_writeCrashInfo(m_crashHandler, writeCrashToLog, &m_testCtx->getLog());
+        if (m_listener)
+            m_listener->terminateTestCase(qpGetTestResultName(QP_TEST_RESULT_CRASH));
         m_testCtx->getLog().terminateCase(QP_TEST_RESULT_CRASH);
     }
     else
