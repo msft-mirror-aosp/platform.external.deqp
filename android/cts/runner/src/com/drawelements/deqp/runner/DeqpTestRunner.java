@@ -303,6 +303,7 @@ public class DeqpTestRunner
         new HashMap<>();
     private final Set<TestDescription> mUnstableTests = new LinkedHashSet<>();
     private final Set<TestDescription> mErrantTests = new LinkedHashSet<>();
+    private boolean mIsParallelRetry = false;
 
     protected IAbi mAbi;
     protected CompatibilityBuildHelper mBuildHelper;
@@ -468,6 +469,14 @@ public class DeqpTestRunner
                 mPendingResults.remove(testId);
                 mRemainingTests.remove(testId);
 
+                // If test failed in parallel mode (and not currently on retry or unstable), defer reporting to sink
+                final boolean isStrictlyErrantOnly = !result.allInstancesPassed && !mUnstableTests.contains(testId);
+                final boolean isParallelFirstAttempt = isParallelMode() && !mIsParallelRetry;
+                if (isStrictlyErrantOnly && isParallelFirstAttempt) {
+                    mErrantTests.add(testId);
+                    return;
+                }
+
                 // Forward results to the sink
                 mSink.testStarted(testId);
 
@@ -490,9 +499,6 @@ public class DeqpTestRunner
 
                 // Error message
                 if (!result.allInstancesPassed) {
-                    if (isParallelMode()) {
-                        mErrantTests.add(testId);
-                    }
                     final StringBuilder errorLog = new StringBuilder();
 
                     for (Map.Entry<BatchRunConfiguration, String> entry :
@@ -1496,6 +1502,31 @@ public class DeqpTestRunner
 
             runTestRunBatch(batch);
         }
+
+        if (!mErrantTests.isEmpty()) {
+            retryErrantTests();
+        }
+    }
+
+    /**
+     * Retries any errant (failed) tests recorded during execution.
+     */
+    private void retryErrantTests()
+        throws DeviceNotAvailableException, CapabilityQueryFailureException {
+        final Set<TestDescription> errantTests = new LinkedHashSet<>(mErrantTests);
+        mErrantTests.clear();
+        CLog.d("Number of errant tests to be retried is : %d", errantTests.size());
+
+        for (TestDescription test : errantTests) {
+            mRemainingTests.add(test);
+        }
+
+        mIsParallelRetry = true;
+        try {
+            runTests();
+        } finally {
+            mIsParallelRetry = false;
+        }
     }
 
     /**
@@ -1662,7 +1693,9 @@ public class DeqpTestRunner
                .append(" -e deqpEventReportingMode \"").append(mEventReportingMode).append("\"");
 
         if (isParallel) {
-            final int maxWorkers = (testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD) ? mDeqpMaxWorkers : 1;
+            final int maxWorkers = (!mIsParallelRetry && testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD)
+                    ? mDeqpMaxWorkers
+                    : 1;
             CLog.d("Executing batch with test count: %d, max workers: %d, in Parallel mode", testCount, maxWorkers);
             // Pass parallel execution configuration options to DeqpInstrumentation on the device.
             command.append(" -e deqpEnableParallel \"true\"")
