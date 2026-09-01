@@ -2306,6 +2306,100 @@ public class DeqpTestRunnerTest extends TestCase {
         runAndVerifyTest(deqpTest);
     }
 
+    /**
+     * Test that when a single-test batch fails in parallel mode, it is retried and if it passes on retry,
+     * only the retry pass result is recorded to the listener.
+     */
+    public void testRun_parallelMode_singleTestBatchFailed_retriedAndPasses() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run: test fails
+        String failOutput = buildTestProcessOutput(tests, "Fail", "Fail");
+        runInstrumentationLineAndAnswerParallel(tests, failOutput, 1, 1);
+
+        // 2nd run (retry): test passes
+        String passOutput = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetupAndTeardown();
+
+        // 2nd run (retry): pass recorded (initial failure in parallel mode is deferred for retry)
+        expectTestWithResult(tests, true);
+
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when a single-test batch fails in parallel mode and fails again on retry,
+     * the failure is recorded only once (from the retried serial run).
+     */
+    public void testRun_parallelMode_singleTestBatchFailed_retriedAndFailsAgain() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run: test fails
+        String failOutput1 = buildTestProcessOutput(tests, "Fail", "Fail");
+        runInstrumentationLineAndAnswerParallel(tests, failOutput1, 1, 1);
+
+        // 2nd run (retry): test fails again
+        String failOutput2 = buildTestProcessOutput(tests, "Fail", "Fail");
+        runInstrumentationLineAndAnswerParallel(tests, failOutput2, 1, 1);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetupAndTeardown();
+
+        // 2nd run (retry): failure recorded
+        expectTestWithResult(tests, false);
+
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when tests fail in a parallel run above the parallel threshold (5000 tests),
+     * the failed tests are retried with maxWorkers forced to 1 (sequential) rather than 4,
+     * and only the retried result is recorded.
+     */
+    public void testRun_parallelMode_aboveThresholdFailed_retriedWithSingleWorker() throws Exception {
+        final int numTests = 5000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run: 5000 tests pushed in 5 batches, executed with maxWorkers=4, all fail.
+        String failOutput = buildTestProcessOutput(tests, "Fail", "Fail");
+        runInstrumentationLineAndAnswerParallel(tests, failOutput, 5, 4);
+
+        // 2nd run (retry): all 5000 tests retried with maxWorkers forced to 1, and pass.
+        String passOutput = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, passOutput, 5, 1);
+
+        expectTestRunStarted(deqpTest, numTests);
+        expectAngleSetupAndTeardown();
+
+        // Retry run: all pass (initial failures in parallel run are deferred for retry)
+        expectTestWithResult(tests, true);
+
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
 
     /**
      * Test that an invalid test event reporting mode throws an IllegalArgumentException.

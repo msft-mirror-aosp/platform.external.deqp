@@ -42,6 +42,7 @@ class CommandLine;
 class TestLog;
 class TestPackageRoot;
 class TestRunStatus;
+class TestSessionListener;
 
 enum
 {
@@ -68,7 +69,8 @@ enum
 class App
 {
 public:
-    App(Platform &platform, Archive &archive, TestLog &log, const CommandLine &cmdLine);
+    App(Platform &platform, Archive &archive, TestLog &log, const CommandLine &cmdLine,
+        TestSessionListener *listener = nullptr);
     virtual ~App(void);
 
     bool iterate(void);
@@ -92,6 +94,7 @@ protected:
     TestContext *m_testCtx;
     TestPackageRoot *m_testRoot;
     TestSessionExecutor *m_testExecutor;
+    TestSessionListener *m_listener;
 };
 
 } // namespace tcu
