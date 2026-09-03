@@ -233,7 +233,6 @@ public class DeqpTestRunner
     private Map<String, Boolean> mConfigQuerySupportCache = new HashMap<>();
     private IRunUtil mRunUtil = RunUtil.getDefault();
     private Set<String> mIncrementalDeqpIncludeTests = new HashSet<>();
-    private long mTimeOfLastRun = 0;
 
     private IRecovery mDeviceRecovery = new Recovery();
     { mDeviceRecovery.setSleepProvider(new SleepProvider()); }
@@ -1584,19 +1583,12 @@ public class DeqpTestRunner
             new InstrumentationParser(mInstanceListerner);
         Throwable interruptingError = null;
 
-        // Fix the requirement of sleep() between batches
-        long duration = System.currentTimeMillis() - mTimeOfLastRun;
-        if (duration < 5000) {
-            CLog.i("Sleeping for %dms", 5000 - duration);
-            mRunUtil.sleep(5000 - duration);
-        }
 
         try {
             executeShellCommandAndReadOutput(command, parser);
         } catch (Throwable ex) {
             interruptingError = ex;
         } finally {
-            mTimeOfLastRun = System.currentTimeMillis();
             parser.flush();
         }
 
