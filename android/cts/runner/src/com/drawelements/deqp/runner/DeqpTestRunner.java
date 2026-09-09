@@ -135,6 +135,8 @@ public class DeqpTestRunner
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
         10 * 60 * 1000; // 10min
     private static final int DEQP_PARALLEL_EXECUTION_THRESHOLD = 5000;
+    private static final int PUSH_STRING_MAX_ATTEMPTS = 3;
+    private static final int PUSH_STRING_RETRY_DELAY_MS = 2000;
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
     private static final int DEQP_LEVEL_B_2025 = 132711169;
@@ -1808,6 +1810,35 @@ public class DeqpTestRunner
     }
 
     /**
+     * Pushes a string to a remote file path with retry and backoff delay.
+     *
+     * @param content the string content to push
+     * @param remoteFilePath the remote destination file path on device
+     * @return true if pushed successfully, false if all attempts failed
+     * @throws DeviceNotAvailableException if device is not available
+     */
+    private boolean pushStringWithRetry(String content, String remoteFilePath)
+            throws DeviceNotAvailableException {
+        for (int attempt = 1; attempt <= PUSH_STRING_MAX_ATTEMPTS; attempt++) {
+            CLog.d("Pushing test cases to " + remoteFilePath + " (attempt " + attempt + " of "
+                    + PUSH_STRING_MAX_ATTEMPTS + ")");
+            if (mDevice.pushString(content, remoteFilePath)) {
+                CLog.d("Successfully pushed test cases to " + remoteFilePath);
+                return true;
+            } else {
+                CLog.w("Failed to push test cases to " + remoteFilePath + " on attempt " + attempt);
+                if (attempt < PUSH_STRING_MAX_ATTEMPTS) {
+                    long currentDelay = attempt * PUSH_STRING_RETRY_DELAY_MS;
+                    CLog.d("Waiting %d ms before retrying push to %s", currentDelay,
+                            remoteFilePath);
+                    mRunUtil.sleep(currentDelay);
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
      * Runs one execution pass over the given batch.
      *
      * Tries to run the batch. Always makes progress (executes instances or
@@ -1840,8 +1871,11 @@ public class DeqpTestRunner
                 List<TestDescription> subList = testList.subList(i, Math.min(i + batchSize, testList.size()));
                 String testCases = generateTestCaseTrie(subList);
                 String remoteFileName = remoteCaselistsDir + "dEQP-part" + (i / batchSize + 1) + ".txt";
-                if (!mDevice.pushString(testCases + "\n", remoteFileName)) {
-                    throw new RuntimeException("Failed to write test cases to " + remoteFileName);
+                if (!pushStringWithRetry(testCases + "\n", remoteFileName)) {
+                    CLog.e("Failed to write test cases to " + remoteFileName + " after "
+                            + PUSH_STRING_MAX_ATTEMPTS
+                            + " attempts. Aborting further caselist pushes for this chunk.");
+                    break;
                 }
             }
         } else {
@@ -1849,7 +1883,7 @@ public class DeqpTestRunner
             final String testCaseFilename = APP_DIR + CASE_LIST_FILE_NAME;
             mDevice.executeShellCommand("rm " + testCaseFilename);
             mDevice.executeShellCommand("rm " + APP_DIR + LOG_FILE_NAME);
-            if (!mDevice.pushString(testCases + "\n", testCaseFilename)) {
+            if (!pushStringWithRetry(testCases + "\n", testCaseFilename)) {
                 throw new RuntimeException("Failed to write test cases to " +
                                            testCaseFilename);
             }
