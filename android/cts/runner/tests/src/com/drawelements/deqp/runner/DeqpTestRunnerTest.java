@@ -2226,9 +2226,10 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     /**
-     * Test that when a single-test batch cannot be executed in parallel mode, the test fails.
+     * Test that when a single-test batch cannot be executed in parallel mode and fails again on retry,
+     * the unexecuted test fails.
      */
-    public void testRun_parallelMode_singleTestBatchUnexecuted() throws Exception {
+    public void testRun_parallelMode_singleTestBatchUnexecuted_retriedAndFailsAgain() throws Exception {
         final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
         List<TestDescription> tests = Collections.singletonList(testId);
 
@@ -2236,9 +2237,13 @@ public class DeqpTestRunnerTest extends TestCase {
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
-        // Empty output contains no BeginTestCase event, leaving getCurrentTestId() null to mark it as unexecuted.
-        String output = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswerParallel(tests, output, 1, 1);
+        // 1st run: Empty output contains no BeginTestCase event, leaving getCurrentTestId() null to mark it as unexecuted.
+        String output1 = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output1, 1, 1);
+
+        // 2nd run (retry): Empty output again.
+        String output2 = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2249,13 +2254,44 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     /**
-     * Test that when a single-test batch crashes in parallel mode, the test fails.
-     * <p>
-     * An incomplete output produces a BeginTestCase event without a corresponding EndTestCase before
-     * the session ends. Because the test started, getCurrentTestId() is non-null, which marks the test
-     * as aborted on the listener.
+     * Tests that unexecuted multi-test batches in parallel mode are bisected on retry,
+     * reducing the batch size down to 1. This ensures that persistently failing tests
+     * are cleanly aborted, preventing an infinite retry loop.
      */
-    public void testRun_parallelMode_singleTestBatchCrashed() throws Exception {
+    public void testRun_parallelMode_multipleTestsUnexecuted_retriedBisectedAndFailsAgain() throws Exception {
+        final TestDescription test1 = new TestDescription("dEQP-GLES3.info", "version");
+        final TestDescription test2 = new TestDescription("dEQP-GLES3.info", "vendor");
+        List<TestDescription> tests = Arrays.asList(test1, test2);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run: Empty output contains no BeginTestCase event; both tests remain unexecuted.
+        String output1 = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output1, 1, 1);
+
+        // 2nd run (retry): Empty output again. The batch of 2 tests fails to execute.
+        String output2 = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
+
+        // Bisected sub-batches: each test is retried individually (batch of size 1), fails, and is aborted.
+        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test1), output2, 1, 1);
+        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), output2, 1, 1);
+
+        expectTestRunStarted(deqpTest, 2);
+        expectAngleSetupAndTeardown();
+        expectTestWithResult(tests, false);
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when a single-test batch is unexecuted in parallel mode on 1st attempt,
+     * it is retried and only the successful retry result is reported to the listener.
+     */
+    public void testRun_parallelMode_singleTestBatchUnexecuted_retriedAndPasses() throws Exception {
         final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
         List<TestDescription> tests = Collections.singletonList(testId);
 
@@ -2263,12 +2299,73 @@ public class DeqpTestRunnerTest extends TestCase {
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
-        String output = buildIncompleteTestProcessOutput(testId);
+        // 1st run: unexecuted
+        String output = buildTestProcessOutput(Collections.emptyList());
         runInstrumentationLineAndAnswerParallel(tests, output, 1, 1);
+
+        // 2nd run (retry): passes
+        String passOutput = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetupAndTeardown();
+        expectTestWithResult(tests, true);
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when a single-test batch crashes in parallel mode and crashes again on retry,
+     * the test failure is recorded once.
+     */
+    public void testRun_parallelMode_singleTestBatchCrashed_retriedAndFailsAgain() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run: crashes
+        String output1 = buildIncompleteTestProcessOutput(testId);
+        runInstrumentationLineAndAnswerParallel(tests, output1, 1, 1);
+
+        // 2nd run (retry): crashes again
+        String output2 = buildIncompleteTestProcessOutput(testId);
+        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
         expectTestWithResult(tests, false);
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when a single-test batch crashes in parallel mode, it is retried and if it passes on retry,
+     * only the retry pass result is recorded to the listener.
+     */
+    public void testRun_parallelMode_singleTestBatchCrashed_retriedAndPasses() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run: test crashes
+        String crashOutput = buildIncompleteTestProcessOutput(testId);
+        runInstrumentationLineAndAnswerParallel(tests, crashOutput, 1, 1);
+
+        // 2nd run (retry): test passes
+        String passOutput = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetupAndTeardown();
+        expectTestWithResult(tests, true);
         expectTestRunEnded();
 
         runAndVerifyTest(deqpTest);
@@ -2276,9 +2373,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
     /**
      * Test that when a multi-test batch crashes in parallel mode, the remaining test(s) in the batch
-     * are recovered and executed in a subsequent sub-batch.
+     * are recovered and executed in a subsequent sub-batch, and the crashed test is retried and passes.
      */
-    public void testRun_parallelMode_multiTestBatchCrashed_retriesRemainingTests() throws Exception {
+    public void testRun_parallelMode_multiTestBatchCrashed_retriedAndPasses() throws Exception {
         final TestDescription test1 = new TestDescription("dEQP-GLES3.info", "test1");
         final TestDescription test2 = new TestDescription("dEQP-GLES3.info", "test2");
         List<TestDescription> tests = Arrays.asList(test1, test2);
@@ -2292,14 +2389,19 @@ public class DeqpTestRunnerTest extends TestCase {
         runInstrumentationLineAndAnswerParallel(tests, crashOutput, 1, 1);
 
         // 2nd sub-batch run: test1 is excluded (unstable), test2 is selected and passes
-        String passOutput = buildTestProcessOutput(Collections.singletonList(test2));
-        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), passOutput, 1, 1);
+        String passOutput2 = buildTestProcessOutput(Collections.singletonList(test2));
+        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), passOutput2, 1, 1);
+
+        // 3rd run (retry): test1 is retried with maxWorkers=1 and passes
+        String passOutput1 = buildTestProcessOutput(Collections.singletonList(test1));
+        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test1), passOutput1, 1, 1);
 
         expectTestRunStarted(deqpTest, 2);
         expectAngleSetupAndTeardown();
 
-        // test2 is started and passes in 2nd sub-batch
+        // test2 passes in 2nd sub-batch, test1 passes on retry
         expectTestWithResult(Collections.singletonList(test2), true);
+        expectTestWithResult(Collections.singletonList(test1), true);
 
         expectTestRunEnded();
 
@@ -2393,6 +2495,38 @@ public class DeqpTestRunnerTest extends TestCase {
         expectAngleSetupAndTeardown();
 
         // Retry run: all pass (initial failures in parallel run are deferred for retry)
+        expectTestWithResult(tests, true);
+
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that when tests crash in a parallel run above the parallel threshold (5000 tests),
+     * the crashed tests are retried with maxWorkers forced to 1 (sequential) rather than 4,
+     * and only the retried result is recorded.
+     */
+    public void testRun_parallelMode_aboveThresholdCrashed_retriedWithSingleWorker() throws Exception {
+        final int numTests = 5000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run: 5000 tests pushed in 5 batches, executed with maxWorkers=4, unexecuted / crashed
+        String unexecutedOutput = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, unexecutedOutput, 5, 4);
+
+        // 2nd run (retry): all 5000 tests retried with maxWorkers forced to 1, and pass.
+        String passOutput = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, passOutput, 5, 1);
+
+        expectTestRunStarted(deqpTest, numTests);
+        expectAngleSetupAndTeardown();
+
+        // Retry run: all pass (initial crashes in parallel run are deferred for retry)
         expectTestWithResult(tests, true);
 
         expectTestRunEnded();

@@ -471,8 +471,7 @@ public class DeqpTestRunner
 
                 // If test failed in parallel mode (and not currently on retry or unstable), defer reporting to sink
                 final boolean isStrictlyErrantOnly = !result.allInstancesPassed && !mUnstableTests.contains(testId);
-                final boolean isParallelFirstAttempt = isParallelMode() && !mIsParallelRetry;
-                if (isStrictlyErrantOnly && isParallelFirstAttempt) {
+                if (isStrictlyErrantOnly && isParallelFirstAttempt()) {
                     mErrantTests.add(testId);
                     return;
                 }
@@ -1472,11 +1471,14 @@ public class DeqpTestRunner
         }
     }
 
-    protected void recordTestInstability(TestDescription testId, boolean isParallelMode) {
-        // We are not aborting the tests now in the parallel mode
-        // TODO : We have to take into account instability of the test and hence we can
-        // reduce the parallel batch size based on instability score instead of aborting the test.
-        if (isParallelMode) {
+    /**
+     * Records test instability.
+     *
+     * During the initial parallel run, unstable (crashed or interrupted) tests are collected
+     * in {@code mUnstableTests} to be retried in a subsequent pass instead of being aborted immediately.
+     */
+    protected void recordTestInstability(TestDescription testId) {
+        if (isParallelFirstAttempt()) {
             mUnstableTests.add(testId);
         } else {
             mTestInstabilityRatings.put(testId,
@@ -1503,23 +1505,25 @@ public class DeqpTestRunner
             runTestRunBatch(batch);
         }
 
+        if (!mUnstableTests.isEmpty()) {
+            retryUnstableTests();
+        }
+
         if (!mErrantTests.isEmpty()) {
             retryErrantTests();
         }
     }
 
     /**
-     * Retries any errant (failed) tests recorded during execution.
+     * Helper to retry a given set of tests recorded during execution.
      */
-    private void retryErrantTests()
+    private void retryTests(Set<TestDescription> testsToRetry, String testType)
         throws DeviceNotAvailableException, CapabilityQueryFailureException {
-        final Set<TestDescription> errantTests = new LinkedHashSet<>(mErrantTests);
-        mErrantTests.clear();
-        CLog.d("Number of errant tests to be retried is : %d", errantTests.size());
+        final Set<TestDescription> tests = new LinkedHashSet<>(testsToRetry);
+        testsToRetry.clear();
+        CLog.d("Number of %s tests to be retried is : %d", testType, tests.size());
 
-        for (TestDescription test : errantTests) {
-            mRemainingTests.add(test);
-        }
+        mRemainingTests.addAll(tests);
 
         mIsParallelRetry = true;
         try {
@@ -1527,6 +1531,22 @@ public class DeqpTestRunner
         } finally {
             mIsParallelRetry = false;
         }
+    }
+
+    /**
+     * Retries any unstable (crashed) tests recorded during parallel execution.
+     */
+    private void retryUnstableTests()
+        throws DeviceNotAvailableException, CapabilityQueryFailureException {
+        retryTests(mUnstableTests, "unstable");
+    }
+
+    /**
+     * Retries any errant (failed) tests recorded during execution.
+     */
+    private void retryErrantTests()
+        throws DeviceNotAvailableException, CapabilityQueryFailureException {
+        retryTests(mErrantTests, "errant");
     }
 
     /**
@@ -1738,8 +1758,8 @@ public class DeqpTestRunner
             }
         }
 
-        if (isParallel) {
-            // In parallel mode, re-select and execute remaining pending tests in sub-batches.
+        if (isParallelFirstAttempt()) {
+            // In the first parallel attempt, re-select and execute remaining pending tests in sub-batches.
             // Any test that is unstable or errant is excluded by selectRunBatch, allowing the
             // remaining tests in the batch to be executed in subsequent passes.
             for (;;) {
@@ -1895,19 +1915,21 @@ public class DeqpTestRunner
             // two observations until bailing.
             if (!wasTestExecuted &&
                 (!wasLinkFailure || getTestInstabilityRating(onlyTest) > 0)) {
-                recordTestInstability(onlyTest, isParallel);
+                recordTestInstability(onlyTest);
                 // If we cannot finish the test, mark the case as a crash.
                 //
                 // If we couldn't even start the test, fail the test instance as
                 // non-executable. This is required so that a consistently
                 // crashing or non-existent tests will not cause futile
                 // (non-terminating) re-execution attempts.
-                if (getInstanceListener().getCurrentTestId() != null) {
-                    getInstanceListener().abortTest(onlyTest,
-                                                 INCOMPLETE_LOG_MESSAGE);
-                } else {
-                    getInstanceListener().abortTest(onlyTest,
-                                                 NOT_EXECUTABLE_LOG_MESSAGE);
+                if (!isParallelFirstAttempt()) {
+                    if (getInstanceListener().getCurrentTestId() != null) {
+                        getInstanceListener().abortTest(onlyTest,
+                                                     INCOMPLETE_LOG_MESSAGE);
+                    } else {
+                        getInstanceListener().abortTest(onlyTest,
+                                                     NOT_EXECUTABLE_LOG_MESSAGE);
+                    }
                 }
             } else if (wasTestExecuted) {
                 clearTestInstability(onlyTest);
@@ -1923,14 +1945,14 @@ public class DeqpTestRunner
                 for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
                     if (getInstanceListener().isPendingTestInstance(
                             test, batch.getTestBatchConfig())) {
-                        recordTestInstability(test, isParallel);
+                        recordTestInstability(test);
                     } else {
                         clearTestInstability(test);
                     }
                 }
             } else {
                 final TestDescription currentTest = getInstanceListener().getCurrentTestId();
-                recordTestInstability(currentTest, isParallel);
+                recordTestInstability(currentTest);
                 for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
                     // \note: isPendingTestInstance is false for
                     // getCurrentTestId. Current ID is considered 'running' and
@@ -3082,6 +3104,10 @@ public class DeqpTestRunner
 
     private boolean isParallelMode() {
         return mEnableDeqpParallelRun && isHandheld();
+    }
+
+    private boolean isParallelFirstAttempt() {
+        return isParallelMode() && !mIsParallelRetry;
     }
 
 }
