@@ -2243,7 +2243,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): Empty output again.
         String output2 = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2273,11 +2273,11 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): Empty output again. The batch of 2 tests fails to execute.
         String output2 = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
 
         // Bisected sub-batches: each test is retried individually (batch of size 1), fails, and is aborted.
-        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test1), output2, 1, 1);
-        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
+        runInstrumentationLineAndAnswer(output2);
 
         expectTestRunStarted(deqpTest, 2);
         expectAngleSetupAndTeardown();
@@ -2305,7 +2305,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2333,7 +2333,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): crashes again
         String output2 = buildIncompleteTestProcessOutput(testId);
-        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2361,7 +2361,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2392,9 +2392,9 @@ public class DeqpTestRunnerTest extends TestCase {
         String passOutput2 = buildTestProcessOutput(Collections.singletonList(test2));
         runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), passOutput2, 1, 1);
 
-        // 3rd run (retry): test1 is retried with maxWorkers=1 and passes
+        // 3rd run (retry): test1 is retried in legacy mode and passes
         String passOutput1 = buildTestProcessOutput(Collections.singletonList(test1));
-        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test1), passOutput1, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput1);
 
         expectTestRunStarted(deqpTest, 2);
         expectAngleSetupAndTeardown();
@@ -2426,7 +2426,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2457,7 +2457,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test fails again
         String failOutput2 = buildTestProcessOutput(tests, "Fail", "Fail");
-        runInstrumentationLineAndAnswerParallel(tests, failOutput2, 1, 1);
+        runInstrumentationLineAndAnswer(failOutput2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2472,10 +2472,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
     /**
      * Test that when tests fail in a parallel run above the parallel threshold (5000 tests),
-     * the failed tests are retried with maxWorkers forced to 1 (sequential) rather than 4,
-     * and only the retried result is recorded.
+     * the failed tests are retried in legacy mode, and only the retried result is recorded.
      */
-    public void testRun_parallelMode_aboveThresholdFailed_retriedWithSingleWorker() throws Exception {
+    public void testRun_parallelMode_aboveThresholdFailed_retriedInLegacyMode() throws Exception {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
@@ -2487,9 +2486,13 @@ public class DeqpTestRunnerTest extends TestCase {
         String failOutput = buildTestProcessOutput(tests, "Fail", "Fail");
         runInstrumentationLineAndAnswerParallel(tests, failOutput, 5, 4);
 
-        // 2nd run (retry): all 5000 tests retried with maxWorkers forced to 1, and pass.
-        String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 5, 1);
+        // 2nd run (retry): all 5000 tests retried in legacy mode in 5 batches of 1000 tests each, and pass.
+        final int batchSize = 1000;
+        for (int i = 0; i < numTests; i += batchSize) {
+            List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(subOutput);
+        }
 
         expectTestRunStarted(deqpTest, numTests);
         expectAngleSetupAndTeardown();
@@ -2504,10 +2507,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
     /**
      * Test that when tests crash in a parallel run above the parallel threshold (5000 tests),
-     * the crashed tests are retried with maxWorkers forced to 1 (sequential) rather than 4,
-     * and only the retried result is recorded.
+     * the crashed tests are retried in legacy mode, and only the retried result is recorded.
      */
-    public void testRun_parallelMode_aboveThresholdCrashed_retriedWithSingleWorker() throws Exception {
+    public void testRun_parallelMode_aboveThresholdCrashed_retriedInLegacyMode() throws Exception {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
@@ -2519,9 +2521,13 @@ public class DeqpTestRunnerTest extends TestCase {
         String unexecutedOutput = buildTestProcessOutput(Collections.emptyList());
         runInstrumentationLineAndAnswerParallel(tests, unexecutedOutput, 5, 4);
 
-        // 2nd run (retry): all 5000 tests retried with maxWorkers forced to 1, and pass.
-        String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 5, 1);
+        // 2nd run (retry): all 5000 tests retried in legacy mode in 5 batches of 1000 tests each, and pass.
+        final int batchSize = 1000;
+        for (int i = 0; i < numTests; i += batchSize) {
+            List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(subOutput);
+        }
 
         expectTestRunStarted(deqpTest, numTests);
         expectAngleSetupAndTeardown();

@@ -303,7 +303,7 @@ public class DeqpTestRunner
         new HashMap<>();
     private final Set<TestDescription> mUnstableTests = new LinkedHashSet<>();
     private final Set<TestDescription> mErrantTests = new LinkedHashSet<>();
-    private boolean mIsParallelRetry = false;
+    private boolean mRetryInLegacyMode = false;
 
     protected IAbi mAbi;
     protected CompatibilityBuildHelper mBuildHelper;
@@ -471,7 +471,7 @@ public class DeqpTestRunner
 
                 // If test failed in parallel mode (and not currently on retry or unstable), defer reporting to sink
                 final boolean isStrictlyErrantOnly = !result.allInstancesPassed && !mUnstableTests.contains(testId);
-                if (isStrictlyErrantOnly && isParallelFirstAttempt()) {
+                if (isStrictlyErrantOnly && isParallelMode()) {
                     mErrantTests.add(testId);
                     return;
                 }
@@ -1478,7 +1478,7 @@ public class DeqpTestRunner
      * in {@code mUnstableTests} to be retried in a subsequent pass instead of being aborted immediately.
      */
     protected void recordTestInstability(TestDescription testId) {
-        if (isParallelFirstAttempt()) {
+        if (isParallelMode()) {
             mUnstableTests.add(testId);
         } else {
             mTestInstabilityRatings.put(testId,
@@ -1525,11 +1525,11 @@ public class DeqpTestRunner
 
         mRemainingTests.addAll(tests);
 
-        mIsParallelRetry = true;
+        mRetryInLegacyMode = true;
         try {
             runTests();
         } finally {
-            mIsParallelRetry = false;
+            mRetryInLegacyMode = false;
         }
     }
 
@@ -1713,7 +1713,7 @@ public class DeqpTestRunner
                .append(" -e deqpEventReportingMode \"").append(mEventReportingMode).append("\"");
 
         if (isParallel) {
-            final int maxWorkers = (!mIsParallelRetry && testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD)
+            final int maxWorkers = (testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD)
                     ? mDeqpMaxWorkers
                     : 1;
             CLog.d("Executing batch with test count: %d, max workers: %d, in Parallel mode", testCount, maxWorkers);
@@ -1758,7 +1758,7 @@ public class DeqpTestRunner
             }
         }
 
-        if (isParallelFirstAttempt()) {
+        if (isParallelMode()) {
             // In the first parallel attempt, re-select and execute remaining pending tests in sub-batches.
             // Any test that is unstable or errant is excluded by selectRunBatch, allowing the
             // remaining tests in the batch to be executed in subsequent passes.
@@ -1922,7 +1922,7 @@ public class DeqpTestRunner
                 // non-executable. This is required so that a consistently
                 // crashing or non-existent tests will not cause futile
                 // (non-terminating) re-execution attempts.
-                if (!isParallelFirstAttempt()) {
+                if (!isParallelMode()) {
                     if (getInstanceListener().getCurrentTestId() != null) {
                         getInstanceListener().abortTest(onlyTest,
                                                      INCOMPLETE_LOG_MESSAGE);
@@ -3103,11 +3103,7 @@ public class DeqpTestRunner
     }
 
     private boolean isParallelMode() {
-        return mEnableDeqpParallelRun && isHandheld();
-    }
-
-    private boolean isParallelFirstAttempt() {
-        return isParallelMode() && !mIsParallelRetry;
+        return mEnableDeqpParallelRun && isHandheld() && !mRetryInLegacyMode;
     }
 
 }
