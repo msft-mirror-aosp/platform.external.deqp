@@ -98,7 +98,10 @@ public class WorkerServiceConnection implements ServiceConnection {
         try {
             Class<? extends WorkerService> serviceClass = WorkerService.getServiceClass(workerId);
             Intent intent = new Intent(context, serviceClass);
-            success = context.bindService(intent, this, Context.BIND_AUTO_CREATE);
+            // BIND_IMPORTANT ensures worker processes inherit foreground CPU scheduling
+            // from the host activity rather than being throttled as background services.
+            int flags = Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT;
+            success = context.bindService(intent, this, flags);
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Exception while binding to Worker service for worker ID: " + workerId, e);
         }
