@@ -307,7 +307,7 @@ public class DeqpTestRunner
         new HashMap<>();
     private final Set<TestDescription> mUnstableTests = new LinkedHashSet<>();
     private final Set<TestDescription> mErrantTests = new LinkedHashSet<>();
-    private boolean mRetryInLegacyMode = false;
+    private boolean mRunInLegacyMode = false;
 
     protected IAbi mAbi;
     protected CompatibilityBuildHelper mBuildHelper;
@@ -1610,11 +1610,11 @@ public class DeqpTestRunner
 
         mRemainingTests.addAll(tests);
 
-        mRetryInLegacyMode = true;
+        mRunInLegacyMode = true;
         try {
             runTests();
         } finally {
-            mRetryInLegacyMode = false;
+            mRunInLegacyMode = false;
         }
     }
 
@@ -1789,24 +1789,26 @@ public class DeqpTestRunner
         // which are parsed asynchronously by parallel log parsers.
         final boolean shouldLogData = !isParallel && mLogData;
         final String deqpCmdLine = buildDeqpCmdLine(runConfig, isParallel, shouldLogData);
+        // Resolved per batch into a local so that the @Option field is never mutated. Writing the
+        // resolved value back would make it sticky: the first batch's mode would override the
+        // isParallel based default for every subsequent batch.
+        final String eventReportingMode =
+            resolveEventReportingMode(mEventReportingMode, isParallel);
 
         final StringBuilder command = new StringBuilder("am instrument ");
         command.append(AbiUtils.createAbiFlag(mAbi.getName()))
                .append(" -w -e deqpLogFilename \"").append(deqpLogPath).append("\"")
                .append(" -e deqpCmdLine \"").append(deqpCmdLine).append("\"")
                .append(" -e deqpLogData \"").append(shouldLogData).append("\"")
-               .append(" -e deqpEventReportingMode \"").append(mEventReportingMode).append("\"");
+               .append(" -e deqpEventReportingMode \"").append(eventReportingMode).append("\"");
 
         if (isParallel) {
-            final int maxWorkers = (testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD)
-                    ? mDeqpMaxWorkers
-                    : 1;
-            CLog.d("Executing batch with test count: %d, max workers: %d, in Parallel mode", testCount, maxWorkers);
+            CLog.d("Executing batch with test count: %d, max workers: %d, in Parallel mode", testCount, mDeqpMaxWorkers);
             // Pass parallel execution configuration options to DeqpInstrumentation on the device.
             command.append(" -e deqpEnableParallel \"true\"")
                    .append(" -e deqpCaselistDir \"").append(APP_DIR_PARALLEL_CASELISTS).append("\"")
                    .append(" -e deqpLogDir \"").append(APP_DIR_PARALLEL_LOGS).append("\"")
-                   .append(" -e deqpMaxWorkers \"").append(maxWorkers).append("\"");
+                   .append(" -e deqpMaxWorkers \"").append(mDeqpMaxWorkers).append("\"");
         } else {
             CLog.d("Executing batch with test count: %d in Serial mode", testCount);
         }
@@ -1821,74 +1823,93 @@ public class DeqpTestRunner
     protected void executeTestRunBatch(TestBatch batch)
         throws DeviceNotAvailableException {
         final int testCount = batch.getTestBatchTestDescriptionList().size();
-        final boolean isParallel = isParallelMode();
-        mEventReportingMode = resolveEventReportingMode(mEventReportingMode, isParallel);
-
-        final String command =
-            buildInstrumentationCommand(batch.getTestBatchConfig(), isParallel, testCount);
-
-        final InstrumentationParser parser =
-            new InstrumentationParser(getInstanceListener());
-        // attempt full run once
-        executeTestRunBatchRun(batch, APK_INSTRUMENTATION_NAME, command, parser);
-
-        // split remaining tests to two sub batches and execute both. This will
-        // terminate since executeTestRunBatchRun will always progress for a
-        // batch of size 1.
-        final ArrayList<TestDescription> pendingTests = new ArrayList<>();
-
-        for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
-            if (getInstanceListener().isPendingTestInstance(test, batch.getTestBatchConfig())) {
-                pendingTests.add(test);
-            }
+        // Batches smaller than the threshold are not worth the parallel execution overhead, so
+        // they are forced to run in legacy (serial) mode.
+        //
+        // mRunInLegacyMode is an instance variable shared by every batch this runner executes, so
+        // setting it here without restoring it would create a sticky state: once a single small
+        // batch flipped it to true, every subsequent batch would be forced into legacy mode as
+        // well, even when its test count is well above the threshold. The previous value is
+        // therefore captured here and restored in the finally block below, which keeps the
+        // override scoped to this batch only and also preserves the enclosing value when this
+        // method recurses over sub batches.
+        final boolean previousRunInLegacyMode = mRunInLegacyMode;
+        if (testCount < DEQP_PARALLEL_EXECUTION_THRESHOLD) {
+            mRunInLegacyMode = true;
         }
 
-        if (isParallelMode()) {
-            // In the first parallel attempt, re-select and execute remaining pending tests in sub-batches.
-            // Any test that is unstable or errant is excluded by selectRunBatch, allowing the
-            // remaining tests in the batch to be executed in subsequent passes.
-            for (;;) {
-                TestBatch subBatch = selectRunBatch(pendingTests, batch.getTestBatchConfig());
+        try {
+            final boolean isParallel = isParallelMode();
+            final String command =
+                buildInstrumentationCommand(batch.getTestBatchConfig(), isParallel, testCount);
 
-                if (subBatch == null) {
-                    break;
+            final InstrumentationParser parser =
+                new InstrumentationParser(getInstanceListener());
+            // attempt full run once
+            executeTestRunBatchRun(batch, APK_INSTRUMENTATION_NAME, command, parser);
+
+            // split remaining tests to two sub batches and execute both. This will
+            // terminate since executeTestRunBatchRun will always progress for a
+            // batch of size 1.
+            final ArrayList<TestDescription> pendingTests = new ArrayList<>();
+
+            for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
+                if (getInstanceListener().isPendingTestInstance(test, batch.getTestBatchConfig())) {
+                    pendingTests.add(test);
                 }
-
-                executeTestRunBatch(subBatch);
-            }
-        } else {
-            final int divisorNdx = pendingTests.size() / 2;
-            final List<TestDescription> headList =
-                pendingTests.subList(0, divisorNdx);
-            final List<TestDescription> tailList =
-                pendingTests.subList(divisorNdx, pendingTests.size());
-
-            // head
-            for (;;) {
-                TestBatch subBatch = selectRunBatch(headList, batch.getTestBatchConfig());
-
-                if (subBatch == null) {
-                    break;
-                }
-
-                executeTestRunBatch(subBatch);
             }
 
-            // tail
-            for (;;) {
-                TestBatch subBatch = selectRunBatch(tailList, batch.getTestBatchConfig());
+            if (isParallel) {
+                // In the first parallel attempt, re-select and execute remaining pending tests in sub-batches.
+                // Any test that is unstable or errant is excluded by selectRunBatch, allowing the
+                // remaining tests in the batch to be executed in subsequent passes.
+                for (;;) {
+                    TestBatch subBatch = selectRunBatch(pendingTests, batch.getTestBatchConfig());
 
-                if (subBatch == null) {
-                    break;
+                    if (subBatch == null) {
+                        break;
+                    }
+
+                    executeTestRunBatch(subBatch);
+                }
+            } else {
+                final int divisorNdx = pendingTests.size() / 2;
+                final List<TestDescription> headList =
+                    pendingTests.subList(0, divisorNdx);
+                final List<TestDescription> tailList =
+                    pendingTests.subList(divisorNdx, pendingTests.size());
+
+                // head
+                for (;;) {
+                    TestBatch subBatch = selectRunBatch(headList, batch.getTestBatchConfig());
+
+                    if (subBatch == null) {
+                        break;
+                    }
+
+                    executeTestRunBatch(subBatch);
                 }
 
-                executeTestRunBatch(subBatch);
-            }
-        }
+                // tail
+                for (;;) {
+                    TestBatch subBatch = selectRunBatch(tailList, batch.getTestBatchConfig());
 
-        if (getBatchNumPendingCases(batch) != 0) {
-            throw new AssertionError(
-                "executeTestRunBatch postcondition failed");
+                    if (subBatch == null) {
+                        break;
+                    }
+
+                    executeTestRunBatch(subBatch);
+                }
+            }
+
+            if (getBatchNumPendingCases(batch) != 0) {
+                throw new AssertionError(
+                    "executeTestRunBatch postcondition failed");
+            }
+        } finally {
+            // Undo the batch scoped legacy mode override, including when the batch bails out with
+            // an exception, so that it never becomes sticky for the batches that follow.
+            mRunInLegacyMode = previousRunInLegacyMode;
         }
     }
 
@@ -3265,7 +3286,7 @@ public class DeqpTestRunner
     }
 
     private boolean isParallelMode() {
-        return mEnableDeqpParallelRun && isHandheld() && !mRetryInLegacyMode;
+        return mEnableDeqpParallelRun && isHandheld() && !mRunInLegacyMode;
     }
 
 }
