@@ -2540,6 +2540,99 @@ public class DeqpTestRunnerTest extends TestCase {
         runAndVerifyTest(deqpTest);
     }
 
+    /**
+     * Test the retry mechanism of {@code mDevice.pushString()} in parallel mode.
+     * <p>
+     * Verifies that when pushing test cases to the device fails on the first two attempts,
+     * the runner retries up to 3 attempts, succeeds on the 3rd attempt, breaks out of the retry
+     * loop, and executes the tests successfully.
+     */
+    public void testRun_parallelMode_pushString_retrySuccess() throws Exception {
+        final int numTests = 1000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // Attempts 1 and 2 fail, attempt 3 succeeds.
+        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part1.txt", 2);
+
+        String output = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, output, 1, 1);
+
+        expectRunAndVerifyTest(deqpTest, tests);
+    }
+
+    /**
+     * Test the retry mechanism of {@code mDevice.pushString()} in parallel mode when all attempts fail.
+     * <p>
+     * Verifies that when pushing test cases to the device fails on all 3 attempts,
+     * the runner aborts further caselist pushes for the chunk, retries the unexecuted batch,
+     * fails on all 3 attempts again, and records the test as failed.
+     */
+    public void testRun_parallelMode_pushString_retryFailure() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run (initial parallel attempt):
+        // Attempts 1, 2, and 3 fail to push caselist. Instrumentation runs with empty output,
+        // and the unexecuted test is added to mUnstableTests for a retry pass.
+        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part1.txt", 3);
+        String output1 = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output1, 0, 1);
+
+        // 2nd run (unstable test retry pass via retryUnstableTests()):
+        // Attempts 1, 2, and 3 fail to push caselist again. Because mIsParallelRetry is true
+        // (!isParallelFirstAttempt()), abortTest() marks the unexecuted test as failed.
+        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part1.txt", 3);
+        String output2 = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output2, 0, 1);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetupAndTeardown();
+        expectTestWithResult(tests, false);
+        expectTestRunEnded();
+
+        runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test that in parallel mode, when pushing a caselist partition fails after all 3 attempts,
+     * all previously pushed partitions are still tried in the current run, any remaining
+     * partitions in the chunk are skipped, and the unexecuted tests are subsequently retried.
+     */
+    public void testRun_parallelMode_pushString_multiBatchPartialFailure() throws Exception {
+        final int numTests = 3000;
+        List<TestDescription> tests = generateTestList(numTests);
+        List<TestDescription> pushedTests = tests.subList(0, 1000);
+        List<TestDescription> remainingTests = tests.subList(1000, 3000);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run:
+        // - Partition 1 (tests 0..999) succeeds.
+        // - Partition 2 (tests 1000..1999) fails all 3 push attempts.
+        // - Partition 3 (tests 2000..2999) is skipped (no pushString call expected).
+        // Pushed tests (0..999) are executed in this run.
+        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part2.txt", 3);
+        String output1 = buildTestProcessOutput(pushedTests);
+        runInstrumentationLineAndAnswerParallel(tests, output1, 1, 1);
+
+        // 2nd run (retry):
+        // - Remaining unexecuted tests (1000..2999) are retried across 2 partitions and pass.
+        String output2 = buildTestProcessOutput(remainingTests);
+        runInstrumentationLineAndAnswerParallel(remainingTests, output2, 2, 1);
+
+        expectRunAndVerifyTest(deqpTest, tests);
+    }
+
 
     /**
      * Test that an invalid test event reporting mode throws an IllegalArgumentException.
@@ -2702,6 +2795,15 @@ public class DeqpTestRunnerTest extends TestCase {
     private void expectPushString(String content, String remotePath) throws Exception {
         mockDevice.pushString(content, remotePath);
         EasyMock.expectLastCall().andReturn(true).once();
+    }
+
+    /**
+     * Expects {@code numFailures} consecutive failing attempts to push a caselist to
+     * {@code remotePath}.
+     */
+    private void expectFailedPushString(String remotePath, int numFailures) throws Exception {
+        mockDevice.pushString(EasyMock.<String>anyObject(), EasyMock.eq(remotePath));
+        EasyMock.expectLastCall().andReturn(false).times(numFailures);
     }
 
     private void expectInstrumentationCommand(String logFilename, String cmd, final String output) throws Exception {
