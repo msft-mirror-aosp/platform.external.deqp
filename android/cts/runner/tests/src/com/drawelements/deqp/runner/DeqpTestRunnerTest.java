@@ -1385,7 +1385,7 @@ public class DeqpTestRunnerTest extends TestCase {
         expectAngleSetup();
         expectTestRunEnded();
 
-        runAndVerifyTestInterrupted(deqpTest, mockRunUtil);
+        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RunInterruptedException.class);
     }
 
     private void
@@ -1503,7 +1503,7 @@ public class DeqpTestRunnerTest extends TestCase {
             "message", InfraErrorIdentifier.TRADEFED_SHUTTING_DOWN));
 
         expectTestRunEnded();
-        runAndVerifyTestInterrupted(deqpTest, mockRunUtil);
+        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RunInterruptedException.class);
     }
 
     public void testRuntimeHint_optionSet() throws Exception {
@@ -2568,16 +2568,25 @@ public class DeqpTestRunnerTest extends TestCase {
      * Test the retry mechanism of {@code mDevice.pushString()} in parallel mode when all attempts fail.
      * <p>
      * Verifies that when pushing test cases to the device fails on all 3 attempts,
-     * the runner aborts further caselist pushes for the chunk, retries the unexecuted batch,
-     * fails on all 3 attempts again, and records the test as failed.
+     * the runner aborts further caselist pushes for the chunk, retries the unexecuted batch
+     * in legacy mode, fails to push the caselist again, and throws a RuntimeException.
      */
     public void testRun_parallelMode_pushString_retryFailure() throws Exception {
         final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
         List<TestDescription> tests = Collections.singletonList(testId);
 
+        IRunUtil mockRunUtil = EasyMock.createMock(IRunUtil.class);
+
         DeqpTestRunner deqpTest = setupTestRunner(tests, true);
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        deqpTest.setDevice(mockDevice);
+        deqpTest.setRunUtil(mockRunUtil);
+
+        // The push retry backoff should not sleep for real.
+        mockRunUtil.sleep(EasyMock.anyLong());
+        EasyMock.expectLastCall().anyTimes();
 
         // 1st run (initial parallel attempt):
         // Attempts 1, 2, and 3 fail to push caselist. Instrumentation runs with empty output,
@@ -2586,25 +2595,24 @@ public class DeqpTestRunnerTest extends TestCase {
         String output1 = buildTestProcessOutput(Collections.emptyList());
         runInstrumentationLineAndAnswerParallel(tests, output1, 0, 1);
 
-        // 2nd run (unstable test retry pass via retryUnstableTests()):
-        // Attempts 1, 2, and 3 fail to push caselist again. Because mIsParallelRetry is true
-        // (!isParallelFirstAttempt()), abortTest() marks the unexecuted test as failed.
-        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part1.txt", 3);
-        String output2 = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswerParallel(tests, output2, 0, 1);
+        // 2nd run (unstable test retry pass in legacy mode via retryUnstableTests()):
+        // Attempts 1, 2, and 3 fail to push the legacy caselist file again, throwing a RuntimeException.
+        expectRemoveFile(APP_DIR + CASE_LIST_FILE_NAME);
+        expectRemoveFile(APP_DIR + LOG_FILE_NAME);
+        expectFailedPushString(APP_DIR + CASE_LIST_FILE_NAME, 3);
 
         expectTestRunStarted(deqpTest, 1);
-        expectAngleSetupAndTeardown();
-        expectTestWithResult(tests, false);
+        expectAngleSetup();
         expectTestRunEnded();
 
-        runAndVerifyTest(deqpTest);
+        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RuntimeException.class);
     }
 
     /**
      * Test that in parallel mode, when pushing a caselist partition fails after all 3 attempts,
      * all previously pushed partitions are still tried in the current run, any remaining
-     * partitions in the chunk are skipped, and the unexecuted tests are subsequently retried.
+     * partitions in the chunk are skipped, and the unexecuted tests are subsequently retried
+     * in legacy mode.
      */
     public void testRun_parallelMode_pushString_multiBatchPartialFailure() throws Exception {
         final int numTests = 3000;
@@ -2625,10 +2633,14 @@ public class DeqpTestRunnerTest extends TestCase {
         String output1 = buildTestProcessOutput(pushedTests);
         runInstrumentationLineAndAnswerParallel(tests, output1, 1, 1);
 
-        // 2nd run (retry):
-        // - Remaining unexecuted tests (1000..2999) are retried across 2 partitions and pass.
-        String output2 = buildTestProcessOutput(remainingTests);
-        runInstrumentationLineAndAnswerParallel(remainingTests, output2, 2, 1);
+        // 2nd run (retry in legacy mode):
+        // - Remaining unexecuted tests (1000..2999) are retried in legacy mode in 2 batches of 1000 tests each, and pass.
+        final int batchSize = 1000;
+        for (int i = 0; i < remainingTests.size(); i += batchSize) {
+            List<TestDescription> subList = remainingTests.subList(i, Math.min(i + batchSize, remainingTests.size()));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(subOutput);
+        }
 
         expectRunAndVerifyTest(deqpTest, tests);
     }
@@ -2673,14 +2685,26 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.verify(mockListener, mockDevice, mockIDevice);
     }
 
-    private void runAndVerifyTestInterrupted(DeqpTestRunner deqpTest, IRunUtil mockRunUtil)
+    /**
+     * Replays the mocks, runs the test expecting {@code expectedException} to be thrown,
+     * and verifies the mocks.
+     *
+     * @param deqpTest the runner under test
+     * @param mockRunUtil the mock {@link IRunUtil} injected into the runner
+     * @param expectedException the exception type the run is expected to throw
+     */
+    private void runAndVerifyTestThrowsException(DeqpTestRunner deqpTest, IRunUtil mockRunUtil,
+        Class<? extends Exception> expectedException)
         throws Exception {
         EasyMock.replay(mockDevice, mockIDevice, mockListener);
         EasyMock.replay(mockRunUtil);
         try {
             deqpTest.run(mockListener);
-            fail("expected RunInterruptedException");
-        } catch (RunInterruptedException ex) {
+            fail("expected " + expectedException.getSimpleName());
+        } catch (Exception ex) {
+            if (!expectedException.isInstance(ex)) {
+                throw ex;
+            }
             // expected
         }
         EasyMock.verify(mockRunUtil, mockListener, mockDevice, mockIDevice);
