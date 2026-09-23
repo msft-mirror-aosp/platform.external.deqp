@@ -101,6 +101,7 @@ public class DeqpTestRunnerTest extends TestCase {
     private ITestDevice mockDevice;
     private IDevice mockIDevice;
     private ITestInvocationListener mockListener;
+    private IRunUtil mockRunUtil;
 
     public static class BuildHelperMock extends CompatibilityBuildHelper {
         private File mTestsDir = null;
@@ -124,6 +125,13 @@ public class DeqpTestRunnerTest extends TestCase {
         mockDevice = EasyMock.createMock(ITestDevice.class);
         mockIDevice = EasyMock.createMock(IDevice.class);
         mockListener = EasyMock.createStrictMock(ITestInvocationListener.class);
+
+        // Shared IRunUtil whose sleep() returns instantly, so retry backoffs cost no real time.
+        // Interruption tests need a throwing sleep(), so they reset and reconfigure mockRunUtil.
+        mockRunUtil = EasyMock.createMock(IRunUtil.class);
+        mockRunUtil.sleep(EasyMock.anyLong());
+        EasyMock.expectLastCall().anyTimes();
+        EasyMock.replay(mockRunUtil);
     }
 
     /**
@@ -1363,7 +1371,7 @@ public class DeqpTestRunnerTest extends TestCase {
         Collection<TestDescription> tests = new ArrayList<TestDescription>();
         tests.add(testId);
 
-        IRunUtil mockRunUtil = EasyMock.createMock(IRunUtil.class);
+        EasyMock.reset(mockRunUtil);
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
@@ -1385,7 +1393,9 @@ public class DeqpTestRunnerTest extends TestCase {
         expectAngleSetup();
         expectTestRunEnded();
 
-        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RunInterruptedException.class);
+        EasyMock.replay(mockRunUtil);
+        runAndVerifyTestThrowsException(deqpTest, RunInterruptedException.class);
+        EasyMock.verify(mockRunUtil);
     }
 
     private void
@@ -1469,7 +1479,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         final String output = buildTestProcessOutput(tests, "Fail", "Fail");
 
-        IRunUtil mockRunUtil = EasyMock.createMock(IRunUtil.class);
+        EasyMock.reset(mockRunUtil);
 
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
@@ -1504,7 +1514,10 @@ public class DeqpTestRunnerTest extends TestCase {
             "message", InfraErrorIdentifier.TRADEFED_SHUTTING_DOWN));
 
         expectTestRunEnded();
-        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RunInterruptedException.class);
+
+        EasyMock.replay(mockRunUtil);
+        runAndVerifyTestThrowsException(deqpTest, RunInterruptedException.class);
+        EasyMock.verify(mockRunUtil);
     }
 
     public void testRuntimeHint_optionSet() throws Exception {
@@ -2045,6 +2058,9 @@ public class DeqpTestRunnerTest extends TestCase {
     private DeqpTestRunner setupTestRunner(List<TestDescription> tests, boolean enableParallelRun, boolean isHandheld) throws Exception {
         DeqpTestRunner deqpTest = buildGlesTestRunner(3, 0, tests, mTestsDir);
 
+        // The push retry backoff must not sleep in real time.
+        deqpTest.setRunUtil(mockRunUtil);
+
         if (enableParallelRun) {
             OptionSetter setter = new OptionSetter(deqpTest);
             setter.setOptionValue("enable-deqp-parallel-run", "true");
@@ -2576,18 +2592,11 @@ public class DeqpTestRunnerTest extends TestCase {
         final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
         List<TestDescription> tests = Collections.singletonList(testId);
 
-        IRunUtil mockRunUtil = EasyMock.createMock(IRunUtil.class);
-
         DeqpTestRunner deqpTest = setupTestRunner(tests, true);
         OptionSetter setter = new OptionSetter(deqpTest);
         setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
 
         deqpTest.setDevice(mockDevice);
-        deqpTest.setRunUtil(mockRunUtil);
-
-        // The push retry backoff should not sleep for real.
-        mockRunUtil.sleep(EasyMock.anyLong());
-        EasyMock.expectLastCall().anyTimes();
 
         // 1st run (initial parallel attempt):
         // Attempts 1, 2, and 3 fail to push caselist. Instrumentation runs with empty output,
@@ -2606,7 +2615,7 @@ public class DeqpTestRunnerTest extends TestCase {
         expectAngleSetup();
         expectTestRunEnded();
 
-        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RuntimeException.class);
+        runAndVerifyTestThrowsException(deqpTest, RuntimeException.class);
     }
 
     /**
@@ -2646,6 +2655,54 @@ public class DeqpTestRunnerTest extends TestCase {
         expectRunAndVerifyTest(deqpTest, tests);
     }
 
+    /**
+     * Test the retry mechanism of {@code mDevice.pushString()} in serial (legacy) mode.
+     * <p>
+     * Verifies that when pushing the caselist to the device fails on the first two attempts,
+     * the runner retries up to 3 attempts, succeeds on the 3rd attempt, and executes the batch
+     * successfully.
+     */
+    public void testRun_serialMode_pushString_retrySuccess() throws Exception {
+        final int numTests = 100;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, false);
+
+        // Attempts 1 and 2 fail to push the legacy caselist file, attempt 3 succeeds and the
+        // batch is executed.
+        expectFailedPushString(APP_DIR + CASE_LIST_FILE_NAME, 2);
+        String output = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswer(output);
+
+        expectRunAndVerifyTest(deqpTest, tests);
+    }
+
+    /**
+     * Test the retry mechanism of {@code mDevice.pushString()} in serial (legacy) mode when all
+     * attempts fail.
+     * <p>
+     * Verifies that when pushing the caselist to the device fails on all 3 attempts, the runner
+     * gives up and throws a RuntimeException instead of executing the batch.
+     */
+    public void testRun_serialMode_pushString_retryFailure() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, false);
+        deqpTest.setDevice(mockDevice);
+
+        // Attempts 1, 2, and 3 all fail to push the legacy caselist file, throwing a
+        // RuntimeException. No instrumentation command is expected.
+        expectRemoveFile(APP_DIR + CASE_LIST_FILE_NAME);
+        expectRemoveFile(APP_DIR + LOG_FILE_NAME);
+        expectFailedPushString(APP_DIR + CASE_LIST_FILE_NAME, 3);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetup();
+        expectTestRunEnded();
+
+        runAndVerifyTestThrowsException(deqpTest, RuntimeException.class);
+    }
 
     /**
      * Test that an invalid test event reporting mode throws an IllegalArgumentException.
@@ -2687,18 +2744,20 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     /**
-     * Replays the mocks, runs the test expecting {@code expectedException} to be thrown,
-     * and verifies the mocks.
+     * Replays the device mocks, runs the test expecting {@code expectedException} to be thrown,
+     * and verifies them.
+     *
+     * <p>{@link #mockRunUtil} is not replayed here: runners built by {@link #setupTestRunner} use
+     * the shared instance already replayed in {@code setUp()}. A test injecting its own
+     * {@link IRunUtil} must replay and verify it around this call.
      *
      * @param deqpTest the runner under test
-     * @param mockRunUtil the mock {@link IRunUtil} injected into the runner
      * @param expectedException the exception type the run is expected to throw
      */
-    private void runAndVerifyTestThrowsException(DeqpTestRunner deqpTest, IRunUtil mockRunUtil,
+    private void runAndVerifyTestThrowsException(DeqpTestRunner deqpTest,
         Class<? extends Exception> expectedException)
         throws Exception {
         EasyMock.replay(mockDevice, mockIDevice, mockListener);
-        EasyMock.replay(mockRunUtil);
         try {
             deqpTest.run(mockListener);
             fail("expected " + expectedException.getSimpleName());
@@ -2708,7 +2767,7 @@ public class DeqpTestRunnerTest extends TestCase {
             }
             // expected
         }
-        EasyMock.verify(mockRunUtil, mockListener, mockDevice, mockIDevice);
+        EasyMock.verify(mockListener, mockDevice, mockIDevice);
     }
 
     private List<TestDescription> generateTestList(int numTests) {

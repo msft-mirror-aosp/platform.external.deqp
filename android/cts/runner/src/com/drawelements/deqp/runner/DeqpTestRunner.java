@@ -138,7 +138,7 @@ public class DeqpTestRunner
     private static final int DEQP_PARALLEL_EXECUTION_THRESHOLD = 4000;
     private static final int DEQP_DEFAULT_MAX_WORKERS = 4;
     private static final int PUSH_STRING_MAX_ATTEMPTS = 3;
-    private static final int PUSH_STRING_RETRY_DELAY_MS = 2000;
+    private static final int PUSH_STRING_RETRY_DELAY_MS = 1000;
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
     private static final int DEQP_LEVEL_B_2025 = 132711169;
