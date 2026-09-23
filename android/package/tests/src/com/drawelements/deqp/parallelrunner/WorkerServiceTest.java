@@ -20,14 +20,12 @@
 
 package com.drawelements.deqp.parallelrunner;
 
-import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.AssetManager;
 import android.os.IBinder;
 import android.os.Process;
 import android.os.RemoteException;
@@ -98,10 +96,10 @@ public class WorkerServiceTest {
         ISurfaceWorker worker = getBoundWorker(workerService);
 
         // Verify calling startTestBatch rejects null surface safely without crashing
-        boolean accepted = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info");
+        boolean accepted = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info", null);
         assertFalse("Worker should reject test batch when surface is null", accepted);
 
-        boolean acceptedSecond = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info");
+        boolean acceptedSecond = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info", null);
         assertFalse("Worker should reject second test batch sequentially when surface is null", acceptedSecond);
     }
 
@@ -124,7 +122,7 @@ public class WorkerServiceTest {
         RecordingWorkerService service = new RecordingWorkerService();
         ISurfaceWorker worker = getBoundWorker(service);
 
-        worker.startTestBatch(new Surface(), "--deqp-case=dEQP-GLES2.info");
+        worker.startTestBatch(new Surface(), "--deqp-case=dEQP-GLES2.info", null);
 
         assertEquals(
                 "dEQP execution must run at display priority to match the legacy runner",
@@ -139,10 +137,43 @@ public class WorkerServiceTest {
 
         Process.setThreadPriority(Process.THREAD_PRIORITY_DEFAULT);
         int before = Process.getThreadPriority(Process.myTid());
-        worker.startTestBatch(new Surface(), "--deqp-case=dEQP-GLES2.info");
+        worker.startTestBatch(new Surface(), "--deqp-case=dEQP-GLES2.info", null);
         int after = Process.getThreadPriority(Process.myTid());
 
         assertEquals("Thread priority must be restored after the batch completes", before, after);
         assertEquals(Process.THREAD_PRIORITY_DEFAULT, after);
+    }
+
+    @Test
+    public void testStartTestBatch_withEventCallback_reachesNativeExecutionAtDisplayPriority()
+            throws RemoteException {
+        RecordingWorkerService service = new RecordingWorkerService();
+        ISurfaceWorker worker = getBoundWorker(service);
+        ITestEventCallback callback = new ITestEventCallback.Stub() {
+            @Override
+            public void beginSession() {}
+
+            @Override
+            public void endSession() {}
+
+            @Override
+            public void sessionInfo(String name, String value) {}
+
+            @Override
+            public void beginTestCase(String testCasePath) {}
+
+            @Override
+            public void endTestCase() {}
+
+            @Override
+            public void testCaseResult(String statusCode, String details) {}
+
+            @Override
+            public void terminateTestCase(String reason) {}
+        };
+
+        boolean result = worker.startTestBatch(new Surface(), "--deqp-case=dEQP-GLES2.info", callback);
+        assertFalse(result);
+        assertEquals(Process.THREAD_PRIORITY_DISPLAY, service.priorityDuringCall);
     }
 }
