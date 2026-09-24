@@ -1606,7 +1606,12 @@ public class DeqpTestRunner
         throws DeviceNotAvailableException, CapabilityQueryFailureException {
         final Set<TestDescription> tests = new LinkedHashSet<>(testsToRetry);
         testsToRetry.clear();
-        CLog.d("Number of %s tests to be retried is : %d", testType, tests.size());
+
+        CLog.d("Number of %s tests to be retried is : %d", testType,
+                tests.size());
+        for (TestDescription test : tests) {
+            CLog.d("  %s.%s", test.getClassName(), test.getTestName());
+        }
 
         mRemainingTests.addAll(tests);
 
