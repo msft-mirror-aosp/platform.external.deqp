@@ -20,9 +20,8 @@
 
 package com.drawelements.deqp.parallelrunner;
 
-import com.drawelements.deqp.testercore.LogParser;
-
 import android.util.Log;
+import com.drawelements.deqp.testercore.LogParser;
 import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.BlockingQueue;
@@ -168,7 +167,7 @@ public class LogParserWorker implements Runnable {
     }
 
     private void parseWhileTestProcessAlive() throws InterruptedException, IOException {
-        while (testProcessAlive.get()) {
+        while (testProcessAlive.get() && !accumulator.hasSessionEnded()) {
             if (Thread.currentThread().isInterrupted()) {
                 throw new InterruptedException();
             }
@@ -180,7 +179,10 @@ public class LogParserWorker implements Runnable {
 
     private void parseRemainingMessages() throws InterruptedException, IOException {
         long lastDataMs = System.currentTimeMillis();
-        while (true) {
+        while (!accumulator.hasSessionEnded()) {
+            if (Thread.currentThread().isInterrupted()) {
+                throw new InterruptedException();
+            }
             if (parser.parse()) {
                 lastDataMs = System.currentTimeMillis();
             } else {
