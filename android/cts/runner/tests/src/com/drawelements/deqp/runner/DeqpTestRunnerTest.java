@@ -488,7 +488,7 @@ public class DeqpTestRunnerTest extends TestCase {
         if (thereAreTests) {
             expectRenderConfigQuery(3, 0);
             String testOut = buildTestProcessOutput(expectedTests);
-            runInstrumentationLineAndAnswer(testOut);
+            runInstrumentationLineAndAnswer(expectedTrie, getCommandLine(), testOut);
         }
 
         expectRunAndVerifyTest(deqpTest, expectedTests);
@@ -564,7 +564,7 @@ public class DeqpTestRunnerTest extends TestCase {
         List<TestDescription> allTests = Arrays.asList(testIds);
 
         String expectedTrie =
-            "{dEQP-GLES3{group1{mememe,yeah,takeitall},group2{jeba,yes,granted}}}";
+            "{dEQP-GLES3{group2{jeba,yes,granted},group1{mememe,yeah,takeitall}}}";
 
         DeqpTestRunner deqpTest =
             buildGlesTestRunner(3, 0, allTests, mTestsDir);
@@ -1420,7 +1420,7 @@ public class DeqpTestRunnerTest extends TestCase {
             String testOut = buildTestProcessOutput(shardTests);
             // NOTE: This assumes that there won't be multiple batches per
             // shard!
-            runInstrumentationLineAndAnswer(testOut);
+            runInstrumentationLineAndAnswer(shardTests, testOut);
 
             expectRunAndVerifyTest(shard, shardTests);
         }
@@ -1585,10 +1585,12 @@ public class DeqpTestRunnerTest extends TestCase {
                    runtime < (1000 * 10)); // Must be done in 10s
     }
 
-    private void runInstrumentationLineAndAnswer(final String output)
+    private void runInstrumentationLineAndAnswer(final Collection<TestDescription> tests,
+                                                 final String output)
         throws Exception {
         String cmd = getCommandLine();
-        runInstrumentationLineAndAnswer(null, cmd, output);
+        String expectedTrie = DeqpTestRunner.generateTestCaseTrie(tests);
+        runInstrumentationLineAndAnswer(expectedTrie, cmd, output);
     }
 
 
@@ -1600,11 +1602,7 @@ public class DeqpTestRunnerTest extends TestCase {
         expectRemoveFile(APP_DIR + LOG_FILE_NAME);
 
         String remotePath = APP_DIR + CASE_LIST_FILE_NAME;
-        if (testTrie != null) {
-            expectPushString(testTrie + "\n", remotePath);
-        } else {
-            expectPushString((String)EasyMock.anyObject(), EasyMock.eq(remotePath));
-        }
+        expectPushString(EasyMock.eq(testTrie + "\n"), EasyMock.eq(remotePath));
 
         String logFilename = APP_DIR + LOG_FILE_NAME;
         expectInstrumentationCommand(logFilename, cmd, output);
@@ -1621,15 +1619,10 @@ public class DeqpTestRunnerTest extends TestCase {
         final int batchSize = 1000;
         for (int i = 0; i < expectedParallelBatches; i++) {
             String remotePath = DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part" + (i + 1) + ".txt";
-            if (tests != null) {
-                List<TestDescription> subList = tests.subList(i * batchSize, Math.min((i + 1) * batchSize, tests.size()));
-                String expectedTrie = DeqpTestRunner.generateTestCaseTrie(subList);
-                expectPushString(EasyMock.eq(expectedTrie + "\n"),
-                                 EasyMock.eq(remotePath));
-            } else {
-                expectPushString((String)EasyMock.anyObject(),
-                                 EasyMock.eq(remotePath));
-            }
+            List<TestDescription> subList = tests.subList(i * batchSize, Math.min((i + 1) * batchSize, tests.size()));
+            String expectedTrie = DeqpTestRunner.generateTestCaseTrie(subList);
+            expectPushString(EasyMock.eq(expectedTrie + "\n"),
+                             EasyMock.eq(remotePath));
         }
 
         String logFilename = DeqpTestRunner.APP_DIR_PARALLEL_LOGS;
@@ -1637,7 +1630,7 @@ public class DeqpTestRunnerTest extends TestCase {
             "--deqp-gl-config-name=rgba8888d24s8 --deqp-screen-rotation=unspecified "
             + "--deqp-surface-type=window --deqp-log-images=disable --deqp-log-shader-sources=disable "
             + "--deqp-watchdog=enable";
-        expectInstrumentationCommand(logFilename, parallelCmd, output, maxWorkers);
+        expectInstrumentationCommand(logFilename, parallelCmd, output, true, maxWorkers);
     }
 
 
@@ -1722,7 +1715,7 @@ public class DeqpTestRunnerTest extends TestCase {
         activeTests.add(testIds[0]);
         activeTests.add(testIds[5]);
 
-        String expectedTrie = "{dEQP-GLES3{group1{footah}group2{yes}}}";
+        String expectedTrie = "{dEQP-GLES3{group2{yes},group1{footah}}}";
 
         DeqpTestRunner deqpTest =
             buildGlesTestRunner(3, 0, allTests, mTestsDir);
@@ -2100,7 +2093,7 @@ public class DeqpTestRunnerTest extends TestCase {
         for (int i = 0; i < numTests; i += batchSize) {
             List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
             String subOutput = buildTestProcessOutput(subList);
-            runInstrumentationLineAndAnswer(null, getCommandLine(), subOutput);
+            runInstrumentationLineAndAnswer(subList, subOutput);
         }
 
         expectRunAndVerifyTest(deqpTest, tests);
@@ -2217,7 +2210,7 @@ public class DeqpTestRunnerTest extends TestCase {
         for (int i = 0; i < numTests; i += batchSize) {
             List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
             String subOutput = buildTestProcessOutput(subList);
-            runInstrumentationLineAndAnswer(null, getCommandLine(), subOutput);
+            runInstrumentationLineAndAnswer(subList, subOutput);
         }
 
         expectRunAndVerifyTest(deqpTest, tests);
@@ -2260,7 +2253,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): Empty output again.
         String output2 = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswer(output2);
+        runInstrumentationLineAndAnswer(tests, output2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2290,11 +2283,11 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): Empty output again. The batch of 2 tests fails to execute.
         String output2 = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswer(output2);
+        runInstrumentationLineAndAnswer(tests, output2);
 
         // Bisected sub-batches: each test is retried individually (batch of size 1), fails, and is aborted.
-        runInstrumentationLineAndAnswer(output2);
-        runInstrumentationLineAndAnswer(output2);
+        runInstrumentationLineAndAnswer(Collections.singletonList(test1), output2);
+        runInstrumentationLineAndAnswer(Collections.singletonList(test2), output2);
 
         expectTestRunStarted(deqpTest, 2);
         expectAngleSetupAndTeardown();
@@ -2322,7 +2315,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswer(passOutput);
+        runInstrumentationLineAndAnswer(tests, passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2350,7 +2343,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): crashes again
         String output2 = buildIncompleteTestProcessOutput(testId);
-        runInstrumentationLineAndAnswer(output2);
+        runInstrumentationLineAndAnswer(tests, output2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2378,7 +2371,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswer(passOutput);
+        runInstrumentationLineAndAnswer(tests, passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2411,7 +2404,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 3rd run (retry): test1 is retried in legacy mode and passes
         String passOutput1 = buildTestProcessOutput(Collections.singletonList(test1));
-        runInstrumentationLineAndAnswer(passOutput1);
+        runInstrumentationLineAndAnswer(Collections.singletonList(test1), passOutput1);
 
         expectTestRunStarted(deqpTest, 2);
         expectAngleSetupAndTeardown();
@@ -2443,7 +2436,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswer(passOutput);
+        runInstrumentationLineAndAnswer(tests, passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2474,7 +2467,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test fails again
         String failOutput2 = buildTestProcessOutput(tests, "Fail", "Fail");
-        runInstrumentationLineAndAnswer(failOutput2);
+        runInstrumentationLineAndAnswer(tests, failOutput2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2508,7 +2501,7 @@ public class DeqpTestRunnerTest extends TestCase {
         for (int i = 0; i < numTests; i += batchSize) {
             List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
             String subOutput = buildTestProcessOutput(subList);
-            runInstrumentationLineAndAnswer(subOutput);
+            runInstrumentationLineAndAnswer(subList, subOutput);
         }
 
         expectTestRunStarted(deqpTest, numTests);
@@ -2543,7 +2536,7 @@ public class DeqpTestRunnerTest extends TestCase {
         for (int i = 0; i < numTests; i += batchSize) {
             List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
             String subOutput = buildTestProcessOutput(subList);
-            runInstrumentationLineAndAnswer(subOutput);
+            runInstrumentationLineAndAnswer(subList, subOutput);
         }
 
         expectTestRunStarted(deqpTest, numTests);
@@ -2649,7 +2642,7 @@ public class DeqpTestRunnerTest extends TestCase {
         for (int i = 0; i < remainingTests.size(); i += batchSize) {
             List<TestDescription> subList = remainingTests.subList(i, Math.min(i + batchSize, remainingTests.size()));
             String subOutput = buildTestProcessOutput(subList);
-            runInstrumentationLineAndAnswer(subOutput);
+            runInstrumentationLineAndAnswer(subList, subOutput);
         }
 
         expectRunAndVerifyTest(deqpTest, tests);
@@ -2672,7 +2665,7 @@ public class DeqpTestRunnerTest extends TestCase {
         // batch is executed.
         expectFailedPushString(APP_DIR + CASE_LIST_FILE_NAME, 2);
         String output = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswer(output);
+        runInstrumentationLineAndAnswer(tests, output);
 
         expectRunAndVerifyTest(deqpTest, tests);
     }
@@ -2891,10 +2884,10 @@ public class DeqpTestRunnerTest extends TestCase {
     }
 
     private void expectInstrumentationCommand(String logFilename, String cmd, final String output) throws Exception {
-        expectInstrumentationCommand(logFilename, cmd, output, 4);
+        expectInstrumentationCommand(logFilename, cmd, output, false, 4);
     }
 
-    private void expectInstrumentationCommand(String logFilename, String cmd, final String output, int maxWorkers) throws Exception {
+    private void expectInstrumentationCommand(String logFilename, String cmd, final String output, boolean isParallel, int maxWorkers) throws Exception {
         final StringBuilder commandBuilder = new StringBuilder();
         commandBuilder.append(String.format(
             "am instrument %s -w -e deqpLogFilename \"%s\" -e deqpCmdLine \"%s\" "
@@ -2902,7 +2895,7 @@ public class DeqpTestRunnerTest extends TestCase {
             AbiUtils.createAbiFlag(ABI.getName()), logFilename, cmd,
             false, DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER));
 
-        if (DeqpTestRunner.APP_DIR_PARALLEL_LOGS.equals(logFilename)) {
+        if (isParallel) {
             commandBuilder.append(String.format(
                 " -e deqpEnableParallel \"true\" -e deqpCaselistDir \"%s\" -e deqpLogDir \"%s\" -e deqpMaxWorkers \"%d\"",
                 DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS, DeqpTestRunner.APP_DIR_PARALLEL_LOGS, maxWorkers));
