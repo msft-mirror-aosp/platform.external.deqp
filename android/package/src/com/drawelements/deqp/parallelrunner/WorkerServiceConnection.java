@@ -48,22 +48,25 @@ public class WorkerServiceConnection implements ServiceConnection {
          * avoid performing heavy or long-running operations directly in this callback
          * to prevent blocking the main thread. Consider offloading work to a background thread.
          *
+         * @param connection The active WorkerServiceConnection instance.
          * @param worker The active ISurfaceWorker interface.
          */
-        void onConnected(ISurfaceWorker worker);
+        void onConnected(WorkerServiceConnection connection, ISurfaceWorker worker);
 
         /**
          * Called when the connection to the worker service is lost.
+         *
+         * @param connection The WorkerServiceConnection instance that disconnected.
          */
-        void onDisconnected();
+        void onDisconnected(WorkerServiceConnection connection);
     }
 
     private enum BindState { UNBOUND, BINDING, BOUND }
 
     private final Context context;
     private final int workerId;
-    private final Callback callback;
-
+    
+    private Callback callback;
     private ISurfaceWorker worker;
     private BindState state = BindState.UNBOUND;
 
@@ -95,7 +98,10 @@ public class WorkerServiceConnection implements ServiceConnection {
         try {
             Class<? extends WorkerService> serviceClass = WorkerService.getServiceClass(workerId);
             Intent intent = new Intent(context, serviceClass);
-            success = context.bindService(intent, this, Context.BIND_AUTO_CREATE);
+            // BIND_IMPORTANT ensures worker processes inherit foreground CPU scheduling
+            // from the host activity rather than being throttled as background services.
+            int flags = Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT;
+            success = context.bindService(intent, this, flags);
         } catch (IllegalArgumentException e) {
             Log.e(TAG, "Exception while binding to Worker service for worker ID: " + workerId, e);
         }
@@ -114,6 +120,7 @@ public class WorkerServiceConnection implements ServiceConnection {
             Log.w(TAG, "Worker " + workerId + " not bound.");
             return;
         }
+        callback = null;
         try {
             context.unbindService(this);
         } catch (IllegalArgumentException e) {
@@ -135,6 +142,7 @@ public class WorkerServiceConnection implements ServiceConnection {
     @Override
     public void onServiceConnected(ComponentName name, IBinder service) {
         ISurfaceWorker localWorker;
+        Callback localCallback;
         synchronized (this) {
             if (state != BindState.BINDING && state != BindState.BOUND) {
                 Log.w(TAG, "onServiceConnected called when not binding/bound for worker ID: " + workerId);
@@ -143,9 +151,10 @@ public class WorkerServiceConnection implements ServiceConnection {
             state = BindState.BOUND;
             worker = ISurfaceWorker.Stub.asInterface(service);
             localWorker = worker;
+            localCallback = callback;
         }
-        if (callback != null) {
-            callback.onConnected(localWorker);
+        if (localCallback != null) {
+            localCallback.onConnected(this, localWorker);
         }
     }
 
@@ -153,12 +162,14 @@ public class WorkerServiceConnection implements ServiceConnection {
     public void onServiceDisconnected(ComponentName name) {
         // Transient loss of connection. The system will attempt to reconnect. Do not unbind.
         boolean wasBound;
+        Callback localCallback;
         synchronized (this) {
             wasBound = (state == BindState.BOUND);
             worker = null;
+            localCallback = callback;
         }
-        if (wasBound && callback != null) {
-            callback.onDisconnected();
+        if (wasBound && localCallback != null) {
+            localCallback.onDisconnected(this);
         }
     }
 
@@ -174,6 +185,7 @@ public class WorkerServiceConnection implements ServiceConnection {
 
     private void handleFatalDisconnection(String reason) {
         boolean wasBoundOrBinding;
+        Callback localCallback;
         synchronized (this) {
             wasBoundOrBinding = (state != BindState.UNBOUND);
             if (wasBoundOrBinding) {
@@ -185,9 +197,10 @@ public class WorkerServiceConnection implements ServiceConnection {
                 state = BindState.UNBOUND;
                 worker = null;
             }
+            localCallback = callback;
         }
-        if (wasBoundOrBinding && callback != null) {
-            callback.onDisconnected();
+        if (wasBoundOrBinding && localCallback != null) {
+            localCallback.onDisconnected(this);
         }
     }
 }
