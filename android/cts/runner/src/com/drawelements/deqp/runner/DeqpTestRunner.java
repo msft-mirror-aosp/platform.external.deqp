@@ -1968,8 +1968,9 @@ public class DeqpTestRunner
             mDevice.executeShellCommand("mkdir -p " + remoteCaselistsDir);
             mDevice.executeShellCommand("mkdir -p " + remoteLogsDir);
 
-            // TODO: Currently we are taking instability score of 0 for the parallel mode
-            //       In future we have to take into account of instability score of the tests.
+            // Parallel mode is only used for the first attempt. Unstable and errant tests
+            // are retried in legacy mode, which sizes batches based on instability.
+            // Hence, the instability score is always 0 here.
             final int batchSize = getBatchSizeLimitForInstability(0);
             for (int i = 0; i < testList.size(); i += batchSize) {
                 List<TestDescription> subList = testList.subList(i, Math.min(i + batchSize, testList.size()));
