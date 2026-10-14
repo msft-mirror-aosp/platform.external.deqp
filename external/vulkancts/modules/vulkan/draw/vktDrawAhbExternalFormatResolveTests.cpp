@@ -206,7 +206,8 @@ tcu::TestStatus AhbExternalFormatResolveTestInstance::iterate(void)
     else
     {
         // Need to destroy Vulkan image that has a reference to the android hardware buffer
-        m_resources.~DrawResources();
+        DrawResources emptyResources;
+        m_resources = emptyResources;
 
         if (!androidBuffer.lock(AndroidHardwareBufferInstance::Usage::CPU_READ))
         {
