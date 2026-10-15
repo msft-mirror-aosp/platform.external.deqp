@@ -174,7 +174,7 @@ public class ParallelTestsSchedulerTest {
             return null;
         }).once();
 
-        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(true).once();
+        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"), isNull())).andReturn(true).once();
 
         replay(mockWorker, mockSchedulerCallback);
 
@@ -214,7 +214,7 @@ public class ParallelTestsSchedulerTest {
             return null;
         }).once();
 
-        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(true).once();
+        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"), isNull())).andReturn(true).once();
 
         replay(mockWorker, mockSchedulerCallback);
 

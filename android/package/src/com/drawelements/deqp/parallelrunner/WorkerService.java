@@ -46,12 +46,24 @@ public class WorkerService extends Service {
     private final ISurfaceWorker.Stub binder = new ISurfaceWorker.Stub() {
         private volatile boolean isExecuting = false;
         private final Object stateLock = new Object();
+
         /**
          * Executes the test batch on the provided surface.
-         * This call is blocking and will not return until native dEQP execution completes.
+         *
+         * <p>This call is blocking and will not return until native dEQP execution completes.
+         *
+         * @param surface the surface used for rendering during test execution
+         * @param commandLineArgs the dEQP command line arguments for this batch
+         * @param callback the listener that receives test events over Binder, or {@code null}
+         *     if test execution callbacks are not required
+         * @return {@code true} if native execution completed, {@code false} if the batch was
+         *     rejected or failed
          */
         @Override
-        public boolean startTestBatch(final Surface surface, final String commandLineArgs) {
+        public boolean startTestBatch(
+                final Surface surface,
+                final String commandLineArgs,
+                final ITestEventCallback callback) {
             synchronized (stateLock) {
                 if (isExecuting) {
                     Log.w(TAG, "Worker is already executing a batch. Ignoring request.");
@@ -72,10 +84,15 @@ public class WorkerService extends Service {
                 } catch (Throwable t) {
                     Log.w(TAG, "Failed to set thread priority for dEQP execution", t);
                 }
+
+                TestEventListener listener = null;
+                if (callback != null) {
+                    listener = new NativeTestEventBridge(callback);
+                }
+
                 Log.i(TAG, "Executing native dEQP engine...");
                 AssetManager assets = (getBaseContext() != null) ? getAssets() : null;
-                // TODO(b/564804892): Pass valid listener once direct event reporting mode is implemented.
-                nativeStartDeqp(surface, commandLineArgs, assets, null);
+                nativeStartDeqp(surface, commandLineArgs, assets, listener);
                 return true;
             } catch (Exception e) {
                 Log.e(TAG, "Native execution failed.", e);

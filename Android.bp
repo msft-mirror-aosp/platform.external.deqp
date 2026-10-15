@@ -223,6 +223,9 @@ android_test {
         "android/package/src/**/*.java",
         "android/package/src/**/*.aidl",
     ],
+    aidl: {
+        local_include_dirs: ["android/package/src"],
+    },
     resource_dirs: ["android/package/res"],
     manifest: "android/package/AndroidManifest-integration.xml",
 

@@ -202,7 +202,7 @@ public class WorkerHolderTest {
         holder.surfaceCreated(mockHolder);
 
         // When startTestBatch is called, simulate surface destruction
-        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andAnswer(() -> {
+        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"), isNull())).andAnswer(() -> {
             holder.surfaceDestroyed(mockHolder);
             return true;
         }).once();
@@ -235,7 +235,7 @@ public class WorkerHolderTest {
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
-        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(true).once();
+        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"), isNull())).andReturn(true).once();
         mockCoordinator.parse(anyObject());
         expectLastCall().once();
         mockCoordinator.onTestProcessFinished(anyObject());
@@ -267,7 +267,7 @@ public class WorkerHolderTest {
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
-        expect(mockWorker.startTestBatch(eq(testSurface), matches(".*--deqp-log-filename=/sdcard/deqplogs/TestLog_parallel_0_\\d+\\.qpa --deqp-caselist-file=.*"))).andReturn(true).once();
+        expect(mockWorker.startTestBatch(eq(testSurface), matches(".*--deqp-log-filename=/sdcard/deqplogs/TestLog_parallel_0_\\d+\\.qpa --deqp-caselist-file=.*"), isNull())).andReturn(true).once();
         mockCoordinator.parse(anyObject());
         expectLastCall().once();
         mockCoordinator.onTestProcessFinished(anyObject());
@@ -332,7 +332,7 @@ public class WorkerHolderTest {
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
-        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(false).once();
+        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"), isNull())).andReturn(false).once();
         mockCoordinator.parse(anyObject());
         expectLastCall().once();
         mockCoordinator.onTestProcessFinished(anyObject());
@@ -368,7 +368,7 @@ public class WorkerHolderTest {
         SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
         holder.surfaceCreated(mockHolder);
 
-        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andAnswer(() -> {
+        expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"), isNull())).andAnswer(() -> {
             holder.onDisconnected(capturedConnections.get(0));
             return false;
         }).once();
@@ -422,8 +422,8 @@ public class WorkerHolderTest {
         holder.surfaceCreated(mockHolder);
 
         // Batch 1 finishes successfully on connection 0
-        expect(mockWorker1.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(true).once();
-        expect(mockWorker2.startTestBatch(eq(testSurface), contains("batch_2.txt"))).andReturn(true).once();
+        expect(mockWorker1.startTestBatch(eq(testSurface), contains("batch_1.txt"), isNull())).andReturn(true).once();
+        expect(mockWorker2.startTestBatch(eq(testSurface), contains("batch_2.txt"), isNull())).andReturn(true).once();
         mockCoordinator.parse(anyObject());
         expectLastCall().times(2);
         mockCoordinator.onTestProcessFinished(anyObject());
