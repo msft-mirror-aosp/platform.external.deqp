@@ -1349,17 +1349,6 @@ struct VkAccelerationStructureMemoryRequirementsInfoNV
 	VkAccelerationStructureNV						accelerationStructure;
 };
 
-struct VkAccelerationStructureTrianglesOpacityMicromapKHR
-{
-	VkStructureType				sType;
-	void*						pNext;
-	VkIndexType					indexType;
-	VkDeviceAddress				indexBuffer;
-	VkDeviceSize				indexStride;
-	uint32_t					baseTriangle;
-	VkAccelerationStructureKHR	micromap;
-};
-
 struct VkAccelerationStructureVersionInfoKHR
 {
 	VkStructureType	sType;
@@ -2176,7 +2165,7 @@ struct VkDataGraphPipelineCreateInfoARM
 {
 	VkStructureType								sType;
 	const void*									pNext;
-	VkPipelineCreateFlags2						flags;
+	VkPipelineCreateFlags2KHR					flags;
 	VkPipelineLayout							layout;
 	uint32_t									resourceInfoCount;
 	const VkDataGraphPipelineResourceInfoARM*	pResourceInfos;
@@ -2500,48 +2489,6 @@ struct VkDeviceAddressBindingCallbackDataEXT
 	VkDeviceAddressBindingTypeEXT	bindingType;
 };
 
-struct VkDeviceAddressRangeKHR
-{
-	VkDeviceAddress	address;
-	VkDeviceSize	size;
-};
-
-struct VkAccelerationStructureCreateInfo2KHR
-{
-	VkStructureType							sType;
-	const void*								pNext;
-	VkAccelerationStructureCreateFlagsKHR	createFlags;
-	VkDeviceAddressRangeKHR					addressRange;
-	VkAddressCommandFlagsKHR				addressFlags;
-	VkAccelerationStructureTypeKHR			type;
-};
-
-struct VkBindIndexBuffer3InfoKHR
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkDeviceAddressRangeKHR		addressRange;
-	VkAddressCommandFlagsKHR	addressFlags;
-	VkIndexType					indexType;
-};
-
-struct VkBindTransformFeedbackBuffer2InfoEXT
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkDeviceAddressRangeKHR		addressRange;
-	VkAddressCommandFlagsKHR	addressFlags;
-};
-
-struct VkConditionalRenderingBeginInfo2EXT
-{
-	VkStructureType					sType;
-	const void*						pNext;
-	VkDeviceAddressRangeKHR			addressRange;
-	VkAddressCommandFlagsKHR		addressFlags;
-	VkConditionalRenderingFlagsEXT	flags;
-};
-
 struct VkDeviceBufferMemoryRequirements
 {
 	VkStructureType				sType;
@@ -2565,9 +2512,9 @@ struct VkDeviceEventInfoEXT
 	VkDeviceEventTypeEXT	deviceEvent;
 };
 
-struct VkDeviceFaultAddressInfoKHR
+struct VkDeviceFaultAddressInfoEXT
 {
-	VkDeviceFaultAddressTypeKHR	addressType;
+	VkDeviceFaultAddressTypeEXT	addressType;
 	VkDeviceAddress				reportedAddress;
 	VkDeviceSize				addressPrecision;
 };
@@ -2581,10 +2528,10 @@ struct VkDeviceFaultCountsEXT
 	VkDeviceSize	vendorBinarySize;
 };
 
-struct VkDeviceFaultVendorBinaryHeaderVersionOneKHR
+struct VkDeviceFaultVendorBinaryHeaderVersionOneEXT
 {
 	uint32_t									headerSize;
-	VkDeviceFaultVendorBinaryHeaderVersionKHR	headerVersion;
+	VkDeviceFaultVendorBinaryHeaderVersionEXT	headerVersion;
 	uint32_t									vendorID;
 	uint32_t									deviceID;
 	uint32_t									driverVersion;
@@ -2596,7 +2543,7 @@ struct VkDeviceFaultVendorBinaryHeaderVersionOneKHR
 	uint32_t									apiVersion;
 };
 
-struct VkDeviceFaultVendorInfoKHR
+struct VkDeviceFaultVendorInfoEXT
 {
 	char		description[VK_MAX_DESCRIPTION_SIZE];
 	uint64_t	vendorFaultCode;
@@ -2608,8 +2555,8 @@ struct VkDeviceFaultInfoEXT
 	VkStructureType					sType;
 	void*							pNext;
 	char							description[VK_MAX_DESCRIPTION_SIZE];
-	VkDeviceFaultAddressInfoKHR*	pAddressInfos;
-	VkDeviceFaultVendorInfoKHR*		pVendorInfos;
+	VkDeviceFaultAddressInfoEXT*	pAddressInfos;
+	VkDeviceFaultVendorInfoEXT*		pVendorInfos;
 	void*							pVendorBinaryData;
 };
 
@@ -2670,24 +2617,6 @@ struct VkDeviceGroupSwapchainCreateInfoKHR
 	VkStructureType						sType;
 	const void*							pNext;
 	VkDeviceGroupPresentModeFlagsKHR	modes;
-};
-
-struct VkDeviceMemoryCopyKHR
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkDeviceAddressRangeKHR		srcRange;
-	VkAddressCommandFlagsKHR	srcFlags;
-	VkDeviceAddressRangeKHR		dstRange;
-	VkAddressCommandFlagsKHR	dstFlags;
-};
-
-struct VkCopyDeviceMemoryInfoKHR
-{
-	VkStructureType					sType;
-	const void*						pNext;
-	uint32_t						regionCount;
-	const VkDeviceMemoryCopyKHR*	pRegions;
 };
 
 struct VkDeviceMemoryOpaqueCaptureAddressInfo
@@ -2932,14 +2861,6 @@ struct VkDirectFBSurfaceCreateInfoEXT
 	VkDirectFBSurfaceCreateFlagsEXT	flags;
 	pt::IDirectFB*					dfb;
 	pt::IDirectFBSurface*			surface;
-};
-
-struct VkDispatchIndirect2InfoKHR
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkDeviceAddressRangeKHR		addressRange;
-	VkAddressCommandFlagsKHR	addressFlags;
 };
 
 struct VkDispatchIndirectCommand
@@ -3510,13 +3431,13 @@ struct VkGeometryNV
 
 struct VkAccelerationStructureInfoNV
 {
-	VkStructureType							sType;
-	const void*								pNext;
-	VkAccelerationStructureTypeNV			type;
-	VkBuildAccelerationStructureFlagsKHR	flags;
-	uint32_t								instanceCount;
-	uint32_t								geometryCount;
-	const VkGeometryNV*						pGeometries;
+	VkStructureType						sType;
+	const void*							pNext;
+	VkAccelerationStructureTypeNV		type;
+	VkBuildAccelerationStructureFlagsNV	flags;
+	uint32_t							instanceCount;
+	uint32_t							geometryCount;
+	const VkGeometryNV*					pGeometries;
 };
 
 struct VkGraphicsPipelineLibraryCreateInfoEXT
@@ -4302,16 +4223,6 @@ struct VkMemoryMapPlacedInfoEXT
 	void*			pPlacedAddress;
 };
 
-struct VkMemoryMarkerInfoAMD
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkPipelineStageFlags2KHR	stage;
-	VkDeviceAddressRangeKHR		dstRange;
-	VkAddressCommandFlagsKHR	dstFlags;
-	uint32_t					marker;
-};
-
 struct VkMemoryMetalHandlePropertiesEXT
 {
 	VkStructureType	sType;
@@ -4331,28 +4242,6 @@ struct VkMemoryPriorityAllocateInfoEXT
 	VkStructureType	sType;
 	const void*		pNext;
 	float			priority;
-};
-
-struct VkMemoryRangeBarrierKHR
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkPipelineStageFlags2		srcStageMask;
-	VkAccessFlags2				srcAccessMask;
-	VkPipelineStageFlags2		dstStageMask;
-	VkAccessFlags2				dstAccessMask;
-	uint32_t					srcQueueFamilyIndex;
-	uint32_t					dstQueueFamilyIndex;
-	VkDeviceAddressRangeKHR		addressRange;
-	VkAddressCommandFlagsKHR	addressFlags;
-};
-
-struct VkMemoryRangeBarriersInfoKHR
-{
-	VkStructureType					sType;
-	const void*						pNext;
-	uint32_t						memoryRangeBarrierCount;
-	const VkMemoryRangeBarrierKHR*	pMemoryRangeBarriers;
 };
 
 struct VkMemoryRequirements
@@ -4426,7 +4315,7 @@ struct VkMicromapCreateInfoEXT
 	VkDeviceAddress				deviceAddress;
 };
 
-struct VkMicromapTriangleKHR
+struct VkMicromapTriangleEXT
 {
 	uint32_t	dataOffset;
 	uint16_t	subdivisionLevel;
@@ -4490,25 +4379,6 @@ struct VkMicromapBuildInfoEXT
 	VkDeviceOrHostAddressConstKHR		data;
 	VkDeviceOrHostAddressKHR			scratchData;
 	VkDeviceOrHostAddressConstKHR		triangleArray;
-	VkDeviceSize						triangleArrayStride;
-};
-
-struct VkMicromapUsageKHR
-{
-	uint32_t					count;
-	uint32_t					subdivisionLevel;
-	VkOpacityMicromapFormatKHR	format;
-};
-
-struct VkAccelerationStructureGeometryMicromapDataKHR
-{
-	VkStructureType						sType;
-	const void*							pNext;
-	uint32_t							usageCountsCount;
-	const VkMicromapUsageKHR*			pUsageCounts;
-	const VkMicromapUsageKHR* const*	ppUsageCounts;
-	VkDeviceAddress						data;
-	VkDeviceAddress						triangleArray;
 	VkDeviceSize						triangleArrayStride;
 };
 
@@ -4624,20 +4494,6 @@ struct VkCopyMemoryToImageIndirectCommandKHR
 	uint32_t					bufferRowLength;
 	uint32_t					bufferImageHeight;
 	VkImageSubresourceLayers	imageSubresource;
-	VkOffset3D					imageOffset;
-	VkExtent3D					imageExtent;
-};
-
-struct VkDeviceMemoryImageCopyKHR
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkDeviceAddressRangeKHR		addressRange;
-	VkAddressCommandFlagsKHR	addressFlags;
-	uint32_t					addressRowLength;
-	uint32_t					addressImageHeight;
-	VkImageSubresourceLayers	imageSubresource;
-	VkImageLayout				imageLayout;
 	VkOffset3D					imageOffset;
 	VkExtent3D					imageExtent;
 };
@@ -4760,15 +4616,6 @@ struct VkCopyBufferToImageInfo2
 	VkImageLayout				dstImageLayout;
 	uint32_t					regionCount;
 	const VkBufferImageCopy2*	pRegions;
-};
-
-struct VkCopyDeviceMemoryImageInfoKHR
-{
-	VkStructureType						sType;
-	const void*							pNext;
-	VkImage								image;
-	uint32_t							regionCount;
-	const VkDeviceMemoryImageCopyKHR*	pRegions;
 };
 
 struct VkCopyImageInfo2
@@ -5478,13 +5325,6 @@ struct VkPhysicalDeviceDescriptorIndexingProperties
 	uint32_t		maxDescriptorSetUpdateAfterBindSampledImages;
 	uint32_t		maxDescriptorSetUpdateAfterBindStorageImages;
 	uint32_t		maxDescriptorSetUpdateAfterBindInputAttachments;
-};
-
-struct VkPhysicalDeviceDeviceAddressCommandsFeaturesKHR
-{
-	VkStructureType	sType;
-	void*			pNext;
-	VkBool32		deviceAddressCommands;
 };
 
 struct VkPhysicalDeviceDeviceGeneratedCommandsComputeFeaturesNV
@@ -6701,29 +6541,12 @@ struct VkPhysicalDeviceOpacityMicromapFeaturesEXT
 	VkBool32		micromapHostCommands;
 };
 
-struct VkPhysicalDeviceOpacityMicromapFeaturesKHR
-{
-	VkStructureType	sType;
-	void*			pNext;
-	VkBool32		micromap;
-};
-
 struct VkPhysicalDeviceOpacityMicromapPropertiesEXT
 {
 	VkStructureType	sType;
 	void*			pNext;
 	uint32_t		maxOpacity2StateSubdivisionLevel;
 	uint32_t		maxOpacity4StateSubdivisionLevel;
-};
-
-struct VkPhysicalDeviceOpacityMicromapPropertiesKHR
-{
-	VkStructureType	sType;
-	void*			pNext;
-	uint32_t		maxOpacity2StateSubdivisionLevel;
-	uint32_t		maxOpacity4StateSubdivisionLevel;
-	uint32_t		maxOpacityLossy4StateSubdivisionLevel;
-	uint64_t		maxMicromapTriangles;
 };
 
 struct VkPhysicalDevicePCIBusInfoPropertiesEXT
@@ -9730,15 +9553,6 @@ struct VkStridedDeviceAddressRangeKHR
 	VkDeviceSize	stride;
 };
 
-struct VkBindVertexBuffer3InfoKHR
-{
-	VkStructureType					sType;
-	const void*						pNext;
-	VkBool32						setStride;
-	VkStridedDeviceAddressRangeKHR	addressRange;
-	VkAddressCommandFlagsKHR		addressFlags;
-};
-
 struct VkCopyMemoryIndirectInfoKHR
 {
 	VkStructureType					sType;
@@ -9759,26 +9573,6 @@ struct VkCopyMemoryToImageIndirectInfoKHR
 	VkImage							dstImage;
 	VkImageLayout					dstImageLayout;
 	const VkImageSubresourceLayers*	pImageSubresources;
-};
-
-struct VkDrawIndirect2InfoKHR
-{
-	VkStructureType					sType;
-	const void*						pNext;
-	VkStridedDeviceAddressRangeKHR	addressRange;
-	VkAddressCommandFlagsKHR		addressFlags;
-	uint32_t						drawCount;
-};
-
-struct VkDrawIndirectCount2InfoKHR
-{
-	VkStructureType					sType;
-	const void*						pNext;
-	VkStridedDeviceAddressRangeKHR	addressRange;
-	VkAddressCommandFlagsKHR		addressFlags;
-	VkDeviceAddressRangeKHR			countAddressRange;
-	VkAddressCommandFlagsKHR		countAddressFlags;
-	uint32_t						maxDrawCount;
 };
 
 struct VkStridedDeviceAddressRegionKHR
@@ -10370,15 +10164,6 @@ struct VkAccelerationStructureInstanceKHR
 	uint32_t					instanceShaderBindingTableRecordOffset : 24;
 	VkGeometryInstanceFlagsKHR	flags : 8;
 	uint64_t					accelerationStructureReference;
-};
-
-struct VkUbmSurfaceCreateInfoSEC
-{
-	VkStructureType				sType;
-	const void*					pNext;
-	VkUbmSurfaceCreateFlagsSEC	flags;
-	struct ubm_device*			device;
-	struct ubm_surface*			surface;
 };
 
 struct VkValidationFeaturesEXT
@@ -11865,19 +11650,7 @@ typedef VkDescriptorUpdateTemplateCreateInfo VkDescriptorUpdateTemplateCreateInf
 typedef VkDescriptorUpdateTemplateEntry VkDescriptorUpdateTemplateEntryKHR;
 
 
-typedef VkDeviceAddressRangeKHR VkDeviceAddressRangeEXT;
-
-
 typedef VkDeviceBufferMemoryRequirements VkDeviceBufferMemoryRequirementsKHR;
-
-
-typedef VkDeviceFaultAddressInfoKHR VkDeviceFaultAddressInfoEXT;
-
-
-typedef VkDeviceFaultVendorBinaryHeaderVersionOneKHR VkDeviceFaultVendorBinaryHeaderVersionOneEXT;
-
-
-typedef VkDeviceFaultVendorInfoKHR VkDeviceFaultVendorInfoEXT;
 
 
 typedef VkDeviceGroupBindSparseInfo VkDeviceGroupBindSparseInfoKHR;
@@ -12031,9 +11804,6 @@ typedef VkMemoryToImageCopy VkMemoryToImageCopyEXT;
 
 
 typedef VkMemoryUnmapInfo VkMemoryUnmapInfoKHR;
-
-
-typedef VkMicromapTriangleKHR VkMicromapTriangleEXT;
 
 
 typedef VkMutableDescriptorTypeCreateInfoEXT VkMutableDescriptorTypeCreateInfoVALVE;

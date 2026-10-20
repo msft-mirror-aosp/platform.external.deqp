@@ -20,6 +20,8 @@
 
 package com.drawelements.deqp.parallelrunner;
 
+import static org.easymock.EasyMock.*;
+import static org.junit.Assert.*;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -30,8 +32,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
 
 /**
  * Unit tests for {@link WorkerServiceConnection} verifying binding lifecycle and callbacks.
@@ -58,19 +58,6 @@ public class WorkerServiceConnectionTest {
 
         assertTrue(connection.isBound());
         assertTrue(testContext.bindServiceCalled);
-        verify(mockCallback);
-    }
-
-    @Test
-    public void testBindPassesSchedulingParityFlags() {
-        WorkerServiceConnection connection = new WorkerServiceConnection(testContext, 0, mockCallback);
-
-        replay(mockCallback);
-
-        connection.bind();
-
-        int expectedFlags = Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT;
-        assertEquals(expectedFlags, testContext.lastBindFlags);
         verify(mockCallback);
     }
 
@@ -141,7 +128,7 @@ public class WorkerServiceConnectionTest {
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
 
         expect(mockBinder.queryLocalInterface(anyObject())).andReturn(mockWorker);
-        mockCallback.onConnected(connection, mockWorker);
+        mockCallback.onConnected(mockWorker);
         expectLastCall().once();
 
         replay(mockCallback, mockBinder, mockWorker);
@@ -176,10 +163,10 @@ public class WorkerServiceConnectionTest {
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
 
         expect(mockBinder.queryLocalInterface(anyObject())).andReturn(mockWorker);
-        mockCallback.onConnected(connection, mockWorker);
+        mockCallback.onConnected(mockWorker);
         expectLastCall().once();
 
-        mockCallback.onDisconnected(connection);
+        mockCallback.onDisconnected();
         expectLastCall().once();
 
         replay(mockCallback, mockBinder, mockWorker);
@@ -199,7 +186,7 @@ public class WorkerServiceConnectionTest {
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
 
         expect(mockBinder.queryLocalInterface(anyObject())).andReturn(mockWorker);
-        mockCallback.onConnected(connection, mockWorker);
+        mockCallback.onConnected(mockWorker);
         expectLastCall().once();
 
         replay(mockCallback, mockBinder, mockWorker);
@@ -216,7 +203,7 @@ public class WorkerServiceConnectionTest {
     @Test
     public void testOnBindingDied() {
         WorkerServiceConnection connection = new WorkerServiceConnection(testContext, 0, mockCallback);
-        mockCallback.onDisconnected(connection);
+        mockCallback.onDisconnected();
         expectLastCall().once();
 
         replay(mockCallback);
@@ -233,7 +220,7 @@ public class WorkerServiceConnectionTest {
     @Test
     public void testOnNullBinding() {
         WorkerServiceConnection connection = new WorkerServiceConnection(testContext, 0, mockCallback);
-        mockCallback.onDisconnected(connection);
+        mockCallback.onDisconnected();
         expectLastCall().once();
 
         replay(mockCallback);
@@ -251,7 +238,6 @@ public class WorkerServiceConnectionTest {
         private boolean bindServiceResult = true;
         private boolean bindServiceCalled = false;
         private boolean unbindServiceCalled = false;
-        private int lastBindFlags = 0;
 
         TestContext(Context base) {
             super(base);
@@ -269,7 +255,6 @@ public class WorkerServiceConnectionTest {
         @Override
         public boolean bindService(Intent service, ServiceConnection conn, int flags) {
             bindServiceCalled = true;
-            lastBindFlags = flags;
             return bindServiceResult;
         }
 

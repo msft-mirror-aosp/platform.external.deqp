@@ -21,7 +21,6 @@
 package com.drawelements.deqp.parallelrunner;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 
@@ -76,12 +75,10 @@ public class TestSessionEventsAccumulatorTest {
     @Test
     public void testSessionEvents() {
         accumulator = new TestSessionEventsAccumulator(testEventQueue, true);
-        assertFalse(accumulator.hasSessionEnded());
 
         accumulator.beginSession();
         accumulator.sessionInfo("key1", "value1");
         accumulator.endSession();
-        assertTrue(accumulator.hasSessionEnded());
 
         assertEquals(3, testEventQueue.size());
 

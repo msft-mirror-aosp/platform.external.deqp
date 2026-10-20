@@ -20,7 +20,6 @@ m_vk.createMetalSurfaceEXT = (CreateMetalSurfaceEXTFunc) GET_PROC_ADDR("vkCreate
 m_vk.createScreenSurfaceQNX = (CreateScreenSurfaceQNXFunc) GET_PROC_ADDR("vkCreateScreenSurfaceQNX");
 m_vk.createStreamDescriptorSurfaceGGP = (CreateStreamDescriptorSurfaceGGPFunc) GET_PROC_ADDR("vkCreateStreamDescriptorSurfaceGGP");
 m_vk.createSurfaceOHOS = (CreateSurfaceOHOSFunc) GET_PROC_ADDR("vkCreateSurfaceOHOS");
-m_vk.createUbmSurfaceSEC = (CreateUbmSurfaceSECFunc) GET_PROC_ADDR("vkCreateUbmSurfaceSEC");
 m_vk.createViSurfaceNN = (CreateViSurfaceNNFunc) GET_PROC_ADDR("vkCreateViSurfaceNN");
 m_vk.createWaylandSurfaceKHR = (CreateWaylandSurfaceKHRFunc) GET_PROC_ADDR("vkCreateWaylandSurfaceKHR");
 m_vk.createWin32SurfaceKHR = (CreateWin32SurfaceKHRFunc) GET_PROC_ADDR("vkCreateWin32SurfaceKHR");
@@ -127,7 +126,6 @@ m_vk.getPhysicalDeviceToolProperties = (GetPhysicalDeviceToolPropertiesFunc) GET
 if (!m_vk.getPhysicalDeviceToolProperties)
     m_vk.getPhysicalDeviceToolProperties = (GetPhysicalDeviceToolPropertiesFunc) GET_PROC_ADDR("vkGetPhysicalDeviceToolPropertiesEXT");
 m_vk.getPhysicalDeviceToolPropertiesEXT = (GetPhysicalDeviceToolPropertiesFunc) GET_PROC_ADDR("vkGetPhysicalDeviceToolPropertiesEXT");
-m_vk.getPhysicalDeviceUbmPresentationSupportSEC = (GetPhysicalDeviceUbmPresentationSupportSECFunc) GET_PROC_ADDR("vkGetPhysicalDeviceUbmPresentationSupportSEC");
 m_vk.getPhysicalDeviceVideoCapabilitiesKHR = (GetPhysicalDeviceVideoCapabilitiesKHRFunc) GET_PROC_ADDR("vkGetPhysicalDeviceVideoCapabilitiesKHR");
 m_vk.getPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR = (GetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHRFunc) GET_PROC_ADDR("vkGetPhysicalDeviceVideoEncodeQualityLevelPropertiesKHR");
 m_vk.getPhysicalDeviceVideoFormatPropertiesKHR = (GetPhysicalDeviceVideoFormatPropertiesKHRFunc) GET_PROC_ADDR("vkGetPhysicalDeviceVideoFormatPropertiesKHR");

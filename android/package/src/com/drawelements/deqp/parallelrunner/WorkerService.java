@@ -24,10 +24,8 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.os.IBinder;
-import android.os.Process;
 import android.util.Log;
 import android.view.Surface;
-import com.drawelements.deqp.testercore.TestEventListener;
 import java.util.List;
 
 public class WorkerService extends Service {
@@ -41,7 +39,7 @@ public class WorkerService extends Service {
         }
     }
 
-    private native void nativeStartDeqp(Surface surface, String commandLineArgs, AssetManager assetManager, TestEventListener listener);
+    private native void nativeStartDeqp(Surface surface, String commandLineArgs, AssetManager assetManager);
 
     private final ISurfaceWorker.Stub binder = new ISurfaceWorker.Stub() {
         private volatile boolean isExecuting = false;
@@ -57,35 +55,22 @@ public class WorkerService extends Service {
                     Log.w(TAG, "Worker is already executing a batch. Ignoring request.");
                     return false;
                 }
-                if (surface == null) {
+                isExecuting = true;
+            }
+            try {
+                Log.i(TAG, "Executing native dEQP engine...");
+                if (surface != null) {
+                    AssetManager assets = (getBaseContext() != null) ? getAssets() : null;
+                    nativeStartDeqp(surface, commandLineArgs, assets);
+                    return true;
+                } else {
                     Log.w(TAG, "Cannot execute test batch: Surface is null.");
                     return false;
                 }
-                isExecuting = true;
-            }
-            // Elevate the binder thread to display priority during test execution to match
-            // legacy runner scheduling, and restore in finally to avoid leaking into the thread pool.
-            int prevPriority = Process.getThreadPriority(Process.myTid());
-            try {
-                try {
-                    Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
-                } catch (Throwable t) {
-                    Log.w(TAG, "Failed to set thread priority for dEQP execution", t);
-                }
-                Log.i(TAG, "Executing native dEQP engine...");
-                AssetManager assets = (getBaseContext() != null) ? getAssets() : null;
-                // TODO(b/564804892): Pass valid listener once direct event reporting mode is implemented.
-                nativeStartDeqp(surface, commandLineArgs, assets, null);
-                return true;
             } catch (Exception e) {
                 Log.e(TAG, "Native execution failed.", e);
                 return false;
             } finally {
-                try {
-                    Process.setThreadPriority(prevPriority);
-                } catch (Throwable t) {
-                    Log.w(TAG, "Failed to restore thread priority", t);
-                }
                 synchronized (stateLock) {
                     isExecuting = false;
                 }

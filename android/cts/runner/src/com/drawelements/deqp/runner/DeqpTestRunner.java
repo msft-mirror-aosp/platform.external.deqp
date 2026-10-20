@@ -132,13 +132,9 @@ public class DeqpTestRunner
     private static final int DEQP_PARALLEL_MAX_BATCHES_PER_CHUNK = 50;
     private static final int DEQP_PARALLEL_CHUNK_SIZE =
         DEQP_PARALLEL_MAX_BATCHES_PER_CHUNK * TESTCASE_BATCH_LIMIT;
-    private static final double DEQP_PARALLEL_TAIL_RATIO = 0.3;
     private static final int UNRESPONSIVE_CMD_TIMEOUT_MS_DEFAULT =
         10 * 60 * 1000; // 10min
-    private static final int DEQP_PARALLEL_EXECUTION_THRESHOLD = 4000;
-    private static final int DEQP_DEFAULT_MAX_WORKERS = 4;
-    private static final int PUSH_STRING_MAX_ATTEMPTS = 3;
-    private static final int PUSH_STRING_RETRY_DELAY_MS = 1000;
+    private static final int DEQP_PARALLEL_EXECUTION_THRESHOLD = 5000;
     private static final int R_API_LEVEL = 30;
     private static final int DEQP_LEVEL_R_2020 = 132383489;
     private static final int DEQP_LEVEL_B_2025 = 132711169;
@@ -287,8 +283,8 @@ public class DeqpTestRunner
     @Option(
         name = "deqp-max-workers",
         description =
-            "Maximum number of parallel workers for parallel run. Default is " + DEQP_DEFAULT_MAX_WORKERS)
-    private int mDeqpMaxWorkers = DEQP_DEFAULT_MAX_WORKERS;
+            "Maximum number of parallel workers for parallel run. Default is 4.")
+    private int mDeqpMaxWorkers = 4;
 
     @Option(
         name = "deqp-test-events-reporting-mode",
@@ -307,7 +303,7 @@ public class DeqpTestRunner
         new HashMap<>();
     private final Set<TestDescription> mUnstableTests = new LinkedHashSet<>();
     private final Set<TestDescription> mErrantTests = new LinkedHashSet<>();
-    private boolean mRunInLegacyMode = false;
+    private boolean mIsParallelRetry = false;
 
     protected IAbi mAbi;
     protected CompatibilityBuildHelper mBuildHelper;
@@ -475,7 +471,7 @@ public class DeqpTestRunner
 
                 // If test failed in parallel mode (and not currently on retry or unstable), defer reporting to sink
                 final boolean isStrictlyErrantOnly = !result.allInstancesPassed && !mUnstableTests.contains(testId);
-                if (isStrictlyErrantOnly && isParallelMode()) {
+                if (isStrictlyErrantOnly && isParallelFirstAttempt()) {
                     mErrantTests.add(testId);
                     return;
                 }
@@ -1451,87 +1447,6 @@ public class DeqpTestRunner
         return TESTCASE_BATCH_LIMIT;
     }
 
-    /**
-     * Returns the smallest shard size worth producing when splitting across devices.
-     *
-     * <p>A shard must hold enough tests to fill every on-device worker with a full
-     * {@link #TESTCASE_BATCH_LIMIT} batch, and must also clear
-     * {@link #DEQP_PARALLEL_EXECUTION_THRESHOLD} so that it actually activates parallel mode once
-     * it reaches the device. Without the threshold clamp, a lowered {@code deqp-max-workers}
-     * (e.g. 2 -> 2 * 1000 = 2000) would produce shards that spin up the full sharding machinery
-     * and then run single-threaded anyway.
-     *
-     * @return Minimum viable shard size in tests.
-     */
-    private int getMinChunkSize() {
-        int workers = mDeqpMaxWorkers > 0 ? mDeqpMaxWorkers : DEQP_DEFAULT_MAX_WORKERS;
-        return Math.max(DEQP_PARALLEL_EXECUTION_THRESHOLD, workers * TESTCASE_BATCH_LIMIT);
-    }
-
-    /**
-     * Calculates dynamic batch limits when splitting dEQP test suites across shards.
-     *
-     * To ensure all connected devices stay busy and finish at approximately the same time,
-     * batch sizes shrink progressively as the test run nears completion:
-     *   1. Early Phase (70% remaining): Uses larger batches (up to 50,000 tests) to
-     *      minimize process restarts and maximize execution speed.
-     *   2. Final Phase (30% remaining): Gradually reduces batch size down to a core minimum,
-     *      allowing fast devices to pick up remaining work instead of waiting idle. That minimum is
-     *      the larger of the on-device worker capacity (workers x 1,000) and the parallel
-     *      activation threshold, so every shard can both fill all workers and enable parallel mode.
-     *
-     * @param remainingTests Number of tests remaining to be assigned to shards.
-     * @param totalTests Total number of tests in the test suite.
-     * @param shardCountHint The attempted shard count provided by Tradefed.
-     * @return Calculated batch size limit for the current shard.
-     */
-    private int getTaperedBatchLimit(int remainingTests, int totalTests, int shardCountHint) {
-        // Fallback to legacy batch limit (1000) if parallel mode is disabled or test counts are invalid.
-        if (!mEnableDeqpParallelRun || totalTests <= 0 || remainingTests <= 0) {
-            return TESTCASE_BATCH_LIMIT;
-        }
-
-        int effectiveShardCount = shardCountHint > 0 ? shardCountHint : 1;
-        int workers = mDeqpMaxWorkers > 0 ? mDeqpMaxWorkers : DEQP_DEFAULT_MAX_WORKERS;
-
-        // Total active rendering streams across all assigned shards.
-        int totalWorkers = effectiveShardCount * workers;
-        int baseDivisor = Math.max(1, totalWorkers / 2);
-
-        // Minimum shard size required to feed all worker cores with 1000-test batches.
-        int minChunk = getMinChunkSize();
-
-        // If the suite is smaller than the minimum chunk floor, do not shard across devices.
-        if (totalTests < minChunk) {
-            return totalTests;
-        }
-
-        // When total test count is too small for progressive tapering (baseChunk would collapse to minChunk),
-        // distribute tests evenly across shards to produce balanced workloads.
-        if (totalTests <= baseDivisor * minChunk) {
-            int maxShards = Math.min(effectiveShardCount, totalTests / minChunk);
-            return (int) Math.ceil((double) totalTests / Math.max(1, maxShards));
-        }
-
-        // Large batch target for the early phase (bounded between minChunk and 50,000 tests).
-        int baseChunk = Math.min(DEQP_PARALLEL_CHUNK_SIZE, Math.max(minChunk, totalTests / baseDivisor));
-
-        double remainingRatio = (double) remainingTests / totalTests;
-
-        int targetChunk;
-        if (remainingRatio > DEQP_PARALLEL_TAIL_RATIO) {
-            // Early Phase: Maintain max batch size during the first 70% of execution.
-            targetChunk = baseChunk;
-        } else {
-            // Final Phase: Linearly shrink batch size from baseChunk down to minChunk during the final 30%.
-            double tailRatio = remainingRatio / DEQP_PARALLEL_TAIL_RATIO;
-            targetChunk = minChunk + (int) ((baseChunk - minChunk) * tailRatio);
-        }
-
-        // Cap batch size by remaining tests to prevent over-requesting on final shard.
-        return Math.min(remainingTests, Math.max(minChunk, targetChunk));
-    }
-
     protected int getBatchNumPendingCases(TestBatch batch) {
         int numPending = 0;
         for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
@@ -1563,7 +1478,7 @@ public class DeqpTestRunner
      * in {@code mUnstableTests} to be retried in a subsequent pass instead of being aborted immediately.
      */
     protected void recordTestInstability(TestDescription testId) {
-        if (isParallelMode()) {
+        if (isParallelFirstAttempt()) {
             mUnstableTests.add(testId);
         } else {
             mTestInstabilityRatings.put(testId,
@@ -1606,20 +1521,15 @@ public class DeqpTestRunner
         throws DeviceNotAvailableException, CapabilityQueryFailureException {
         final Set<TestDescription> tests = new LinkedHashSet<>(testsToRetry);
         testsToRetry.clear();
-
-        CLog.d("Number of %s tests to be retried is : %d", testType,
-                tests.size());
-        for (TestDescription test : tests) {
-            CLog.d("  %s.%s", test.getClassName(), test.getTestName());
-        }
+        CLog.d("Number of %s tests to be retried is : %d", testType, tests.size());
 
         mRemainingTests.addAll(tests);
 
-        mRunInLegacyMode = true;
+        mIsParallelRetry = true;
         try {
             runTests();
         } finally {
-            mRunInLegacyMode = false;
+            mIsParallelRetry = false;
         }
     }
 
@@ -1794,26 +1704,24 @@ public class DeqpTestRunner
         // which are parsed asynchronously by parallel log parsers.
         final boolean shouldLogData = !isParallel && mLogData;
         final String deqpCmdLine = buildDeqpCmdLine(runConfig, isParallel, shouldLogData);
-        // Resolved per batch into a local so that the @Option field is never mutated. Writing the
-        // resolved value back would make it sticky: the first batch's mode would override the
-        // isParallel based default for every subsequent batch.
-        final String eventReportingMode =
-            resolveEventReportingMode(mEventReportingMode, isParallel);
 
         final StringBuilder command = new StringBuilder("am instrument ");
         command.append(AbiUtils.createAbiFlag(mAbi.getName()))
                .append(" -w -e deqpLogFilename \"").append(deqpLogPath).append("\"")
                .append(" -e deqpCmdLine \"").append(deqpCmdLine).append("\"")
                .append(" -e deqpLogData \"").append(shouldLogData).append("\"")
-               .append(" -e deqpEventReportingMode \"").append(eventReportingMode).append("\"");
+               .append(" -e deqpEventReportingMode \"").append(mEventReportingMode).append("\"");
 
         if (isParallel) {
-            CLog.d("Executing batch with test count: %d, max workers: %d, in Parallel mode", testCount, mDeqpMaxWorkers);
+            final int maxWorkers = (!mIsParallelRetry && testCount >= DEQP_PARALLEL_EXECUTION_THRESHOLD)
+                    ? mDeqpMaxWorkers
+                    : 1;
+            CLog.d("Executing batch with test count: %d, max workers: %d, in Parallel mode", testCount, maxWorkers);
             // Pass parallel execution configuration options to DeqpInstrumentation on the device.
             command.append(" -e deqpEnableParallel \"true\"")
                    .append(" -e deqpCaselistDir \"").append(APP_DIR_PARALLEL_CASELISTS).append("\"")
                    .append(" -e deqpLogDir \"").append(APP_DIR_PARALLEL_LOGS).append("\"")
-                   .append(" -e deqpMaxWorkers \"").append(mDeqpMaxWorkers).append("\"");
+                   .append(" -e deqpMaxWorkers \"").append(maxWorkers).append("\"");
         } else {
             CLog.d("Executing batch with test count: %d in Serial mode", testCount);
         }
@@ -1828,123 +1736,75 @@ public class DeqpTestRunner
     protected void executeTestRunBatch(TestBatch batch)
         throws DeviceNotAvailableException {
         final int testCount = batch.getTestBatchTestDescriptionList().size();
-        // Batches smaller than the threshold are not worth the parallel execution overhead, so
-        // they are forced to run in legacy (serial) mode.
-        //
-        // mRunInLegacyMode is an instance variable shared by every batch this runner executes, so
-        // setting it here without restoring it would create a sticky state: once a single small
-        // batch flipped it to true, every subsequent batch would be forced into legacy mode as
-        // well, even when its test count is well above the threshold. The previous value is
-        // therefore captured here and restored in the finally block below, which keeps the
-        // override scoped to this batch only and also preserves the enclosing value when this
-        // method recurses over sub batches.
-        final boolean previousRunInLegacyMode = mRunInLegacyMode;
-        if (testCount < DEQP_PARALLEL_EXECUTION_THRESHOLD) {
-            mRunInLegacyMode = true;
-        }
+        final boolean isParallel = isParallelMode();
+        mEventReportingMode = resolveEventReportingMode(mEventReportingMode, isParallel);
 
-        try {
-            final boolean isParallel = isParallelMode();
-            final String command =
-                buildInstrumentationCommand(batch.getTestBatchConfig(), isParallel, testCount);
+        final String command =
+            buildInstrumentationCommand(batch.getTestBatchConfig(), isParallel, testCount);
 
-            final InstrumentationParser parser =
-                new InstrumentationParser(getInstanceListener());
-            // attempt full run once
-            executeTestRunBatchRun(batch, APK_INSTRUMENTATION_NAME, command, parser);
+        final InstrumentationParser parser =
+            new InstrumentationParser(getInstanceListener());
+        // attempt full run once
+        executeTestRunBatchRun(batch, APK_INSTRUMENTATION_NAME, command, parser);
 
-            // split remaining tests to two sub batches and execute both. This will
-            // terminate since executeTestRunBatchRun will always progress for a
-            // batch of size 1.
-            final ArrayList<TestDescription> pendingTests = new ArrayList<>();
+        // split remaining tests to two sub batches and execute both. This will
+        // terminate since executeTestRunBatchRun will always progress for a
+        // batch of size 1.
+        final ArrayList<TestDescription> pendingTests = new ArrayList<>();
 
-            for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
-                if (getInstanceListener().isPendingTestInstance(test, batch.getTestBatchConfig())) {
-                    pendingTests.add(test);
-                }
-            }
-
-            if (isParallel) {
-                // In the first parallel attempt, re-select and execute remaining pending tests in sub-batches.
-                // Any test that is unstable or errant is excluded by selectRunBatch, allowing the
-                // remaining tests in the batch to be executed in subsequent passes.
-                for (;;) {
-                    TestBatch subBatch = selectRunBatch(pendingTests, batch.getTestBatchConfig());
-
-                    if (subBatch == null) {
-                        break;
-                    }
-
-                    executeTestRunBatch(subBatch);
-                }
-            } else {
-                final int divisorNdx = pendingTests.size() / 2;
-                final List<TestDescription> headList =
-                    pendingTests.subList(0, divisorNdx);
-                final List<TestDescription> tailList =
-                    pendingTests.subList(divisorNdx, pendingTests.size());
-
-                // head
-                for (;;) {
-                    TestBatch subBatch = selectRunBatch(headList, batch.getTestBatchConfig());
-
-                    if (subBatch == null) {
-                        break;
-                    }
-
-                    executeTestRunBatch(subBatch);
-                }
-
-                // tail
-                for (;;) {
-                    TestBatch subBatch = selectRunBatch(tailList, batch.getTestBatchConfig());
-
-                    if (subBatch == null) {
-                        break;
-                    }
-
-                    executeTestRunBatch(subBatch);
-                }
-            }
-
-            if (getBatchNumPendingCases(batch) != 0) {
-                throw new AssertionError(
-                    "executeTestRunBatch postcondition failed");
-            }
-        } finally {
-            // Undo the batch scoped legacy mode override, including when the batch bails out with
-            // an exception, so that it never becomes sticky for the batches that follow.
-            mRunInLegacyMode = previousRunInLegacyMode;
-        }
-    }
-
-    /**
-     * Pushes a string to a remote file path with retry and backoff delay.
-     *
-     * @param content the string content to push
-     * @param remoteFilePath the remote destination file path on device
-     * @return true if pushed successfully, false if all attempts failed
-     * @throws DeviceNotAvailableException if device is not available
-     */
-    private boolean pushStringWithRetry(String content, String remoteFilePath)
-            throws DeviceNotAvailableException {
-        for (int attempt = 1; attempt <= PUSH_STRING_MAX_ATTEMPTS; attempt++) {
-            CLog.d("Pushing test cases to " + remoteFilePath + " (attempt " + attempt + " of "
-                    + PUSH_STRING_MAX_ATTEMPTS + ")");
-            if (mDevice.pushString(content, remoteFilePath)) {
-                CLog.d("Successfully pushed test cases to " + remoteFilePath);
-                return true;
-            } else {
-                CLog.w("Failed to push test cases to " + remoteFilePath + " on attempt " + attempt);
-                if (attempt < PUSH_STRING_MAX_ATTEMPTS) {
-                    long currentDelay = attempt * PUSH_STRING_RETRY_DELAY_MS;
-                    CLog.d("Waiting %d ms before retrying push to %s", currentDelay,
-                            remoteFilePath);
-                    mRunUtil.sleep(currentDelay);
-                }
+        for (TestDescription test : batch.getTestBatchTestDescriptionList()) {
+            if (getInstanceListener().isPendingTestInstance(test, batch.getTestBatchConfig())) {
+                pendingTests.add(test);
             }
         }
-        return false;
+
+        if (isParallelFirstAttempt()) {
+            // In the first parallel attempt, re-select and execute remaining pending tests in sub-batches.
+            // Any test that is unstable or errant is excluded by selectRunBatch, allowing the
+            // remaining tests in the batch to be executed in subsequent passes.
+            for (;;) {
+                TestBatch subBatch = selectRunBatch(pendingTests, batch.getTestBatchConfig());
+
+                if (subBatch == null) {
+                    break;
+                }
+
+                executeTestRunBatch(subBatch);
+            }
+        } else {
+            final int divisorNdx = pendingTests.size() / 2;
+            final List<TestDescription> headList =
+                pendingTests.subList(0, divisorNdx);
+            final List<TestDescription> tailList =
+                pendingTests.subList(divisorNdx, pendingTests.size());
+
+            // head
+            for (;;) {
+                TestBatch subBatch = selectRunBatch(headList, batch.getTestBatchConfig());
+
+                if (subBatch == null) {
+                    break;
+                }
+
+                executeTestRunBatch(subBatch);
+            }
+
+            // tail
+            for (;;) {
+                TestBatch subBatch = selectRunBatch(tailList, batch.getTestBatchConfig());
+
+                if (subBatch == null) {
+                    break;
+                }
+
+                executeTestRunBatch(subBatch);
+            }
+        }
+
+        if (getBatchNumPendingCases(batch) != 0) {
+            throw new AssertionError(
+                "executeTestRunBatch postcondition failed");
+        }
     }
 
     /**
@@ -1973,19 +1833,15 @@ public class DeqpTestRunner
             mDevice.executeShellCommand("mkdir -p " + remoteCaselistsDir);
             mDevice.executeShellCommand("mkdir -p " + remoteLogsDir);
 
-            // Parallel mode is only used for the first attempt. Unstable and errant tests
-            // are retried in legacy mode, which sizes batches based on instability.
-            // Hence, the instability score is always 0 here.
+            // TODO: Currently we are taking instability score of 0 for the parallel mode
+            //       In future we have to take into account of instability score of the tests.
             final int batchSize = getBatchSizeLimitForInstability(0);
             for (int i = 0; i < testList.size(); i += batchSize) {
                 List<TestDescription> subList = testList.subList(i, Math.min(i + batchSize, testList.size()));
                 String testCases = generateTestCaseTrie(subList);
                 String remoteFileName = remoteCaselistsDir + "dEQP-part" + (i / batchSize + 1) + ".txt";
-                if (!pushStringWithRetry(testCases + "\n", remoteFileName)) {
-                    CLog.e("Failed to write test cases to " + remoteFileName + " after "
-                            + PUSH_STRING_MAX_ATTEMPTS
-                            + " attempts. Aborting further caselist pushes for this chunk.");
-                    break;
+                if (!mDevice.pushString(testCases + "\n", remoteFileName)) {
+                    throw new RuntimeException("Failed to write test cases to " + remoteFileName);
                 }
             }
         } else {
@@ -1993,7 +1849,7 @@ public class DeqpTestRunner
             final String testCaseFilename = APP_DIR + CASE_LIST_FILE_NAME;
             mDevice.executeShellCommand("rm " + testCaseFilename);
             mDevice.executeShellCommand("rm " + APP_DIR + LOG_FILE_NAME);
-            if (!pushStringWithRetry(testCases + "\n", testCaseFilename)) {
+            if (!mDevice.pushString(testCases + "\n", testCaseFilename)) {
                 throw new RuntimeException("Failed to write test cases to " +
                                            testCaseFilename);
             }
@@ -2066,7 +1922,7 @@ public class DeqpTestRunner
                 // non-executable. This is required so that a consistently
                 // crashing or non-existent tests will not cause futile
                 // (non-terminating) re-execution attempts.
-                if (!isParallelMode()) {
+                if (!isParallelFirstAttempt()) {
                     if (getInstanceListener().getCurrentTestId() != null) {
                         getInstanceListener().abortTest(onlyTest,
                                                      INCOMPLETE_LOG_MESSAGE);
@@ -3177,15 +3033,9 @@ public class DeqpTestRunner
 
     /**
      * {@inheritDoc}
-     *
-     * <p>Splits tests across target devices using progressive batch sizing to balance bulk
-     * execution throughput and tail work-stealing.
-     *
-     * @param shardCountHint The attempted shard count provided by Tradefed.
-     * @return A collection of {@link IRemoteTest} shards, or {@code []} if no tests to run.
      */
     @Override
-    public Collection<IRemoteTest> split(int shardCountHint) {
+    public Collection<IRemoteTest> split() {
         if (mTestInstances != null) {
             throw new AssertionError(
                 "Re-splitting or splitting running instance?");
@@ -3206,64 +3056,25 @@ public class DeqpTestRunner
 
         if (iterationSet.keySet().isEmpty()) {
             CLog.i("Cannot split deqp tests, no tests to run");
-            // Omit empty caselists during dEQP test sharding, eliminating dummy invocations
-            return new ArrayList<>();
+            return null;
         }
 
-        int totalTests = iterationSet.keySet().size();
-        int remainingTests = totalTests;
-        int shardIndex = 0;
-
-        CLog.i("==========================================================================");
-        CLog.i("SHARDING DEQP PACKAGE: %s (Caselist: %s)", mDeqpPackage, mCaselistFile);
-        CLog.i("Total Tests: %d | Shard Count Hint: %d | Parallel Mode: %b | Max Workers: %d",
-                totalTests, shardCountHint, mEnableDeqpParallelRun, mDeqpMaxWorkers);
-        CLog.i("--------------------------------------------------------------------------");
-
-        // Go through tests and create shards using progressive batch sizing.
+        // Go through tests, split
         for (TestDescription test : iterationSet.keySet()) {
             currentSet.put(test, iterationSet.get(test));
-            int currentLimit = getTaperedBatchLimit(remainingTests, totalTests, shardCountHint);
-            if (currentSet.size() >= currentLimit) {
-                shardIndex++;
-                int remainingAfter = remainingTests - currentSet.size();
-                double remainingPct = ((double) remainingAfter / totalTests) * 100.0;
-                CLog.i("  [Shard #%d] Size: %d tests | Remaining after: %d (%.1f%%)",
-                        shardIndex, currentSet.size(), remainingAfter, remainingPct);
+            if (currentSet.size() >= getBatchSizeLimit()) {
                 runners.add(new DeqpTestRunner(this, currentSet));
-                remainingTests -= currentSet.size();
                 // NOTE: Use linked hash map to keep the insertion order in
                 // iteration
                 currentSet = new LinkedHashMap<>();
             }
         }
-        if (!currentSet.isEmpty()) {
-            shardIndex++;
-            CLog.i("  [Shard #%d (Tail)] Size: %d tests | Remaining after: 0 (0.0%%)",
-                    shardIndex, currentSet.size());
-            runners.add(new DeqpTestRunner(this, currentSet));
-        }
+        runners.add(new DeqpTestRunner(this, currentSet));
 
         // Compute new runtime hints
         updateRuntimeHint(iterationSet.size(), runners);
-        CLog.i("--------------------------------------------------------------------------");
-        CLog.i("Successfully split %s into %d total shards.", mCaselistFile, runners.size());
-        CLog.i("==========================================================================");
+        CLog.i("Split deqp tests into %d shards", runners.size());
         return runners;
-    }
-
-    /**
-     * {@inheritDoc}
-     *
-     * <p>Default overload for {@link IShardableTest#split()}. Delegates to {@code split(1)}
-     * (single-device baseline) primarily for unit tests and interface compliance, as production
-     * Tradefed invocations call {@link #split(int)} directly.
-     *
-     * @return A collection of {@link IRemoteTest} shards for single-device execution.
-     */
-    @Override
-    public Collection<IRemoteTest> split() {
-        return split(1);
     }
 
     /**
@@ -3292,8 +3103,11 @@ public class DeqpTestRunner
     }
 
     private boolean isParallelMode() {
-        return mEnableDeqpParallelRun && isHandheld() && !mRunInLegacyMode;
+        return mEnableDeqpParallelRun && isHandheld();
+    }
+
+    private boolean isParallelFirstAttempt() {
+        return isParallelMode() && !mIsParallelRetry;
     }
 
 }
-

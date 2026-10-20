@@ -55,7 +55,6 @@
 #ifndef CTS_USES_VULKANSC
 #include "vktApiSmokeTests.hpp"
 #include "vktApiBufferMarkerTests.hpp"
-#include "vktApiDeviceAddressCommandsTests.hpp"
 #include "vktApiDeviceDrmPropertiesTests.hpp"
 #include "vktApiExternalMemoryTests.hpp"
 #include "vktApiToolingInfoTests.hpp"
@@ -133,7 +132,6 @@ void createApiTests(tcu::TestCaseGroup *apiTests)
     apiTests->addChild(createMaintenance5Tests(testCtx));
     apiTests->addChild(createFragmentShaderOutputTests(testCtx));
     apiTests->addChild(createMaintenance7Tests(testCtx));
-    apiTests->addChild(createDeviceAddressCommandsTests(testCtx));
 #endif
     apiTests->addChild(createExtensionDuplicatesTests(testCtx));
 #ifndef CTS_USES_VULKANSC

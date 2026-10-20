@@ -281,17 +281,9 @@ inline VkDescriptorUpdateTemplateEntry makeDescriptorUpdateTemplateEntry (uint32
 	return res;
 }
 
-inline VkDeviceAddressRangeKHR makeDeviceAddressRangeKHR (VkDeviceAddress address, VkDeviceSize size)
+inline VkDeviceFaultAddressInfoEXT makeDeviceFaultAddressInfoEXT (VkDeviceFaultAddressTypeEXT addressType, VkDeviceAddress reportedAddress, VkDeviceSize addressPrecision)
 {
-	VkDeviceAddressRangeKHR res;
-	res.address	= address;
-	res.size	= size;
-	return res;
-}
-
-inline VkDeviceFaultAddressInfoKHR makeDeviceFaultAddressInfoKHR (VkDeviceFaultAddressTypeKHR addressType, VkDeviceAddress reportedAddress, VkDeviceSize addressPrecision)
-{
-	VkDeviceFaultAddressInfoKHR res;
+	VkDeviceFaultAddressInfoEXT res;
 	res.addressType			= addressType;
 	res.reportedAddress		= reportedAddress;
 	res.addressPrecision	= addressPrecision;
@@ -529,9 +521,9 @@ inline VkMemoryRequirements makeMemoryRequirements (VkDeviceSize size, VkDeviceS
 	return res;
 }
 
-inline VkMicromapTriangleKHR makeMicromapTriangleKHR (uint32_t dataOffset, uint16_t subdivisionLevel, uint16_t format)
+inline VkMicromapTriangleEXT makeMicromapTriangleEXT (uint32_t dataOffset, uint16_t subdivisionLevel, uint16_t format)
 {
-	VkMicromapTriangleKHR res;
+	VkMicromapTriangleEXT res;
 	res.dataOffset			= dataOffset;
 	res.subdivisionLevel	= subdivisionLevel;
 	res.format				= format;
@@ -541,15 +533,6 @@ inline VkMicromapTriangleKHR makeMicromapTriangleKHR (uint32_t dataOffset, uint1
 inline VkMicromapUsageEXT makeMicromapUsageEXT (uint32_t count, uint32_t subdivisionLevel, uint32_t format)
 {
 	VkMicromapUsageEXT res;
-	res.count				= count;
-	res.subdivisionLevel	= subdivisionLevel;
-	res.format				= format;
-	return res;
-}
-
-inline VkMicromapUsageKHR makeMicromapUsageKHR (uint32_t count, uint32_t subdivisionLevel, VkOpacityMicromapFormatKHR format)
-{
-	VkMicromapUsageKHR res;
 	res.count				= count;
 	res.subdivisionLevel	= subdivisionLevel;
 	res.format				= format;

@@ -34,7 +34,6 @@
 #include "vktRayQueryNonUniformArgsTests.hpp"
 #include "vktRayQueryMultipleRayQueries.hpp"
 #include "vktRayQueryOpacityMicromapTests.hpp"
-#include "vktRayQueryOpacityMicromapTestsKHR.hpp"
 #include "vktRayQueryPositionFetchTests.hpp"
 #include "vktRayQueryStressTests.hpp"
 
@@ -64,12 +63,7 @@ tcu::TestCaseGroup *createTests(tcu::TestContext &testCtx, const std::string &na
     group->addChild(createBarycentricCoordinatesTests(testCtx));
     group->addChild(createNonUniformArgsTests(testCtx));
     group->addChild(addHelperInvocationsTests(testCtx));
-
-    de::MovePtr<tcu::TestCaseGroup> opacityMicromapGroup(new tcu::TestCaseGroup(testCtx, "opacity_micromap"));
-    opacityMicromapGroup->addChild(createOpacityMicromapTests(testCtx));
-    opacityMicromapGroup->addChild(createOpacityMicromapTestsKHR(testCtx));
-    group->addChild(opacityMicromapGroup.release());
-
+    group->addChild(createOpacityMicromapTests(testCtx));
     group->addChild(createPositionFetchTests(testCtx));
     group->addChild(createMultipleRayQueryTests(testCtx));
     group->addChild(createRayQueryStressTests(testCtx));

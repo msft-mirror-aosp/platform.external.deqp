@@ -191,7 +191,6 @@ struct TestParams
     uint32_t workerThreadsCount;
     EmptyAccelerationStructureCase emptyASCase;
     InstanceCustomIndexCase instanceCustomIndexCase;
-    bool useDeviceAddressCommands;
     bool useCullMask;
     uint32_t cullMask;
     UpdateCase updateCase;
@@ -440,7 +439,6 @@ std::vector<de::SharedPtr<BottomLevelAccelerationStructure>> CheckerboardConfigu
         }
 
         bottomLevelAccelerationStructure->addGeometry(geometry);
-        bottomLevelAccelerationStructure->setUseDeviceAddressCommands(testParams.useDeviceAddressCommands);
 
         if (testParams.instanceCustomIndexCase == InstanceCustomIndexCase::ANY_HIT)
             geometry->setGeometryFlags(VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR);
@@ -544,7 +542,6 @@ std::vector<de::SharedPtr<BottomLevelAccelerationStructure>> CheckerboardConfigu
                 }
 
                 bottomLevelAccelerationStructure->addGeometry(geometry);
-                bottomLevelAccelerationStructure->setUseDeviceAddressCommands(testParams.useDeviceAddressCommands);
 
                 if (testParams.instanceCustomIndexCase == InstanceCustomIndexCase::ANY_HIT)
                     geometry->setGeometryFlags(VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR);
@@ -571,7 +568,6 @@ de::MovePtr<TopLevelAccelerationStructure> CheckerboardConfiguration::initTopAcc
 
     de::MovePtr<TopLevelAccelerationStructure> result = makeTopLevelAccelerationStructure();
     result->setInstanceCount(instanceCount);
-    result->setUseDeviceAddressCommands(testParams.useDeviceAddressCommands);
 
     if (testParams.topTestType == TopTestType::DIFFERENT_INSTANCES)
     {
@@ -1209,7 +1205,7 @@ class RayTracingASBasicTestCase : public TestCase
 {
 public:
     RayTracingASBasicTestCase(tcu::TestContext &context, const char *name, const TestParams &data);
-    ~RayTracingASBasicTestCase(void) = default;
+    ~RayTracingASBasicTestCase(void);
 
     void checkSupport(Context &context) const override;
     void initPrograms(SourceCollections &programCollection) const override;
@@ -1225,7 +1221,9 @@ class RayTracingASFuncArgTestCase : public RayTracingASBasicTestCase
 {
 public:
     RayTracingASFuncArgTestCase(tcu::TestContext &context, const char *name, const TestParams &data);
-    ~RayTracingASFuncArgTestCase(void) = default;
+    ~RayTracingASFuncArgTestCase(void)
+    {
+    }
 
     void initPrograms(SourceCollections &programCollection) const override;
 };
@@ -1253,6 +1251,10 @@ RayTracingASBasicTestCase::RayTracingASBasicTestCase(tcu::TestContext &context, 
 {
 }
 
+RayTracingASBasicTestCase::~RayTracingASBasicTestCase(void)
+{
+}
+
 void RayTracingASBasicTestCase::checkSupport(Context &context) const
 {
     commonASTestsCheckSupport(context);
@@ -1263,9 +1265,6 @@ void RayTracingASBasicTestCase::checkSupport(Context &context) const
         accelerationStructureFeaturesKHR.accelerationStructureHostCommands == false)
         TCU_THROW(NotSupportedError,
                   "Requires VkPhysicalDeviceAccelerationStructureFeaturesKHR.accelerationStructureHostCommands");
-
-    if (m_data.useDeviceAddressCommands)
-        context.requireDeviceFunctionality("VK_KHR_device_address_commands");
 
     if (m_data.useCullMask)
         context.requireDeviceFunctionality("VK_KHR_ray_tracing_maintenance1");
@@ -5576,7 +5575,7 @@ void addBasicBuildingTests(tcu::TestCaseGroup *group)
                     de::MovePtr<tcu::TestCaseGroup> topGroup(
                         new tcu::TestCaseGroup(group->getTestContext(), topTestTypes[topNdx].name));
 
-                    for (size_t paddingTypeIdx = 0; paddingTypeIdx < DE_LENGTH_OF_ARRAY(paddingType); ++paddingTypeIdx)
+                    for (int paddingTypeIdx = 0; paddingTypeIdx < DE_LENGTH_OF_ARRAY(paddingType); ++paddingTypeIdx)
                     {
                         de::MovePtr<tcu::TestCaseGroup> paddingGroup(
                             new tcu::TestCaseGroup(group->getTestContext(), paddingType[paddingTypeIdx].name));
@@ -5642,28 +5641,12 @@ void addBasicBuildingTests(tcu::TestCaseGroup *group)
                                                 EmptyAccelerationStructureCase::NOT_EMPTY,
                                                 InstanceCustomIndexCase::NONE,
                                                 false,
-                                                false,
                                                 0xFFu,
                                                 UpdateCase::NONE,
                                                 accStructBufferResTypes[structResidencyNdx].res,
                                             };
-
                                             paddingGroup->addChild(new RayTracingASBasicTestCase(
                                                 group->getTestContext(), testName.c_str(), testParams));
-
-                                            // limit number of repeated tests for device_address_commands
-                                            if (!unboundedCreationBottom && !unboundedCreationTop &&
-                                                (buildTypes[buildTypeNdx].buildType ==
-                                                 VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR) &&
-                                                (bottomNdx == topNdx) && (paddingTypeIdx == optimizationNdx) &&
-                                                (compactionNdx == lowMemoryNdx) && (paddingTypeIdx == lowMemoryNdx))
-                                            {
-                                                testName += "_device_address";
-                                                testParams.useDeviceAddressCommands = true;
-
-                                                paddingGroup->addChild(new RayTracingASBasicTestCase(
-                                                    group->getTestContext(), testName.c_str(), testParams));
-                                            }
                                         }
                                     }
                                 }
@@ -5794,7 +5777,6 @@ void addVertexIndexFormatsTests(tcu::TestCaseGroup *group)
                             0u,
                             EmptyAccelerationStructureCase::NOT_EMPTY,
                             InstanceCustomIndexCase::NONE,
-                            false,
                             false,
                             0xFFu,
                             UpdateCase::NONE,
@@ -5928,7 +5910,6 @@ void addOperationTestsImpl(tcu::TestCaseGroup *group, const uint32_t workerThrea
                             EmptyAccelerationStructureCase::NOT_EMPTY,
                             InstanceCustomIndexCase::NONE,
                             false,
-                            false,
                             0xFFu,
                             UpdateCase::NONE,
                             accStructBufferResTypes[structResidencyNdx].res,
@@ -6026,7 +6007,6 @@ void addFuncArgTests(tcu::TestCaseGroup *group)
                 0u,
                 EmptyAccelerationStructureCase::NOT_EMPTY,
                 InstanceCustomIndexCase::NONE,
-                false,
                 false,
                 0xFFu,
                 UpdateCase::NONE,
@@ -6142,7 +6122,6 @@ void addInstanceTriangleCullingTests(tcu::TestCaseGroup *group)
                             0u,
                             EmptyAccelerationStructureCase::NOT_EMPTY,
                             InstanceCustomIndexCase::NONE,
-                            false,
                             false,
                             0xFFu,
                             UpdateCase::NONE,
@@ -6276,7 +6255,6 @@ void addEmptyAccelerationStructureTests(tcu::TestCaseGroup *group)
                         emptyCases[emptyCaseIdx].emptyASCase,
                         InstanceCustomIndexCase::NONE,
                         false,
-                        false,
                         0xFFu,
                         UpdateCase::NONE,
                         accStructBufferResTypes[structResidencyNdx].res,
@@ -6373,7 +6351,6 @@ void addInstanceIndexTests(tcu::TestCaseGroup *group)
                     EmptyAccelerationStructureCase::NOT_EMPTY,
                     customIndexCases[customIndexCaseIdx].customIndexCase,
                     false,
-                    false,
                     0xFFu,
                     UpdateCase::NONE,
                     accStructBufferResTypes[structResidencyNdx].res,
@@ -6460,7 +6437,6 @@ void addInstanceUpdateTests(tcu::TestCaseGroup *group)
                     0u,
                     EmptyAccelerationStructureCase::NOT_EMPTY,
                     InstanceCustomIndexCase::NONE,
-                    false,
                     false,
                     0xFFu,
                     UpdateCase::NONE,
@@ -6570,7 +6546,6 @@ void addInstanceRayCullMaskTests(tcu::TestCaseGroup *group)
                         0u,
                         EmptyAccelerationStructureCase::NOT_EMPTY,
                         customIndexCases[customIndexCaseIdx].customIndexCase,
-                        false,
                         true,
                         cullMask[cullMaskIdx].cullMask,
                         UpdateCase::NONE,
@@ -6660,7 +6635,6 @@ void addGetDeviceAccelerationStructureCompabilityTests(tcu::TestCaseGroup *group
                     0u,                                                                // workerThreadsCount
                     EmptyAccelerationStructureCase::NOT_EMPTY,                         // emptyASCase
                     InstanceCustomIndexCase::NONE,                                     // instanceCustomIndexCase
-                    false,                                                             // useDeviceAddressCommands
                     false,                                                             // useCullMask
                     0xFFu,                                                             // cullMask
                     UpdateCase::NONE,                                                  // updateCase
@@ -6748,7 +6722,6 @@ void addUpdateHeaderBottomAddressTests(tcu::TestCaseGroup *group)
                     0u,                                              // workerThreadsCount
                     EmptyAccelerationStructureCase::NOT_EMPTY,       // emptyASCase
                     InstanceCustomIndexCase::NONE,                   // instanceCustomIndexCase
-                    false,                                           // useDeviceAddressCommands
                     false,                                           // useCullMask
                     0xFFu,                                           // cullMask
                     UpdateCase::NONE,                                // updateCase
@@ -6998,7 +6971,6 @@ void addUpdateTests(TestCaseGroup *group)
                         0u,
                         EmptyAccelerationStructureCase::NOT_EMPTY,
                         InstanceCustomIndexCase::NONE,
-                        false,
                         false,
                         0xFFu,
                         updateTypes[updateTypesIdx].updateType,

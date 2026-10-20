@@ -776,8 +776,7 @@ tcu::TestStatus ShaderObjectDeviceFeaturesBinaryInstance::iterate(void)
     auto imageViewMinLodFeatures                    = m_context.getImageViewMinLodFeaturesEXT();
     auto multiDrawFeatures                          = m_context.getMultiDrawFeaturesEXT();
     auto image2DViewOf3DFeatures                    = m_context.getImage2DViewOf3DFeaturesEXT();
-    auto opacityMicromapFeaturesEXT                 = m_context.getOpacityMicromapFeaturesEXT();
-    auto opacityMicromapFeatures                    = m_context.getOpacityMicromapFeatures();
+    auto opacityMicromapFeatures                    = m_context.getOpacityMicromapFeaturesEXT();
     auto displacementMicromapFeatures               = m_context.getDisplacementMicromapFeatures();
     auto clusterCullingShaderFeatures               = m_context.getClusterCullingShaderFeaturesHUAWEI();
     auto borderColorSwizzleFeatures                 = m_context.getBorderColorSwizzleFeaturesEXT();
@@ -914,7 +913,6 @@ tcu::TestStatus ShaderObjectDeviceFeaturesBinaryInstance::iterate(void)
         &imageViewMinLodFeatures,
         &multiDrawFeatures,
         &image2DViewOf3DFeatures,
-        &opacityMicromapFeaturesEXT,
         &opacityMicromapFeatures,
         &displacementMicromapFeatures,
         &clusterCullingShaderFeatures,

@@ -27,14 +27,16 @@
 #include "vktTestCase.hpp"
 #include "vktDrawGroupParams.hpp"
 
-namespace vkt::Draw
+namespace vkt
+{
+namespace Draw
 {
 
 class InstancedTests : public tcu::TestCaseGroup
 {
 public:
     InstancedTests(tcu::TestContext &testCtx, const SharedGroupParams groupParams);
-    ~InstancedTests(void) = default;
+    ~InstancedTests(void);
 
 private:
     InstancedTests(const InstancedTests &other);
@@ -44,6 +46,7 @@ private:
     const SharedGroupParams m_groupParams;
 };
 
-} // namespace vkt::Draw
+} // namespace Draw
+} // namespace vkt
 
 #endif // _VKTDRAWINSTANCEDTESTS_HPP

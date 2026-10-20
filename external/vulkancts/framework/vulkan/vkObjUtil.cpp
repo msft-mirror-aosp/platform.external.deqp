@@ -143,21 +143,23 @@ Move<VkPipeline> makeGraphicsPipeline(
         dynamicStateCreateInfo ? dynamicStateCreateInfo : dynamicStateCreateInfoDefaultPtr, pNext, pipelineCreateFlags);
 }
 
-Move<VkPipeline> makeGraphicsPipeline(
-    const DeviceInterface &vk, const VkDevice device, const VkPipelineLayout pipelineLayout,
-    const VkShaderModule vertexShaderModule, const VkShaderModule tessellationControlShaderModule,
-    const VkShaderModule tessellationEvalShaderModule, const VkShaderModule geometryShaderModule,
-    const VkShaderModule fragmentShaderModule, const VkRenderPass renderPass, const uint32_t subpass,
-    const VkPipelineVertexInputStateCreateInfo *vertexInputStateCreateInfo,
-    const VkPipelineInputAssemblyStateCreateInfo *inputAssemblyStateCreateInfo,
-    const VkPipelineTessellationStateCreateInfo *tessStateCreateInfo,
-    const VkPipelineViewportStateCreateInfo *viewportStateCreateInfo,
-    const VkPipelineRasterizationStateCreateInfo *rasterizationStateCreateInfo,
-    const VkPipelineMultisampleStateCreateInfo *multisampleStateCreateInfo,
-    const VkPipelineDepthStencilStateCreateInfo *depthStencilStateCreateInfo,
-    const VkPipelineColorBlendStateCreateInfo *colorBlendStateCreateInfo,
-    const VkPipelineDynamicStateCreateInfo *dynamicStateCreateInfo, const void *pNext,
-    const VkPipelineCreateFlags pipelineCreateFlags, const VkSpecializationInfo *vertexShaderSpecializationInfo)
+Move<VkPipeline> makeGraphicsPipeline(const DeviceInterface &vk, const VkDevice device,
+                                      const VkPipelineLayout pipelineLayout, const VkShaderModule vertexShaderModule,
+                                      const VkShaderModule tessellationControlShaderModule,
+                                      const VkShaderModule tessellationEvalShaderModule,
+                                      const VkShaderModule geometryShaderModule,
+                                      const VkShaderModule fragmentShaderModule, const VkRenderPass renderPass,
+                                      const uint32_t subpass,
+                                      const VkPipelineVertexInputStateCreateInfo *vertexInputStateCreateInfo,
+                                      const VkPipelineInputAssemblyStateCreateInfo *inputAssemblyStateCreateInfo,
+                                      const VkPipelineTessellationStateCreateInfo *tessStateCreateInfo,
+                                      const VkPipelineViewportStateCreateInfo *viewportStateCreateInfo,
+                                      const VkPipelineRasterizationStateCreateInfo *rasterizationStateCreateInfo,
+                                      const VkPipelineMultisampleStateCreateInfo *multisampleStateCreateInfo,
+                                      const VkPipelineDepthStencilStateCreateInfo *depthStencilStateCreateInfo,
+                                      const VkPipelineColorBlendStateCreateInfo *colorBlendStateCreateInfo,
+                                      const VkPipelineDynamicStateCreateInfo *dynamicStateCreateInfo, const void *pNext,
+                                      const VkPipelineCreateFlags pipelineCreateFlags)
 {
     DE_ASSERT(tessStateCreateInfo ||
               (tessellationControlShaderModule == VK_NULL_HANDLE && tessellationEvalShaderModule == VK_NULL_HANDLE));
@@ -177,9 +179,8 @@ Move<VkPipeline> makeGraphicsPipeline(
     std::vector<VkPipelineShaderStageCreateInfo> pipelineShaderStageParams;
 
     {
-        stageCreateInfo.stage               = VK_SHADER_STAGE_VERTEX_BIT;
-        stageCreateInfo.module              = vertexShaderModule;
-        stageCreateInfo.pSpecializationInfo = vertexShaderSpecializationInfo;
+        stageCreateInfo.stage  = VK_SHADER_STAGE_VERTEX_BIT;
+        stageCreateInfo.module = vertexShaderModule;
         pipelineShaderStageParams.push_back(stageCreateInfo);
     }
 

@@ -35,7 +35,9 @@
 
 #include <bitset>
 
-namespace vkt::conditional
+namespace vkt
+{
+namespace conditional
 {
 namespace
 {
@@ -128,7 +130,6 @@ struct DrawTestParams
     bool m_invert;
     bool m_useOffset;
     bool m_useMaintenance5;
-    bool m_useDeviceAddressCommands;
     uint32_t
         m_beginSequenceBits; //bits 0..3 control BEFORE which of the 4 draw calls the vkCmdBeginConditionalRenderingEXT call is executed. Least significant bit corresponds to the first draw call.
     uint32_t
@@ -160,37 +161,37 @@ enum
 };
 
 const DrawTestParams drawTestGrid[] = {
-    {false, false, false, false, false, b0001, b1000, b1111, false, NONE, HOST},
-    {true, false, false, false, false, b0001, b1000, b0000, false, NONE, HOST},
-    {true, false, false, false, false, b0001, b0001, b1110, false, NONE, HOST},
-    {true, false, false, false, false, b1111, b1111, b0000, false, NONE, HOST},
-    {true, false, false, false, false, b0010, b0010, b1101, false, NONE, HOST},
-    {true, true, false, false, false, b1010, b1010, b0101, false, NONE, HOST},
-    {false, true, true, false, false, b1010, b1010, b1111, false, NONE, HOST},
-    {true, true, true, false, false, b0010, b1000, b0001, false, NONE, HOST},
-    {true, true, true, false, false, b1001, b1001, b0110, false, NONE, HOST},
-    {true, true, true, false, false, b0010, b1000, b1111, true, FILL, HOST},
-    {true, true, true, false, false, b1001, b1001, b1111, true, FILL, HOST},
-    {false, true, true, false, false, b1001, b1001, b0110, true, FILL, HOST},
-    {true, true, true, false, false, b0010, b1000, b1111, true, COPY, HOST},
-    {true, true, true, false, false, b1001, b1001, b1111, true, COPY, HOST},
-    {false, true, true, false, false, b1001, b1001, b0110, true, COPY, HOST},
+    {false, false, false, false, b0001, b1000, b1111, false, NONE, HOST},
+    {true, false, false, false, b0001, b1000, b0000, false, NONE, HOST},
+    {true, false, false, false, b0001, b0001, b1110, false, NONE, HOST},
+    {true, false, false, false, b1111, b1111, b0000, false, NONE, HOST},
+    {true, false, false, false, b0010, b0010, b1101, false, NONE, HOST},
+    {true, true, false, false, b1010, b1010, b0101, false, NONE, HOST},
+    {false, true, true, false, b1010, b1010, b1111, false, NONE, HOST},
+    {true, true, true, false, b0010, b1000, b0001, false, NONE, HOST},
+    {true, true, true, false, b1001, b1001, b0110, false, NONE, HOST},
+    {true, true, true, false, b0010, b1000, b1111, true, FILL, HOST},
+    {true, true, true, false, b1001, b1001, b1111, true, FILL, HOST},
+    {false, true, true, false, b1001, b1001, b0110, true, FILL, HOST},
+    {true, true, true, false, b0010, b1000, b1111, true, COPY, HOST},
+    {true, true, true, false, b1001, b1001, b1111, true, COPY, HOST},
+    {false, true, true, false, b1001, b1001, b0110, true, COPY, HOST},
 
-    {false, false, false, false, false, b0001, b1000, b1111, false, NONE, LOCAL},
-    {true, false, false, false, false, b0001, b1000, b0000, false, NONE, LOCAL},
-    {true, false, false, false, false, b0001, b0001, b1110, false, NONE, LOCAL},
-    {true, false, false, false, false, b1111, b1111, b0000, false, NONE, LOCAL},
-    {true, false, false, false, false, b0010, b0010, b1101, false, NONE, LOCAL},
-    {true, true, false, false, false, b1010, b1010, b0101, false, NONE, LOCAL},
-    {false, true, true, false, false, b1010, b1010, b1111, false, NONE, LOCAL},
-    {true, true, true, false, false, b0010, b1000, b0001, false, NONE, LOCAL},
-    {true, true, true, false, false, b1001, b1001, b0110, false, NONE, LOCAL},
-    {true, true, true, false, false, b0010, b1000, b1111, true, FILL, LOCAL},
-    {true, true, true, false, false, b1001, b1001, b1111, true, FILL, LOCAL},
-    {false, true, true, false, false, b1001, b1001, b0110, true, FILL, LOCAL},
-    {true, true, true, false, false, b0010, b1000, b1111, true, COPY, LOCAL},
-    {true, true, true, false, false, b1001, b1001, b1111, true, COPY, LOCAL},
-    {false, true, true, false, false, b1001, b1001, b0110, true, COPY, LOCAL},
+    {false, false, false, false, b0001, b1000, b1111, false, NONE, LOCAL},
+    {true, false, false, false, b0001, b1000, b0000, false, NONE, LOCAL},
+    {true, false, false, false, b0001, b0001, b1110, false, NONE, LOCAL},
+    {true, false, false, false, b1111, b1111, b0000, false, NONE, LOCAL},
+    {true, false, false, false, b0010, b0010, b1101, false, NONE, LOCAL},
+    {true, true, false, false, b1010, b1010, b0101, false, NONE, LOCAL},
+    {false, true, true, false, b1010, b1010, b1111, false, NONE, LOCAL},
+    {true, true, true, false, b0010, b1000, b0001, false, NONE, LOCAL},
+    {true, true, true, false, b1001, b1001, b0110, false, NONE, LOCAL},
+    {true, true, true, false, b0010, b1000, b1111, true, FILL, LOCAL},
+    {true, true, true, false, b1001, b1001, b1111, true, FILL, LOCAL},
+    {false, true, true, false, b1001, b1001, b0110, true, FILL, LOCAL},
+    {true, true, true, false, b0010, b1000, b1111, true, COPY, LOCAL},
+    {true, true, true, false, b1001, b1001, b1111, true, COPY, LOCAL},
+    {false, true, true, false, b1001, b1001, b0110, true, COPY, LOCAL},
 };
 
 struct UpdateBufferWithDrawTestParams
@@ -251,7 +252,7 @@ public:
 protected:
     virtual tcu::TestStatus iterate(void) = 0;
     void createInitBufferWithPredicate(ConditionalBufferMemory memoryType, bool discard, bool invert,
-                                       uint32_t offsetMultiplier, VkBufferUsageFlags extraUsage, bool maintenance5);
+                                       uint32_t offsetMultiplier, VkBufferUsageFlagBits extraUsage, bool maintenance5);
     void createTargetColorImageAndImageView(void);
     void createTargetDepthImageAndImageView(void);
     void createRenderPass(VkFormat format, VkImageLayout layout);
@@ -331,10 +332,8 @@ public:
     ConditionalRenderingDrawTestInstance(Context &context, const DrawTestParams &testParams);
 
 protected:
-    // Execute 4 draw calls, each can be drawn with or without conditional rendering. Each draw call
-    // renders to the different part of an image - this is achieved by using push constant and 'discard'
-    // in the fragment shader. This way it is possible to tell which of the rendering command were
-    // discarded by the conditional rendering mechanism.
+    //Execute 4 draw calls, each can be drawn with or without conditional rendering. Each draw call renders to the different part of an image - this is achieved by
+    //using push constant and 'discard' in the fragment shader. This way it is possible to tell which of the rendering command were discarded by the conditional rendering mechanism.
     virtual tcu::TestStatus iterate(void);
     void createPipelineLayout(void);
     void prepareReferenceImage(tcu::PixelBufferAccess &reference, const VkClearColorValue &clearColor,
@@ -377,7 +376,7 @@ ConditionalRenderingBaseTestInstance::ConditionalRenderingBaseTestInstance(Conte
 
 void ConditionalRenderingBaseTestInstance::createInitBufferWithPredicate(
     ConditionalBufferMemory memoryType, bool discard, bool invert, uint32_t offsetMultiplier = 0,
-    VkBufferUsageFlags extraUsage = (VkBufferUsageFlagBits)0, bool maintenance5 = false)
+    VkBufferUsageFlagBits extraUsage = (VkBufferUsageFlagBits)0, bool maintenance5 = false)
 {
     m_conditionalRenderingBufferOffset = sizeof(uint32_t) * offsetMultiplier;
 
@@ -397,12 +396,8 @@ void ConditionalRenderingBaseTestInstance::createInitBufferWithPredicate(
     }
 #endif // CTS_USES_VULKANSC
 
-    bool useDeviceAddress        = (extraUsage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT);
-    vk::MemoryRequirement memReq = (useDeviceAddress) ?
-                                       (vk::MemoryRequirement::DeviceAddress | vk::MemoryRequirement::HostVisible) :
-                                       vk::MemoryRequirement::HostVisible;
-
-    auto buffer = Buffer::createAndAlloc(m_vkd, m_device, createInfo, m_context.getDefaultAllocator(), memReq);
+    de::SharedPtr<Draw::Buffer> buffer = Buffer::createAndAlloc(
+        m_vkd, m_device, createInfo, m_context.getDefaultAllocator(), MemoryRequirement::HostVisible);
 
     void *conditionalRenderingBufferDataPointer =
         static_cast<char *>(buffer->getBoundMemory().getHostPtr()) + m_conditionalRenderingBufferOffset;
@@ -426,12 +421,8 @@ void ConditionalRenderingBaseTestInstance::createInitBufferWithPredicate(
         }
 #endif // CTS_USES_VULKANSC
 
-        vk::MemoryRequirement memReqLoc = (useDeviceAddress) ?
-                                              (vk::MemoryRequirement::DeviceAddress | vk::MemoryRequirement::Local) :
-                                              vk::MemoryRequirement::Local;
-
-        m_conditionalRenderingBuffer =
-            Buffer::createAndAlloc(m_vkd, m_device, createInfo, m_context.getDefaultAllocator(), memReqLoc);
+        m_conditionalRenderingBuffer = Buffer::createAndAlloc(
+            m_vkd, m_device, createInfo, m_context.getDefaultAllocator(), MemoryRequirement::Local);
 
         auto cmdBuffer = vk::allocateCommandBuffer(m_vkd, m_device, *m_cmdPool, vk::VK_COMMAND_BUFFER_LEVEL_PRIMARY);
 
@@ -530,13 +521,13 @@ void ConditionalRenderingBaseTestInstance::createFramebuffer(VkImageView imageVi
     const VkFramebufferCreateInfo framebufferCreateInfo = {
         VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO, // VkStructureType                sType
         nullptr,                                   // const void*                    pNext
-        (VkFramebufferCreateFlags)0,               // VkFramebufferCreateFlags       flags;
-        *m_renderPass,                             // VkRenderPass                   renderPass
-        1,                                         // uint32_t                       attachmentCount
-        &imageView,                                // const VkImageView*             pAttachments
-        WIDTH,                                     // uint32_t                       width
-        HEIGHT,                                    // uint32_t                       height
-        1                                          // uint32_t                       layers
+        (VkFramebufferCreateFlags)0,               // VkFramebufferCreateFlags flags;
+        *m_renderPass,                             // VkRenderPass                    renderPass
+        1,                                         // uint32_t                        attachmentCount
+        &imageView,                                // const VkImageView*            pAttachments
+        WIDTH,                                     // uint32_t                        width
+        HEIGHT,                                    // uint32_t                        height
+        1                                          // uint32_t                        layers
     };
     m_framebuffer = vk::createFramebuffer(m_vkd, m_device, &framebufferCreateInfo);
 }
@@ -549,23 +540,23 @@ void ConditionalRenderingBaseTestInstance::imageMemoryBarrier(VkImage image, VkA
                                                               VkImageAspectFlags imageAspectFlags)
 {
     const struct VkImageSubresourceRange subRangeColor = {
-        imageAspectFlags, // VkImageAspectFlags          aspectMask
+        imageAspectFlags, // VkImageAspectFlags        aspectMask
         0u,               // uint32_t                    baseMipLevel
         1u,               // uint32_t                    mipLevels
         0u,               // uint32_t                    baseArrayLayer
         1u,               // uint32_t                    arraySize
     };
     const VkImageMemoryBarrier imageBarrier = {
-        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType          sType
-        nullptr,                                // const void*              pNext
+        VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER, // VkStructureType            sType
+        nullptr,                                // const void*                pNext
         srcAccessMask,                          // VkAccessFlags            srcAccessMask
         dstAccessMask,                          // VkAccessFlags            dstAccessMask
         oldLayout,                              // VkImageLayout            oldLayout
         newLayout,                              // VkImageLayout            newLayout
-        VK_QUEUE_FAMILY_IGNORED,                // uint32_t                 srcQueueFamilyIndex
-        VK_QUEUE_FAMILY_IGNORED,                // uint32_t                 dstQueueFamilyIndex
-        image,                                  // VkImage                  image
-        subRangeColor                           // VkImageSubresourceRange  subresourceRange
+        VK_QUEUE_FAMILY_IGNORED,                // uint32_t                    srcQueueFamilyIndex
+        VK_QUEUE_FAMILY_IGNORED,                // uint32_t                    dstQueueFamilyIndex
+        image,                                  // VkImage                    image
+        subRangeColor                           // VkImageSubresourceRange    subresourceRange
     };
 
     m_vkd.cmdPipelineBarrier(*m_cmdBufferPrimary, srcStageMask, dstStageMask, false, 0u, nullptr, 0u, nullptr, 1u,
@@ -654,7 +645,7 @@ void ConditionalRenderingBaseTestInstance::prepareReferenceImageColorClearPartia
 void ConditionalRenderingBaseTestInstance::clearWithClearColorImage(const VkClearColorValue &color)
 {
     const struct VkImageSubresourceRange subRangeColor = {
-        VK_IMAGE_ASPECT_COLOR_BIT, // VkImageAspectFlags          aspectMask
+        VK_IMAGE_ASPECT_COLOR_BIT, // VkImageAspectFlags        aspectMask
         0u,                        // uint32_t                    baseMipLevel
         1u,                        // uint32_t                    mipLevels
         0u,                        // uint32_t                    baseArrayLayer
@@ -667,7 +658,7 @@ void ConditionalRenderingBaseTestInstance::clearWithClearColorImage(const VkClea
 void ConditionalRenderingBaseTestInstance::clearWithClearDepthStencilImage(const VkClearDepthStencilValue &value)
 {
     const struct VkImageSubresourceRange subRangeColor = {
-        VK_IMAGE_ASPECT_DEPTH_BIT, // VkImageAspectFlags      aspectMask
+        VK_IMAGE_ASPECT_DEPTH_BIT, // VkImageAspectFlags    aspectMask
         0u,                        // uint32_t                baseMipLevel
         1u,                        // uint32_t                mipLevels
         0u,                        // uint32_t                baseArrayLayer
@@ -755,13 +746,13 @@ void ConditionalRenderingBaseTestInstance::createVertexBuffer(void)
 
 void ConditionalRenderingBaseTestInstance::createPipelineLayout(void)
 {
-    const VkPipelineLayoutCreateInfo pipelineLayoutParams{
-        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, // VkStructureType               sType
-        nullptr,                                       // const void*                   pNext
-        (VkPipelineLayoutCreateFlags)0,                // VkPipelineLayoutCreateFlags   flags
-        1u,                                            // uint32_t                      descriptorSetCount
-        &(m_descriptorSetLayout.get()),                // const VkDescriptorSetLayout*  pSetLayouts
-        0u,                                            // uint32_t                      pushConstantRangeCount
+    const VkPipelineLayoutCreateInfo pipelineLayoutParams = {
+        VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, // VkStructureType                sType
+        nullptr,                                       // const void*                    pNext
+        (VkPipelineLayoutCreateFlags)0,                // VkPipelineLayoutCreateFlags    flags
+        1u,                                            // uint32_t                        descriptorSetCount
+        &(m_descriptorSetLayout.get()),                // const VkDescriptorSetLayout*    pSetLayouts
+        0u,                                            // uint32_t                        pushConstantRangeCount
         nullptr                                        // const VkPushConstantRange*    pPushConstantRanges
     };
 
@@ -771,11 +762,11 @@ void ConditionalRenderingBaseTestInstance::createPipelineLayout(void)
 void ConditionalRenderingBaseTestInstance::createAndUpdateDescriptorSet(void)
 {
     const VkDescriptorSetAllocateInfo allocInfo = {
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, // VkStructureType              sType
-        nullptr,                                        // const void*                  pNext
-        *m_descriptorPool,                              // VkDescriptorPool             descriptorPool
-        1u,                                             // uint32_t                     setLayoutCount
-        &(m_descriptorSetLayout.get())                  // const VkDescriptorSetLayout* pSetLayouts
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, // VkStructureType                                sType
+        nullptr,                                        // const void*                                    pNext
+        *m_descriptorPool,             // VkDescriptorPool                                descriptorPool
+        1u,                            // uint32_t                                        setLayoutCount
+        &(m_descriptorSetLayout.get()) // const VkDescriptorSetLayout*                    pSetLayouts
     };
 
     m_descriptorSet = allocateDescriptorSet(m_vkd, m_device, &allocInfo);
@@ -793,33 +784,41 @@ void ConditionalRenderingBaseTestInstance::createPipeline(void)
     const std::vector<VkViewport> viewports(1, makeViewport(tcu::UVec2(WIDTH, HEIGHT)));
     const std::vector<VkRect2D> scissors(1, makeRect2D(tcu::UVec2(WIDTH, HEIGHT)));
     const VkPrimitiveTopology topology                                = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-    const VkPipelineVertexInputStateCreateInfo vertexInputStateParams = initVulkanStructure();
+    const VkPipelineVertexInputStateCreateInfo vertexInputStateParams = {
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, // VkStructureType                                sType
+        nullptr, // const void*                                    pNext
+        0u,      // vkPipelineVertexInputStateCreateFlags        flags
+        0u,      // uint32_t                                        bindingCount
+        nullptr, // const VkVertexInputBindingDescription*        pVertexBindingDescriptions
+        0u,      // uint32_t                                        attributeCount
+        nullptr, // const VkVertexInputAttributeDescription*        pVertexAttributeDescriptions
+    };
 
     m_pipeline = makeGraphicsPipeline(
         m_vkd,                    // const DeviceInterface&                        vk
         m_device,                 // const VkDevice                                device
         *m_pipelineLayout,        // const VkPipelineLayout                        pipelineLayout
-        *m_vertexShaderModule,    // const VkShaderModule                          vertexShaderModule
-        VK_NULL_HANDLE,           // const VkShaderModule                          tessellationControlShaderModule
-        VK_NULL_HANDLE,           // const VkShaderModule                          tessellationEvalShaderModule
-        VK_NULL_HANDLE,           // const VkShaderModule                          geometryShaderModule
-        *m_fragmentShaderModule,  // const VkShaderModule                          fragmentShaderModule
+        *m_vertexShaderModule,    // const VkShaderModule                            vertexShaderModule
+        VK_NULL_HANDLE,           // const VkShaderModule                            tessellationControlShaderModule
+        VK_NULL_HANDLE,           // const VkShaderModule                            tessellationEvalShaderModule
+        VK_NULL_HANDLE,           // const VkShaderModule                            geometryShaderModule
+        *m_fragmentShaderModule,  // const VkShaderModule                            fragmentShaderModule
         *m_renderPass,            // const VkRenderPass                            renderPass
         viewports,                // const std::vector<VkViewport>&                viewports
-        scissors,                 // const std::vector<VkRect2D>&                  scissors
-        topology,                 // const VkPrimitiveTopology                     topology
+        scissors,                 // const std::vector<VkRect2D>&                    scissors
+        topology,                 // const VkPrimitiveTopology                    topology
         0u,                       // const uint32_t                                subpass
         0u,                       // const uint32_t                                patchControlPoints
-        &vertexInputStateParams); // const VkPipelineVertexInputStateCreateInfo*   vertexInputStateCreateInfo
+        &vertexInputStateParams); // const VkPipelineVertexInputStateCreateInfo*    vertexInputStateCreateInfo
 }
 
 void ConditionalRenderingBaseTestInstance::copyResultImageToBuffer(VkImageAspectFlags imageAspectFlags, VkImage image)
 {
     const VkBufferImageCopy region_all = {
-        0,                           // VkDeviceSize                  bufferOffset
-        0,                           // uint32_t                      bufferRowLength
-        0,                           // uint32_t                      bufferImageHeight
-        {imageAspectFlags, 0, 0, 1}, // VkImageSubresourceLayers      imageSubresource
+        0,                           // VkDeviceSize                    bufferOffset
+        0,                           // uint32_t                        bufferRowLength
+        0,                           // uint32_t                        bufferImageHeight
+        {imageAspectFlags, 0, 0, 1}, // VkImageSubresourceLayers        imageSubresource
         {0, 0, 0},                   // VkOffset3D                    imageOffset
         {WIDTH, HEIGHT, 1}           // VkExtent3D                    imageExtent
     };
@@ -896,19 +895,22 @@ tcu::TestStatus ConditionalRenderingClearAttachmentsTestInstance::iterate(void)
 
     imageMemoryBarrier(
         m_testParams.m_testDepth ? m_depthTargetImage->object() :
-                                   m_colorTargetImage->object(), //VkImage              image
-        VK_ACCESS_TRANSFER_WRITE_BIT,                            //VkAccessFlags        srcAccessMask
+                                   m_colorTargetImage->object(), //VkImage                            image
+        VK_ACCESS_TRANSFER_WRITE_BIT,                            //VkAccessFlags                        srcAccessMask
         m_testParams.m_testDepth ?
             (VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT) :
             (VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT), //VkAccessFlags        dstAccessMask
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       //VkImageLayout        oldLayout
-        m_testParams.m_testDepth ? VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL :
-                                   VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, //VkImageLayout        newLayout
-        VK_PIPELINE_STAGE_TRANSFER_BIT,                                      //VkPipelineStageFlags srcStageMask
-        m_testParams.m_testDepth ? VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT :
-                                   VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags dstStageMask
-        m_testParams.m_testDepth ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT); //VkImageAspectFlags   flags
+             VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT), //VkAccessFlags                        dstAccessMask
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,       //VkImageLayout                        oldLayout
+        m_testParams.m_testDepth ?
+            VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL :
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, //VkImageLayout                        newLayout
+        VK_PIPELINE_STAGE_TRANSFER_BIT,               //VkPipelineStageFlags                srcStageMask
+        m_testParams.m_testDepth ?
+            VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT :
+            VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags                dstStageMask
+        m_testParams.m_testDepth ? VK_IMAGE_ASPECT_DEPTH_BIT :
+                                   VK_IMAGE_ASPECT_COLOR_BIT); //VkImageAspectFlags                flags
 
     if (m_testParams.m_clearAttachmentTwice)
     {
@@ -1039,11 +1041,9 @@ tcu::TestStatus ConditionalRenderingDrawTestInstance::iterate(void)
     if (m_testParams.m_useOffset)
         offsetMultiplier = 3;
 
-    VkBufferUsageFlags bufferUsageExtraFlags = (VkBufferUsageFlagBits)0;
+    VkBufferUsageFlagBits bufferUsageExtraFlags = (VkBufferUsageFlagBits)0;
     if (m_testParams.m_togglePredicate)
         bufferUsageExtraFlags = VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    if (m_testParams.m_useDeviceAddressCommands)
-        bufferUsageExtraFlags |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
     m_cmdPool = createCommandPool(m_vkd, m_device, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT, queueFamilyIndex);
 
@@ -1080,13 +1080,14 @@ tcu::TestStatus ConditionalRenderingDrawTestInstance::iterate(void)
     createPipelineLayout();
     createAndUpdateDescriptorSet();
 
-    auto &bc               = m_context.getBinaryCollection();
-    m_vertexShaderModule   = createShaderModule(m_vkd, m_device, bc.get("position_only.vert"));
-    m_fragmentShaderModule = createShaderModule(m_vkd, m_device, bc.get("only_color_out.frag"));
+    m_vertexShaderModule =
+        createShaderModule(m_vkd, m_device, m_context.getBinaryCollection().get("position_only.vert"), 0);
+    m_fragmentShaderModule =
+        createShaderModule(m_vkd, m_device, m_context.getBinaryCollection().get("only_color_out.frag"), 0);
 
     createPipeline();
 
-    VkConditionalRenderingBeginInfoEXT conditionalRenderingBeginInfo{
+    VkConditionalRenderingBeginInfoEXT conditionalRenderingBeginInfo = {
         VK_STRUCTURE_TYPE_CONDITIONAL_RENDERING_BEGIN_INFO_EXT, //VkStructureType sType;
         nullptr,                                                //const void* pNext;
         m_conditionalRenderingBuffer->object(),                 //VkBuffer buffer;
@@ -1095,48 +1096,28 @@ tcu::TestStatus ConditionalRenderingDrawTestInstance::iterate(void)
                                  (VkConditionalRenderingFlagsEXT)0) //VkConditionalRenderingFlagsEXT flags;
     };
 
-#ifndef CTS_USES_VULKANSC
-    VkDeviceAddress conditionalRenderingBufferAddress = 0ull;
-
-    if (m_testParams.m_useDeviceAddressCommands)
-    {
-        conditionalRenderingBufferAddress =
-            getBufferDeviceAddress(m_vkd, m_device, m_conditionalRenderingBuffer->object());
-    }
-
-    VkConditionalRenderingBeginInfo2EXT conditionalRenderingBeginInfo2{
-        VK_STRUCTURE_TYPE_CONDITIONAL_RENDERING_BEGIN_INFO_2_EXT, //VkStructureType sType;
-        nullptr,                                                  //const void* pNext;
-        {conditionalRenderingBufferAddress + m_conditionalRenderingBufferOffset,
-         sizeof(uint32_t) + m_conditionalRenderingBufferOffset}, // VkDeviceAddressRangeKHR addressRange;
-        VK_ADDRESS_COMMAND_UNKNOWN_STORAGE_BUFFER_USAGE_BIT_KHR, // VkAddressCommandFlagsKHR addressFlags;
-        (m_testParams.m_invert ? (VkConditionalRenderingFlagsEXT)VK_CONDITIONAL_RENDERING_INVERTED_BIT_EXT :
-                                 (VkConditionalRenderingFlagsEXT)0) //VkConditionalRenderingFlagsEXT flags;
-    };
-#endif
-
     beginCommandBuffer(m_vkd, *m_cmdBufferPrimary);
 
-    imageMemoryBarrier(m_colorTargetImage->object(),         //VkImage              image
-                       0u,                                   //VkAccessFlags        srcAccessMask
-                       VK_ACCESS_TRANSFER_WRITE_BIT,         //VkAccessFlags        dstAccessMask
-                       VK_IMAGE_LAYOUT_UNDEFINED,            //VkImageLayout        oldLayout
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, //VkImageLayout        newLayout
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags srcStageMask
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags dstStageMask
-                       VK_IMAGE_ASPECT_COLOR_BIT);           //VkImageAspectFlags   flags
+    imageMemoryBarrier(m_colorTargetImage->object(),         //VkImage                            image
+                       0u,                                   //VkAccessFlags                        srcAccessMask
+                       VK_ACCESS_TRANSFER_WRITE_BIT,         //VkAccessFlags                        dstAccessMask
+                       VK_IMAGE_LAYOUT_UNDEFINED,            //VkImageLayout                        oldLayout
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, //VkImageLayout                        newLayout
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags                srcStageMask
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags                dstStageMask
+                       VK_IMAGE_ASPECT_COLOR_BIT);           //VkImageAspectFlags                flags
 
     clearWithClearColorImage(clearColorInitial);
 
-    imageMemoryBarrier(m_colorTargetImage->object(), //VkImage              image
-                       VK_ACCESS_TRANSFER_WRITE_BIT, //VkAccessFlags        srcAccessMask
+    imageMemoryBarrier(m_colorTargetImage->object(), //VkImage                            image
+                       VK_ACCESS_TRANSFER_WRITE_BIT, //VkAccessFlags                        srcAccessMask
                        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                           VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,      //VkAccessFlags        dstAccessMask
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,          //VkImageLayout        oldLayout
-                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,      //VkImageLayout        newLayout
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,                //VkPipelineStageFlags srcStageMask
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags dstStageMask
-                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags   flags
+                           VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, //VkAccessFlags                        dstAccessMask
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,     //VkImageLayout                        oldLayout
+                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, //VkImageLayout                        newLayout
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,           //VkPipelineStageFlags                srcStageMask
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags                dstStageMask
+                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags                flags
 
     m_vkd.cmdBindPipeline(*m_cmdBufferPrimary, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_pipeline);
     m_vkd.cmdBindDescriptorSets(*m_cmdBufferPrimary, VK_PIPELINE_BIND_POINT_GRAPHICS, *m_pipelineLayout, 0, 1,
@@ -1182,14 +1163,7 @@ tcu::TestStatus ConditionalRenderingDrawTestInstance::iterate(void)
         m_vkd.cmdPushConstants(*m_cmdBufferPrimary, *m_pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, 16, dataPtr);
 
         if (isBitSet(m_testParams.m_beginSequenceBits, drawNdx))
-        {
-            if (!m_testParams.m_useDeviceAddressCommands)
-                m_vkd.cmdBeginConditionalRenderingEXT(*m_cmdBufferPrimary, &conditionalRenderingBeginInfo);
-#ifndef CTS_USES_VULKANSC
-            if (m_testParams.m_useDeviceAddressCommands)
-                m_vkd.cmdBeginConditionalRendering2EXT(*m_cmdBufferPrimary, &conditionalRenderingBeginInfo2);
-#endif
-        }
+            m_vkd.cmdBeginConditionalRenderingEXT(*m_cmdBufferPrimary, &conditionalRenderingBeginInfo);
 
         draw();
 
@@ -1199,14 +1173,14 @@ tcu::TestStatus ConditionalRenderingDrawTestInstance::iterate(void)
 
     endRenderPass(m_vkd, *m_cmdBufferPrimary);
 
-    imageMemoryBarrier(m_colorTargetImage->object(),                  //VkImage              image
-                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,          //VkAccessFlags        srcAccessMask
-                       VK_ACCESS_TRANSFER_READ_BIT,                   //VkAccessFlags        dstAccessMask
-                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,      //VkImageLayout        oldLayout
-                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,          //VkImageLayout        newLayout
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags srcStageMask
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,                //VkPipelineStageFlags dstStageMask
-                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags   flags
+    imageMemoryBarrier(m_colorTargetImage->object(),             //VkImage                            image
+                       VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,     //VkAccessFlags                        srcAccessMask
+                       VK_ACCESS_TRANSFER_READ_BIT,              //VkAccessFlags                        dstAccessMask
+                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, //VkImageLayout                        oldLayout
+                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,     //VkImageLayout                        newLayout
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags                srcStageMask
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,                //VkPipelineStageFlags                dstStageMask
+                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags                flags
 
     copyResultImageToBuffer(VK_IMAGE_ASPECT_COLOR_BIT, m_colorTargetImage->object());
 
@@ -1258,10 +1232,10 @@ void ConditionalRenderingDrawTestInstance::createPipelineLayout(void)
         VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO, //VkStructureType                sType
         nullptr,                                       //const void*                    pNext
         (VkPipelineLayoutCreateFlags)0,                //VkPipelineLayoutCreateFlags    flags
-        1u,                                            //uint32_t                       descriptorSetCount
-        &(m_descriptorSetLayout.get()),                //const VkDescriptorSetLayout*   pSetLayouts
-        1u,                                            //uint32_t                       pushConstantRangeCount
-        &pushConstantRange                             //const VkPushConstantRange*     pPushConstantRanges
+        1u,                                            //uint32_t                        descriptorSetCount
+        &(m_descriptorSetLayout.get()),                //const VkDescriptorSetLayout*    pSetLayouts
+        1u,                                            //uint32_t                        pushConstantRangeCount
+        &pushConstantRange                             //const VkPushConstantRange*    pPushConstantRanges
     };
 
     m_pipelineLayout = vk::createPipelineLayout(m_vkd, m_device, &pipelineLayoutParams);
@@ -1301,11 +1275,11 @@ void ConditionalRenderingUpdateBufferWithDrawTestInstance::createAndUpdateDescri
 {
     //the same descriptor set layout can be used for the creation of both descriptor sets
     const VkDescriptorSetAllocateInfo allocInfo = {
-        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, //VkStructureType               sType
-        nullptr,                                        //const void*                   pNext
-        *m_descriptorPool,                              //VkDescriptorPool              descriptorPool
-        1u,                                             //uint32_t                      setLayoutCount
-        &(m_descriptorSetLayout.get())                  //const VkDescriptorSetLayout*  pSetLayouts
+        VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO, //VkStructureType                        sType
+        nullptr,                                        //const void*                            pNext
+        *m_descriptorPool,                              //VkDescriptorPool                        descriptorPool
+        1u,                                             //uint32_t                                setLayoutCount
+        &(m_descriptorSetLayout.get())                  //const VkDescriptorSetLayout*            pSetLayouts
     };
 
     m_descriptorSet = allocateDescriptorSet(m_vkd, m_device, &allocInfo);
@@ -1332,41 +1306,49 @@ void ConditionalRenderingUpdateBufferWithDrawTestInstance::createPipelines(void)
     const std::vector<VkViewport> viewports(1, makeViewport(tcu::UVec2(WIDTH, HEIGHT)));
     const std::vector<VkRect2D> scissors(1, makeRect2D(tcu::UVec2(WIDTH, HEIGHT)));
     const VkPrimitiveTopology topology                                = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_FAN;
-    const VkPipelineVertexInputStateCreateInfo vertexInputStateParams = initVulkanStructure();
+    const VkPipelineVertexInputStateCreateInfo vertexInputStateParams = {
+        VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO, //VkStructureType                                sType
+        nullptr, //const void*                                    pNext
+        0u,      //vkPipelineVertexInputStateCreateFlags            flags
+        0u,      //uint32_t                                        bindingCount
+        nullptr, //const VkVertexInputBindingDescription*        pVertexBindingDescriptions
+        0u,      //uint32_t                                        attributeCount
+        nullptr, //const VkVertexInputAttributeDescription*        pVertexAttributeDescriptions
+    };
 
     m_pipelineDraw = makeGraphicsPipeline(
         m_vkd,                       //const DeviceInterface&                        vk
         m_device,                    //const VkDevice                                device
         *m_pipelineLayout,           //const VkPipelineLayout                        pipelineLayout
-        *m_vertexShaderModuleDraw,   //const VkShaderModule                          vertexShaderModule
-        VK_NULL_HANDLE,              //const VkShaderModule                          tessellationControlShaderModule
-        VK_NULL_HANDLE,              //const VkShaderModule                          tessellationEvalShaderModule
-        VK_NULL_HANDLE,              //const VkShaderModule                          geometryShaderModule
-        *m_fragmentShaderModuleDraw, //const VkShaderModule                          fragmentShaderModule
+        *m_vertexShaderModuleDraw,   //const VkShaderModule                            vertexShaderModule
+        VK_NULL_HANDLE,              //const VkShaderModule                            tessellationControlShaderModule
+        VK_NULL_HANDLE,              //const VkShaderModule                            tessellationEvalShaderModule
+        VK_NULL_HANDLE,              //const VkShaderModule                            geometryShaderModule
+        *m_fragmentShaderModuleDraw, //const VkShaderModule                            fragmentShaderModule
         *m_renderPass,               //const VkRenderPass                            renderPass
         viewports,                   //const std::vector<VkViewport>&                viewports
-        scissors,                    //const std::vector<VkRect2D>&                  scissors
-        topology,                    //const VkPrimitiveTopology                     topology
+        scissors,                    //const std::vector<VkRect2D>&                    scissors
+        topology,                    //const VkPrimitiveTopology                        topology
         0u,                          //const uint32_t                                subpass
         0u,                          //const uint32_t                                patchControlPoints
-        &vertexInputStateParams);    //const VkPipelineVertexInputStateCreateInfo*   vertexInputStateCreateInfo
+        &vertexInputStateParams);    //const VkPipelineVertexInputStateCreateInfo*    vertexInputStateCreateInfo
 
     m_pipelineUpdate = makeGraphicsPipeline(
-        m_vkd,                          //const DeviceInterface&                         vk
-        m_device,                       //const VkDevice                                 device
-        *m_pipelineLayout,              //const VkPipelineLayout                         pipelineLayout
-        *m_vertexShaderModuleUpdate,    //const VkShaderModule                           vertexShaderModule
-        VK_NULL_HANDLE,                 //const VkShaderModule                           tessellationControlShaderModule
-        VK_NULL_HANDLE,                 //const VkShaderModule                           tessellationEvalShaderModule
-        VK_NULL_HANDLE,                 //const VkShaderModule                           geometryShaderModule
-        *m_fragmentShaderModuleDiscard, //const VkShaderModule                        fragmentShaderModule
-        *m_renderPass,                  //const VkRenderPass                          renderPass
-        viewports,                      //const std::vector<VkViewport>&              viewports
-        scissors,                       //const std::vector<VkRect2D>&                scissors
-        topology,                       //const VkPrimitiveTopology                   topology
-        0u,                             //const uint32_t                              subpass
-        0u,                             //const uint32_t                              patchControlPoints
-        &vertexInputStateParams);       //const VkPipelineVertexInputStateCreateInfo* vertexInputStateCreateInfo
+        m_vkd,                       //const DeviceInterface&                        vk
+        m_device,                    //const VkDevice                                device
+        *m_pipelineLayout,           //const VkPipelineLayout                        pipelineLayout
+        *m_vertexShaderModuleUpdate, //const VkShaderModule                            vertexShaderModule
+        VK_NULL_HANDLE,              //const VkShaderModule                            tessellationControlShaderModule
+        VK_NULL_HANDLE,              //const VkShaderModule                            tessellationEvalShaderModule
+        VK_NULL_HANDLE,              //const VkShaderModule                            geometryShaderModule
+        *m_fragmentShaderModuleDiscard, //const VkShaderModule                            fragmentShaderModule
+        *m_renderPass,                  //const VkRenderPass                            renderPass
+        viewports,                      //const std::vector<VkViewport>&                viewports
+        scissors,                       //const std::vector<VkRect2D>&                    scissors
+        topology,                       //const VkPrimitiveTopology                        topology
+        0u,                             //const uint32_t                                subpass
+        0u,                             //const uint32_t                                patchControlPoints
+        &vertexInputStateParams);       //const VkPipelineVertexInputStateCreateInfo*    vertexInputStateCreateInfo
 }
 
 void ConditionalRenderingUpdateBufferWithDrawTestInstance::createRenderPass(VkFormat format, VkImageLayout layout)
@@ -1382,7 +1364,7 @@ void ConditionalRenderingUpdateBufferWithDrawTestInstance::createRenderPass(VkFo
                                                              VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL));
 
     const VkAttachmentReference attachmentReference = {
-        0u,    // uint32_t             attachment
+        0u,    // uint32_t                attachment
         layout // VkImageLayout        layout
     };
 
@@ -1436,11 +1418,14 @@ tcu::TestStatus ConditionalRenderingUpdateBufferWithDrawTestInstance::iterate(vo
     createPipelineLayout();
     createAndUpdateDescriptorSets();
 
-    auto &bc                      = m_context.getBinaryCollection();
-    m_vertexShaderModuleDraw      = createShaderModule(m_vkd, m_device, bc.get("position_only.vert"));
-    m_fragmentShaderModuleDraw    = createShaderModule(m_vkd, m_device, bc.get("only_color_out.frag"));
-    m_vertexShaderModuleUpdate    = createShaderModule(m_vkd, m_device, bc.get("update.vert"));
-    m_fragmentShaderModuleDiscard = createShaderModule(m_vkd, m_device, bc.get("discard.frag"));
+    m_vertexShaderModuleDraw =
+        createShaderModule(m_vkd, m_device, m_context.getBinaryCollection().get("position_only.vert"), 0);
+    m_fragmentShaderModuleDraw =
+        createShaderModule(m_vkd, m_device, m_context.getBinaryCollection().get("only_color_out.frag"), 0);
+    m_vertexShaderModuleUpdate =
+        createShaderModule(m_vkd, m_device, m_context.getBinaryCollection().get("update.vert"), 0);
+    m_fragmentShaderModuleDiscard =
+        createShaderModule(m_vkd, m_device, m_context.getBinaryCollection().get("discard.frag"), 0);
 
     createPipelines();
 
@@ -1454,26 +1439,26 @@ tcu::TestStatus ConditionalRenderingUpdateBufferWithDrawTestInstance::iterate(vo
 
     beginCommandBuffer(m_vkd, *m_cmdBufferPrimary);
 
-    imageMemoryBarrier(m_colorTargetImage->object(),         //VkImage               image
-                       0u,                                   //VkAccessFlags         srcAccessMask
-                       VK_ACCESS_TRANSFER_WRITE_BIT,         //VkAccessFlags         dstAccessMask
-                       VK_IMAGE_LAYOUT_UNDEFINED,            //VkImageLayout         oldLayout
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, //VkImageLayout         newLayout
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags  srcStageMask
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags  dstStageMask
-                       VK_IMAGE_ASPECT_COLOR_BIT);           //VkImageAspectFlags    flags
+    imageMemoryBarrier(m_colorTargetImage->object(),         //VkImage                            image
+                       0u,                                   //VkAccessFlags                        srcAccessMask
+                       VK_ACCESS_TRANSFER_WRITE_BIT,         //VkAccessFlags                        dstAccessMask
+                       VK_IMAGE_LAYOUT_UNDEFINED,            //VkImageLayout                        oldLayout
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, //VkImageLayout                        newLayout
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags                srcStageMask
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,       //VkPipelineStageFlags                dstStageMask
+                       VK_IMAGE_ASPECT_COLOR_BIT);           //VkImageAspectFlags                flags
 
     clearWithClearColorImage(clearColorInitial);
 
-    imageMemoryBarrier(m_colorTargetImage->object(), //VkImage               image
-                       VK_ACCESS_TRANSFER_WRITE_BIT, //VkAccessFlags         srcAccessMask
+    imageMemoryBarrier(m_colorTargetImage->object(), //VkImage                            image
+                       VK_ACCESS_TRANSFER_WRITE_BIT, //VkAccessFlags                        srcAccessMask
                        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                           VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,      //VkAccessFlags         dstAccessMask
-                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,          //VkImageLayout         oldLayout
-                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,      //VkImageLayout         newLayout
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,                //VkPipelineStageFlags  srcStageMask
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags  dstStageMask
-                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags    flags
+                           VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, //VkAccessFlags                        dstAccessMask
+                       VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,     //VkImageLayout                        oldLayout
+                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, //VkImageLayout                        newLayout
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,           //VkPipelineStageFlags                srcStageMask
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags                dstStageMask
+                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags                flags
 
     beginRenderPass(m_vkd, *m_cmdBufferPrimary, *m_renderPass, *m_framebuffer, makeRect2D(0, 0, WIDTH, HEIGHT));
 
@@ -1501,15 +1486,15 @@ tcu::TestStatus ConditionalRenderingUpdateBufferWithDrawTestInstance::iterate(vo
 
     endRenderPass(m_vkd, *m_cmdBufferPrimary);
 
-    imageMemoryBarrier(m_colorTargetImage->object(), //VkImage              image
+    imageMemoryBarrier(m_colorTargetImage->object(), //VkImage                            image
                        VK_ACCESS_COLOR_ATTACHMENT_READ_BIT |
-                           VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,      //VkAccessFlags        srcAccessMask
-                       VK_ACCESS_TRANSFER_READ_BIT,                   //VkAccessFlags        dstAccessMask
-                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,      //VkImageLayout        oldLayout
-                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,          //VkImageLayout        newLayout
-                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags srcStageMask
-                       VK_PIPELINE_STAGE_TRANSFER_BIT,                //VkPipelineStageFlags dstStageMask
-                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags   flags
+                           VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, //VkAccessFlags                        srcAccessMask
+                       VK_ACCESS_TRANSFER_READ_BIT,              //VkAccessFlags                        dstAccessMask
+                       VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, //VkImageLayout                        oldLayout
+                       VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,     //VkImageLayout                        newLayout
+                       VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, //VkPipelineStageFlags                srcStageMask
+                       VK_PIPELINE_STAGE_TRANSFER_BIT,                //VkPipelineStageFlags                dstStageMask
+                       VK_IMAGE_ASPECT_COLOR_BIT);                    //VkImageAspectFlags                flags
 
     copyResultImageToBuffer(VK_IMAGE_ASPECT_COLOR_BIT, m_colorTargetImage->object());
 
@@ -1678,12 +1663,6 @@ void checkMaintenance5Support(Context &context)
     context.requireDeviceFunctionality("VK_KHR_maintenance5");
 }
 
-void checkDeviceAddressCommandsSupport(Context &context)
-{
-    checkFan(context);
-    context.requireDeviceFunctionality("VK_KHR_device_address_commands");
-}
-
 void checkFanAndVertexStores(Context &context)
 {
     checkFan(context);
@@ -1708,49 +1687,40 @@ void ConditionalRenderingDrawAndClearTests::init(void)
     tcu::TestCaseGroup *depth = new tcu::TestCaseGroup(m_testCtx, "depth");
     tcu::TestCaseGroup *draw  = new tcu::TestCaseGroup(m_testCtx, "draw");
 
-    using ClearAttachmentsInstanceFactory =
-        InstanceFactory1WithSupport<ConditionalRenderingClearAttachmentsTestInstance, ClearTestParams,
-                                    FunctionSupport0>;
-    using DrawTestInstanceFactory = InstanceFactory1WithSupport<ConditionalRenderingDrawTestInstance, DrawTestParams,
-                                                                FunctionSupport0, AddProgramsDraw>;
-
     for (int testNdx = 0; testNdx < DE_LENGTH_OF_ARRAY(clearColorTestGrid); testNdx++)
-        color->addChild(new ClearAttachmentsInstanceFactory(
+        color->addChild(new InstanceFactory1WithSupport<ConditionalRenderingClearAttachmentsTestInstance,
+                                                        ClearTestParams, FunctionSupport0>(
             m_testCtx, generateClearTestName(clearColorTestGrid[testNdx]), clearColorTestGrid[testNdx], checkSupport));
 
     for (int testNdx = 0; testNdx < DE_LENGTH_OF_ARRAY(clearDepthTestGrid); testNdx++)
-        depth->addChild(new ClearAttachmentsInstanceFactory(
+        depth->addChild(new InstanceFactory1WithSupport<ConditionalRenderingClearAttachmentsTestInstance,
+                                                        ClearTestParams, FunctionSupport0>(
             m_testCtx, generateClearTestName(clearDepthTestGrid[testNdx]), clearDepthTestGrid[testNdx], checkSupport));
 
     for (int testNdx = 0; testNdx < DE_LENGTH_OF_ARRAY(clearColorTwiceGrid); testNdx++)
-        color->addChild(new ClearAttachmentsInstanceFactory(
+        color->addChild(new InstanceFactory1WithSupport<ConditionalRenderingClearAttachmentsTestInstance,
+                                                        ClearTestParams, FunctionSupport0>(
             m_testCtx, "clear_attachment_twice_" + generateClearTestName(clearColorTwiceGrid[testNdx]),
             clearColorTwiceGrid[testNdx], checkSupport));
 
     for (int testNdx = 0; testNdx < DE_LENGTH_OF_ARRAY(clearDepthTwiceGrid); testNdx++)
-        depth->addChild(new ClearAttachmentsInstanceFactory(
+        depth->addChild(new InstanceFactory1WithSupport<ConditionalRenderingClearAttachmentsTestInstance,
+                                                        ClearTestParams, FunctionSupport0>(
             m_testCtx, "clear_attachment_twice_" + generateClearTestName(clearDepthTwiceGrid[testNdx]),
             clearDepthTwiceGrid[testNdx], checkSupport));
 
     for (int testNdx = 0; testNdx < DE_LENGTH_OF_ARRAY(drawTestGrid); testNdx++)
-        draw->addChild(new DrawTestInstanceFactory(m_testCtx, generateDrawTestName(testNdx, drawTestGrid[testNdx]),
-                                                   AddProgramsDraw(), drawTestGrid[testNdx], checkFan));
+        draw->addChild(new InstanceFactory1WithSupport<ConditionalRenderingDrawTestInstance, DrawTestParams,
+                                                       FunctionSupport0, AddProgramsDraw>(
+            m_testCtx, generateDrawTestName(testNdx, drawTestGrid[testNdx]), AddProgramsDraw(), drawTestGrid[testNdx],
+            checkFan));
 
 #ifndef CTS_USES_VULKANSC
     DrawTestParams maintenance5TestParams    = drawTestGrid[5];
     maintenance5TestParams.m_useMaintenance5 = true;
-    draw->addChild(new DrawTestInstanceFactory(m_testCtx, "maintenance5", AddProgramsDraw(), maintenance5TestParams,
-                                               checkMaintenance5Support));
-
-    // test interaction with VK_KHR_device_address_commands
-    for (int testNdx = 0; testNdx < DE_LENGTH_OF_ARRAY(drawTestGrid); testNdx++)
-    {
-        DrawTestParams testParams             = drawTestGrid[testNdx];
-        testParams.m_useDeviceAddressCommands = true;
-        draw->addChild(new DrawTestInstanceFactory(m_testCtx,
-                                                   generateDrawTestName(testNdx, testParams) + "_device_address",
-                                                   AddProgramsDraw(), testParams, checkDeviceAddressCommandsSupport));
-    }
+    draw->addChild(new InstanceFactory1WithSupport<ConditionalRenderingDrawTestInstance, DrawTestParams,
+                                                   FunctionSupport0, AddProgramsDraw>(
+        m_testCtx, "maintenance5", AddProgramsDraw(), maintenance5TestParams, checkMaintenance5Support));
 #endif
 
     for (int testNdx = 0; testNdx < DE_LENGTH_OF_ARRAY(UpdateBufferWithDrawTestGrind); testNdx++)
@@ -1766,4 +1736,5 @@ void ConditionalRenderingDrawAndClearTests::init(void)
     addChild(draw);
 }
 
-} // namespace vkt::conditional
+} // namespace conditional
+} // namespace vkt

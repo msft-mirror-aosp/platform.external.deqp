@@ -22,6 +22,7 @@ package com.drawelements.deqp.parallelrunner;
 
 import com.drawelements.deqp.testercore.Log;
 import com.drawelements.deqp.testercore.LogParser;
+import com.drawelements.deqp.testercore.DeqpInstrumentation;
 
 import java.util.Map;
 import java.util.concurrent.BlockingQueue;
@@ -29,22 +30,18 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Coordinates parallel parsing of multiple log files. Manages a pool of workers
- * and distributes
+ * Coordinates parallel parsing of multiple log files. Manages a pool of workers and distributes
  * finished test TestEvent one by one.
  */
 public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
 
     private static final String LOG_TAG = "dEQP/AsyncLogParsersCoordinator";
-    private static final int DISPATCHER_TIMEOUT_MS = 2000;
-    private static final int MAX_NO_PROGRESS_CHECKS = 3;
-    private static final TestEvent POISON_PILL = new TestEvent();
+    private static final int EXECUTOR_TERMINATION_TIMEOUT_SECONDS = 2;
+    private static final int DISPATCHER_THREAD_JOIN_TIMEOUT_MS = 2000;
 
     private final int maxWorkers;
     private final boolean logData;
@@ -52,30 +49,21 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
     private final BlockingQueue<TestEvent> testEventQueue;
     private final CopyOnWriteArrayList<TestEventSubscriber> subscribers;
     private ExecutorService workersExecutor;
-    private ExecutorService dispatcherExecutor;
+    private Thread dispatcherThread;
     private volatile boolean isInitialized;
     private final Map<String, LogParserWorker> workers = new ConcurrentHashMap<>();
     private final Object lock = new Object();
     private final LogParserFactory logParserFactory;
-    private final AtomicLong totalEventsPublished = new AtomicLong(0);
-    private final LogParserWorker.TimingSettings workerTimingSettings;
 
     private static volatile AsyncLogParsersCoordinator instance;
 
     public static void initialize(int maxWorkers, boolean logData, String eventReportingMode,
             LogParserFactory logParserFactory) {
-        initialize(maxWorkers, logData, eventReportingMode, logParserFactory,
-                new LogParserWorker.TimingSettings());
-    }
-
-    public static void initialize(int maxWorkers, boolean logData, String eventReportingMode,
-            LogParserFactory logParserFactory,
-            LogParserWorker.TimingSettings workerTimingSettings) {
         if (instance == null) {
             synchronized (AsyncLogParsersCoordinator.class) {
                 if (instance == null) {
                     instance = new AsyncLogParsersCoordinator(maxWorkers, logData, eventReportingMode,
-                            logParserFactory, workerTimingSettings);
+                            logParserFactory);
                 }
             }
         }
@@ -89,13 +77,11 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
     }
 
     private AsyncLogParsersCoordinator(int maxWorkers, boolean logData, String eventReportingMode,
-            LogParserFactory logParserFactory,
-            LogParserWorker.TimingSettings workerTimingSettings) {
+            LogParserFactory logParserFactory) {
         this.maxWorkers = Math.max(1, maxWorkers);
         this.logData = logData;
         this.eventReportingMode = eventReportingMode;
         this.logParserFactory = logParserFactory;
-        this.workerTimingSettings = workerTimingSettings;
         this.testEventQueue = new LinkedBlockingQueue<>();
         this.subscribers = new CopyOnWriteArrayList<>();
         this.isInitialized = false;
@@ -109,6 +95,7 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
             worker.onTestProcessFinished();
         }
     }
+
 
     @Override
     public void subscribe(TestEventSubscriber subscriber) {
@@ -131,7 +118,6 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
         for (TestEventSubscriber subscriber : subscribers) {
             subscriber.onTestEventReceived(event);
         }
-        totalEventsPublished.incrementAndGet();
     }
 
     @Override
@@ -148,10 +134,13 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
     private void init() {
         isInitialized = true;
 
-        dispatcherExecutor = Executors.newSingleThreadExecutor(
-                r -> new Thread(r, "TestEventDispatcherThread"));
-        @SuppressWarnings("unused")
-        Future<?> unused = dispatcherExecutor.submit(this::dispatchTestEvents);
+        dispatcherThread = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                dispatchTestEvents();
+            }
+        }, "TestEventDispatcherThread");
+        dispatcherThread.start();
 
         workersExecutor = Executors.newFixedThreadPool(maxWorkers);
     }
@@ -177,10 +166,10 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
             }
         };
         LogParserWorker worker = new LogParserWorker(parser, testEventQueue, logFilePath, logData,
-                callback, workerTimingSettings);
+            callback);
         workers.put(logFilePath, worker);
         @SuppressWarnings("unused")
-        Future<?> unused = workersExecutor.submit(worker);
+        java.util.concurrent.Future<?> unused = workersExecutor.submit(worker);
     }
 
     @Override
@@ -190,20 +179,28 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
                 return;
             }
 
-            awaitTerminationWithProgress(
-                    workersExecutor,
-                    workerTimingSettings.noDataTimeoutMs,
-                    "log parser workers");
-            workersExecutor = null;
-
             isInitialized = false;
 
-            testEventQueue.offer(POISON_PILL);
-            awaitTerminationWithProgress(
-                    dispatcherExecutor,
-                    DISPATCHER_TIMEOUT_MS,
-                    "event dispatcher");
-            dispatcherExecutor = null;
+            if (workersExecutor != null) {
+                workersExecutor.shutdownNow();
+                try {
+                    workersExecutor.awaitTermination(EXECUTOR_TERMINATION_TIMEOUT_SECONDS,
+                        TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                workersExecutor = null;
+            }
+
+            if (dispatcherThread != null) {
+                dispatcherThread.interrupt();
+                try {
+                    dispatcherThread.join(DISPATCHER_THREAD_JOIN_TIMEOUT_MS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+                dispatcherThread = null;
+            }
 
             subscribers.clear();
             workers.clear();
@@ -211,53 +208,23 @@ public class AsyncLogParsersCoordinator implements LogParsersCoordinator {
         }
     }
 
-    private void awaitTerminationWithProgress(
-            ExecutorService executor, long timeoutMs, String phaseDescription) {
-        if (executor == null) {
-            return;
-        }
-
-        executor.shutdown();
-        int noProgressCount = 0;
-        long lastPublishedEvents = totalEventsPublished.get();
-        try {
-            while (!executor.awaitTermination(timeoutMs, TimeUnit.MILLISECONDS)) {
-                long currentPublishedEvents = totalEventsPublished.get();
-                Log.d(LOG_TAG, "Waiting for " + phaseDescription + " to terminate...");
-
-                if (currentPublishedEvents == lastPublishedEvents) {
-                    noProgressCount++;
-                    if (noProgressCount >= MAX_NO_PROGRESS_CHECKS) {
-                        Log.w(LOG_TAG, "No progress observed for " + phaseDescription + " after "
-                                + MAX_NO_PROGRESS_CHECKS
-                                + " consecutive checks; forcing shutdown.");
-                        executor.shutdownNow();
-                        break;
-                    }
-                } else {
-                    noProgressCount = 0;
-                    lastPublishedEvents = currentPublishedEvents;
-                }
-            }
-        } catch (InterruptedException e) {
-            executor.shutdownNow();
-            Thread.currentThread().interrupt();
-        }
-    }
-
     private void dispatchTestEvents() {
         try {
-            while (true) {
+            while (isInitialized) {
                 TestEvent event = testEventQueue.take();
-                if (event == POISON_PILL) {
-                    Log.i(LOG_TAG, "Poison pill received. Shutting down dispatcher.");
-                    break;
-                }
                 publish(event);
             }
         } catch (InterruptedException e) {
             Log.i(LOG_TAG, "Dispatcher thread interrupted.");
             Thread.currentThread().interrupt();
+        } finally {
+            Log.i(LOG_TAG, "Flushing remaining events.");
+            while (!testEventQueue.isEmpty()) {
+                TestEvent event = testEventQueue.poll();
+                if (event != null) {
+                    publish(event);
+                }
+            }
         }
     }
 

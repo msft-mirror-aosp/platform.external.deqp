@@ -193,7 +193,6 @@ struct TestParams
     bool topUsesAOP;           // does top AS use arrays, or arrays of pointers
     bool topGeneric;           // Top created as generic AS type.
     bool topUnboundedCreation; // Top created with unbounded buffer memory.
-    bool useDeviceAddressCommands;
     VkBuildAccelerationStructureFlagsKHR buildFlags;
     OperationTarget operationTarget;
     OperationType operationType;
@@ -1337,7 +1336,6 @@ std::vector<de::SharedPtr<BottomLevelAccelerationStructure>> CheckerboardSceneBu
         }
 
         bottomLevelAccelerationStructure->addGeometry(geometry);
-        bottomLevelAccelerationStructure->setUseDeviceAddressCommands(testParams.useDeviceAddressCommands);
         result.push_back(de::SharedPtr<BottomLevelAccelerationStructure>(bottomLevelAccelerationStructure.release()));
     }
     else // m_data.topTestType == TTT_IDENTICAL_INSTANCES
@@ -1359,7 +1357,6 @@ std::vector<de::SharedPtr<BottomLevelAccelerationStructure>> CheckerboardSceneBu
                 de::MovePtr<BottomLevelAccelerationStructure> bottomLevelAccelerationStructure =
                     makeBottomLevelAccelerationStructure();
                 bottomLevelAccelerationStructure->setGeometryCount(geometryCount);
-                bottomLevelAccelerationStructure->setUseDeviceAddressCommands(testParams.useDeviceAddressCommands);
 
                 if (testParams.bottomTestType == BottomTestType::TRIANGLES)
                 {
@@ -1485,7 +1482,6 @@ de::MovePtr<TopLevelAccelerationStructure> CheckerboardSceneBuilder::initTopAcce
 
     de::MovePtr<TopLevelAccelerationStructure> result = makeTopLevelAccelerationStructure();
     result->setInstanceCount(instanceCount);
-    result->setUseDeviceAddressCommands(testParams.useDeviceAddressCommands);
 
     if (testParams.topTestType == TopTestType::DIFFERENT_INSTANCES)
     {
@@ -1580,7 +1576,7 @@ class RayQueryASBasicTestInstance : public TestInstance
 {
 public:
     RayQueryASBasicTestInstance(Context &context, const TestParams &data);
-    ~RayQueryASBasicTestInstance(void) = default;
+    ~RayQueryASBasicTestInstance(void);
     tcu::TestStatus iterate(void);
 
 protected:
@@ -1606,9 +1602,6 @@ RayQueryASBasicTestCase::~RayQueryASBasicTestCase(void)
 void RayQueryASBasicTestCase::checkSupport(Context &context) const
 {
     commonASTestsCheckSupport(context);
-
-    if (m_data.useDeviceAddressCommands)
-        context.requireDeviceFunctionality("VK_KHR_device_address_commands");
 
     const VkPhysicalDeviceFeatures2 &features2 = context.getDeviceFeatures2();
 
@@ -2492,6 +2485,10 @@ void RayQueryASFuncArgTestCase::initPrograms(SourceCollections &programCollectio
 RayQueryASBasicTestInstance::RayQueryASBasicTestInstance(Context &context, const TestParams &data)
     : vkt::TestInstance(context)
     , m_data(data)
+{
+}
+
+RayQueryASBasicTestInstance::~RayQueryASBasicTestInstance(void)
 {
 }
 
@@ -3671,8 +3668,7 @@ void addBasicBuildingTests(tcu::TestCaseGroup *group)
                         de::MovePtr<tcu::TestCaseGroup> topGroup(
                             new tcu::TestCaseGroup(group->getTestContext(), topTestTypes[topNdx].name));
 
-                        for (size_t paddingTypeIdx = 0; paddingTypeIdx < DE_LENGTH_OF_ARRAY(paddingType);
-                             ++paddingTypeIdx)
+                        for (int paddingTypeIdx = 0; paddingTypeIdx < DE_LENGTH_OF_ARRAY(paddingType); ++paddingTypeIdx)
                         {
                             de::MovePtr<tcu::TestCaseGroup> paddingTypeGroup(
                                 new tcu::TestCaseGroup(group->getTestContext(), paddingType[paddingTypeIdx].name));
@@ -3726,7 +3722,6 @@ void addBasicBuildingTests(tcu::TestCaseGroup *group)
                                                     topTestTypes[topNdx].usesAOP,
                                                     createGenericParams[createGenericIdx].topGeneric,
                                                     unboundedCreationTop,
-                                                    false,
                                                     optimizationTypes[optimizationNdx].flags |
                                                         updateTypes[updateNdx].flags |
                                                         compactionTypes[compactionNdx].flags |
@@ -3741,19 +3736,6 @@ void addBasicBuildingTests(tcu::TestCaseGroup *group)
                                                 };
                                                 paddingTypeGroup->addChild(new RayQueryASBasicTestCase(
                                                     group->getTestContext(), testName.c_str(), testParams));
-
-                                                // limit number of repeated tests for device_address_commands
-                                                if (!unboundedCreationBottom && !unboundedCreationTop &&
-                                                    (buildTypes[buildTypeNdx].buildType ==
-                                                     VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR) &&
-                                                    (bottomNdx == topNdx) && (paddingTypeIdx == optimizationNdx) &&
-                                                    (compactionNdx == lowMemoryNdx) && (paddingTypeIdx == lowMemoryNdx))
-                                                {
-                                                    testName += "_device_address";
-                                                    testParams.useDeviceAddressCommands = true;
-                                                    paddingTypeGroup->addChild(new RayQueryASBasicTestCase(
-                                                        group->getTestContext(), testName.c_str(), testParams));
-                                                }
                                             }
                                         }
                                     }
@@ -3947,7 +3929,6 @@ void addVertexIndexFormatsTests(tcu::TestCaseGroup *group)
                                 false,
                                 false,
                                 false,
-                                false,
                                 VkBuildAccelerationStructureFlagsKHR(0u),
                                 OT_NONE,
                                 OP_NONE,
@@ -4129,30 +4110,31 @@ void addOperationTestsImpl(tcu::TestCaseGroup *group, const uint32_t workerThrea
                                     TopTestType::DIFFERENT_INSTANCES :
                                     TopTestType::IDENTICAL_INSTANCES;
 
-                            TestParams testParams{shaderSourceTypes[shaderSourceNdx].shaderSourceType,
-                                                  shaderSourceTypes[shaderSourceNdx].shaderSourcePipeline,
-                                                  buildTypes[buildTypeNdx].buildType,
-                                                  VK_FORMAT_R32G32B32_SFLOAT,
-                                                  false,
-                                                  VK_INDEX_TYPE_NONE_KHR,
-                                                  bottomTestTypes[testTypeNdx].testType,
-                                                  InstanceCullFlags::NONE,
-                                                  false,
-                                                  false,
-                                                  false,
-                                                  topTest,
-                                                  false,
-                                                  false,
-                                                  false,
-                                                  false,
-                                                  VkBuildAccelerationStructureFlagsKHR(0u),
-                                                  operationTargets[operationTargetNdx].operationTarget,
-                                                  operationTypes[operationTypeNdx].operationType,
-                                                  TEST_WIDTH,
-                                                  TEST_HEIGHT,
-                                                  workerThreads,
-                                                  EmptyAccelerationStructureCase::NOT_EMPTY,
-                                                  accStructBufferResTypes[structResidencyNdx].res};
+                            TestParams testParams{
+                                shaderSourceTypes[shaderSourceNdx].shaderSourceType,
+                                shaderSourceTypes[shaderSourceNdx].shaderSourcePipeline,
+                                buildTypes[buildTypeNdx].buildType,
+                                VK_FORMAT_R32G32B32_SFLOAT,
+                                false,
+                                VK_INDEX_TYPE_NONE_KHR,
+                                bottomTestTypes[testTypeNdx].testType,
+                                InstanceCullFlags::NONE,
+                                false,
+                                false,
+                                false,
+                                topTest,
+                                false,
+                                false,
+                                false,
+                                VkBuildAccelerationStructureFlagsKHR(0u),
+                                operationTargets[operationTargetNdx].operationTarget,
+                                operationTypes[operationTypeNdx].operationType,
+                                TEST_WIDTH,
+                                TEST_HEIGHT,
+                                workerThreads,
+                                EmptyAccelerationStructureCase::NOT_EMPTY,
+                                accStructBufferResTypes[structResidencyNdx].res,
+                            };
                             operationTargetGroup->addChild(new RayQueryASBasicTestCase(
                                 group->getTestContext(), bottomTestTypes[testTypeNdx].name, testParams));
                         }
@@ -4242,7 +4224,6 @@ void addFuncArgTests(tcu::TestCaseGroup *group)
                 false,
                 false,
                 TopTestType::IDENTICAL_INSTANCES,
-                false,
                 false,
                 false,
                 false,
@@ -4424,7 +4405,6 @@ void addInstanceTriangleCullingTests(tcu::TestCaseGroup *group)
                                 false,
                                 false,
                                 false,
-                                false,
                                 VkBuildAccelerationStructureFlagsKHR(0u),
                                 OT_NONE,
                                 OP_NONE,
@@ -4514,7 +4494,6 @@ void addInstanceUpdateTests(tcu::TestCaseGroup *group)
                     false,
                     false,
                     TopTestType::IDENTICAL_INSTANCES,
-                    false,
                     false,
                     false,
                     false,
@@ -4715,7 +4694,6 @@ void addEmptyAccelerationStructureTests(tcu::TestCaseGroup *group)
                             false,
                             false,
                             TopTestType::IDENTICAL_INSTANCES,
-                            false,
                             false,
                             false,
                             false,

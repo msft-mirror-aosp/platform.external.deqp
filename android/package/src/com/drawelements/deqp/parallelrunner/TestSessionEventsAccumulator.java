@@ -24,7 +24,6 @@ import android.os.Bundle;
 import com.drawelements.deqp.testercore.TestEventConstants;
 import com.drawelements.deqp.testercore.TestEventListener;
 import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Implementation of TestEventListener that aggregates streaming parser events into cohesive,
@@ -39,7 +38,6 @@ public class TestSessionEventsAccumulator implements TestEventListener {
 
     private final BlockingQueue<TestEvent> testEventQueue;
     private final boolean shouldLogData;
-    private final AtomicBoolean sessionEnded = new AtomicBoolean(false);
     private TestEvent currentEvent;
 
     public TestSessionEventsAccumulator(BlockingQueue<TestEvent> testEventQueue,
@@ -50,10 +48,6 @@ public class TestSessionEventsAccumulator implements TestEventListener {
         this.testEventQueue = testEventQueue;
         this.shouldLogData = shouldLogData;
         this.currentEvent = null;
-    }
-
-    boolean hasSessionEnded() {
-        return sessionEnded.get();
     }
 
     @Override
@@ -143,7 +137,6 @@ public class TestSessionEventsAccumulator implements TestEventListener {
         sessionEvent.addBundle(info);
 
         enqueue(sessionEvent);
-        sessionEnded.set(true);
     }
 
     @Override

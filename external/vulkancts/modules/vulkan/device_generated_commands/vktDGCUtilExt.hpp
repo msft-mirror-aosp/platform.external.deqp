@@ -324,6 +324,8 @@ protected:
     vk::VkDeviceAddress m_deviceAddress;
 };
 
+vk::VkDeviceAddress getBufferDeviceAddress(const vk::DeviceInterface &vkd, vk::VkDevice device, vk::VkBuffer buffer);
+
 // General buffer with indirect usage and device-addressable memory.
 class DGCBuffer
 {
