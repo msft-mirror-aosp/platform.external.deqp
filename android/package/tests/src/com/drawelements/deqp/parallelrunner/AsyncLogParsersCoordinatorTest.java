@@ -33,7 +33,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import com.drawelements.deqp.testercore.LogParser;
+import com.drawelements.deqp.testercore.TestEventListener;
 
 import static org.easymock.EasyMock.*;
 import static org.junit.Assert.assertEquals;
@@ -44,11 +49,20 @@ import static org.junit.Assert.assertTrue;
 @RunWith(RobolectricTestRunner.class)
 public class AsyncLogParsersCoordinatorTest {
 
+    private static final LogParserWorker.TimingSettings FAST_TIMING_SETTINGS =
+            new LogParserWorker.TimingSettings(
+                    /* noActivitySleepMs = */ 1,
+                    /* noDataSleepMs = */ 2,
+                    /* noDataTimeoutMs = */ 5,
+                    LogParserWorker.TimingSettings.DEFAULT_FILE_READY_TIMEOUT_MS);
+
     private LogParsersCoordinator coordinator;
 
     @Before
     public void setUp() throws Exception {
-        AsyncLogParsersCoordinator.initialize(4, true, DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, new LogParserFactoryImpl());
+        AsyncLogParsersCoordinator.initialize(4, true,
+                DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, new LogParserFactoryImpl(),
+                FAST_TIMING_SETTINGS);
         coordinator = AsyncLogParsersCoordinator.getInstance();
     }
 
@@ -73,7 +87,7 @@ public class AsyncLogParsersCoordinatorTest {
     @Test
     public void testPublishToSubscribers() throws Exception {
         final List<TestEvent> receivedTestEvents = new ArrayList<>();
-        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(
+        final CountDownLatch latch = new CountDownLatch(
             3);
         TestEventSubscriber subscriber = new TestEventSubscriber() {
             @Override
@@ -87,8 +101,9 @@ public class AsyncLogParsersCoordinatorTest {
 
         File dummyQpa = createDummyQpaFile();
         coordinator.parse(dummyQpa.getAbsolutePath());
+        coordinator.onTestProcessFinished(dummyQpa.getAbsolutePath());
 
-        boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
+        boolean receivedAll = latch.await(3, TimeUnit.SECONDS);
         assertTrue("Timeout waiting for 3 events", receivedAll);
 
         assertEquals(3, receivedTestEvents.size());
@@ -107,7 +122,7 @@ public class AsyncLogParsersCoordinatorTest {
         coordinator.subscribe(subscriber);
         coordinator.unsubscribe(subscriber);
 
-        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(
+        final CountDownLatch latch = new CountDownLatch(
             3);
         TestEventSubscriber helperSubscriber = new TestEventSubscriber() {
             @Override
@@ -119,8 +134,9 @@ public class AsyncLogParsersCoordinatorTest {
 
         File dummyQpa = createDummyQpaFile();
         coordinator.parse(dummyQpa.getAbsolutePath());
+        coordinator.onTestProcessFinished(dummyQpa.getAbsolutePath());
 
-        boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
+        boolean receivedAll = latch.await(3, TimeUnit.SECONDS);
         assertTrue("Timeout waiting for 3 events in helper subscriber", receivedAll);
 
         // Ensure the dispatcher thread has completely finished its publish loop
@@ -135,7 +151,7 @@ public class AsyncLogParsersCoordinatorTest {
     public void testPublishMultipleSubscribers() throws Exception {
         final List<TestEvent> events1 = new ArrayList<>();
         final List<TestEvent> events2 = new ArrayList<>();
-        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(
+        final CountDownLatch latch = new CountDownLatch(
             6); // 3 events * 2 subscribers
 
         TestEventSubscriber sub1 = new TestEventSubscriber() {
@@ -158,8 +174,9 @@ public class AsyncLogParsersCoordinatorTest {
 
         File dummyQpa = createDummyQpaFile();
         coordinator.parse(dummyQpa.getAbsolutePath());
+        coordinator.onTestProcessFinished(dummyQpa.getAbsolutePath());
 
-        boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
+        boolean receivedAll = latch.await(3, TimeUnit.SECONDS);
         assertTrue("Timeout waiting for 6 events across subscribers", receivedAll);
 
         assertEquals(3, events1.size());
@@ -169,7 +186,7 @@ public class AsyncLogParsersCoordinatorTest {
     @Test
     public void testTestEventsFromMultipleParsers() throws Exception {
         final List<TestEvent> receivedTestEvents = new ArrayList<>();
-        final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(
+        final CountDownLatch latch = new CountDownLatch(
             6);
         TestEventSubscriber subscriber = new TestEventSubscriber() {
             @Override
@@ -187,9 +204,11 @@ public class AsyncLogParsersCoordinatorTest {
 
         coordinator.parse(dummyQpa1.getAbsolutePath());
         coordinator.parse(dummyQpa2.getAbsolutePath());
+        coordinator.onTestProcessFinished(dummyQpa1.getAbsolutePath());
+        coordinator.onTestProcessFinished(dummyQpa2.getAbsolutePath());
 
         // wait till we receive 6 values with timeout
-        boolean receivedAll = latch.await(3, java.util.concurrent.TimeUnit.SECONDS);
+        boolean receivedAll = latch.await(3, TimeUnit.SECONDS);
         assertTrue("Timeout waiting for 6 events", receivedAll);
 
         assertEquals(6, receivedTestEvents.size());
@@ -198,7 +217,7 @@ public class AsyncLogParsersCoordinatorTest {
     @Test
     public void testParseAndDeinit() throws Exception {
         final List<TestEvent> receivedTestEvents = new ArrayList<>();
-        final java.util.concurrent.CountDownLatch firstEventLatch = new java.util.concurrent.CountDownLatch(
+        final CountDownLatch firstEventLatch = new CountDownLatch(
             1);
 
         TestEventSubscriber subscriber = new TestEventSubscriber() {
@@ -223,17 +242,18 @@ public class AsyncLogParsersCoordinatorTest {
             out.println("#beginSession");
 
             // Deterministically wait for parsing to start and the first event to arrive
-            boolean gotEvent = firstEventLatch.await(3, java.util.concurrent.TimeUnit.SECONDS);
+            boolean gotEvent = firstEventLatch.await(3, TimeUnit.SECONDS);
             assertTrue("Timeout waiting for first event", gotEvent);
 
             // Now deinit
+            coordinator.onTestProcessFinished(dummyQpa.getAbsolutePath());
             coordinator.deinit();
 
             int sizeAfterDeinit = receivedTestEvents.size();
 
             // Verify no extra events are fired after deinit returns
             // We subscribe the extraSubscriber BEFORE writing the remaining lines to guarantee we catch them if they fire.
-            final java.util.concurrent.CountDownLatch extraEventLatch = new java.util.concurrent.CountDownLatch(
+            final CountDownLatch extraEventLatch = new CountDownLatch(
                 1);
             TestEventSubscriber extraSubscriber = new TestEventSubscriber() {
                 @Override
@@ -250,7 +270,7 @@ public class AsyncLogParsersCoordinatorTest {
             out.println("#endSession");
 
             boolean gotExtraEvent = extraEventLatch.await(100,
-                java.util.concurrent.TimeUnit.MILLISECONDS);
+                    TimeUnit.MILLISECONDS);
             assertFalse("No events should be received after deinit", gotExtraEvent);
             assertEquals(sizeAfterDeinit, receivedTestEvents.size());
         }
@@ -285,16 +305,119 @@ public class AsyncLogParsersCoordinatorTest {
         replay(mockFactory);
 
         AsyncLogParsersCoordinator.initialize(
-                4, true, DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, mockFactory);
+                4, true, DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, mockFactory,
+                FAST_TIMING_SETTINGS);
         LogParsersCoordinator customCoordinator = AsyncLogParsersCoordinator.getInstance();
 
         try {
             File dummyQpa = createDummyQpaFile();
             customCoordinator.parse(dummyQpa.getAbsolutePath());
+            customCoordinator.onTestProcessFinished(dummyQpa.getAbsolutePath());
 
             verify(mockFactory);
         } finally {
             AsyncLogParsersCoordinator.reset();
         }
+    }
+
+    @Test
+    public void testPendingFilesParsedInDeinit() throws Exception {
+        AsyncLogParsersCoordinator.reset();
+
+        final CountDownLatch blockFirstParserLatch = new CountDownLatch(1);
+        final CountDownLatch firstParserStartedLatch = new CountDownLatch(1);
+
+        LogParserFactory mockFactory = new LogParserFactory() {
+            @Override
+            public LogParser create(String eventReportingMode) {
+                return new LogParser() {
+                    private TestEventListener listener;
+                    private String logFile;
+
+                    @Override
+                    public void init(TestEventListener testEventListener, String logFileName, boolean logData) {
+                        this.listener = testEventListener;
+                        this.logFile = logFileName;
+                    }
+
+                    private boolean parsed = false;
+
+                    @Override
+                    public boolean parse() throws IOException {
+                        if (!parsed) {
+                            parsed = true;
+                            if (logFile != null && logFile.contains("dummy1")) {
+                                firstParserStartedLatch.countDown();
+                                try {
+                                    blockFirstParserLatch.await();
+                                } catch (InterruptedException e) {
+                                    Thread.currentThread().interrupt();
+                                }
+                                listener.beginSession();
+                            } else if (logFile != null && logFile.contains("dummy2")) {
+                                listener.beginSession();
+                            }
+                            return true;
+                        }
+                        return false;
+                    }
+
+                    @Override
+                    public void deinit() {
+                    }
+                };
+            }
+        };
+
+        LogParserWorker.TimingSettings RELAXED_TIMING_SETTINGS =
+                new LogParserWorker.TimingSettings(
+                        /* noActivitySleepMs = */ 1,
+                        /* noDataSleepMs = */ 2,
+                        /* noDataTimeoutMs = */ 50,
+                        LogParserWorker.TimingSettings.DEFAULT_FILE_READY_TIMEOUT_MS);
+
+        AsyncLogParsersCoordinator.initialize(1, true,
+                DeqpInstrumentation.REPORTING_MODE_JAVA_LOG_PARSER, mockFactory,
+                RELAXED_TIMING_SETTINGS);
+        LogParsersCoordinator customCoordinator = AsyncLogParsersCoordinator.getInstance();
+
+        final AtomicInteger eventCount = new AtomicInteger(0);
+        customCoordinator.subscribe(new TestEventSubscriber() {
+            @Override
+            public void onTestEventReceived(TestEvent event) {
+                eventCount.incrementAndGet();
+            }
+        });
+
+        File dummyQpa1 = File.createTempFile("dummy1", ".qpa");
+        File dummyQpa2 = File.createTempFile("dummy2", ".qpa");
+        dummyQpa1.deleteOnExit();
+        dummyQpa2.deleteOnExit();
+
+        customCoordinator.parse(dummyQpa1.getAbsolutePath());
+        customCoordinator.parse(dummyQpa2.getAbsolutePath());
+
+        customCoordinator.onTestProcessFinished(dummyQpa1.getAbsolutePath());
+        customCoordinator.onTestProcessFinished(dummyQpa2.getAbsolutePath());
+
+        assertTrue("Timeout waiting for first parser to start",
+                firstParserStartedLatch.await(3, TimeUnit.SECONDS));
+
+        Thread deinitThread = new Thread(() -> {
+            try {
+                customCoordinator.deinit();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
+        deinitThread.start();
+
+        Thread.sleep(50);
+
+        blockFirstParserLatch.countDown();
+
+        deinitThread.join(3000);
+
+        assertEquals(2, eventCount.get());
     }
 }

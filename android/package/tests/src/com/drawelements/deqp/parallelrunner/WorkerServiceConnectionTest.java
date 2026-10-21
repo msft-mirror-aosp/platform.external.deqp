@@ -20,8 +20,6 @@
 
 package com.drawelements.deqp.parallelrunner;
 
-import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
@@ -32,6 +30,8 @@ import androidx.test.ext.junit.runners.AndroidJUnit4;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import static org.easymock.EasyMock.*;
+import static org.junit.Assert.*;
 
 /**
  * Unit tests for {@link WorkerServiceConnection} verifying binding lifecycle and callbacks.
@@ -128,7 +128,7 @@ public class WorkerServiceConnectionTest {
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
 
         expect(mockBinder.queryLocalInterface(anyObject())).andReturn(mockWorker);
-        mockCallback.onConnected(mockWorker);
+        mockCallback.onConnected(connection, mockWorker);
         expectLastCall().once();
 
         replay(mockCallback, mockBinder, mockWorker);
@@ -163,10 +163,10 @@ public class WorkerServiceConnectionTest {
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
 
         expect(mockBinder.queryLocalInterface(anyObject())).andReturn(mockWorker);
-        mockCallback.onConnected(mockWorker);
+        mockCallback.onConnected(connection, mockWorker);
         expectLastCall().once();
 
-        mockCallback.onDisconnected();
+        mockCallback.onDisconnected(connection);
         expectLastCall().once();
 
         replay(mockCallback, mockBinder, mockWorker);
@@ -186,7 +186,7 @@ public class WorkerServiceConnectionTest {
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
 
         expect(mockBinder.queryLocalInterface(anyObject())).andReturn(mockWorker);
-        mockCallback.onConnected(mockWorker);
+        mockCallback.onConnected(connection, mockWorker);
         expectLastCall().once();
 
         replay(mockCallback, mockBinder, mockWorker);
@@ -203,7 +203,7 @@ public class WorkerServiceConnectionTest {
     @Test
     public void testOnBindingDied() {
         WorkerServiceConnection connection = new WorkerServiceConnection(testContext, 0, mockCallback);
-        mockCallback.onDisconnected();
+        mockCallback.onDisconnected(connection);
         expectLastCall().once();
 
         replay(mockCallback);
@@ -220,7 +220,7 @@ public class WorkerServiceConnectionTest {
     @Test
     public void testOnNullBinding() {
         WorkerServiceConnection connection = new WorkerServiceConnection(testContext, 0, mockCallback);
-        mockCallback.onDisconnected();
+        mockCallback.onDisconnected(connection);
         expectLastCall().once();
 
         replay(mockCallback);

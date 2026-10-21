@@ -25,7 +25,6 @@ import android.view.Surface;
 import android.view.SurfaceHolder;
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import com.drawelements.deqp.testercore.DeqpInstrumentation;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,9 +55,11 @@ public class WorkerHolderTest {
     private final Object stateLock = new Object();
 
     private static class TestSurface extends Surface {
+        boolean valid = true;
+
         @Override
         public boolean isValid() {
-            return true;
+            return valid;
         }
     }
 
@@ -189,7 +190,7 @@ public class WorkerHolderTest {
     }
 
     @Test
-    public void testSurfaceDestroyedTriggersUnbindAndPutsBatchBack() throws Exception {
+    public void testSurfaceDestroyedTriggersUnbind() throws Exception {
         setupBatchLoaderWithFiles("batch_1.txt");
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
         TestSurface testSurface = new TestSurface();
@@ -213,14 +214,11 @@ public class WorkerHolderTest {
         replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
-        holder.onConnected(mockWorker);
+        holder.onConnected(capturedConnections.get(0), mockWorker);
 
         verify(mockWorker, mockCoordinator);
         assertTrue(capturedConnections.get(0).unbindCalled);
-
-        // The batch should be put back in the queue
-        String expectedPath = new File(tempFolder.getRoot(), "batch_1.txt").getAbsolutePath();
-        assertEquals(expectedPath, batchLoader.getBatchQueue().poll());
+        assertEquals(1, callback.releasedCount);
     }
 
     @Test
@@ -247,7 +245,7 @@ public class WorkerHolderTest {
 
         // Trigger connection
         capturedConnections.get(0).workerVal = mockWorker;
-        holder.onConnected(mockWorker);
+        holder.onConnected(capturedConnections.get(0), mockWorker);
 
         verify(mockWorker, mockCoordinator);
         assertTrue(callback.checkAllWorkersFinishedCalled);
@@ -278,7 +276,7 @@ public class WorkerHolderTest {
         replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
-        holder.onConnected(mockWorker);
+        holder.onConnected(capturedConnections.get(0), mockWorker);
 
         verify(mockWorker, mockCoordinator);
         assertTrue(callback.checkAllWorkersFinishedCalled);
@@ -299,7 +297,7 @@ public class WorkerHolderTest {
         holder.surfaceCreated(mockHolder);
 
         capturedConnections.get(0).workerVal = mockWorker;
-        holder.onConnected(mockWorker);
+        holder.onConnected(capturedConnections.get(0), mockWorker);
     }
 
     @Test
@@ -314,7 +312,7 @@ public class WorkerHolderTest {
         replay(mockCoordinator);
 
         capturedConnections.get(0).workerVal = createMock(ISurfaceWorker.class);
-        holder.onConnected(capturedConnections.get(0).workerVal);
+        holder.onConnected(capturedConnections.get(0), capturedConnections.get(0).workerVal);
 
         verify(mockCoordinator);
         assertTrue(callback.checkAllWorkersFinishedCalled);
@@ -343,7 +341,7 @@ public class WorkerHolderTest {
         replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
-        holder.onConnected(mockWorker);
+        holder.onConnected(capturedConnections.get(0), mockWorker);
 
         verify(mockWorker, mockCoordinator);
         // Connection 1 (service ID 0) should be unbound
@@ -353,14 +351,13 @@ public class WorkerHolderTest {
         assertTrue(capturedConnections.get(1).bindCalled);
 
         String expectedBatch2 = new File(tempFolder.getRoot(), "batch_2.txt").getAbsolutePath();
-        String expectedBatch1 = new File(tempFolder.getRoot(), "batch_1.txt").getAbsolutePath();
         assertEquals(expectedBatch2, batchLoader.getBatchQueue().poll());
-        assertEquals(expectedBatch1, batchLoader.getBatchQueue().poll());
+        assertNull(batchLoader.getBatchQueue().poll());
         assertEquals(1, callback.releasedCount);
     }
 
     @Test
-    public void testWorkerDisconnectedTriggersUnbindAndPutsBatchBack() throws Exception {
+    public void testWorkerDisconnectedTriggersUnbindAndSafeBinds() throws Exception {
         setupBatchLoaderWithFiles("batch_1.txt", "batch_2.txt");
         ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
         TestSurface testSurface = new TestSurface();
@@ -372,7 +369,7 @@ public class WorkerHolderTest {
         holder.surfaceCreated(mockHolder);
 
         expect(mockWorker.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andAnswer(() -> {
-            holder.onDisconnected();
+            holder.onDisconnected(capturedConnections.get(0));
             return false;
         }).once();
         mockCoordinator.parse(anyObject());
@@ -383,7 +380,7 @@ public class WorkerHolderTest {
         replay(mockWorker, mockCoordinator);
 
         capturedConnections.get(0).workerVal = mockWorker;
-        holder.onConnected(mockWorker);
+        holder.onConnected(capturedConnections.get(0), mockWorker);
 
         verify(mockWorker, mockCoordinator);
         // Connection 1 (service ID 0) should be unbound
@@ -393,9 +390,8 @@ public class WorkerHolderTest {
         assertTrue(capturedConnections.get(1).bindCalled);
 
         String expectedBatch2 = new File(tempFolder.getRoot(), "batch_2.txt").getAbsolutePath();
-        String expectedBatch1 = new File(tempFolder.getRoot(), "batch_1.txt").getAbsolutePath();
         assertEquals(expectedBatch2, batchLoader.getBatchQueue().poll());
-        assertEquals(expectedBatch1, batchLoader.getBatchQueue().poll());
+        assertNull(batchLoader.getBatchQueue().poll());
         assertEquals(1, callback.releasedCount);
     }
 
@@ -410,5 +406,123 @@ public class WorkerHolderTest {
 
         holder.surfaceDestroyed(mockHolder);
         assertEquals(1, callback.releasedCount);
+    }
+
+    @Test
+    public void testStaleDisconnectionFromPreviousConnectionIgnored() throws Exception {
+        setupBatchLoaderWithFiles("batch_1.txt", "batch_2.txt");
+        ISurfaceWorker mockWorker1 = createMock(ISurfaceWorker.class);
+        ISurfaceWorker mockWorker2 = createMock(ISurfaceWorker.class);
+        TestSurface testSurface = new TestSurface();
+        List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
+        TestSchedulerCallback callback = new TestSchedulerCallback();
+
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
+        SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
+        holder.surfaceCreated(mockHolder);
+
+        // Batch 1 finishes successfully on connection 0
+        expect(mockWorker1.startTestBatch(eq(testSurface), contains("batch_1.txt"))).andReturn(true).once();
+        expect(mockWorker2.startTestBatch(eq(testSurface), contains("batch_2.txt"))).andReturn(true).once();
+        mockCoordinator.parse(anyObject());
+        expectLastCall().times(2);
+        mockCoordinator.onTestProcessFinished(anyObject());
+        expectLastCall().times(2);
+
+        replay(mockWorker1, mockWorker2, mockCoordinator);
+
+        capturedConnections.get(0).workerVal = mockWorker1;
+        holder.onConnected(capturedConnections.get(0), mockWorker1);
+
+        // Connection 1 was unbound, connection 2 was created
+        assertEquals(2, capturedConnections.size());
+        assertTrue(capturedConnections.get(0).unbindCalled);
+
+        // Now simulate delayed onDisconnected from connection 0 arriving
+        holder.onDisconnected(capturedConnections.get(0));
+
+        // Connection 2 should NOT be unbound by the stale disconnect
+        assertFalse(capturedConnections.get(1).unbindCalled);
+
+        // Connection 2 connects and runs batch 2
+        capturedConnections.get(1).workerVal = mockWorker2;
+        holder.onConnected(capturedConnections.get(1), mockWorker2);
+
+        verify(mockWorker1, mockWorker2, mockCoordinator);
+        assertTrue(capturedConnections.get(1).unbindCalled);
+        assertTrue(callback.checkAllWorkersFinishedCalled);
+        assertEquals(2, callback.releasedCount);
+    }
+
+    @Test
+    public void testOnConnectedWithInvalidSurfaceTriggersResetAndChecksFinished() throws Exception {
+        setupBatchLoaderWithFiles("batch_1.txt");
+        ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
+        TestSurface testSurface = new TestSurface();
+        List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
+        TestSchedulerCallback callback = new TestSchedulerCallback();
+
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
+
+        SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
+        holder.surfaceCreated(mockHolder);
+
+        // Invalidate surface before onConnected arrives
+        testSurface.valid = false;
+
+        capturedConnections.get(0).workerVal = mockWorker;
+        holder.onConnected(capturedConnections.get(0), mockWorker);
+
+        // Connection should be unbound, service ID released, and checkAllWorkersFinished called
+        assertTrue(capturedConnections.get(0).unbindCalled);
+        assertEquals(1, callback.releasedCount);
+        assertTrue(callback.checkAllWorkersFinishedCalled);
+    }
+
+    @Test
+    public void testStaleConnectionFromPreviousConnectionIgnored() throws Exception {
+        setupBatchLoaderWithFiles("batch_1.txt");
+        ISurfaceWorker mockWorker = createMock(ISurfaceWorker.class);
+        TestSurface testSurface = new TestSurface();
+        List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
+        TestSchedulerCallback callback = new TestSchedulerCallback();
+
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
+
+        SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
+        holder.surfaceCreated(mockHolder);
+
+        // Surface destroyed resets the holder and unbinds connection 0
+        holder.surfaceDestroyed(mockHolder);
+        assertTrue(capturedConnections.get(0).unbindCalled);
+
+        // Now a delayed onConnected from connection 0 arrives
+        holder.onConnected(capturedConnections.get(0), mockWorker);
+
+        // Should be ignored: worker is not busy and batch remains in queue
+        assertFalse(holder.isBusy());
+        assertEquals(1, batchLoader.getBatchQueue().size());
+    }
+
+    @Test
+    public void testOnConnectedWithNullWorkerTriggersResetAndChecksFinished() throws Exception {
+        setupBatchLoaderWithFiles("batch_1.txt");
+        TestSurface testSurface = new TestSurface();
+        List<TestWorkerServiceConnection> capturedConnections = registerMockConnectionFactory();
+        TestSchedulerCallback callback = new TestSchedulerCallback();
+
+        WorkerHolder holder = new WorkerHolder(context, 0, batchLoader, TEST_LOG_DIR, TEST_CMD_LINE, directExecutor, stateLock, callback, mockCoordinator);
+
+        SurfaceHolder mockHolder = createMockSurfaceHolder(testSurface);
+        holder.surfaceCreated(mockHolder);
+
+        // onConnected with null worker (e.g. stub resolution failure)
+        capturedConnections.get(0).workerVal = null;
+        holder.onConnected(capturedConnections.get(0), null);
+
+        // Connection should be unbound, service ID released, and checkAllWorkersFinished called
+        assertTrue(capturedConnections.get(0).unbindCalled);
+        assertEquals(1, callback.releasedCount);
+        assertTrue(callback.checkAllWorkersFinishedCalled);
     }
 }
