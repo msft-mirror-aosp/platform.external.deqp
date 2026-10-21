@@ -25,9 +25,13 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetManager;
 import android.os.IBinder;
+import android.os.Process;
 import android.os.RemoteException;
+import android.view.Surface;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import java.lang.reflect.InvocationTargetException;
 import org.junit.Before;
@@ -99,5 +103,46 @@ public class WorkerServiceTest {
 
         boolean acceptedSecond = worker.startTestBatch(null, "--deqp-case=dEQP-GLES2.info");
         assertFalse("Worker should reject second test batch sequentially when surface is null", acceptedSecond);
+    }
+
+    /**
+     * Intercepts execution before {@code nativeStartDeqp} is called, capturing thread priority
+     * without requiring libdeqp.so or adding test hooks to WorkerService.
+     */
+    private static class RecordingWorkerService extends WorkerService {
+        volatile int priorityDuringCall = Integer.MIN_VALUE;
+
+        @Override
+        public Context getBaseContext() {
+            priorityDuringCall = Process.getThreadPriority(Process.myTid());
+            throw new RuntimeException("Stop execution before native call");
+        }
+    }
+
+    @Test
+    public void testStartTestBatch_runsNativeEngineAtDisplayPriority() throws RemoteException {
+        RecordingWorkerService service = new RecordingWorkerService();
+        ISurfaceWorker worker = getBoundWorker(service);
+
+        worker.startTestBatch(new Surface(), "--deqp-case=dEQP-GLES2.info");
+
+        assertEquals(
+                "dEQP execution must run at display priority to match the legacy runner",
+                Process.THREAD_PRIORITY_DISPLAY,
+                service.priorityDuringCall);
+    }
+
+    @Test
+    public void testStartTestBatch_restoresThreadPriorityAfterBatch() throws RemoteException {
+        RecordingWorkerService service = new RecordingWorkerService();
+        ISurfaceWorker worker = getBoundWorker(service);
+
+        Process.setThreadPriority(Process.THREAD_PRIORITY_DEFAULT);
+        int before = Process.getThreadPriority(Process.myTid());
+        worker.startTestBatch(new Surface(), "--deqp-case=dEQP-GLES2.info");
+        int after = Process.getThreadPriority(Process.myTid());
+
+        assertEquals("Thread priority must be restored after the batch completes", before, after);
+        assertEquals(Process.THREAD_PRIORITY_DEFAULT, after);
     }
 }

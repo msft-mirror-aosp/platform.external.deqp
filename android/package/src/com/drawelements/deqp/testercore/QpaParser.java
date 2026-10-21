@@ -23,9 +23,14 @@ package com.drawelements.deqp.testercore;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 
 public class QpaParser implements LogParser {
-    private RandomAccessFile raf;
+    private static final int MAX_REUSABLE_LOG_BUFFER_CHARS = 1024 * 1024;
+
+    private LineReader mLineReader;
+
     private StringBuilder currentLogData = new StringBuilder();
     private String currentTestPath = null;
     private boolean mLogDataEnabled;
@@ -57,13 +62,33 @@ public class QpaParser implements LogParser {
     public void init(TestEventListener testEventListener, String filePath, boolean logDataEnabled) throws IOException {
         this.mTestEventListener = testEventListener;
         this.mLogDataEnabled = logDataEnabled;
-        // "r" mode: We do not lock the file. The C++ worker can write to it freely.
-        this.raf = new RandomAccessFile(new File(filePath), "r");
+        this.mLineReader = new LineReader(new File(filePath));
+        resetLogData();
+        this.currentTestPath = null;
     }
 
     @Override
     public void deinit() throws IOException {
-        if (raf != null) raf.close();
+        if (mLineReader != null) {
+            try {
+                mLineReader.flushRemaining();
+            } finally {
+                try {
+                    mLineReader.close();
+                } finally {
+                    mLineReader = null;
+                    currentLogData = new StringBuilder();
+                }
+            }
+        }
+    }
+
+    private void resetLogData() {
+        if (currentLogData.capacity() > MAX_REUSABLE_LOG_BUFFER_CHARS) {
+            currentLogData = new StringBuilder();
+        } else {
+            currentLogData.setLength(0);
+        }
     }
 
     /**
@@ -73,70 +98,75 @@ public class QpaParser implements LogParser {
      */
     @Override
     public boolean parse() throws IOException {
-        String line;
-        long currentPosition = raf.getFilePointer();
-        boolean gotData = false;
-
-        while ((line = raf.readLine()) != null) {
-            gotData = true;
-
-            if (line.startsWith(TAG_BEGIN_SESSION)) {
-                beginSession();
-            }
-            else if (line.startsWith(TAG_END_SESSION)) {
-                endSession();
-            }
-            else if (line.startsWith(TAG_SESSION_INFO)) {
-                // Format: #sessionInfo name value
-                String[] parts = line.substring(SESSION_INFO_VALUE_OFFSET).trim().split("\\s+", SESSION_INFO_PARTS_COUNT);
-                if (parts.length == SESSION_INFO_PARTS_COUNT) {
-                    String name = parts[0];
-                    String value = parseSessionInfoValue(parts[1]);
-                    sessionInfo(name, value);
-                }
-            }
-            else if (line.startsWith(TAG_BEGIN_TEST_CASE_RESULT)) {
-                currentTestPath = line.substring(BEGIN_TEST_CASE_VALUE_OFFSET).trim();
-                currentLogData.setLength(0); // Clear string builder for new test
-
-                beginTestCase(currentTestPath);
-            }
-            else if (line.startsWith(TAG_END_TEST_CASE_RESULT) || line.startsWith(TAG_TERMINATE_TEST_CASE_RESULT)) {
-                boolean isTerminate = line.startsWith(TAG_TERMINATE_TEST_CASE_PREFIX);
-                String terminateReason = isTerminate ? line.substring(TERMINATE_TEST_CASE_VALUE_OFFSET).trim() : "";
-
-                String logText = currentLogData.toString();
-                String statusCode = extractStatusCode(logText);
-                String details = extractDetails(logText, statusCode);
-
-                if (mLogDataEnabled && logText.length() > 0) {
-                    String fullXml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
-                        "<?xml-stylesheet href=\"testlog.xsl\" type=\"text/xsl\"?>\n" +
-                        logText;
-
-                    try {
-                        testLogData(fullXml);
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                    }
-                }
-
-                testCaseResult(statusCode, isTerminate ? terminateReason : details);
-                if (isTerminate) {
-                    terminateTestCase(terminateReason);
-                } else {
-                    endTestCase();
-                }
-            }
-            else {
-                currentLogData.append(line).append("\n");
-            }
-
-            currentPosition = raf.getFilePointer();
+        if (mLineReader == null) {
+            return false;
         }
 
-        raf.seek(currentPosition);
-        return gotData;
+        long bytesBefore = mLineReader.getTotalBytesRead();
+        boolean gotData = false;
+        String line;
+
+        while ((line = mLineReader.nextLine()) != null) {
+            processLine(line);
+            gotData = true;
+        }
+
+        boolean newBytes = mLineReader.getTotalBytesRead() > bytesBefore;
+        return gotData || newBytes;
+    }
+
+    private void processLine(String line) {
+        if (line.startsWith(TAG_BEGIN_SESSION)) {
+            beginSession();
+        }
+        else if (line.startsWith(TAG_END_SESSION)) {
+            endSession();
+        }
+        else if (line.startsWith(TAG_SESSION_INFO)) {
+            // Format: #sessionInfo name value
+            String[] parts = line.substring(SESSION_INFO_VALUE_OFFSET).trim().split("\\s+", SESSION_INFO_PARTS_COUNT);
+            if (parts.length == SESSION_INFO_PARTS_COUNT) {
+                String name = parts[0];
+                String value = parseSessionInfoValue(parts[1]);
+                sessionInfo(name, value);
+            }
+        }
+        else if (line.startsWith(TAG_BEGIN_TEST_CASE_RESULT)) {
+            currentTestPath = line.substring(BEGIN_TEST_CASE_VALUE_OFFSET).trim();
+            resetLogData();
+
+            beginTestCase(currentTestPath);
+        }
+        else if (line.startsWith(TAG_END_TEST_CASE_RESULT) || line.startsWith(TAG_TERMINATE_TEST_CASE_RESULT)) {
+            boolean isTerminate = line.startsWith(TAG_TERMINATE_TEST_CASE_PREFIX);
+            String terminateReason = isTerminate ? line.substring(TERMINATE_TEST_CASE_VALUE_OFFSET).trim() : "";
+
+            String logText = currentLogData.toString();
+            String statusCode = extractStatusCode(logText);
+            String details = extractDetails(logText, statusCode);
+
+            if (mLogDataEnabled && logText.length() > 0) {
+                String fullXml = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+                    "<?xml-stylesheet href=\"testlog.xsl\" type=\"text/xsl\"?>\n" +
+                    logText;
+
+                try {
+                    testLogData(fullXml);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+
+            testCaseResult(statusCode, isTerminate ? terminateReason : details);
+            if (isTerminate) {
+                terminateTestCase(terminateReason);
+            } else {
+                endTestCase();
+            }
+        }
+        else {
+            currentLogData.append(line).append("\n");
+        }
     }
 
     private void testCaseResult(String code, String details) {
@@ -240,5 +270,109 @@ public class QpaParser implements LogParser {
             }
         }
         return defaultDetails;
+    }
+
+    private class LineReader implements AutoCloseable {
+        private static final int BUFFER_SIZE_BYTES = 64 * 1024;
+
+        private final RandomAccessFile mRaf;
+        private byte[] mReadBuffer = new byte[BUFFER_SIZE_BYTES];
+        private long mTotalBytesRead = 0;
+        private int mBufferPos = 0;
+        private int mBufferEnd = 0;
+
+        LineReader(File file) throws IOException {
+            // "r" mode: We do not lock the file. The C++ worker can write to it freely.
+            this.mRaf = new RandomAccessFile(file, "r");
+        }
+
+        String nextLine() throws IOException {
+            while (true) {
+                // 1. Try to find a newline in the buffered data
+                int newlineIdx = -1;
+                for (int i = mBufferPos; i < mBufferEnd; i++) {
+                    if (mReadBuffer[i] == '\n') {
+                        newlineIdx = i;
+                        break;
+                    }
+                }
+
+                if (newlineIdx != -1) {
+                    return extractString(newlineIdx);
+                }
+
+                // 2. Buffer is empty/partial, try to refill from disk
+                if (!refill()) {
+                    return null; // EOF or no new data yet
+                }
+            }
+        }
+
+        private String extractString(int newlineIdx) {
+            String line = createString(newlineIdx);
+            mBufferPos = newlineIdx + 1; // Advance past the newline character
+            return line;
+        }
+
+        void flushRemaining() {
+            if (mBufferEnd > mBufferPos) {
+                String line = createString(mBufferEnd);
+                mBufferPos = mBufferEnd;
+                processLine(line);
+            }
+        }
+
+        private String createString(int endIndex) {
+            int length = endIndex - mBufferPos;
+
+            // QPA logs may contain CRLF line endings on some platforms, 
+            // so we strip the carriage return (\r) if it precedes the newline.
+            if (length > 0 && mReadBuffer[endIndex - 1] == '\r') {
+                length--;
+            }
+
+            return new String(mReadBuffer, mBufferPos, length, StandardCharsets.UTF_8);
+        }
+
+        private boolean refill() throws IOException {
+            // Compact buffer by shifting remaining unparsed bytes to the front.
+            if (mBufferPos > 0) {
+                int remaining = mBufferEnd - mBufferPos;
+                if (remaining > 0) {
+                    System.arraycopy(mReadBuffer, mBufferPos, mReadBuffer, 0, remaining);
+                }
+                mBufferPos = 0;
+                mBufferEnd = remaining;
+            }
+
+            // Shrink buffer back to default capacity if empty and previously expanded.
+            if (mBufferEnd == 0 && mReadBuffer.length > BUFFER_SIZE_BYTES) {
+                mReadBuffer = new byte[BUFFER_SIZE_BYTES];
+            }
+
+            // Expand buffer if full of a single line that exceeds current buffer capacity
+            if (mBufferEnd == mReadBuffer.length) {
+                mReadBuffer = Arrays.copyOf(mReadBuffer, mReadBuffer.length * 2);
+            }
+
+            // Read next chunk from file
+            int bytesRead = mRaf.read(mReadBuffer, mBufferEnd, mReadBuffer.length - mBufferEnd);
+            if (bytesRead <= 0) {
+                return false;
+            }
+
+            mTotalBytesRead += bytesRead;
+            mBufferEnd += bytesRead;
+            return true;
+        }
+
+        long getTotalBytesRead() {
+            return mTotalBytesRead;
+        }
+
+        @Override
+        public void close() throws IOException {
+            mRaf.close();
+        }
     }
 }

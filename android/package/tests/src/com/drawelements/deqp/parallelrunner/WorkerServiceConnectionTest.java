@@ -62,6 +62,19 @@ public class WorkerServiceConnectionTest {
     }
 
     @Test
+    public void testBindPassesSchedulingParityFlags() {
+        WorkerServiceConnection connection = new WorkerServiceConnection(testContext, 0, mockCallback);
+
+        replay(mockCallback);
+
+        connection.bind();
+
+        int expectedFlags = Context.BIND_AUTO_CREATE | Context.BIND_IMPORTANT;
+        assertEquals(expectedFlags, testContext.lastBindFlags);
+        verify(mockCallback);
+    }
+
+    @Test
     public void testBindFailure() {
         WorkerServiceConnection connection = new WorkerServiceConnection(testContext, 0, mockCallback);
         testContext.setBindServiceResult(false);
@@ -238,6 +251,7 @@ public class WorkerServiceConnectionTest {
         private boolean bindServiceResult = true;
         private boolean bindServiceCalled = false;
         private boolean unbindServiceCalled = false;
+        private int lastBindFlags = 0;
 
         TestContext(Context base) {
             super(base);
@@ -255,6 +269,7 @@ public class WorkerServiceConnectionTest {
         @Override
         public boolean bindService(Intent service, ServiceConnection conn, int flags) {
             bindServiceCalled = true;
+            lastBindFlags = flags;
             return bindServiceResult;
         }
 

@@ -35,8 +35,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
 @RunWith(RobolectricTestRunner.class)
@@ -352,4 +352,28 @@ public class QpaParserTest {
         assertEquals("value2", results.get(1).getString("dEQP-SessionInfo-Value"));
         assertEquals("value3", results.get(2).getString("dEQP-SessionInfo-Value"));
     }
+
+    @Test
+    public void testParse_partialLineWithoutNewline_returnsTrue() throws Exception {
+        TestDeqpInstrumentation instrumentation = new TestDeqpInstrumentation();
+
+        QpaParser parser = new QpaParser();
+        parser.init(instrumentation, tempQpaFile.getAbsolutePath(), false);
+
+        try {
+            // 1. Partial write: returns true because new bytes were read from disk
+            appendToFile("#beginTestCaseResult dEQP-GLES3.test");
+            assertTrue(parser.parse());
+
+            // 2. No new data written: must return false (proves progress tracking doesn't stay stuck on true)
+            assertFalse(parser.parse());
+
+            // 3. Complete the line: buffer completes and parses the line
+            appendToFile("\n");
+            assertTrue(parser.parse());
+        } finally {
+            parser.deinit();
+        }
+    }
+
 }

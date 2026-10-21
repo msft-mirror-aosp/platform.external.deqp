@@ -1385,7 +1385,7 @@ public class DeqpTestRunnerTest extends TestCase {
         expectAngleSetup();
         expectTestRunEnded();
 
-        runAndVerifyTestInterrupted(deqpTest, mockRunUtil);
+        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RunInterruptedException.class);
     }
 
     private void
@@ -1451,8 +1451,9 @@ public class DeqpTestRunnerTest extends TestCase {
         DeqpTestRunner runner = buildGlesTestRunner(
             3, 0, new ArrayList<TestDescription>(), mTestsDir);
         ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>)runner.split();
-        // Returns null when cannot be sharded.
-        assertNull(shards);
+        // Returns empty list when there are no tests to run to omit empty caselists.
+        assertNotNull(shards);
+        assertTrue(shards.isEmpty());
     }
 
     /**
@@ -1503,7 +1504,7 @@ public class DeqpTestRunnerTest extends TestCase {
             "message", InfraErrorIdentifier.TRADEFED_SHUTTING_DOWN));
 
         expectTestRunEnded();
-        runAndVerifyTestInterrupted(deqpTest, mockRunUtil);
+        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RunInterruptedException.class);
     }
 
     public void testRuntimeHint_optionSet() throws Exception {
@@ -2243,7 +2244,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): Empty output again.
         String output2 = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2273,11 +2274,11 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): Empty output again. The batch of 2 tests fails to execute.
         String output2 = buildTestProcessOutput(Collections.emptyList());
-        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
 
         // Bisected sub-batches: each test is retried individually (batch of size 1), fails, and is aborted.
-        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test1), output2, 1, 1);
-        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
+        runInstrumentationLineAndAnswer(output2);
 
         expectTestRunStarted(deqpTest, 2);
         expectAngleSetupAndTeardown();
@@ -2305,7 +2306,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2333,7 +2334,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): crashes again
         String output2 = buildIncompleteTestProcessOutput(testId);
-        runInstrumentationLineAndAnswerParallel(tests, output2, 1, 1);
+        runInstrumentationLineAndAnswer(output2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2361,7 +2362,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2392,9 +2393,9 @@ public class DeqpTestRunnerTest extends TestCase {
         String passOutput2 = buildTestProcessOutput(Collections.singletonList(test2));
         runInstrumentationLineAndAnswerParallel(Collections.singletonList(test2), passOutput2, 1, 1);
 
-        // 3rd run (retry): test1 is retried with maxWorkers=1 and passes
+        // 3rd run (retry): test1 is retried in legacy mode and passes
         String passOutput1 = buildTestProcessOutput(Collections.singletonList(test1));
-        runInstrumentationLineAndAnswerParallel(Collections.singletonList(test1), passOutput1, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput1);
 
         expectTestRunStarted(deqpTest, 2);
         expectAngleSetupAndTeardown();
@@ -2426,7 +2427,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test passes
         String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 1, 1);
+        runInstrumentationLineAndAnswer(passOutput);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2457,7 +2458,7 @@ public class DeqpTestRunnerTest extends TestCase {
 
         // 2nd run (retry): test fails again
         String failOutput2 = buildTestProcessOutput(tests, "Fail", "Fail");
-        runInstrumentationLineAndAnswerParallel(tests, failOutput2, 1, 1);
+        runInstrumentationLineAndAnswer(failOutput2);
 
         expectTestRunStarted(deqpTest, 1);
         expectAngleSetupAndTeardown();
@@ -2472,10 +2473,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
     /**
      * Test that when tests fail in a parallel run above the parallel threshold (5000 tests),
-     * the failed tests are retried with maxWorkers forced to 1 (sequential) rather than 4,
-     * and only the retried result is recorded.
+     * the failed tests are retried in legacy mode, and only the retried result is recorded.
      */
-    public void testRun_parallelMode_aboveThresholdFailed_retriedWithSingleWorker() throws Exception {
+    public void testRun_parallelMode_aboveThresholdFailed_retriedInLegacyMode() throws Exception {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
@@ -2487,9 +2487,13 @@ public class DeqpTestRunnerTest extends TestCase {
         String failOutput = buildTestProcessOutput(tests, "Fail", "Fail");
         runInstrumentationLineAndAnswerParallel(tests, failOutput, 5, 4);
 
-        // 2nd run (retry): all 5000 tests retried with maxWorkers forced to 1, and pass.
-        String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 5, 1);
+        // 2nd run (retry): all 5000 tests retried in legacy mode in 5 batches of 1000 tests each, and pass.
+        final int batchSize = 1000;
+        for (int i = 0; i < numTests; i += batchSize) {
+            List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(subOutput);
+        }
 
         expectTestRunStarted(deqpTest, numTests);
         expectAngleSetupAndTeardown();
@@ -2504,10 +2508,9 @@ public class DeqpTestRunnerTest extends TestCase {
 
     /**
      * Test that when tests crash in a parallel run above the parallel threshold (5000 tests),
-     * the crashed tests are retried with maxWorkers forced to 1 (sequential) rather than 4,
-     * and only the retried result is recorded.
+     * the crashed tests are retried in legacy mode, and only the retried result is recorded.
      */
-    public void testRun_parallelMode_aboveThresholdCrashed_retriedWithSingleWorker() throws Exception {
+    public void testRun_parallelMode_aboveThresholdCrashed_retriedInLegacyMode() throws Exception {
         final int numTests = 5000;
         List<TestDescription> tests = generateTestList(numTests);
 
@@ -2519,9 +2522,13 @@ public class DeqpTestRunnerTest extends TestCase {
         String unexecutedOutput = buildTestProcessOutput(Collections.emptyList());
         runInstrumentationLineAndAnswerParallel(tests, unexecutedOutput, 5, 4);
 
-        // 2nd run (retry): all 5000 tests retried with maxWorkers forced to 1, and pass.
-        String passOutput = buildTestProcessOutput(tests);
-        runInstrumentationLineAndAnswerParallel(tests, passOutput, 5, 1);
+        // 2nd run (retry): all 5000 tests retried in legacy mode in 5 batches of 1000 tests each, and pass.
+        final int batchSize = 1000;
+        for (int i = 0; i < numTests; i += batchSize) {
+            List<TestDescription> subList = tests.subList(i, Math.min(i + batchSize, numTests));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(subOutput);
+        }
 
         expectTestRunStarted(deqpTest, numTests);
         expectAngleSetupAndTeardown();
@@ -2532,6 +2539,111 @@ public class DeqpTestRunnerTest extends TestCase {
         expectTestRunEnded();
 
         runAndVerifyTest(deqpTest);
+    }
+
+    /**
+     * Test the retry mechanism of {@code mDevice.pushString()} in parallel mode.
+     * <p>
+     * Verifies that when pushing test cases to the device fails on the first two attempts,
+     * the runner retries up to 3 attempts, succeeds on the 3rd attempt, breaks out of the retry
+     * loop, and executes the tests successfully.
+     */
+    public void testRun_parallelMode_pushString_retrySuccess() throws Exception {
+        final int numTests = 1000;
+        List<TestDescription> tests = generateTestList(numTests);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // Attempts 1 and 2 fail, attempt 3 succeeds.
+        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part1.txt", 2);
+
+        String output = buildTestProcessOutput(tests);
+        runInstrumentationLineAndAnswerParallel(tests, output, 1, 1);
+
+        expectRunAndVerifyTest(deqpTest, tests);
+    }
+
+    /**
+     * Test the retry mechanism of {@code mDevice.pushString()} in parallel mode when all attempts fail.
+     * <p>
+     * Verifies that when pushing test cases to the device fails on all 3 attempts,
+     * the runner aborts further caselist pushes for the chunk, retries the unexecuted batch
+     * in legacy mode, fails to push the caselist again, and throws a RuntimeException.
+     */
+    public void testRun_parallelMode_pushString_retryFailure() throws Exception {
+        final TestDescription testId = new TestDescription("dEQP-GLES3.info", "version");
+        List<TestDescription> tests = Collections.singletonList(testId);
+
+        IRunUtil mockRunUtil = EasyMock.createMock(IRunUtil.class);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        deqpTest.setDevice(mockDevice);
+        deqpTest.setRunUtil(mockRunUtil);
+
+        // The push retry backoff should not sleep for real.
+        mockRunUtil.sleep(EasyMock.anyLong());
+        EasyMock.expectLastCall().anyTimes();
+
+        // 1st run (initial parallel attempt):
+        // Attempts 1, 2, and 3 fail to push caselist. Instrumentation runs with empty output,
+        // and the unexecuted test is added to mUnstableTests for a retry pass.
+        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part1.txt", 3);
+        String output1 = buildTestProcessOutput(Collections.emptyList());
+        runInstrumentationLineAndAnswerParallel(tests, output1, 0, 1);
+
+        // 2nd run (unstable test retry pass in legacy mode via retryUnstableTests()):
+        // Attempts 1, 2, and 3 fail to push the legacy caselist file again, throwing a RuntimeException.
+        expectRemoveFile(APP_DIR + CASE_LIST_FILE_NAME);
+        expectRemoveFile(APP_DIR + LOG_FILE_NAME);
+        expectFailedPushString(APP_DIR + CASE_LIST_FILE_NAME, 3);
+
+        expectTestRunStarted(deqpTest, 1);
+        expectAngleSetup();
+        expectTestRunEnded();
+
+        runAndVerifyTestThrowsException(deqpTest, mockRunUtil, RuntimeException.class);
+    }
+
+    /**
+     * Test that in parallel mode, when pushing a caselist partition fails after all 3 attempts,
+     * all previously pushed partitions are still tried in the current run, any remaining
+     * partitions in the chunk are skipped, and the unexecuted tests are subsequently retried
+     * in legacy mode.
+     */
+    public void testRun_parallelMode_pushString_multiBatchPartialFailure() throws Exception {
+        final int numTests = 3000;
+        List<TestDescription> tests = generateTestList(numTests);
+        List<TestDescription> pushedTests = tests.subList(0, 1000);
+        List<TestDescription> remainingTests = tests.subList(1000, 3000);
+
+        DeqpTestRunner deqpTest = setupTestRunner(tests, true);
+        OptionSetter setter = new OptionSetter(deqpTest);
+        setter.setOptionValue("deqp-test-events-reporting-mode", DeqpTestRunner.REPORTING_MODE_NATIVE_LOG_PARSER);
+
+        // 1st run:
+        // - Partition 1 (tests 0..999) succeeds.
+        // - Partition 2 (tests 1000..1999) fails all 3 push attempts.
+        // - Partition 3 (tests 2000..2999) is skipped (no pushString call expected).
+        // Pushed tests (0..999) are executed in this run.
+        expectFailedPushString(DeqpTestRunner.APP_DIR_PARALLEL_CASELISTS + "dEQP-part2.txt", 3);
+        String output1 = buildTestProcessOutput(pushedTests);
+        runInstrumentationLineAndAnswerParallel(tests, output1, 1, 1);
+
+        // 2nd run (retry in legacy mode):
+        // - Remaining unexecuted tests (1000..2999) are retried in legacy mode in 2 batches of 1000 tests each, and pass.
+        final int batchSize = 1000;
+        for (int i = 0; i < remainingTests.size(); i += batchSize) {
+            List<TestDescription> subList = remainingTests.subList(i, Math.min(i + batchSize, remainingTests.size()));
+            String subOutput = buildTestProcessOutput(subList);
+            runInstrumentationLineAndAnswer(subOutput);
+        }
+
+        expectRunAndVerifyTest(deqpTest, tests);
     }
 
 
@@ -2574,14 +2686,26 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.verify(mockListener, mockDevice, mockIDevice);
     }
 
-    private void runAndVerifyTestInterrupted(DeqpTestRunner deqpTest, IRunUtil mockRunUtil)
+    /**
+     * Replays the mocks, runs the test expecting {@code expectedException} to be thrown,
+     * and verifies the mocks.
+     *
+     * @param deqpTest the runner under test
+     * @param mockRunUtil the mock {@link IRunUtil} injected into the runner
+     * @param expectedException the exception type the run is expected to throw
+     */
+    private void runAndVerifyTestThrowsException(DeqpTestRunner deqpTest, IRunUtil mockRunUtil,
+        Class<? extends Exception> expectedException)
         throws Exception {
         EasyMock.replay(mockDevice, mockIDevice, mockListener);
         EasyMock.replay(mockRunUtil);
         try {
             deqpTest.run(mockListener);
-            fail("expected RunInterruptedException");
-        } catch (RunInterruptedException ex) {
+            fail("expected " + expectedException.getSimpleName());
+        } catch (Exception ex) {
+            if (!expectedException.isInstance(ex)) {
+                throw ex;
+            }
             // expected
         }
         EasyMock.verify(mockRunUtil, mockListener, mockDevice, mockIDevice);
@@ -2698,6 +2822,15 @@ public class DeqpTestRunnerTest extends TestCase {
         EasyMock.expectLastCall().andReturn(true).once();
     }
 
+    /**
+     * Expects {@code numFailures} consecutive failing attempts to push a caselist to
+     * {@code remotePath}.
+     */
+    private void expectFailedPushString(String remotePath, int numFailures) throws Exception {
+        mockDevice.pushString(EasyMock.<String>anyObject(), EasyMock.eq(remotePath));
+        EasyMock.expectLastCall().andReturn(false).times(numFailures);
+    }
+
     private void expectInstrumentationCommand(String logFilename, String cmd, final String output) throws Exception {
         expectInstrumentationCommand(logFilename, cmd, output, 4);
     }
@@ -2766,5 +2899,85 @@ public class DeqpTestRunnerTest extends TestCase {
         expectTestWithResult(tests, true);
         expectTestRunEnded();
         runAndVerifyTest(deqpTest);
+    }
+
+    public void testSplit_parallelDisabled_usesLegacyBatchLimit() throws Exception {
+        List<TestDescription> tests = new ArrayList<>();
+        for (int i = 0; i < 2500; i++) {
+            tests.add(new TestDescription("dEQP-GLES3.test", "test_" + i));
+        }
+        DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
+        OptionSetter setter = new OptionSetter(runner);
+        setter.setOptionValue("enable-deqp-parallel-run", "false");
+
+        ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>) runner.split();
+        assertEquals(3, shards.size());
+        assertEquals(1000, ((DeqpTestRunner) shards.get(0)).getTestInstance().size());
+        assertEquals(1000, ((DeqpTestRunner) shards.get(1)).getTestInstance().size());
+        assertEquals(500, ((DeqpTestRunner) shards.get(2)).getTestInstance().size());
+    }
+
+    public void testSplit_parallelEnabled_smallCaselist_dividesEvenly() throws Exception {
+        List<TestDescription> tests = new ArrayList<>();
+        for (int i = 0; i < 10000; i++) {
+            tests.add(new TestDescription("dEQP-GLES3.test", "test_" + i));
+        }
+        DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
+        OptionSetter setter = new OptionSetter(runner);
+        setter.setOptionValue("enable-deqp-parallel-run", "true");
+        setter.setOptionValue("deqp-max-workers", "4");
+
+        // ITestSuite rejects a shard count hint of 1 or less, and ModuleSplitter then doubles the
+        // hint for dynamic modules before clamping it to MAX_MODULE_LOCAL_SHARDING (8). A module
+        // therefore never sees a hint below 4 in a suite run, so testing against 2 would exercise
+        // a code path that cannot occur in production.
+        ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>) runner.split(4);
+        assertEquals(2, shards.size());
+        assertEquals(5000, ((DeqpTestRunner) shards.get(0)).getTestInstance().size());
+        assertEquals(5000, ((DeqpTestRunner) shards.get(1)).getTestInstance().size());
+
+        int totalShardedTests = 0;
+        for (IRemoteTest shard : shards) {
+            totalShardedTests += ((DeqpTestRunner) shard).getTestInstance().size();
+        }
+        assertEquals(10000, totalShardedTests);
+    }
+
+    /**
+     * Pins the exact shard plan produced by progressive batch sizing.
+     *
+     * <p>With 100,000 tests, a shard count hint of 4 and 4 workers:
+     * {@code baseDivisor = (4 * 4) / 2 = 8}, so {@code baseChunk = 100000 / 8 = 12500} and
+     * {@code minChunk = max(4000, 4 * 1000) = 4000}. Shards stay flat at 12,500 while more than
+     * 30% of the tests remain, then shrink linearly towards {@code minChunk}.
+     *
+     * <p>The trailing shard of 282 is what is left once the taper runs out. It is below the
+     * parallel execution threshold, so it runs single-threaded on device. That is accepted
+     * behaviour, not a bug, and this test records it so a future change to the taper is visible
+     * in the diff rather than silent.
+     */
+    public void testSplit_parallelEnabled_largeCaselist_usesProgressiveTapering() throws Exception {
+        List<TestDescription> tests = new ArrayList<>();
+        for (int i = 0; i < 100000; i++) {
+            tests.add(new TestDescription("dEQP-GLES3.test", "test_" + i));
+        }
+        DeqpTestRunner runner = buildGlesTestRunner(3, 0, tests, mTestsDir);
+        OptionSetter setter = new OptionSetter(runner);
+        setter.setOptionValue("enable-deqp-parallel-run", "true");
+        setter.setOptionValue("deqp-max-workers", "4");
+
+        // 4 is the smallest hint reachable in production (see the note on the test above).
+        ArrayList<IRemoteTest> shards = (ArrayList<IRemoteTest>) runner.split(4);
+
+        final int[] expected = {12500, 12500, 12500, 12500, 12500, 12500, 11083, 7943, 5692, 282};
+        assertEquals("Unexpected shard count", expected.length, shards.size());
+
+        int totalShardedTests = 0;
+        for (int i = 0; i < expected.length; i++) {
+            int actual = ((DeqpTestRunner) shards.get(i)).getTestInstance().size();
+            assertEquals("Shard " + i + " has the wrong size", expected[i], actual);
+            totalShardedTests += actual;
+        }
+        assertEquals("Sharding lost or duplicated tests", 100000, totalShardedTests);
     }
 }

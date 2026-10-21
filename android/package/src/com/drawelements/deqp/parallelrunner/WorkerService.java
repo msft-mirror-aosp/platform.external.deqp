@@ -24,6 +24,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.os.IBinder;
+import android.os.Process;
 import android.util.Log;
 import android.view.Surface;
 import java.util.List;
@@ -55,22 +56,34 @@ public class WorkerService extends Service {
                     Log.w(TAG, "Worker is already executing a batch. Ignoring request.");
                     return false;
                 }
-                isExecuting = true;
-            }
-            try {
-                Log.i(TAG, "Executing native dEQP engine...");
-                if (surface != null) {
-                    AssetManager assets = (getBaseContext() != null) ? getAssets() : null;
-                    nativeStartDeqp(surface, commandLineArgs, assets);
-                    return true;
-                } else {
+                if (surface == null) {
                     Log.w(TAG, "Cannot execute test batch: Surface is null.");
                     return false;
                 }
+                isExecuting = true;
+            }
+            // Elevate the binder thread to display priority during test execution to match
+            // legacy runner scheduling, and restore in finally to avoid leaking into the thread pool.
+            int prevPriority = Process.getThreadPriority(Process.myTid());
+            try {
+                try {
+                    Process.setThreadPriority(Process.THREAD_PRIORITY_DISPLAY);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to set thread priority for dEQP execution", t);
+                }
+                Log.i(TAG, "Executing native dEQP engine...");
+                AssetManager assets = (getBaseContext() != null) ? getAssets() : null;
+                nativeStartDeqp(surface, commandLineArgs, assets);
+                return true;
             } catch (Exception e) {
                 Log.e(TAG, "Native execution failed.", e);
                 return false;
             } finally {
+                try {
+                    Process.setThreadPriority(prevPriority);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to restore thread priority", t);
+                }
                 synchronized (stateLock) {
                     isExecuting = false;
                 }
