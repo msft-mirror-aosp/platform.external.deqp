@@ -27,6 +27,7 @@ import android.os.IBinder;
 import android.os.Process;
 import android.util.Log;
 import android.view.Surface;
+import com.drawelements.deqp.testercore.TestEventListener;
 import java.util.List;
 
 public class WorkerService extends Service {
@@ -40,7 +41,7 @@ public class WorkerService extends Service {
         }
     }
 
-    private native void nativeStartDeqp(Surface surface, String commandLineArgs, AssetManager assetManager);
+    private native void nativeStartDeqp(Surface surface, String commandLineArgs, AssetManager assetManager, TestEventListener listener);
 
     private final ISurfaceWorker.Stub binder = new ISurfaceWorker.Stub() {
         private volatile boolean isExecuting = false;
@@ -73,7 +74,8 @@ public class WorkerService extends Service {
                 }
                 Log.i(TAG, "Executing native dEQP engine...");
                 AssetManager assets = (getBaseContext() != null) ? getAssets() : null;
-                nativeStartDeqp(surface, commandLineArgs, assets);
+                // TODO(b/564804892): Pass valid listener once direct event reporting mode is implemented.
+                nativeStartDeqp(surface, commandLineArgs, assets, null);
                 return true;
             } catch (Exception e) {
                 Log.e(TAG, "Native execution failed.", e);
