@@ -20,23 +20,21 @@
 
 package com.drawelements.deqp.parallelrunner;
 
+import static org.easymock.EasyMock.*;
+import static org.junit.Assert.*;
+
 import com.drawelements.deqp.testercore.LogParser;
-import org.easymock.EasyMock;
+import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
+import org.easymock.Capture;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.BlockingQueue;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import static org.easymock.EasyMock.*;
-import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
 public class LogParserWorkerTest {
@@ -210,4 +208,83 @@ public class LogParserWorkerTest {
 
         verify(mockParser);
     }
+
+    @Test
+    public void testRun_sessionEnded_closesParserEarly() throws Exception {
+        Capture<TestSessionEventsAccumulator> accumulatorCapture = new Capture<>();
+        mockParser.init(capture(accumulatorCapture), eq(tempFile.getAbsolutePath()), eq(true));
+        expectLastCall().once();
+
+        LogParserWorker.TimingSettings config = new LogParserWorker.TimingSettings(
+                /* noActivitySleepMs= */ 5,
+                /* noDataSleepMs= */ 5,
+                /* noDataTimeoutMs= */ 100,
+                LogParserWorker.TimingSettings.DEFAULT_FILE_READY_TIMEOUT_MS);
+
+        LogParserWorker.Callback mockCallback = createMock(LogParserWorker.Callback.class);
+        mockCallback.onParseSuccess(tempFile.getAbsolutePath());
+        expectLastCall().once();
+
+        // During parse(), end the session via the captured accumulator
+        expect(mockParser.parse()).andAnswer(() -> {
+            accumulatorCapture.getValue().endSession();
+            return true;
+        }).once();
+
+        // Parser should be de-initialized/closed early without waiting for process to
+        // exit or timing out
+        mockParser.deinit();
+        expectLastCall().once();
+
+        replay(mockParser, mockCallback);
+
+        LogParserWorker worker = new LogParserWorker(mockParser, testEventQueue,
+                tempFile.getAbsolutePath(), true, mockCallback, config);
+
+        // onTestProcessFinished() is intentionally NOT called to verify it exits due to
+        // sessionEnded
+        worker.run();
+
+        verify(mockParser, mockCallback);
+    }
+
+    @Test
+    public void testRun_processFinishedAndSessionEnded_closesParserEarly()
+            throws Exception {
+        Capture<TestSessionEventsAccumulator> accumulatorCapture = new Capture<>();
+        mockParser.init(capture(accumulatorCapture), eq(tempFile.getAbsolutePath()), eq(true));
+        expectLastCall().once();
+
+        LogParserWorker.TimingSettings config = new LogParserWorker.TimingSettings(
+                /* noActivitySleepMs= */ 5,
+                /* noDataSleepMs= */ 5,
+                /* noDataTimeoutMs= */ 100,
+                LogParserWorker.TimingSettings.DEFAULT_FILE_READY_TIMEOUT_MS);
+
+        LogParserWorker.Callback mockCallback = createMock(LogParserWorker.Callback.class);
+        mockCallback.onParseSuccess(tempFile.getAbsolutePath());
+        expectLastCall().once();
+
+        // In parseRemainingMessages(), parse() triggers the end of the session
+        expect(mockParser.parse()).andAnswer(() -> {
+            accumulatorCapture.getValue().endSession();
+            return true;
+        }).once();
+
+        mockParser.deinit();
+        expectLastCall().once();
+
+        replay(mockParser, mockCallback);
+
+        LogParserWorker worker = new LogParserWorker(mockParser, testEventQueue,
+                tempFile.getAbsolutePath(), true, mockCallback, config);
+
+        // Mark process finished so parseWhileTestProcessAlive() is skipped and
+        // parseRemainingMessages() is exercised directly.
+        worker.onTestProcessFinished();
+        worker.run();
+
+        verify(mockParser, mockCallback);
+    }
 }
+
