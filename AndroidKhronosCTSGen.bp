@@ -1202,6 +1202,10 @@ cc_library_static {
         "external/openglcts/modules/glesext/texture_cube_map_array",
         "external/openglcts/modules/glesext/texture_shadow_lod",
     ],
+    extra_include_dir_deps: [
+        "external/openglcts/modules/glesext/gpu_shader5/esextcGPUShader5FmaPrecision.cpp",
+        "external/openglcts/modules/glesext/texture_border_clamp/esextcTextureBorderClampSamplingTexture.cpp",
+    ],
     static_libs: [
         "libkhronoscts_common",
         "libkhronoscts_modules_gles",
