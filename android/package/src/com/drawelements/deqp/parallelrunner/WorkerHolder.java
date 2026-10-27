@@ -241,7 +241,8 @@ class WorkerHolder implements SurfaceHolder.Callback, WorkerServiceConnection.Ca
             logParsersCoordinator.parse(logFilePath);
 
             try {
-                success = finalWorker.startTestBatch(finalSurface, fullCmdLine);
+                // TODO(b/564804892): Pass valid callback once direct event reporting mode is wired in WorkerHolder.
+                success = finalWorker.startTestBatch(finalSurface, fullCmdLine, null);
             } catch (Exception e) {
                 Log.e(TAG, "Execution failure on worker " + id, e);
             }

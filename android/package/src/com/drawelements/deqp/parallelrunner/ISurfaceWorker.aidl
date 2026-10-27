@@ -21,6 +21,7 @@
 package com.drawelements.deqp.parallelrunner;
 
 import android.view.Surface;
+import com.drawelements.deqp.parallelrunner.ITestEventCallback;
 
 interface ISurfaceWorker {
     /**
@@ -28,5 +29,6 @@ interface ISurfaceWorker {
      * Note: This is a synchronous, blocking call. It will not return
      * until the dEQP test execution finishes.
      */
-    boolean startTestBatch(in Surface surface, String commandLineArgs);
+    boolean startTestBatch(
+            in Surface surface, String commandLineArgs, @nullable ITestEventCallback callback);
 }
